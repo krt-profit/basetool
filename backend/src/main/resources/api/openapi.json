@@ -58469,6 +58469,10 @@
           },
           "meetingPoint" : {
             "type" : "string"
+          },
+          "ownershipVersion" : {
+            "type" : "integer",
+            "format" : "int64"
           }
         },
         "required" : [ "name" ]

@@ -46,6 +46,7 @@ import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.DynamicUpdate;
+import org.hibernate.annotations.Formula;
 import org.hibernate.annotations.OptimisticLock;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.UnmodifiableView;
@@ -291,6 +292,25 @@ public class Mission extends AbstractEntity<UUID> {
   @JoinColumn(name = "owner_id")
   @OptimisticLock(excluded = true)
   private User owner;
+
+  /**
+   * Optimistic-lock counter of the owner change: the {@code version} of this mission's {@link
+   * MissionOwnership} companion row, or {@code 0} while the owner has never been changed (the
+   * companion row is only created by the first change). It is what {@code PUT
+   * /api/v1/missions/{id}/owner} compares the client's echo against, and what the mission detail
+   * hands to the client so it has something to echo.
+   *
+   * <p>A read-only {@code @Formula}: the counter itself lives on {@code mission_ownership}, where
+   * its JPA {@code @Version} bumps it, so this column is never written through the mission. The
+   * subquery hits the unique {@code uk_mission_ownership_mission} index, which keeps a page of
+   * missions at one statement rather than one per row. Because a formula is only read when the
+   * mission is loaded, the owner change writes the fresh value back onto the managed entity through
+   * the setter ({@code MissionService.updateMissionOwner}) so the response it maps carries the
+   * counter the change just produced, not the one the mission was loaded with.
+   */
+  @Formula("coalesce((select mo.version from mission_ownership mo where mo.mission_id = id), 0)")
+  @OptimisticLock(excluded = true)
+  private Long ownershipVersion = 0L;
 
   /**
    * Optional party lead (Partyleiter) of this mission, as a linked registered user. Mutually

@@ -1693,28 +1693,31 @@ public final class BackendSeeder {
 
   /**
    * Registers an existing app user as a mission participant via {@code POST
-   * /api/v1/missions/{id}/participants} (the manager-gated add-by-id endpoint), so the user becomes
-   * a {@code p.user != null} participant. A unit's explicit responsible person is chosen from the
-   * mission's registered participants, so this is the precondition for seeding — and then clearing
-   * — a unit responsible in the unit-edit modal (REQ-FE-011).
+   * /api/v1/missions/{id}/participants/slim} (naming somebody else needs {@code canManageMission},
+   * which the mission's creator has), so the user becomes a {@code p.user != null} participant. A
+   * unit's explicit responsible person is chosen from the mission's registered participants, so
+   * this is the precondition for seeding — and then clearing — a unit responsible in the unit-edit
+   * modal (REQ-FE-011).
    *
    * @param username the Keycloak username of the mission's manager (its creator)
    * @param password the Keycloak password
    * @param missionId the mission to add the participant to
    * @param userId the {@code app_user} id to register (see {@link #getUserId})
-   * @return the mission id echoed back by the endpoint's {@code MissionDto} response
+   * @return the mission id, unchanged — the slim endpoint answers with the participant list, not
+   *     with the mission
    */
   public String addRegisteredParticipant(
       String username, String password, String missionId, String userId) {
-    return seedEntity(
+    postBody(
         username,
         password,
-        "/api/v1/missions/" + missionId + "/participants",
+        "/api/v1/missions/" + missionId + "/participants/slim",
         "{\"userId\":\"" + userId + "\"}");
+    return missionId;
   }
 
   /**
-   * Adds a unit to a mission via {@code POST /api/v1/missions/{id}/units} with an explicit
+   * Adds a unit to a mission via {@code POST /api/v1/missions/{id}/units/slim} with an explicit
    * responsible person, so the crew board renders the responsible chip and the unit-edit modal
    * pre-selects it. Only a registered participant (see {@link #addRegisteredParticipant}) is
    * offered in the modal's responsible picker, so the {@code responsibleUserId} must already be a
@@ -1725,15 +1728,16 @@ public final class BackendSeeder {
    * @param missionId the mission to add the unit to
    * @param name the unit's display name (its single mandatory field)
    * @param responsibleUserId the {@code app_user} id pinned as the unit's responsible person
-   * @return the mission id echoed back by the endpoint's {@code MissionDto} response
+   * @return the mission id, unchanged — the slim endpoint answers with the unit list
    */
   public String addUnitWithResponsible(
       String username, String password, String missionId, String name, String responsibleUserId) {
-    return seedEntity(
+    postBody(
         username,
         password,
-        "/api/v1/missions/" + missionId + "/units",
+        "/api/v1/missions/" + missionId + "/units/slim",
         "{\"name\":\"" + name + "\",\"responsibleUserId\":\"" + responsibleUserId + "\"}");
+    return missionId;
   }
 
   /**

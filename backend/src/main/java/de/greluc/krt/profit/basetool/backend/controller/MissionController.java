@@ -25,7 +25,6 @@ import de.greluc.krt.profit.basetool.backend.mapper.MissionMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.ShipMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
-import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.AddCrewRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.AddExternalParticipantRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.AddParticipantRequest;
@@ -49,6 +48,8 @@ import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.MissionSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.MissionService;
+import de.greluc.krt.profit.basetool.backend.service.ParticipantTargetResolver;
+import de.greluc.krt.profit.basetool.backend.service.ParticipantTargetResolver.ParticipantTarget;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.support.MissionPeerRedactor;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
@@ -129,6 +130,7 @@ public class MissionController {
   private final MissionSecurityService missionSecurityService;
   private final AuthHelperService authHelperService;
   private final MissionPeerRedactor missionPeerRedactor;
+  private final ParticipantTargetResolver participantTargetResolver;
 
   /** Sunset date for legacy sub-section endpoints that still return the full MissionDto. */
   private static final String SLIM_DEPRECATION_SUNSET = "2026-10-20";
@@ -253,17 +255,12 @@ public class MissionController {
           + " and @ownerScopeService.canSeeMission(#id)")
   @Transactional(readOnly = true)
   public MissionDto getMissionById(@PathVariable @NotNull UUID id) {
-    var mission = missionService.getMissionById(id);
-    var dto = missionMapper.toDto(mission);
     // REQ-SEC-007: a member below Logistician reads the roster without its PII. The two throws that
     // stood here — internal missions and terminal ones refused outright — belonged to the outsider
     // tier, whose whole audience (anonymous and role-less callers) no longer exists (ADR-0159).
     // Visibility itself is unchanged and is decided by canSeeMission above, which is where the
     // internal-mission rule always lived for members.
-    if (!authHelperService.isLogisticianOrAbove()) {
-      dto = missionPeerRedactor.cleanupMissionForPeer(dto);
-    }
-    return dto;
+    return redactForPeer(missionMapper.toDto(missionService.getMissionById(id)));
   }
 
   /**
@@ -282,14 +279,7 @@ public class MissionController {
   public ResponseEntity<MissionDto> getNextMission() {
     return missionService
         .getNextMission()
-        .map(
-            m -> {
-              var dto = missionMapper.toDto(m);
-              if (!authHelperService.isLogisticianOrAbove()) {
-                dto = missionPeerRedactor.cleanupMissionForPeer(dto);
-              }
-              return ResponseEntity.ok(dto);
-            })
+        .map(m -> ResponseEntity.ok(redactForPeer(missionMapper.toDto(m))))
         .orElse(ResponseEntity.noContent().build());
   }
 
@@ -523,10 +513,7 @@ public class MissionController {
     // included, and the caller here is by definition an ordinary member — the one person on the
     // mission surface most likely to be below Logistician. The old rule could not see it, because
     // it selected only gates that lacked isAuthenticated() and this one has always had it.
-    if (!authHelperService.isLogisticianOrAbove()) {
-      dto = missionPeerRedactor.cleanupMissionForPeer(dto);
-    }
-    return dto;
+    return redactForPeer(dto);
   }
 
   /**
@@ -1009,63 +996,13 @@ public class MissionController {
       @PathVariable @NotNull UUID id,
       @RequestBody @jakarta.validation.Valid @NotNull AddExternalParticipantRequest request,
       Authentication authentication) {
-    UUID finalUserId = request.userId();
-    String finalGuestName = request.guestName();
-
-    // The caller resolved ONCE, through the seam that answers alike for a bearer and for the
-    // token-less acting-member identity (ADR-0129). It used to be `jwt != null` here and
-    // unconditioned in the self-vs-manager check below, so the two adjacent blocks disagreed about
-    // what a null JWT means: for the gateway's identity an empty body left both the id and the
-    // name null and the service answered 400, on a request that names nobody but the caller.
-    UUID callerId = authHelperService.currentUserId().orElse(null);
-
-    if (finalUserId == null && (finalGuestName == null || finalGuestName.isBlank())) {
-      finalUserId = callerId;
-    }
-
-    // Resolve free-text participant name to an existing registered user (case-insensitive,
-    // exact match on username or displayName). This fixes the bug where a squadron member typing
-    // their own name without using the autocomplete dropdown was rejected with "Guest name is
-    // already taken." – now the name is transparently linked to the matching user. Naming SOMEBODY
-    // ELSE this way lands in the self-vs-manager check below, exactly like submitting their id.
-    if (finalUserId == null && finalGuestName != null && !finalGuestName.isBlank()) {
-      List<User> matches = userService.findMatchesByExactName(finalGuestName);
-      if (matches.size() > 1) {
-        log.debug("Participant name is ambiguous ({} matches) for mission {}", matches.size(), id);
-        throw new BusinessConflictException("Participant name is ambiguous.");
-      }
-      if (matches.size() == 1) {
-        finalUserId = matches.get(0).getId();
-        finalGuestName = null;
-        log.debug(
-            "Resolved free-text participant name to userId {} for mission {}", finalUserId, id);
-      }
-    }
-
-    // H-1 (2026-05-20 audit): the legacy public add-participant let a non-manager submit a foreign
-    // userId and silently add another registered member as participant. Self-enroll always works;
-    // adding someone else requires canManageMission.
-    //
-    // Deliberately NOT conditioned on `jwt != null` any more. It used to be, because a null JWT
-    // meant "anonymous" and anonymous was refused a line earlier. Since REQ-SEC-052 there is no
-    // anonymous caller, and a null JWT means the token-less acting-member identity the ingest
-    // gateway installs (ADR-0129) — for which the old shape would have skipped this check
-    // entirely and let it name anyone. Fail closed instead: no resolvable caller id means the
-    // participant is somebody else.
-    if (finalUserId != null) {
-      if ((callerId == null || !finalUserId.equals(callerId))
-          && !missionSecurityService.canManageMission(id, authentication)) {
-        throw new AccessDeniedException(
-            "Only mission managers may add other users as participants.");
-      }
-    }
-
+    ParticipantTarget target = resolveParticipantTarget(id, request, authentication);
     MissionDto dto =
         missionMapper.toDto(
             missionService.addParticipant(
                 id,
-                finalUserId,
-                finalGuestName,
+                target.userId(),
+                target.guestName(),
                 request.desiredJobTypeId(),
                 request.comment(),
                 request.orgUnitIds(),
@@ -1073,10 +1010,7 @@ public class MissionController {
     // H-2 / REQ-SEC-007: a member below Logistician gets the peer view — roster visible, PII
     // stripped. There used to be a stricter tier above this one for anonymous and role-less
     // callers; ADR-0159 removed that audience, so one tier is all that is left.
-    if (!authHelperService.isLogisticianOrAbove()) {
-      dto = missionPeerRedactor.cleanupMissionForPeer(dto);
-    }
-    return dto;
+    return redactForPeer(dto);
   }
 
   /**
@@ -1402,29 +1336,16 @@ public class MissionController {
       @PathVariable @NotNull UUID id,
       @RequestBody @jakarta.validation.Valid @NotNull
           de.greluc.krt.profit.basetool.backend.model.dto.request.SetPartyLeadRequest request) {
-    UUID finalUserId = request.userId();
-    String finalGuestName = request.guestName();
-
-    // Reuse the participant free-text resolution: a free-text name with no explicit userId is
-    // resolved case-insensitively against registered members (exact match on username or
-    // displayName). A unique match links the registered user; multiple matches are ambiguous (409);
-    // no match falls back to a free-text external handle. The caller is always a mission manager
-    // here (canManageMission), so the self-vs-manager check addParticipantPublic needs is moot.
-    if (finalUserId == null && finalGuestName != null && !finalGuestName.isBlank()) {
-      List<User> matches = userService.findMatchesByExactName(finalGuestName);
-      if (matches.size() > 1) {
-        log.debug("Party lead name is ambiguous ({} matches) for mission {}", matches.size(), id);
-        throw new BusinessConflictException("Party lead name is ambiguous.");
-      }
-      if (matches.size() == 1) {
-        finalUserId = matches.get(0).getId();
-        finalGuestName = null;
-      }
-    }
-
+    // The participant free-text resolution: a unique member match links the member, several are a
+    // 409, none keeps the external handle. The caller is always a mission manager here
+    // (canManageMission), so the self-vs-manager check the participant add needs is moot.
+    ParticipantTarget target =
+        participantTargetResolver.resolve(
+            request.userId(), request.guestName(), "Party lead name is ambiguous.");
     return redactForPeer(
         missionMapper.toDto(
-            missionService.setPartyLead(id, finalUserId, finalGuestName, request.version())));
+            missionService.setPartyLead(
+                id, target.userId(), target.guestName(), request.version())));
   }
 
   // -------------------------------------------------------------------------------------
@@ -1946,16 +1867,11 @@ public class MissionController {
             request.guestName(),
             request.version(),
             authentication);
-    MissionParticipantDto dto = missionMapper.toDto(findParticipant(mission, participantId));
-    // The {@code cleanupParticipantForPeer} call satisfies the ArchUnit rule {@code
-    // peerReadableMissionEndpointsMustRedactPii} (audit finding C-1). REQ-SEC-007: below
-    // Logistician the participant comes back as the public callsign tuple, never an e-mail or a
-    // real name — which is exactly what a member editing their own row on a shared Einsatz should
-    // get back, and what a future mapping change must not be able to widen.
-    if (!authHelperService.isLogisticianOrAbove()) {
-      dto = missionPeerRedactor.cleanupParticipantForPeer(dto);
-    }
-    return dto;
+    // REQ-SEC-007 (audit finding C-1): below Logistician the participant comes back as the public
+    // callsign tuple, never an e-mail or a real name — which is exactly what a member editing their
+    // own row on a shared Einsatz should get back, and what a future mapping change must not be
+    // able to widen.
+    return redactForPeer(missionMapper.toDto(findParticipant(mission, participantId)));
   }
 
   /**
@@ -1977,12 +1893,8 @@ public class MissionController {
   public MissionParticipantDto checkInParticipantSlim(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID participantId) {
     var mission = missionService.checkIn(id, participantId);
-    MissionParticipantDto dto = missionMapper.toDto(findParticipant(mission, participantId));
     // REQ-SEC-007: a member below Logistician gets the participant PII redaction.
-    if (!authHelperService.isLogisticianOrAbove()) {
-      dto = missionPeerRedactor.cleanupParticipantForPeer(dto);
-    }
-    return dto;
+    return redactForPeer(missionMapper.toDto(findParticipant(mission, participantId)));
   }
 
   /**
@@ -2004,12 +1916,8 @@ public class MissionController {
   public MissionParticipantDto checkOutParticipantSlim(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID participantId) {
     var mission = missionService.checkOut(id, participantId);
-    MissionParticipantDto dto = missionMapper.toDto(findParticipant(mission, participantId));
     // REQ-SEC-007: a member below Logistician gets the participant PII redaction.
-    if (!authHelperService.isLogisticianOrAbove()) {
-      dto = missionPeerRedactor.cleanupParticipantForPeer(dto);
-    }
-    return dto;
+    return redactForPeer(missionMapper.toDto(findParticipant(mission, participantId)));
   }
 
   /**
@@ -2034,12 +1942,8 @@ public class MissionController {
       @PathVariable @NotNull UUID participantId,
       @RequestBody @jakarta.validation.Valid @NotNull UpdatePayoutPreferenceRequest request) {
     var mission = missionService.updatePayoutPreference(id, participantId, request.preference());
-    MissionParticipantDto dto = missionMapper.toDto(findParticipant(mission, participantId));
     // REQ-SEC-007: a member below Logistician gets the participant PII redaction.
-    if (!authHelperService.isLogisticianOrAbove()) {
-      dto = missionPeerRedactor.cleanupParticipantForPeer(dto);
-    }
-    return dto;
+    return redactForPeer(missionMapper.toDto(findParticipant(mission, participantId)));
   }
 
   /**
@@ -2071,63 +1975,22 @@ public class MissionController {
       @PathVariable @NotNull UUID id,
       @RequestBody @jakarta.validation.Valid @NotNull AddExternalParticipantRequest request,
       Authentication authentication) {
-    UUID finalUserId = request.userId();
-    String finalGuestName = request.guestName();
-
-    // Default self-enroll when the caller submits an empty form. The caller is resolved once,
-    // through the seam that answers alike for a bearer and for the token-less acting-member
-    // identity (ADR-0129) - see addParticipantPublic for why the two adjacent blocks must not
-    // disagree about what a null JWT means.
-    UUID callerId = authHelperService.currentUserId().orElse(null);
-
-    if (finalUserId == null && (finalGuestName == null || finalGuestName.isBlank())) {
-      finalUserId = callerId;
-    }
-
-    // Resolve free-text names against registered users (case-insensitive, exact match on username
-    // or displayName), so a member typing their own name is linked rather than recorded twice. A
-    // name that resolves to somebody ELSE lands in the self-vs-manager check below.
-    if (finalUserId == null && finalGuestName != null && !finalGuestName.isBlank()) {
-      List<User> matches = userService.findMatchesByExactName(finalGuestName);
-      if (matches.size() > 1) {
-        throw new BusinessConflictException("Participant name is ambiguous.");
-      }
-      if (matches.size() == 1) {
-        finalUserId = matches.get(0).getId();
-        finalGuestName = null;
-      }
-    }
-
-    // Adding a *different* registered user requires manage-mission privileges; self-add always
-    // stays permitted. Not conditioned on `jwt != null` — see addParticipantPublic for why the
-    // token-less acting-member identity must fail closed here rather than skip the check.
-    if (finalUserId != null) {
-      if ((callerId == null || !finalUserId.equals(callerId))
-          && !missionSecurityService.canManageMission(id, authentication)) {
-        throw new AccessDeniedException(
-            "Only mission managers may add other users as participants.");
-      }
-    }
-
+    ParticipantTarget target = resolveParticipantTarget(id, request, authentication);
     var mission =
         missionService.addParticipant(
             id,
-            finalUserId,
-            finalGuestName,
+            target.userId(),
+            target.guestName(),
             request.desiredJobTypeId(),
             request.comment(),
             request.orgUnitIds(),
             request.payoutPreference());
-    java.util.stream.Stream<MissionParticipantDto> participants =
-        mission.getParticipants().stream().map(missionMapper::toDto);
     // H-5 / REQ-SEC-007: every caller below Logistician gets the peer-redacted user shape — the
     // full roster, but only the public callsign tuple (username, displayName, rank), never email or
     // real name. The ArchUnit rule {@code peerReadableMissionEndpointsMustRedactPii} statically
     // enforces this for any future endpoint returning a PII-carrying mission DTO.
-    if (!authHelperService.isLogisticianOrAbove()) {
-      participants = participants.map(missionPeerRedactor::cleanupParticipantForPeer);
-    }
-    return participants.toList();
+    return redactParticipantsForPeer(
+        mission.getParticipants().stream().map(missionMapper::toDto).toList());
   }
 
   /**
@@ -2307,6 +2170,68 @@ public class MissionController {
   }
 
   /**
+   * Decides who a participant add names, and whether the caller may name them — the part both add
+   * endpoints ({@link #addParticipantPublic} and {@link #addParticipantSlim}) share.
+   *
+   * <p>Three steps, in this order:
+   *
+   * <ol>
+   *   <li><b>An empty form means the caller.</b> Neither an id nor a name is a self-enrolment.
+   *   <li><b>A free-text name is resolved</b> through {@link ParticipantTargetResolver}: one member
+   *       match links that member, several are a 409, none records an external person. This is what
+   *       stops a member typing their own callsign from being rejected as a duplicate stranger.
+   *   <li><b>Naming anybody else needs {@code canManageMission}</b> — whether by id or through a
+   *       name that resolved to them. An external name is nobody's account and needs no check here;
+   *       the endpoint's own {@code canSeeMission} gate already decided the caller may add one.
+   * </ol>
+   *
+   * <p>The caller is resolved once, through the seam that answers alike for a bearer and for the
+   * token-less acting-member identity (ADR-0129). It used to be read from the JWT in one place and
+   * from nothing in the other, so the two steps disagreed about what a null JWT means: for the
+   * gateway's identity an empty body left both the id and the name null and the service answered
+   * 400, on a request that names nobody but the caller.
+   *
+   * @param id the mission
+   * @param request the submitted id, name and sign-up answers
+   * @param authentication the caller, for the {@code canManageMission} evaluation
+   * @return the resolved target the service records
+   * @throws BusinessConflictException when the name matches more than one member
+   * @throws AccessDeniedException when a non-manager names somebody other than themselves
+   */
+  private ParticipantTarget resolveParticipantTarget(
+      @NotNull UUID id,
+      @NotNull AddExternalParticipantRequest request,
+      Authentication authentication) {
+    UUID callerId = authHelperService.currentUserId().orElse(null);
+    UUID requestedUserId = request.userId();
+    String guestName = request.guestName();
+    if (requestedUserId == null && (guestName == null || guestName.isBlank())) {
+      requestedUserId = callerId;
+    }
+
+    ParticipantTarget target =
+        participantTargetResolver.resolve(
+            requestedUserId, guestName, "Participant name is ambiguous.");
+
+    // H-1 (2026-05-20 audit): the legacy public add-participant let a non-manager submit a foreign
+    // userId and silently add another registered member as participant. Self-enroll always works;
+    // adding someone else requires canManageMission.
+    //
+    // Deliberately NOT conditioned on `jwt != null` any more. It used to be, because a null JWT
+    // meant "anonymous" and anonymous was refused a line earlier. Since REQ-SEC-052 there is no
+    // anonymous caller, and a null JWT means the token-less acting-member identity the ingest
+    // gateway installs (ADR-0129) — for which the old shape would have skipped this check
+    // entirely and let it name anyone. Fail closed instead: no resolvable caller id means the
+    // participant is somebody else.
+    if (target.userId() != null
+        && (callerId == null || !target.userId().equals(callerId))
+        && !missionSecurityService.canManageMission(id, authentication)) {
+      throw new AccessDeniedException("Only mission managers may add other users as participants.");
+    }
+    return target;
+  }
+
+  /**
    * Projects a page of missions into list rows, resolving the whole page's registration counts in
    * ONE grouped statement.
    *
@@ -2360,6 +2285,19 @@ public class MissionController {
     return authHelperService.isLogisticianOrAbove()
         ? dto
         : missionPeerRedactor.cleanupUnitForPeer(dto);
+  }
+
+  /**
+   * Peer pass for a single participant row (the slim participant endpoints).
+   *
+   * @param dto the freshly mapped participant
+   * @return the same DTO for Logistician-and-above, otherwise one whose nested user is reduced to
+   *     the public callsign tuple — no e-mail, no real name (REQ-SEC-007)
+   */
+  private MissionParticipantDto redactForPeer(MissionParticipantDto dto) {
+    return authHelperService.isLogisticianOrAbove()
+        ? dto
+        : missionPeerRedactor.cleanupParticipantForPeer(dto);
   }
 
   /**

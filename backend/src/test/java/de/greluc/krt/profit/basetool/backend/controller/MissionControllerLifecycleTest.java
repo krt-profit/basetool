@@ -61,7 +61,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
@@ -108,12 +107,34 @@ class MissionControllerLifecycleTest {
   @Mock private de.greluc.krt.profit.basetool.backend.service.AuthHelperService authHelperService;
 
   // Real redactor (not a mock) so the peer-redaction assertions exercise the actual
-  // MissionPeerRedactor logic; @Spy makes @InjectMocks wire it into the controller.
-  @org.mockito.Spy
-  private de.greluc.krt.profit.basetool.backend.support.MissionPeerRedactor missionPeerRedactor =
-      new de.greluc.krt.profit.basetool.backend.support.MissionPeerRedactor();
+  // MissionPeerRedactor logic.
+  private final de.greluc.krt.profit.basetool.backend.support.MissionPeerRedactor
+      missionPeerRedactor = new de.greluc.krt.profit.basetool.backend.support.MissionPeerRedactor();
 
-  @InjectMocks private MissionController controller;
+  private MissionController controller;
+
+  /**
+   * Built through the constructor rather than by {@code @InjectMocks}: the name resolver is REAL
+   * (over the mocked {@link UserService}), so the party-lead cases below exercise the actual
+   * resolution rule, and Mockito does not construct a non-mock collaborator for its target.
+   * Argument order is the controller's field-declaration order; the ship mapper is a dependency no
+   * case here reaches, exactly the {@code null} {@code @InjectMocks} passed before.
+   */
+  @BeforeEach
+  void buildController() {
+    controller =
+        new MissionController(
+            missionService,
+            userService,
+            missionMapper,
+            userMapper,
+            null, // shipMapper
+            missionSecurityService,
+            authHelperService,
+            missionPeerRedactor,
+            new de.greluc.krt.profit.basetool.backend.service.ParticipantTargetResolver(
+                userService));
+  }
 
   /**
    * Every mission response now runs through the peer pass on its way out (REQ-SEC-007), so a test
@@ -230,6 +251,7 @@ class MissionControllerLifecycleTest {
         0L, // stepsVersion
         List.of(), // objectives
         0L, // objectivesVersion
+        null,
         null); // meetingPoint
   }
 

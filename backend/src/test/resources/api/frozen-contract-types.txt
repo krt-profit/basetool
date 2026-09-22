@@ -952,6 +952,7 @@ MissionDto.objectives=array<$MissionObjectiveDto>
 MissionDto.objectivesVersion=integer/int64
 MissionDto.operation=$OperationDto
 MissionDto.owner=$UserReferenceDto
+MissionDto.ownershipVersion=integer/int64
 MissionDto.owningOrgUnitVersion=integer/int64
 MissionDto.owningSquadron=$SquadronReferenceDto
 MissionDto.participants=array<$MissionParticipantDto>

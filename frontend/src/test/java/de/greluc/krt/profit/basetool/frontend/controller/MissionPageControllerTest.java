@@ -314,7 +314,9 @@ class MissionPageControllerTest {
     // Assert
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
-        .delete(eq("/api/v1/missions/" + id + "/participants/" + participantId), eq(Void.class));
+        .delete(
+            eq("/api/v1/missions/" + id + "/participants/" + participantId + "/slim"),
+            eq(Void.class));
   }
 
   @Test
@@ -340,7 +342,9 @@ class MissionPageControllerTest {
     // Assert
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
-        .delete(eq("/api/v1/missions/" + id + "/participants/" + participantId), eq(Void.class));
+        .delete(
+            eq("/api/v1/missions/" + id + "/participants/" + participantId + "/slim"),
+            eq(Void.class));
   }
 
   @Test
@@ -376,7 +380,9 @@ class MissionPageControllerTest {
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
         .put(
-            eq("/api/v1/missions/" + id + "/participants/" + participantId), any(), eq(Void.class));
+            eq("/api/v1/missions/" + id + "/participants/" + participantId + "/slim"),
+            any(),
+            eq(Void.class));
   }
 
   @Test
@@ -411,7 +417,9 @@ class MissionPageControllerTest {
     assertEquals("redirect:/missions/" + id, view);
     verify(backendApiClient)
         .put(
-            eq("/api/v1/missions/" + id + "/participants/" + participantId), any(), eq(Void.class));
+            eq("/api/v1/missions/" + id + "/participants/" + participantId + "/slim"),
+            any(),
+            eq(Void.class));
   }
 
   @Test
@@ -496,6 +504,7 @@ class MissionPageControllerTest {
             0L,
             java.util.List.of(),
             0L,
+            null,
             null);
 
     when(backendApiClient.get(eq("/api/v1/missions/" + id), anyTypeRef())).thenReturn(mission);
@@ -559,6 +568,7 @@ class MissionPageControllerTest {
             0L,
             java.util.List.of(),
             0L,
+            null,
             null);
 
     when(backendApiClient.get(eq("/api/v1/missions/" + id), anyTypeRef())).thenReturn(mission);
@@ -639,6 +649,7 @@ class MissionPageControllerTest {
             0L,
             java.util.List.of(),
             0L,
+            null,
             null);
 
     when(backendApiClient.get(eq("/api/v1/missions/" + id), anyTypeRef())).thenReturn(mission);

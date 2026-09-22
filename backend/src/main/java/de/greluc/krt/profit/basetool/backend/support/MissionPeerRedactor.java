@@ -174,7 +174,11 @@ public class MissionPeerRedactor {
         dto.stepsVersion(),
         dto.objectives(),
         dto.objectivesVersion(),
-        dto.meetingPoint());
+        dto.meetingPoint(),
+        // A lock counter, not data about anybody: it says how often the owner changed and nothing
+        // about who. Forwarded so a peer who may change the owner (managing, above) has something
+        // to echo; for one who may not, it is as harmless as the other section counters.
+        dto.ownershipVersion());
   }
 
   /**

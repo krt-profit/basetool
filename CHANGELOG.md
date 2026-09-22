@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Einsätze: Besitzerwechsel meldet jetzt einen Konflikt, wenn jemand anderes den Besitzer
+  inzwischen geändert hat.** Bisher gewann still der spätere von zwei gleichzeitigen Wechseln; jetzt
+  kommt der bekannte Konflikt-Dialog mit „Aktuelle Werte laden". Ein zweiter Wechsel auf derselben
+  Seite funktioniert ohne Neuladen.
+
+### Changed
+
+- **Einsätze: die Weboberfläche nutzt keine der 17 als veraltet markierten Einsatz-Schnittstellen
+  mehr** (Sunset 2026-10-20). Auszahlungsart, Ein-/Auschecken, Teilnehmer, Einheiten und Crew laufen
+  über die schlanken Nachfolger; ein Test verhindert künftig jeden Aufruf einer veralteten
+  Schnittstelle aus dem Frontend.
+
 ## [v1.10.0](https://github.com/krt-profit/basetool/releases/tag/v1.10.0) - 2026-09-22
 
 ### Added
