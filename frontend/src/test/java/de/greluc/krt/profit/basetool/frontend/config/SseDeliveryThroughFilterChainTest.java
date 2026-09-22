@@ -29,12 +29,15 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import org.jetbrains.annotations.NotNull;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -83,6 +86,9 @@ class SseDeliveryThroughFilterChainTest {
   /** Replaced so the context starts without a reachable Keycloak. */
   @MockitoBean private ClientRegistrationRepository clientRegistrationRepository;
 
+  /** The test stream endpoint, whose open emitters are completed after each test. */
+  @Autowired private TestStreamController streamController;
+
   // HTTP/1.1 explicitly: the JDK client's HTTP/2 stream handling can RST_STREAM against a Tomcat
   // still warming up under full-suite load (see ManagementPortIsolationTest).
   private final HttpClient http =
@@ -107,6 +113,18 @@ class SseDeliveryThroughFilterChainTest {
   @RestController
   static class TestStreamController {
 
+    /** The emitters opened and not yet completed; drained by {@link #completeAll()}. */
+    private final List<SseEmitter> open = new CopyOnWriteArrayList<>();
+
+    /**
+     * Completes every stream this controller opened, so none of them runs into its async timeout
+     * (and an error log line) after the test that opened it has finished.
+     */
+    void completeAll() {
+      open.forEach(SseEmitter::complete);
+      open.clear();
+    }
+
     /**
      * Commits the stream on the request thread with a {@code ready} comment and never completes it,
      * so a buffering component would hold the frame for the stream's whole lifetime.
@@ -118,9 +136,16 @@ class SseDeliveryThroughFilterChainTest {
     @NotNull
     SseEmitter stream() throws IOException {
       SseEmitter emitter = new SseEmitter(Duration.ofMinutes(1).toMillis());
+      open.add(emitter);
       emitter.send(SseEmitter.event().comment("ready"));
       return emitter;
     }
+  }
+
+  /** Closes the streams the test opened. */
+  @AfterEach
+  void closeStreams() {
+    streamController.completeAll();
   }
 
   @Test
