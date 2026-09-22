@@ -4,6 +4,16 @@ Doc type: **operational runbook**. The decision is [ADR-0163](adr/0163-the-conta
 the analysis, the measured state and the ordering are in
 [`PODMAN_MIGRATION_PLAN.md` §23](PODMAN_MIGRATION_PLAN.md). **This file carries only the steps.**
 
+> [!note] Executed 2026-09-22. The corrections below are what it found.
+> The stack has served from `rocky-16gb-nbg1-1` since 11:21 UTC and the old host is shut down.
+> Both databases restored from the quiesced snapshot and the per-table baselines compared
+> character-identical; the restore drill reports all seven artifacts at `1`.
+>
+> Eight things in this file were wrong or missing, and each one is marked **— found on the
+> day** where it belongs. The largest is that the order of §1.4 and §1.7 is impossible on a
+> host that has never deployed, and the most dangerous is that haproxy appeared nowhere:
+> followed to the letter, this file moved DNS to a host that accepts nothing on 443.
+
 Two properties shape every step below, and both were measured rather than assumed:
 
 1. **The data is small and the mechanism is weekly.** Under a gigabyte, moved by `backup.sh` and
@@ -70,6 +80,31 @@ skopeo inspect --no-tags docker://ghcr.io/krt-profit/basetool-config:stable >/de
 
 > The release workflow asserts both the presence of `quadlet/systemd` and that it holds at least one
 > `.container`. A green `build-config` job on a commit from this branch is the evidence.
+
+### 0.1a The inventory names the host's own public names — found on the day
+
+> [!danger] Without this the applications do not start, and a later role run UNDOES a hand fix
+> A container on a rootless host cannot reach the machine through its own public address at
+> all — measured 2026-09-22, ports 22, 80 and 443 on the public IPv4 and the public IPv6 all
+> refused from inside a container, `host-gateway` open. Under Docker the hairpin worked, so
+> the role's default said production needed nothing here. ADR-0196 has the measurement.
+>
+> `ansible/inventory/hosts.yml` (gitignored) must carry, for this host:
+>
+> ```yaml
+>       basetool_host_public_name_aliases:
+>         - "profit-base.online:host-gateway"
+>         - "api.profit-base.online:host-gateway"
+>         - "ingest.profit-base.online:host-gateway"
+>         - "grafana.profit-base.online:host-gateway"
+> ```
+>
+> All four, not one: `blackbox-exporter` probes every vhost. The FIRST must match
+> `IRI_KEYCLOAK_HOST_ALIAS` in the host `.env`; `env-reaches-the-units` fails a host where the
+> two disagree in silence.
+>
+> The role **removes** the drop-in when the variable is empty, so a hand-written one does not
+> survive the next play. Put it in the inventory, not on the host.
 
 ### 0.2 The Ansible role has run against the new host, without a tag limit
 
@@ -301,6 +336,22 @@ grep -c '^KC_METRICS_ENABLED=true' /var/iri/code/.env    # expect 1
 `.env` is restored by §1.4 step 2 and does not exist on the host before that, so this is checked at
 §1.5a — see the box in §0.6a.
 
+### 0.6b2 `.env` carries `EDGE_TRUSTED_PROXY` — found on the day
+
+```bash
+grep -c '^EDGE_TRUSTED_PROXY=172.28.15.10' /var/iri/code/.env      # expect 1
+```
+
+> [!warning] A restored `.env` can never carry this, because the Docker host has no front end
+> The rootless host puts haproxy in front of the edge (ADR-0187) and haproxy forwards with
+> `send-proxy-v2`. The edge only turns its listeners into PROXY-protocol listeners when
+> `EDGE_TRUSTED_PROXY` names the one address it accepts a header from — its pinned address on
+> `net-edge-ingress`, which its own Quadlet unit carries.
+>
+> Empty, the edge logs `no front end configured - listeners are plain, no header is trusted`,
+> haproxy's header arrives at a plain listener, and `curl` reports `wrong version number`. The
+> whole site is unreachable and the error names TLS, which is the wrong place to look.
+
 ### 0.6c The certificate files are being watched for expiry
 
 Every certificate the deployment **serves** is probed by blackbox and covered by
@@ -505,6 +556,26 @@ cancel.
 
 ### 1.4 Restore on the new host, from that snapshot
 
+> [!caution] The order below is impossible on a host that has never deployed — found on the day
+> Step 3 starts `db-backend.service` and `db-keycloak.service`. Those units do not exist until
+> the first deploy generates them: on the migration target `/var/iri/code/quadlet` was **empty**
+> and `~iri/.config/containers/systemd` held nothing. The real order is:
+>
+> 1. **steps 1, 2 and 2b below** — the files. Nothing here needs a container.
+> 2. **§1.7, the first deploy** — which generates 39 units, pulls the images and starts the
+>    stack against empty databases. Harmless: Flyway creates a schema that step 3 then drops.
+> 3. **step 3 below** — stop `backend`, `frontend`, `ingest` and `keycloak`, drop/create/restore
+>    both databases, start them again.
+> 4. **§1.5** — compare.
+>
+> Two files from step 2 are START prerequisites rather than nice-to-haves, and the deploy in
+> (2) fails without them: `realm-export.json` (the keycloak unit bind-mounts it, and podman
+> refuses a missing source with `statfs ...: no such file or directory` — the container never
+> starts, and backend, ingest and frontend fail as its dependents) and `keycloak/providers`
+> (`deploy.sh` stages the provider JAR only AFTER the stack is healthy, so the first deploy has
+> none and the restored one is what it runs).
+
+
 > [!caution] `iri-restore-drill.service` is NOT the restore path
 > `restore-drill.sh` proves recoverability: it pulls the **latest** snapshot into a **throwaway**
 > Postgres and touches nothing else. Running it here would verify a different snapshot and restore
@@ -516,6 +587,15 @@ cancel.
 restic snapshots
 restic restore <snapshot-id> --target /var/iri/backup/restore
 ```
+
+> [!note] `restic restore` exits **1** on this host, and the payload is complete — found on the day
+> It cannot strip `security.selinux` from the files it just wrote and reports one
+> `xattr.LRemove ... permission denied` per entry, then `Fatal: There were N errors`. The
+> summary above it is the truth: `Restored 6 / 7 files/dirs (12.262 MiB / 12.262 MiB)`.
+>
+> Verify the PAYLOAD, not the status: every expected file present and non-empty, and
+> `gzip -t` on each archive. A script that runs this under `set -e` stops here for a reason
+> that is not a reason.
 
 ```bash
 # 2. host config, from .../restore/.../config/ :
@@ -752,8 +832,15 @@ its management port simply answers `404` on `/metrics` with nothing else looking
   tar -C /var/iri/redis -czf /tmp/redis-data.tgz dump.rdb appendonlydir
   # new host, before the first deploy starts redis
   sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) podman unshare \
-    tar -C /var/iri/redis -xzf /tmp/redis-data.tgz
+    tar -C /var/iri/redis --numeric-owner -xzf /tmp/redis-data.tgz
   ```
+
+  > [!warning] `--numeric-owner` is not optional — found on the day
+  > GNU tar restores the owner by **name** first. The archive records redis's uid 999 as
+  > `deploy/1000`, because uid 999 is called `deploy` on the old host — and `deploy` is uid
+  > **992** here. Without the flag the session store landed as `100991:100999` instead of
+  > `100998:100999`, which redis cannot read. Measured 2026-09-22; re-extracting with the flag
+  > fixed it. The certificate volumes were not affected, checked rather than assumed.
 
   Skipping it is fine and needs no command — but say so out loud beforehand, because the first
   report will be "everyone got logged out".
@@ -829,6 +916,27 @@ container:
 sudo -u iri podman ps --format '{{.Names}}|{{.Status}}'
 sudo -u iri podman container inspect backend --format '{{.ImageName}}'
 ```
+
+### 1.7a Start the front end — found on the day, and it was missing entirely
+
+> [!danger] Without this the host accepts nothing on 443 and DNS moves to a dead port
+> The edge publishes on `127.0.0.1:8080` and `127.0.0.1:8443` — **loopback**, which is what
+> makes the PROXY header unforgeable (ADR-0187). haproxy binds the public ports and forwards
+> with `send-proxy-v2`. The Ansible role installs, configures and **enables** it, and
+> deliberately does **not start** it: its own message says *“it comes up with the first boot
+> after deploy.sh, or start it by hand once the stack is healthy”*.
+>
+> This runbook did not mention haproxy anywhere. Followed to the letter, it moved DNS to a host
+> whose only listener was sshd.
+
+```bash
+systemctl start haproxy && systemctl is-active haproxy
+ss -tlnp | grep -E ':80 |:443 '                       # expect haproxy on both, v4 and v6
+curl -sS -o /dev/null -w '%{http_code}\n' \
+  https://profit-base.online/auth/realms/iri/.well-known/openid-configuration   # expect 200
+```
+
+A `wrong version number` from that `curl` is `EDGE_TRUSTED_PROXY` (§0.6b2), not TLS.
 
 ### 1.8 Conformance against the new host BY IP, old host still serving
 
@@ -910,6 +1018,22 @@ python scripts/check-conformance.py --ssh root@<new-host-ip> \
 
 ### 1.9 Only then, DNS
 
+### 1.9a The maintenance page outlives the DNS switch — found on the day
+
+> [!note] Expect “it still shows the maintenance page”, and know the answer before it is asked
+> The page reloads itself every 30 s over the HTTP/2 connection it already has — to the OLD
+> host — and an established connection does not consult DNS. It therefore keeps itself alive on
+> the host it is trying to leave, indefinitely. Chrome coalesces one origin across tabs, so a
+> Grafana dashboard pinging the frontend origin holds the connection open for every other tab
+> and closing the one tab does not help.
+>
+> Measured 2026-09-22: the old edge logged 101 requests from one browser in three minutes,
+> every one a 503, while the same machine's other tabs were already reaching the new host.
+>
+> The answer is `chrome://net-internals/#sockets` → *Flush socket pools*, or restarting the
+> browser. Members will not know that, so say it in the announcement — or serve the
+> maintenance page with `Connection: close`, which ends it at the root.
+
 ### 1.10 Conformance against the public names, then shut the old host down
 
 Now the names resolve to the new host, so the whole suite means what it says — the five external
@@ -949,6 +1073,22 @@ the host back is a boot, and the boot re-arms it.
 > complete answer. Bringing it back on a NEWER bundle is not a rollback path and never was.
 
 ### 1.11 The first backup on the NEW host — the step that closes the three zeros
+
+> [!warning] First give the backup helper access to what §1.4 placed — found on the day
+> `backup.sh` reads `keystore.p12` and `realm-export.json` through a helper container, and
+> `rt_read_mount` runs it as `sudo -u iri podman run` — host uid `iri`, not root. The ownership
+> §1.4 gives those two files is chosen for the CONTAINERS (`root:110000` with an ACL for
+> `100999`, and `root:100999`), and the service user is neither. Both were skipped from this
+> host's first two snapshots, each with one `WARN` line and a successful exit.
+>
+> ```bash
+> setfacl -m u:$(id -u iri):r /var/iri/secrets/keystore.p12
+> setfacl -m u:$(id -u iri):r /var/iri/code/realm-export.json
+> getfacl -p /var/iri/secrets/keystore.p12       # expect user:iri:r-- and mask::r--
+> ```
+>
+> Additive on purpose: keycloak keeps the access it has through group `100999`. Then run the
+> backup and check the log has **no** `WARN: could not read` line before running the drill.
 
 §1.6 put the certificates, the ACME account and the redis ACL **on the machine**. It did not put
 them **in a backup**. Every snapshot in the repository at cutover time was written by the old host,
