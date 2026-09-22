@@ -341,10 +341,18 @@ basetool_host_hardening_tailoring_time: "2026-09-20T00:00:00Z"
 # haproxy binds the public ports and hands the edge the client address with PROXY protocol, because
 # rootless port forwarding replaces it. The edge itself publishes on loopback only.
 #
-# basetool_host_edge_trusted_proxy is the edge container's PINNED address on net-edge-ingress, and it must
-# match `IP=` in the generated unit. It is the peer the edge sees -- measured: without a pin that
-# address moves between recreations, which would break set_real_ip_from at the first restart.
-basetool_host_edge_trusted_proxy: "172.28.15.10"
+# basetool_host_edge_trusted_proxy is the edge container's PINNED address on the network
+# rootlessport presents the peer on, and it must match the `ip=` the generated unit gives that
+# network. Without a pin the address moves between recreations, which breaks set_real_ip_from at
+# the first restart.
+#
+# It is net-proxy-frontend, NOT net-edge-ingress, and the difference cost a live regression on
+# 2026-09-22: the peer is the edge's address on net-proxy-frontend, that network is shared with the
+# frontend container and drifts (.10 -> .11 across one recreate), so nginx stopped matching, threw
+# the PROXY header away and logged EVERY request from one bridge address -- 2340 in ten minutes,
+# one rate-limit bucket for the whole internet. generate-quadlet.py's FRONT_END now pins both
+# addresses and this value names the second one.
+basetool_host_edge_trusted_proxy: "172.28.3.250"
 basetool_host_edge_loopback_ports: [8080, 8443]
 basetool_host_frontend_ports:
   - {public: 80, backend: 8080}
