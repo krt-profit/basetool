@@ -654,7 +654,7 @@ public class RefineryImportService {
     if (callerId == null) {
       return null;
     }
-    return userRepository.findById(callerId).map(userMapper::toReferenceDto).orElse(null);
+    return userRepository.findPlainById(callerId).map(userMapper::toReferenceDto).orElse(null);
   }
 
   /**

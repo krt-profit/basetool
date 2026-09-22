@@ -414,7 +414,6 @@ public class JobOrderPageController {
       // version). No user/squadron/owner-picker lookups — the requester touches none of those.
       if (requesterView) {
         model.addAttribute("materials", fetchMaterials());
-        model.addAttribute("users", new ArrayList<>());
         if (!model.containsAttribute("jobOrderForm")) {
           JobOrderForm form = new JobOrderForm();
           form.setComment(order.comment());

@@ -29,14 +29,18 @@ import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -87,6 +91,17 @@ public abstract class UserMapper {
    */
   private static final String MEMBERSHIP_CACHE_ATTR =
       UserMapper.class.getName() + ".staffelMembershipByUserId";
+
+  /**
+   * Request-attribute key under which {@link #resolveSquadrons(User)} memoises the resolved,
+   * name-sorted Staffel references per user. {@link #toDto(User)} reads the squadrons twice ({@code
+   * squadrons} and the primary {@code squadron}), and each read resolved the Staffel entities with
+   * its own {@code findAllById}; the memo makes the second read free. The values are immutable
+   * reference records, so they are safe to reuse across transactions within the request. Seeded for
+   * a whole page at once by {@link #primeStaffelMemberships(Collection)}.
+   */
+  private static final String SQUADRONS_CACHE_ATTR =
+      UserMapper.class.getName() + ".squadronReferencesByUserId";
 
   /**
    * Projects a {@link User} entity to its outbound DTO. The {@code squadron}, {@code squadrons},
@@ -154,11 +169,112 @@ public abstract class UserMapper {
     if (user == null || user.getId() == null) {
       return List.of();
     }
-    return staffelMembershipResolver
-        .resolveNameSortedStaffeln(loadStaffelMemberships(user))
-        .stream()
+    Map<UUID, List<SquadronReferenceDto>> memo = requestMemo(SQUADRONS_CACHE_ATTR);
+    if (memo == null) {
+      return toSquadronReferences(
+          staffelMembershipResolver.resolveNameSortedStaffeln(loadStaffelMemberships(user)));
+    }
+    List<SquadronReferenceDto> cached = memo.get(user.getId());
+    if (cached == null) {
+      cached =
+          toSquadronReferences(
+              staffelMembershipResolver.resolveNameSortedStaffeln(loadStaffelMemberships(user)));
+      memo.put(user.getId(), cached);
+    }
+    return cached;
+  }
+
+  /**
+   * Seeds the request memo for a whole page or aggregate of users in two queries, so the per-user
+   * projection of {@link #toDto(User)} that follows reads everything from the memo instead of
+   * issuing up to three queries per user (REQ-DATA-003). One {@code findAllByIdUserIdInAndKindIn}
+   * loads every {@code SQUADRON}-kind membership row of the given users, and one {@link
+   * StaffelMembershipResolver#resolveNameSortedStaffelnByUser(Map)} loads every Staffel they
+   * reference; both memos ({@link #MEMBERSHIP_CACHE_ATTR} and {@link #SQUADRONS_CACHE_ATTR}) are
+   * then populated for <em>every</em> given user — a user with no Staffel is seeded with an empty
+   * list, which is exactly what the single-user path would have computed.
+   *
+   * <p>Users already memoised are skipped, so priming twice in one request costs nothing. Outside
+   * an HTTP request there is no memo to seed and the call is a no-op: the per-user fallback of
+   * {@link #toDto(User)} still produces the same values. The same immutability assumption as {@link
+   * #loadStaffelMemberships(User)} applies — prime right before mapping, never before a membership
+   * write in the same request.
+   *
+   * @param users the users about to be mapped; {@code null} elements and users without an id are
+   *     ignored. Never {@code null}.
+   */
+  public void primeStaffelMemberships(@NotNull Collection<User> users) {
+    Map<UUID, List<OrgUnitMembership>> membershipMemo = requestMemo(MEMBERSHIP_CACHE_ATTR);
+    Map<UUID, List<SquadronReferenceDto>> squadronMemo = requestMemo(SQUADRONS_CACHE_ATTR);
+    if (membershipMemo == null || squadronMemo == null) {
+      return;
+    }
+    Set<UUID> missing = new HashSet<>();
+    for (User user : users) {
+      if (user != null && user.getId() != null && !squadronMemo.containsKey(user.getId())) {
+        missing.add(user.getId());
+      }
+    }
+    if (missing.isEmpty()) {
+      return;
+    }
+    Map<UUID, List<OrgUnitMembership>> rowsByUser = new HashMap<>();
+    for (UUID id : missing) {
+      rowsByUser.put(id, membershipMemo.getOrDefault(id, List.of()));
+    }
+    Set<UUID> toQuery = new HashSet<>(missing);
+    toQuery.removeAll(membershipMemo.keySet());
+    if (!toQuery.isEmpty()) {
+      Map<UUID, List<OrgUnitMembership>> loaded =
+          membershipRepository
+              .findAllByIdUserIdInAndKindIn(toQuery, EnumSet.of(OrgUnitKind.SQUADRON))
+              .stream()
+              .collect(Collectors.groupingBy(m -> m.getId().getUserId()));
+      for (UUID id : toQuery) {
+        List<OrgUnitMembership> rows = List.copyOf(loaded.getOrDefault(id, List.of()));
+        membershipMemo.put(id, rows);
+        rowsByUser.put(id, rows);
+      }
+    }
+    staffelMembershipResolver
+        .resolveNameSortedStaffelnByUser(rowsByUser)
+        .forEach((id, staffeln) -> squadronMemo.put(id, toSquadronReferences(staffeln)));
+  }
+
+  /**
+   * Projects resolved squadrons to their slim reference DTOs, keeping the primary-first order.
+   *
+   * @param staffeln the name-sorted squadrons; never {@code null}.
+   * @return the reference DTOs in the same order; never {@code null}.
+   */
+  private static List<SquadronReferenceDto> toSquadronReferences(@NotNull List<Squadron> staffeln) {
+    return staffeln.stream()
         .map(s -> new SquadronReferenceDto(s.getId(), s.getName(), s.getShorthand()))
         .toList();
+  }
+
+  /**
+   * Returns the request-scoped memo map stored under {@code attribute}, creating it on first use.
+   *
+   * @param attribute the request-attribute key of the memo.
+   * @param <V> the memoised value type.
+   * @return the memo keyed by user id, or {@code null} outside an HTTP request (no request scope,
+   *     so no memo — callers fall back to a direct query).
+   */
+  @Nullable
+  private static <V> Map<UUID, V> requestMemo(@NotNull String attribute) {
+    RequestAttributes attrs = RequestContextHolder.getRequestAttributes();
+    if (attrs == null) {
+      return null;
+    }
+    @SuppressWarnings("unchecked") // only this class writes the attribute, always with this shape
+    Map<UUID, V> cache =
+        (Map<UUID, V>) attrs.getAttribute(attribute, RequestAttributes.SCOPE_REQUEST);
+    if (cache == null) {
+      cache = new HashMap<>();
+      attrs.setAttribute(attribute, cache, RequestAttributes.SCOPE_REQUEST);
+    }
+    return cache;
   }
 
   /**
@@ -249,17 +365,9 @@ public abstract class UserMapper {
    * @return the user's Staffel membership rows; never {@code null}, possibly empty.
    */
   private List<OrgUnitMembership> loadStaffelMemberships(User user) {
-    RequestAttributes attrs = RequestContextHolder.getRequestAttributes();
-    if (attrs == null) {
-      return queryStaffelMemberships(user);
-    }
-    @SuppressWarnings("unchecked")
-    Map<UUID, List<OrgUnitMembership>> cache =
-        (Map<UUID, List<OrgUnitMembership>>)
-            attrs.getAttribute(MEMBERSHIP_CACHE_ATTR, RequestAttributes.SCOPE_REQUEST);
+    Map<UUID, List<OrgUnitMembership>> cache = requestMemo(MEMBERSHIP_CACHE_ATTR);
     if (cache == null) {
-      cache = new HashMap<>();
-      attrs.setAttribute(MEMBERSHIP_CACHE_ATTR, cache, RequestAttributes.SCOPE_REQUEST);
+      return queryStaffelMemberships(user);
     }
     return cache.computeIfAbsent(user.getId(), id -> queryStaffelMemberships(user));
   }

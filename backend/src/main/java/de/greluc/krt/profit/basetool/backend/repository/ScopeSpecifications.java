@@ -106,8 +106,7 @@ public final class ScopeSpecifications {
    * Mission's scope predicate (alias {@code m}, field {@code owningOrgUnit}): the plain triple plus
    * the cross-staffel public escape ({@code isInternal = false} missions stay visible outside the
    * owning scope) and the ownerless-leadership-mission escape, per REQ-ORG-003. Reused verbatim by
-   * {@code MissionRepository.findAllActiveReference} and both {@code searchMissions} overloads
-   * (List and Page).
+   * {@code MissionRepository.findAllActiveReference} and the paged {@code searchMissions}.
    */
   static final String MISSION_SCOPE_PREDICATE =
       """

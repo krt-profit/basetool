@@ -212,20 +212,16 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    * @param activeOrgUnitId the single OrgUnit the caller is pinned to, or {@code null}.
    * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path); empty for
    *     admins and anonymous callers.
+   *     <p>Only the two {@code @ManyToOne} org units are graphed. The {@code materials}, {@code
+   *     assignees} and {@code handovers} collections this query used to fetch-join made Hibernate
+   *     paginate in memory over every matching order (HHH90003004) and multiplied the rows by each
+   *     collection's size; they now batch-load under {@code default_batch_fetch_size} when the page
+   *     is mapped, one bounded {@code IN} query per collection (REQ-DATA-003, BE-PERF-02).
    * @param pageable page request.
    * @return paged job-orders visible to the caller, matching the optional status + squadron
    *     filters.
    */
-  @EntityGraph(
-      attributePaths = {
-        "materials",
-        "assignees",
-        "assignees.user",
-        "handovers",
-        "handovers.items",
-        "responsibleOrgUnit",
-        "requestingOrgUnit"
-      })
+  @EntityGraph(attributePaths = {"responsibleOrgUnit", "requestingOrgUnit"})
   @Query(
       "SELECT o FROM JobOrder o WHERE "
           + ScopeSpecifications.JOB_ORDER_SCOPE_PREDICATE
@@ -248,9 +244,10 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    * side, so a member of the ordering org unit sees the orders their unit placed even when a
    * foreign squadron processes them and even when the caller is not profit-eligible. The service
    * passes only the caller's own direct-membership org-unit ids, so this never leaks a foreign
-   * unit's placed orders. Uses the same eager-fetch graph as the main list so the stock projection
-   * has no N+1; the response is redacted for the requester at the controller boundary. Ordering is
-   * supplied by the {@link Pageable} (default {@code priority,asc}), matching the main queue.
+   * unit's placed orders. Uses the same to-one-only graph as the main list; the collections
+   * batch-load exactly as there. The response is redacted for the requester at the controller
+   * boundary. Ordering is supplied by the {@link Pageable} (default {@code priority,asc}), matching
+   * the main queue.
    *
    * @param statuses status values to keep; pass the full enum set to disable status filtering
    *     (never empty).
@@ -259,16 +256,7 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    * @param pageable page request (carries the sort).
    * @return paged job-orders the caller's org unit(s) requested.
    */
-  @EntityGraph(
-      attributePaths = {
-        "materials",
-        "assignees",
-        "assignees.user",
-        "handovers",
-        "handovers.items",
-        "responsibleOrgUnit",
-        "requestingOrgUnit"
-      })
+  @EntityGraph(attributePaths = {"responsibleOrgUnit", "requestingOrgUnit"})
   @Query(
       "SELECT o FROM JobOrder o WHERE o.requestingOrgUnit.id IN :requesterOrgUnitIds AND o.status"
           + " IN :statuses")
