@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.config;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -136,6 +137,37 @@ class StaticResourceHandlerMappingTest {
         new TreeSet<>(mapping.getUrlMap().keySet()),
         "the resource handler patterns must match the asset trees on the classpath exactly — a new"
             + " tree needs a pattern in WebMvcConfig, and a catch-all must never come back");
+  }
+
+  /**
+   * Every asset tree lies inside the ETag filter's scope, and the filter is not back on {@code /*}
+   * (FE-PERF-03).
+   *
+   * <p>{@link EtagConfig} lists the asset-tree prefixes by hand, as servlet patterns ({@code
+   * /css/*} for the handler's {@code /css/**}). A tree added to {@link WebMvcConfig} without its
+   * prefix there would silently lose its ETag; a return to {@code /*} would put the buffer back in
+   * front of every page render and the notification stream.
+   */
+  @Test
+  void everyAssetTreeIsInsideTheEtagFilterScope() {
+    SimpleUrlHandlerMapping mapping =
+        context.getBean("resourceHandlerMapping", SimpleUrlHandlerMapping.class);
+    Set<String> servletPatterns = new TreeSet<>();
+    for (String pattern : mapping.getUrlMap().keySet()) {
+      servletPatterns.add(
+          pattern.endsWith("/**") ? pattern.substring(0, pattern.length() - 1) : pattern);
+    }
+
+    assertTrue(
+        EtagConfig.ETAG_URL_PATTERNS.containsAll(servletPatterns),
+        () ->
+            "every asset tree needs its prefix in EtagConfig.ETAG_URL_PATTERNS; missing: "
+                + servletPatterns.stream()
+                    .filter(p -> !EtagConfig.ETAG_URL_PATTERNS.contains(p))
+                    .toList());
+    assertFalse(
+        EtagConfig.ETAG_URL_PATTERNS.contains("/*"),
+        "the ETag filter buffers every response it covers; it must not cover every route again");
   }
 
   /**
