@@ -34,7 +34,7 @@
  * bootstrap block of refinery-orders-create.html, which executes immediately before this script.
  */
 
-/* global MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP, MATERIAL_ENTRY_TITLE_LABEL, MATERIAL_REMOVE_LABEL, RATING_LEVELS, SPEED_LEVELS, MSG_RFC_MATERIAL_INVALID, MSG_RFC_CREATE_FAILED, MSG_RFC_IMPORT_FAILED, REFINERY_HANDOFF_ID */
+/* global MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP, MATERIAL_ENTRY_TITLE_LABEL, MATERIAL_REMOVE_LABEL, RATING_LEVELS, SPEED_LEVELS, MSG_RFC_MATERIAL_INVALID, MSG_RFC_CREATE_FAILED, MSG_RFC_MISSION_PARTICIPANT_REQUIRED, MSG_RFC_IMPORT_FAILED, REFINERY_HANDOFF_ID */
 
 // Initialize the shared yield-badge module. On the create form the map is empty until the
 // user picks a refinery from the location dropdown (then onLocationChange fetches the map
@@ -460,6 +460,22 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
 // behaviour: navigate away to the JSON targetUrl on success (toast:false; a create leaves the
 // page) with resetUnsavedChanges, and the 400-invalid vs generic inline error toast. The classic
 // form-POST is the no-JS fallback (krtFetch absent).
+/**
+ * Picks the toast for a failed in-place create. A mission the order's owner does not take part in
+ * (REQ-SEC-042) is also a 400, so it is told apart by its problem code before the generic 400
+ * "add a material" message — otherwise the member would look for the problem in the goods editor.
+ *
+ * @param {number} status the HTTP status of the failed response
+ * @param {any} body the parsed RFC 7807 problem body, if any
+ * @returns {string} the localized message to show
+ */
+function _refineryCreateErrorMessage(status, body) {
+    if (body && body.code === 'MISSION_PARTICIPANT_REQUIRED') {
+        return MSG_RFC_MISSION_PARTICIPANT_REQUIRED;
+    }
+    return status === 400 ? MSG_RFC_MATERIAL_INVALID : MSG_RFC_CREATE_FAILED;
+}
+
 function _submitRefineryCreate(form, submitter) {
     if (!window.krtFetch) {
         form.submit();
@@ -470,11 +486,9 @@ function _submitRefineryCreate(form, submitter) {
         submitter: submitter,
         toast: false,
         errorMessage: MSG_RFC_CREATE_FAILED,
-        onError: function (status) {
+        onError: function (status, body) {
             if (window.showFrontendErrorToast) {
-                window.showFrontendErrorToast(
-                    status === 400 ? MSG_RFC_MATERIAL_INVALID : MSG_RFC_CREATE_FAILED,
-                );
+                window.showFrontendErrorToast(_refineryCreateErrorMessage(status, body));
             }
             return true;
         },

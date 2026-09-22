@@ -166,7 +166,8 @@ public class RefineryOrderWriteController {
       return "redirect:/refinery-orders";
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "POST /api/v1/refinery-orders", e);
-      redirectAttributes.addFlashAttribute("errorToast", "error.refineryorder.create.failed");
+      redirectAttributes.addFlashAttribute(
+          "errorToast", failureToastKey(e, "error.refineryorder.create.failed"));
       redirectAttributes.addFlashAttribute("refineryOrderForm", form);
       return "redirect:/refinery-orders/create"
           + (form.getSource() != null ? "?source=" + form.getSource() : "");
@@ -215,7 +216,8 @@ public class RefineryOrderWriteController {
       redirectAttributes.addFlashAttribute("successToast", "success.refineryorder.update");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "PUT /api/v1/refinery-orders/{id}", id, e);
-      redirectAttributes.addFlashAttribute("errorToast", "error.refineryorder.update.failed");
+      redirectAttributes.addFlashAttribute(
+          "errorToast", failureToastKey(e, "error.refineryorder.update.failed"));
       redirectAttributes.addFlashAttribute("refineryOrderForm", form);
       return "redirect:/refinery-orders/" + id;
     } catch (Exception e) {
@@ -225,6 +227,22 @@ public class RefineryOrderWriteController {
       return "redirect:/refinery-orders/" + id;
     }
     return "redirect:/refinery-orders";
+  }
+
+  /**
+   * Chooses the toast for a failed classic create or edit. A mission the order's owner does not
+   * take part in (REQ-SEC-042) gets a message that names the mission field; every other backend
+   * failure keeps the handler's generic one.
+   *
+   * @param e the backend failure
+   * @param fallbackKey the handler's generic failure message key
+   * @return the i18n key of the toast to flash
+   */
+  @NotNull
+  static String failureToastKey(@NotNull BackendServiceException e, @NotNull String fallbackKey) {
+    return BackendServiceException.CODE_MISSION_PARTICIPANT_REQUIRED.equals(e.getProblemCode())
+        ? "error.refineryorder.mission.participant_required"
+        : fallbackKey;
   }
 
   /**

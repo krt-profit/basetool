@@ -164,9 +164,19 @@ function _submitRefinery(options) {
         form.submit(); // no-JS fallback: classic POST -> redirect
         return;
     }
-    function fail() {
+    /**
+     * @param {any} [_status] the HTTP status, or the network error on a transport failure
+     * @param {any} [body] the parsed RFC 7807 problem body, if any
+     */
+    function fail(_status, body) {
         if (options.onFailure) options.onFailure();
-        showFrontendErrorToast(options.errorMessage);
+        // REQ-SEC-042: a mission the order's owner does not take part in names the mission field
+        // instead of the generic failure message.
+        showFrontendErrorToast(
+            body && body.code === 'MISSION_PARTICIPANT_REQUIRED'
+                ? REFINERY_DETAIL_MSG.missionParticipantRequired
+                : options.errorMessage,
+        );
         return true;
     }
     window.krtFetch.submitForm({

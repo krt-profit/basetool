@@ -2737,9 +2737,37 @@ participant" rule.
   `403` — the marker behind that refusal is `ROLE_NO_ROLE` since `V239`, not `GUEST`
   (REQ-SEC-053).
 
-**Enforced by:** `MissionSecurityServiceTest`, `MissionFinanceEntryControllerSecurityTest` ·
+**Refinery orders linked to a mission (added 2026-09-22).** A refinery order's `mission` link is the
+same kind of write: `OperationPayoutCalculator` adds every linked order's result to the operation's
+payout pool and credits its expenses to the order's owner. `RefineryOrderService` used to check only
+that the mission existed, so any member could attach an order to any mission whose id they knew —
+another Staffel's included — and move that pool, while the order itself did not even appear in that
+mission's Staffel-scoped refinery list.
+
+The link therefore MUST only be set to a mission the order's **owner** takes part in, i.e. holds a
+participant row resolved by `(missionId, ownerId)`. The rule binds the owner, not the caller, and
+has **no exception for a caller who manages the mission** (owner decision, 2026-09-22): a
+logistician booking on someone's behalf, or a mission manager, is held to it too. It is checked on
+create, and on update **only when the mission changes** — an unchanged link is not re-checked, so an
+order linked before the rule existed, or whose owner has since left the mission, can still be edited.
+Clearing the link is always allowed. A refusal answers `400` with the stable problem code
+`MISSION_PARTICIPANT_REQUIRED` (`MissionParticipantRequiredException`), which the refinery create
+and detail pages map to a message naming the mission field.
+
+**Acceptance (refinery link)**
+
+- [x] Creating an order linked to a mission its owner takes part in succeeds.
+- [x] Creating one linked to a mission its owner does not take part in answers `400`
+  `MISSION_PARTICIPANT_REQUIRED` and persists nothing.
+- [x] Changing an order's mission to one its owner is not on is refused — also for a logistician.
+- [x] Saving an order with its mission unchanged does not re-check participation.
+- [x] Clearing the mission is always allowed.
+
+**Enforced by:** `MissionSecurityServiceTest`, `MissionFinanceEntryControllerSecurityTest`,
+`RefineryOrderServiceLifecycleTest`, `RefineryOrderTest`, `RefineryOrderFailureToastTest` ·
 **Code:** `MissionSecurityService#canCreateFinanceEntry`,
-`MissionFinanceEntryController#createFinanceEntry` · **Related:** REQ-SEC-006, REQ-SEC-009
+`MissionFinanceEntryController#createFinanceEntry`, `RefineryOrderService#resolveMissionForOwner` ·
+**Related:** REQ-SEC-006, REQ-SEC-009
 
 ### REQ-SEC-045 — A login binds a session to the token's own subject, never to a callsign
 

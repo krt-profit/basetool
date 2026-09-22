@@ -99,6 +99,10 @@ class RefineryOrderServiceTest {
   private de.greluc.krt.profit.basetool.backend.repository.MissionRepository missionRepository;
 
   @Mock
+  private de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository
+      missionParticipantRepository;
+
+  @Mock
   private de.greluc.krt.profit.basetool.backend.repository.RefiningMethodRepository
       refiningMethodRepository;
 

@@ -132,6 +132,25 @@ public enum AppExceptionKind {
       "Owning org unit required",
       ErrorDisclosurePolicy.STANDARD),
 
+  /**
+   * {@code MissionParticipantRequiredException} — a refinery order is being linked to a mission its
+   * owner does not take part in (REQ-SEC-042).
+   *
+   * <p>Split out of {@link #BAD_REQUEST} for the same reason as {@link #OWNER_ORG_UNIT_REQUIRED}:
+   * it is a 400 the member can fix, but only if the form says which field is wrong. The refinery
+   * create form otherwise maps every 400 to "add a material", which would send the member hunting
+   * in the goods editor for a problem that sits in the mission dropdown. A stable code lets the
+   * create and detail pages render their own localized message.
+   */
+  MISSION_PARTICIPANT_REQUIRED(
+      HttpStatus.BAD_REQUEST,
+      "MISSION_PARTICIPANT_REQUIRED",
+      "problem.mission_participant_required.title",
+      "problem.mission_participant_required.detail",
+      "mission-participant-required",
+      "Mission participant required",
+      ErrorDisclosurePolicy.STANDARD),
+
   /** {@code DuplicateEntityException} — service-layer uniqueness check. */
   DUPLICATE_ENTITY(
       HttpStatus.CONFLICT,

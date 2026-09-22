@@ -60,6 +60,11 @@
   längst entfernte Endpunkte.** Die Release-Prüfung verlangt jetzt auch `docker/edge` und `docker/acme`
   im Konfigurationspaket. Kein sichtbarer Unterschied.
 
+- **Raffinerie: Ein Auftrag lässt sich nur noch mit einem Einsatz verknüpfen, an dem sein Besitzer
+  teilnimmt.** Bisher genügte die ID irgendeines Einsatzes, und der Auftrag floss in dessen
+  Auszahlungstopf ein — auch bei fremden Staffeln. Das gilt auch für Logistiker und Einsatzleiter;
+  bestehende Verknüpfungen bleiben erhalten, und das Formular nennt den Grund (REQ-SEC-042).
+
 - **Betrieb: Sicherung, Wiederherstellungsprobe und Aufräumen scheitern nicht mehr nach einem Neustart.**
   Ihre Nachhol-Läufe starteten Sekunden nach dem Hochfahren, bevor die Container-Laufzeit bereitstand,
   schlugen fehl und lösten einen kritischen Alarm aus — die nachzuholende Sicherung ging dabei verloren.

@@ -19,10 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.exception.MissionParticipantRequiredException;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
+import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.RefineryGood;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
@@ -36,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryYieldRepository;
@@ -83,6 +86,7 @@ public class RefineryOrderService {
   private final UserRepository userRepository;
   private final LocationRepository locationRepository;
   private final MissionRepository missionRepository;
+  private final MissionParticipantRepository missionParticipantRepository;
   private final RefiningMethodRepository refiningMethodRepository;
   private final MaterialRepository materialRepository;
   private final InventoryItemRepository inventoryItemRepository;
@@ -313,6 +317,8 @@ public class RefineryOrderService {
    * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the chosen
    *     location does not host a refinery, or the picker output is not a valid membership of the
    *     order owner
+   * @throws MissionParticipantRequiredException when a mission is given that the order owner does
+   *     not take part in (REQ-SEC-042)
    */
   @Transactional
   public RefineryOrder createRefineryOrder(
@@ -355,13 +361,7 @@ public class RefineryOrderService {
     }
 
     if (order.getMission() != null && order.getMission().getId() != null) {
-      order.setMission(
-          missionRepository
-              .findById(order.getMission().getId())
-              .orElseThrow(
-                  () ->
-                      new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                          "error.mission.not_found")));
+      order.setMission(resolveMissionForOwner(order.getMission().getId(), user));
     } else {
       order.setMission(null);
     }
@@ -409,6 +409,45 @@ public class RefineryOrderService {
     return saved;
   }
 
+  /**
+   * Loads the mission a refinery order is being linked to and checks that the order's owner takes
+   * part in it (REQ-SEC-042).
+   *
+   * <p>The link is money: {@code OperationPayoutCalculator} adds every linked order's result to the
+   * operation's payout pool and credits its expenses to the order's owner. Checking only that the
+   * mission exists let any member attach an order to any mission whose id they knew — another
+   * Staffel's included, since non-internal missions are listed across Staffeln — and move that
+   * operation's pool. The owner must therefore hold a participant row on the mission; there is no
+   * exception for a caller who manages the mission (owner decision, 2026-09-22). The check is on
+   * the order's <em>owner</em>, not the caller, so a logistician booking on someone's behalf is
+   * held to the same rule.
+   *
+   * @param missionId the requested mission
+   * @param owner the order's owner; {@code null} only for an order that somehow lost its owner,
+   *     which can never be linked
+   * @return the managed mission
+   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no mission has
+   *     that id
+   * @throws MissionParticipantRequiredException when the owner is not a participant of the mission
+   */
+  private Mission resolveMissionForOwner(@NotNull UUID missionId, @Nullable User owner) {
+    Mission mission =
+        missionRepository
+            .findById(missionId)
+            .orElseThrow(
+                () ->
+                    new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
+                        "error.mission.not_found"));
+    if (owner == null
+        || owner.getId() == null
+        || missionParticipantRepository
+            .findByMissionIdAndUserId(missionId, owner.getId())
+            .isEmpty()) {
+      throw new MissionParticipantRequiredException();
+    }
+    return mission;
+  }
+
   @Contract("null -> null")
   @Nullable
   private static Double zeroToNull(Double value) {
@@ -427,6 +466,8 @@ public class RefineryOrderService {
    * @throws AccessDeniedException when the caller is neither owner nor logistician
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the supplied
    *     version is stale
+   * @throws MissionParticipantRequiredException when the mission is changed to one the order owner
+   *     does not take part in (REQ-SEC-042); an unchanged link is not re-checked
    */
   @Transactional
   public RefineryOrder updateRefineryOrder(
@@ -457,15 +498,17 @@ public class RefineryOrderService {
       validateLocationHasRefinery(order.getLocation());
     }
 
-    if (details.getMission() != null && details.getMission().getId() != null) {
-      order.setMission(
-          missionRepository
-              .findById(details.getMission().getId())
-              .orElseThrow(
-                  () ->
-                      new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                          "error.mission.not_found")));
-    } else if (details.getMission() == null) {
+    Mission requestedMission = details.getMission();
+    UUID requestedMissionId = requestedMission != null ? requestedMission.getId() : null;
+    if (requestedMissionId != null) {
+      // REQ-SEC-042: only a CHANGED link is checked. An order that already sits on a mission keeps
+      // it through an ordinary edit, so a link made before the rule existed — or an owner who has
+      // since left the mission — does not block editing the order's other fields.
+      Mission currentMission = order.getMission();
+      if (currentMission == null || !requestedMissionId.equals(currentMission.getId())) {
+        order.setMission(resolveMissionForOwner(requestedMissionId, order.getOwner()));
+      }
+    } else if (requestedMission == null) {
       order.setMission(null);
     }
 
