@@ -246,6 +246,29 @@ class PageRouteCatalogueTest {
   }
 
   /**
+   * Every detail-prefix override points from a real list page to a real detail route.
+   *
+   * <p>The touch sweep follows a list's first {@code <prefix>/<id>} link to measure its detail
+   * view, and {@link FrontendPageRoutes#DETAIL_PREFIX_OVERRIDES} names the lists whose detail links
+   * leave their own path. An override whose key is no page is never consulted, and one whose value
+   * no longer owns a {@code /{id}} route matches no link — either way the detail view drops out of
+   * the sweep while every assertion still passes. This pins both ends to the dispatcher.
+   */
+  @Test
+  @DisplayName("every detail-prefix override maps a list page to a routed /{id} detail view")
+  void everyDetailPrefixOverrideIsRouted() {
+    Set<String> pages = Set.copyOf(FrontendPageRoutes.PAGES);
+    Set<String> routed = Set.copyOf(EndpointEnumeration.patterns(context, HttpMethod.GET));
+
+    assertThat(FrontendPageRoutes.DETAIL_PREFIX_OVERRIDES.keySet())
+        .as("list pages with a detail-prefix override")
+        .allSatisfy(path -> assertThat(pages).contains(path));
+    assertThat(FrontendPageRoutes.DETAIL_PREFIX_OVERRIDES.values())
+        .as("detail prefixes named by an override")
+        .allSatisfy(prefix -> assertThat(routed).contains(prefix + "/{id}"));
+  }
+
+  /**
    * No list repeats itself.
    *
    * <p>{@code List.of} rejects a null but not a duplicate, and a route listed twice is swept twice

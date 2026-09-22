@@ -30,7 +30,8 @@ import java.util.List;
  * @param organisationsleitungen the OL(s) the caller may manage.
  * @param bereiche the Bereiche the caller may appoint into.
  * @param squadrons the Staffeln the caller may appoint into.
- * @param specialCommands the Spezialkommandos the caller may appoint a lead on.
+ * @param specialCommands the Spezialkommandos the caller may appoint a lead on or manage the
+ *     members of (the SK's own lead).
  */
 public record LeitungViewDto(
     boolean admin,

@@ -94,10 +94,10 @@
                 <input type="hidden" th:field="*{source}" />
                 
                 <div class="form-group" th:if="*{isGlobal}">
-                    <label for="userId">Nutzer zuordnen</label>
+                    <label for="userId" th:text="#{inventory.input.assignUser}">Nutzer zuordnen</label>
                     <!-- #1193: server-side user search (remote-users) replaces the preloaded ${users} full list; the roster is queried on demand via /users/search. The empty option ("own entry") stays as the placeholder / self-assign choice. -->
                     <select id="userId" th:field="*{userId}" data-krt-combobox="remote-users">
-                        <option value="">-- Eigener Eintrag --</option>
+                        <option value="" th:text="#{inventory.input.assignUser.own}">-- Eigener Eintrag --</option>
                         <option th:if="${selectedUser != null}" th:value="${selectedUser.id}" th:text="${selectedUser.effectiveName != null ? selectedUser.effectiveName : selectedUser.username}"></option>
                     </select>
                 </div>

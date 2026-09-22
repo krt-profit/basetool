@@ -307,7 +307,7 @@ receives an in-app notification so they learn about the interested party without
 (#1187). This reuses the data-driven notification engine (REQ-NOTIF-007, ADR-0015) exactly like the
 bank booking-request decision (REQ-NOTIF-011): the release path publishes a
 `MaterialExchangeInterestRegisteredEvent` carrying the owner as the directed recipient
-(`contextRecipientSub`), and a seeded default rule (V211) resolves it through a single
+(`contextRecipientUserId`), and a seeded default rule (V211) resolves it through a single
 `EVENT_RECIPIENT` selector with `exclude_actor = TRUE`. The notification is emitted **only** on a
 genuinely new registration — a duplicate/idempotent registration (REQ-MARKET-006) emits nothing — and
 after the registration transaction commits (REQ-NOTIF-002), so a rolled-back registration produces no
@@ -584,7 +584,7 @@ appears in `details`.
 When a member signals they can supply a request (REQ-MARKET-017), the request's owner receives an
 in-app notification (the request-side mirror of REQ-MARKET-011). This reuses the data-driven engine
 (REQ-NOTIF-007, ADR-0015): the signal path publishes a `MaterialRequestFulfillmentSignalledEvent`
-carrying the owner as the directed recipient (`contextRecipientSub`), and a seeded default rule (V225)
+carrying the owner as the directed recipient (`contextRecipientUserId`), and a seeded default rule (V225)
 resolves it through a single `EVENT_RECIPIENT` selector with `exclude_actor = TRUE`. The notification
 is emitted only on a genuinely new signal, after commit (REQ-NOTIF-002). The supplier's name is a
 render parameter — a permitted disclosure because the notification reaches only the owner

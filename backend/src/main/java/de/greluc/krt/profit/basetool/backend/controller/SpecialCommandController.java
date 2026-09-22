@@ -57,8 +57,9 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>All write paths are ADMIN-gated, matching the SK-administration decision recorded in {@code
  * SPEZIALKOMMANDO_PLAN.md} §2 (D2): SK lifecycle is admin-only; per-SK Lead capabilities for
  * membership management are a separate authorisation surface that lives on the membership endpoints
- * (R5.b). The list endpoint is open to any authenticated caller so the owner picker fragment can
- * populate its dropdown without elevated rights.
+ * (R5.b). The single-row read shares that surface's gate so the lead's member page can show its SK.
+ * The list endpoint is open to any authenticated caller so the owner picker fragment can populate
+ * its dropdown without elevated rights.
  */
 @RestController
 @RequestMapping("/api/v1/special-commands")
@@ -119,22 +120,36 @@ public class SpecialCommandController {
   }
 
   /**
-   * Returns a single Spezialkommando by id. Used by the admin detail page and the membership
-   * management UI to resolve a chip click. ADMIN-only because the inactive-row visibility rules on
-   * {@link #getAllSpecialCommands} cannot be enforced on a single-row endpoint without complicating
-   * the surface.
+   * Returns a single Spezialkommando by id. Used by the SK member-management page ({@code
+   * /organisation/special-commands/{id}}) to render the SK header above its roster.
+   *
+   * <p>Gated exactly like the membership endpoints it sits beside, via {@link
+   * de.greluc.krt.profit.basetool.backend.service.SpecialCommandSecurityService#canManageMembers}:
+   * an admin may read any SK, a non-admin only the SK on which their own membership carries {@code
+   * SK_LEAD}. The row is returned whether or not it is active — a soft-deleted SK's description is
+   * then visible to its own lead, who already had it, and to nobody else, so the inactive-row rule
+   * of {@link #getAllSpecialCommands} (admin-only across all SKs) is not widened.
    *
    * @param id Spezialkommando id.
    * @return the matching DTO.
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException if no SK matches.
+   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException if no SK matches and
+   *     the caller is an admin (a non-admin is denied first, because an unknown id carries no lead
+   *     membership).
    */
   @GetMapping("/{id}")
-  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
+  @PreAuthorize("@specialCommandSecurityService.canManageMembers(#id, authentication)")
   @Operation(
       summary = "Get a Spezialkommando by id",
-      description = "Returns the full DTO for the requested Spezialkommando. ADMIN-only.")
+      description =
+          "Returns the full DTO for the requested Spezialkommando. Admin, or the SK lead of this"
+              + " Spezialkommando (the same gate as its member-management endpoints).")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Matching Spezialkommando."),
+    @ApiResponse(
+        responseCode = "403",
+        description =
+            "Caller is neither ADMIN nor Lead of this Spezialkommando — see"
+                + " SpecialCommandSecurityService.canManageMembers."),
     @ApiResponse(responseCode = "404", description = "No Spezialkommando matches the given id.")
   })
   public SpecialCommandDto getSpecialCommand(@PathVariable @NotNull UUID id) {
