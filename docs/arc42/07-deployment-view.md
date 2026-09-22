@@ -72,7 +72,11 @@ neither is a default one can rely on:
   release — and a container on `k8s-file` writes into podman's own storage where Alloy never looks.
 - the host has a **persistent journal** (`/var/log/journal`, `Storage=persistent`), because
   `loki.source.journal` names that path and systemd keeps the journal in RAM under
-  `/run/log/journal` when the directory is absent.
+  `/run/log/journal` when the directory is absent. Setting the two is not enough: journald switches
+  to persistent storage only on a **flush**, which on an ordinary boot comes once from
+  `systemd-journal-flush.service` and never again. Measured 2026-09-22 — with `Storage=persistent`
+  set and the directory created correctly, four restarts left it empty and `journalctl` kept
+  answering from RAM; one `journalctl --flush` moved 127 017 entries in 1.5 s.
 
 Either one missing is silent in the same way: Alloy is `active`, its scrape target is up, and Loki
 simply never gains `<svc>-stdout`, `mon-*`, `postgres-*`, `edge` or `ops-cleanup`. `log-streams`
