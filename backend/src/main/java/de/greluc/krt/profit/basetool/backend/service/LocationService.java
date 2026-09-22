@@ -22,8 +22,10 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.EntityInUseException;
+import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
@@ -83,8 +85,7 @@ public class LocationService {
    * @return all non-hidden locations as reference DTOs (no caching — pre-projected by the
    *     repository)
    */
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto>
-      findAllReference() {
+  public List<LocationReferenceDto> findAllReference() {
     return locationRepository.findAllReference();
   }
 
@@ -98,7 +99,7 @@ public class LocationService {
    * @param pageable page request from the whitelisted picker sort
    * @return one page of matching non-hidden locations as reference DTOs
    */
-  public Page<de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto> searchReference(
+  public Page<LocationReferenceDto> searchReference(
       @Nullable String search, @NotNull Pageable pageable) {
     return locationRepository.searchReference(LikePatterns.escapeNullable(search), pageable);
   }
@@ -114,10 +115,7 @@ public class LocationService {
   public Location getLocation(@NotNull UUID id) {
     return locationRepository
         .findById(id)
-        .orElseThrow(
-            () ->
-                new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                    "Location not found"));
+        .orElseThrow(() -> new NotFoundException("Location not found"));
   }
 
   /**

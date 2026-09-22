@@ -37,6 +37,7 @@ import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -161,11 +162,10 @@ public class BankAdminController {
    */
   @Operation(summary = "Export the bank audit log as JSON for a period (admin)")
   @GetMapping("/audit/export.json")
-  public ResponseEntity<java.util.List<BankAuditEventDto>> exportAuditLogJson(
+  public ResponseEntity<List<BankAuditEventDto>> exportAuditLogJson(
       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to) {
-    java.util.List<BankAuditEventDto> events =
-        bankAuditReportService.generateAuditLogJson(from, to);
+    List<BankAuditEventDto> events = bankAuditReportService.generateAuditLogJson(from, to);
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.APPLICATION_JSON);
     headers.setContentDispositionFormData("attachment", "audit-bank.json");

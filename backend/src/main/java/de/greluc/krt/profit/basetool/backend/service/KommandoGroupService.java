@@ -210,7 +210,7 @@ public class KommandoGroupService {
    * @param group the persisted group; never {@code null}.
    * @param version the client-held version, or {@code null} to skip the check.
    */
-  private static void assertVersionMatches(@NotNull KommandoGroup group, java.lang.Long version) {
+  private static void assertVersionMatches(@NotNull KommandoGroup group, Long version) {
     OptimisticLock.check(group.getVersion(), version, KommandoGroup.class, group.getId());
   }
 }

@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.model.projection.MissionParticipantCount;
@@ -66,6 +67,8 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -148,8 +151,7 @@ public class MissionService {
    *
    * @return lightweight reference projection of the picker-visible missions for the caller
    */
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto>
-      findAllActiveReference() {
+  public List<MissionReferenceDto> findAllActiveReference() {
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
     Instant terminalCutoff = OffsetDateTime.now(ZoneOffset.UTC).minusMonths(3).toInstant();
     return missionRepository.findAllActiveReference(
@@ -465,8 +467,7 @@ public class MissionService {
         Entities.require(missionRepository.findByIdForFullReplace(missionId), "Mission not found");
 
     if (!mission.getVersion().equals(request.version())) {
-      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
-          Mission.class, missionId);
+      throw new ObjectOptimisticLockingFailureException(Mission.class, missionId);
     }
 
     // Decide the effective actualStartTime UP FRONT, before mutating any setter on the managed
@@ -805,7 +806,7 @@ public class MissionService {
       String guestName,
       UUID desiredJobTypeId,
       String comment,
-      java.util.List<UUID> orgUnitIds,
+      List<UUID> orgUnitIds,
       PayoutPreference payoutPreference) {
     return missionParticipantService.addParticipant(
         missionId, userId, guestName, desiredJobTypeId, comment, orgUnitIds, payoutPreference);
@@ -869,11 +870,11 @@ public class MissionService {
       String comment,
       Instant startTime,
       Instant endTime,
-      java.util.List<UUID> orgUnitIds,
+      List<UUID> orgUnitIds,
       PayoutPreference payoutPreference,
       String guestName,
       Long version,
-      org.springframework.security.core.Authentication authentication) {
+      Authentication authentication) {
     return missionParticipantService.updateParticipantAttributes(
         missionId,
         participantId,
@@ -1367,8 +1368,7 @@ public class MissionService {
 
     long current = freq.getVersion() == null ? 0L : freq.getVersion();
     if (!expectedVersion.equals(current)) {
-      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
-          MissionFrequency.class, frequencyId);
+      throw new ObjectOptimisticLockingFailureException(MissionFrequency.class, frequencyId);
     }
 
     freq.setName(name.trim());
@@ -1473,7 +1473,7 @@ public class MissionService {
     long currentVersion =
         existing.map(MissionOwnership::getVersion).map(v -> v == null ? 0L : v).orElse(0L);
     if (expectedVersion != currentVersion) {
-      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
+      throw new ObjectOptimisticLockingFailureException(
           MissionOwnership.class, existing.map(MissionOwnership::getId).orElse(mission.getId()));
     }
     MissionOwnership ownership =

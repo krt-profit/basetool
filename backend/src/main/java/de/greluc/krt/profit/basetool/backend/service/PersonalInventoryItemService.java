@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.repository.SpaceStationRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import jakarta.persistence.EntityNotFoundException;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -288,7 +289,7 @@ public class PersonalInventoryItemService {
     String needle = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
     final int cap = Math.max(1, Math.min(limit, 2000));
 
-    List<UexLocationDto> hits = new java.util.ArrayList<>();
+    List<UexLocationDto> hits = new ArrayList<>();
     for (City c : cityRepository.findAll()) {
       if (c.getIdCity() == null || c.getName() == null) {
         continue;

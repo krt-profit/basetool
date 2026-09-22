@@ -21,10 +21,18 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderMapper;
+import de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
+import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemNeedDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemStockRow;
+import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialNeedDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
@@ -32,12 +40,14 @@ import de.greluc.krt.profit.basetool.backend.service.JobOrderStockProjectionServ
 import de.greluc.krt.profit.basetool.backend.support.QuantityTypeRounding;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
@@ -70,12 +80,11 @@ public class JobOrderQueryService {
   private final InventoryItemRepository inventoryItemRepository;
   private final OwnerScopeService ownerScopeService;
   private final JobOrderMapper jobOrderMapper;
-  private final de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper squadronMapper;
+  private final SquadronMapper squadronMapper;
   private final JobOrderItemService jobOrderItemService;
   private final JobOrderStockProjectionService jobOrderStockProjectionService;
   private final JobOrderMaterialRequirementResolver materialRequirementResolver;
-  private final de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper
-      inventoryItemMapper;
+  private final InventoryItemMapper inventoryItemMapper;
 
   /**
    * Paged list with optional status filter. Status is the primary discriminator the UI offers as a
@@ -191,8 +200,7 @@ public class JobOrderQueryService {
    *     aggregation, a cost the pickers that render no figure must not pay.
    * @return active job orders the caller may see, as reference DTOs
    */
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.JobOrderReferenceDto>
-      findAllActiveReference(boolean withNeeds) {
+  public List<JobOrderReferenceDto> findAllActiveReference(boolean withNeeds) {
     // M-2: mirror the list endpoint's controls. Viewer-side profit gate first (a non-profit member
     // sees nothing, not even the SK-public union), then per-row visibility scope on the loaded
     // rows.
@@ -218,7 +226,7 @@ public class JobOrderQueryService {
     return visible.stream()
         .map(
             o ->
-                new de.greluc.krt.profit.basetool.backend.model.dto.JobOrderReferenceDto(
+                new JobOrderReferenceDto(
                     o.getId(),
                     o.getDisplayId(),
                     o.getHandle(),
@@ -253,10 +261,8 @@ public class JobOrderQueryService {
    * @param stockIndex the batched order-linked stock lookup.
    * @return the order's buckets, empty when it requires no material.
    */
-  private List<de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialNeedDto>
-      materialNeedsOf(
-          @org.jetbrains.annotations.NotNull JobOrder order,
-          @org.jetbrains.annotations.NotNull OrderLinkedStockIndex stockIndex) {
+  private List<JobOrderMaterialNeedDto> materialNeedsOf(
+      @NotNull JobOrder order, @NotNull OrderLinkedStockIndex stockIndex) {
     return materialRequirementResolver.requirementsOf(order).stream()
         .map(
             requirement -> {
@@ -272,7 +278,7 @@ public class JobOrderQueryService {
                   QuantityTypeRounding.roundForQuantityType(
                       stockIndex.stockFor(order.getId(), requirement.material().id(), qualityFloor),
                       requirement.material());
-              return new de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialNeedDto(
+              return new JobOrderMaterialNeedDto(
                   requirement.material().id(),
                   qualityFloor,
                   required,
@@ -295,7 +301,7 @@ public class JobOrderQueryService {
   @NotNull
   private Map<UUID, Map<UUID, Double>> loadItemStockIndex(List<UUID> jobOrderIds) {
     Map<UUID, Map<UUID, Double>> index = new HashMap<>();
-    for (de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemStockRow row :
+    for (JobOrderGameItemStockRow row :
         inventoryItemRepository.findGameItemStockRowsByJobOrderIds(jobOrderIds)) {
       if (row.jobOrderId() == null || row.gameItemId() == null) {
         continue;
@@ -326,17 +332,15 @@ public class JobOrderQueryService {
    * @return the order's per-game-item needs, empty when it orders no items.
    */
   @NotNull
-  private List<de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemNeedDto>
-      gameItemNeedsOf(
-          @org.jetbrains.annotations.NotNull JobOrder order,
-          @org.jetbrains.annotations.NotNull Map<UUID, Map<UUID, Double>> itemStockByOrder) {
+  private List<JobOrderGameItemNeedDto> gameItemNeedsOf(
+      @NotNull JobOrder order, @NotNull Map<UUID, Map<UUID, Double>> itemStockByOrder) {
     if (order.getItems() == null || order.getItems().isEmpty()) {
       return List.of();
     }
     // gameItem.getId() resolves off the FK without initialising the lazy proxy, so this walk fires
     // no per-line catalogue query (the same read InventoryAggregationService relies on).
     Map<UUID, int[]> lineTotals = new LinkedHashMap<>();
-    for (de.greluc.krt.profit.basetool.backend.model.JobOrderItem line : order.getItems()) {
+    for (JobOrderItem line : order.getItems()) {
       if (line.getGameItem() == null) {
         continue;
       }
@@ -345,8 +349,7 @@ public class JobOrderQueryService {
       totals[1] += line.getDeliveredAmount() != null ? line.getDeliveredAmount() : 0;
     }
     Map<UUID, Double> earmarked = itemStockByOrder.getOrDefault(order.getId(), Map.of());
-    List<de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemNeedDto> needs =
-        new ArrayList<>();
+    List<JobOrderGameItemNeedDto> needs = new ArrayList<>();
     lineTotals.forEach(
         (gameItemId, totals) -> {
           int ordered = totals[0];
@@ -354,7 +357,7 @@ public class JobOrderQueryService {
           // Item rows hold whole units (REQ-INV-029), so the SCU-typed slice rounds loss-free.
           int allocated = (int) Math.round(earmarked.getOrDefault(gameItemId, 0.0));
           needs.add(
-              new de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemNeedDto(
+              new JobOrderGameItemNeedDto(
                   gameItemId,
                   ordered,
                   delivered,
@@ -395,8 +398,8 @@ public class JobOrderQueryService {
    * @param materialId target material on that order
    * @return list of inventory items as DTOs
    */
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto>
-      getInventoryItemsForJobOrderMaterial(UUID jobOrderId, UUID materialId) {
+  public List<InventoryItemDto> getInventoryItemsForJobOrderMaterial(
+      UUID jobOrderId, UUID materialId) {
     // Existence guards: load only to surface a 404 for an unknown order / material; the query below
     // filters by the ids directly, so the entities themselves are not needed (#1256 review).
     Entities.require(
@@ -407,24 +410,22 @@ public class JobOrderQueryService {
     return inventoryItemRepository.findByJobOrderIdAndMaterialId(jobOrderId, materialId).stream()
         .map(inventoryItemMapper::toDto)
         .sorted(
-            java.util.Comparator.comparing(
-                    (de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto item) ->
+            Comparator.comparing(
+                    (InventoryItemDto item) ->
                         item.user() != null && item.user().effectiveName() != null
                             ? item.user().effectiveName()
                             : "",
-                    java.util.Comparator.naturalOrder())
+                    Comparator.naturalOrder())
                 .thenComparing(
-                    item -> item.quality() != null ? item.quality() : 0,
-                    java.util.Comparator.reverseOrder())
+                    item -> item.quality() != null ? item.quality() : 0, Comparator.reverseOrder())
                 .thenComparing(
                     item ->
                         item.location() != null && item.location().name() != null
                             ? item.location().name()
                             : "",
-                    java.util.Comparator.naturalOrder())
+                    Comparator.naturalOrder())
                 .thenComparing(
-                    item -> item.amount() != null ? item.amount() : 0.0,
-                    java.util.Comparator.reverseOrder()))
+                    item -> item.amount() != null ? item.amount() : 0.0, Comparator.reverseOrder()))
         .toList();
   }
 
@@ -447,14 +448,13 @@ public class JobOrderQueryService {
    *     requirement.
    * @throws NotFoundException when the order does not exist.
    */
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto>
-      getOrphanedLinkedInventory(UUID jobOrderId) {
+  public List<InventoryItemDto> getOrphanedLinkedInventory(UUID jobOrderId) {
     JobOrder jobOrder =
         Entities.require(
             jobOrderRepository.findById(jobOrderId), () -> "JobOrder not found: " + jobOrderId);
     Set<UUID> requiredMaterials = jobOrderItemService.requiredMaterialIds(jobOrder);
     Set<UUID> requiredGameItems = jobOrderItemService.requiredGameItemIds(jobOrder);
-    return java.util.stream.Stream.concat(
+    return Stream.concat(
             inventoryItemRepository.findByJobOrderIdOrdered(jobOrderId).stream()
                 .filter(
                     item ->

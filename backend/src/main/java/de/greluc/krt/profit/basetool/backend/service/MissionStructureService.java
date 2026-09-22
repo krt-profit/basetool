@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
@@ -43,11 +44,15 @@ import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -367,14 +372,14 @@ public class MissionStructureService {
   public List<Ship> getSelectableUnitShips(@NotNull UUID missionId) {
     Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
 
-    java.util.Map<UUID, Ship> byId = new java.util.LinkedHashMap<>();
+    Map<UUID, Ship> byId = new LinkedHashMap<>();
 
     Set<UUID> participantUserIds =
         mission.getParticipants().stream()
             .map(MissionParticipant::getUser)
             .filter(Objects::nonNull)
             .map(User::getId)
-            .collect(java.util.stream.Collectors.toSet());
+            .collect(Collectors.toSet());
     if (!participantUserIds.isEmpty()) {
       shipRepository
           .findByOwnerIdIn(participantUserIds)
@@ -388,7 +393,7 @@ public class MissionStructureService {
       }
     }
 
-    return new java.util.ArrayList<>(byId.values());
+    return new ArrayList<>(byId.values());
   }
 
   /**
@@ -446,8 +451,7 @@ public class MissionStructureService {
             .anyMatch(c -> c.getParticipant().getId().equals(participantId));
 
     if (isAlreadyAssigned) {
-      throw new de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException(
-          "error.mission.crew.duplicate");
+      throw new DuplicateEntityException("error.mission.crew.duplicate");
     }
 
     MissionCrew crew = new MissionCrew();

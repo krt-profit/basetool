@@ -101,10 +101,7 @@ public class OperationFinanceService {
     Operation operation =
         operationRepository
             .findById(operationId)
-            .orElseThrow(
-                () ->
-                    new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                        "Operation not found"));
+            .orElseThrow(() -> new NotFoundException("Operation not found"));
 
     List<UUID> missionIds = operation.getMissions().stream().map(Mission::getId).toList();
 

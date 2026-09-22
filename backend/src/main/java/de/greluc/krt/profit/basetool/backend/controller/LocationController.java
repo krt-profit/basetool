@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.controller;
 import de.greluc.krt.profit.basetool.backend.mapper.LocationMapper;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.LocationService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
@@ -93,8 +94,7 @@ public class LocationController {
    * @return all non-hidden locations as reference DTOs
    */
   @GetMapping("/lookup")
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto>
-      lookupLocations() {
+  public List<LocationReferenceDto> lookupLocations() {
     return locationService.findAllReference();
   }
 
@@ -111,12 +111,11 @@ public class LocationController {
    * @return one page of matching non-hidden locations as reference DTOs
    */
   @GetMapping("/search")
-  public PageResponse<de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto>
-      searchLocations(
-          @RequestParam(required = false) String search,
-          @RequestParam(required = false) Integer page,
-          @RequestParam(required = false) Integer size,
-          @RequestParam(required = false) String sort) {
+  public PageResponse<LocationReferenceDto> searchLocations(
+      @RequestParam(required = false) String search,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      @RequestParam(required = false) String sort) {
     Pageable pageable =
         PaginationUtil.createPageRequest(page, size, sort, Set.of("name", "id"), "name");
     return PageResponse.of(locationService.searchReference(search, pageable));

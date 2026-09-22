@@ -37,6 +37,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.MDC;
 import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -205,7 +206,7 @@ public class TermsAcceptanceAccessFilter extends OncePerRequestFilter {
       writeForbiddenBody(request, response);
     } finally {
       if (owned) {
-        org.slf4j.MDC.remove(MDC_USER_ID);
+        MDC.remove(MDC_USER_ID);
       }
     }
   }
@@ -217,11 +218,11 @@ public class TermsAcceptanceAccessFilter extends OncePerRequestFilter {
    * @return {@code true} when this call stamped the key and must remove it again
    */
   private static boolean stampUserId(UUID userId) {
-    String existing = org.slf4j.MDC.get(MDC_USER_ID);
+    String existing = MDC.get(MDC_USER_ID);
     if (existing != null && !existing.isBlank()) {
       return false;
     }
-    org.slf4j.MDC.put(MDC_USER_ID, userId.toString());
+    MDC.put(MDC_USER_ID, userId.toString());
     return true;
   }
 

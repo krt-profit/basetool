@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkCheckoutRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkRebookRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkRebookResultDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryAllocationDimension;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryAllocationInput;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryAllocationWriteDto;
@@ -132,7 +133,7 @@ public class InventoryItemService {
    * @return one slice per (material, quality) the user owns, with the summed SCU; never {@code
    *     null}
    */
-  public List<OwnedStockSlice> getOwnedStockSlices(@org.jetbrains.annotations.NotNull UUID userId) {
+  public List<OwnedStockSlice> getOwnedStockSlices(@NotNull UUID userId) {
     return inventoryAggregationService.getOwnedStockSlices(userId);
   }
 
@@ -178,8 +179,7 @@ public class InventoryItemService {
    * @param userId owner id
    * @return aggregated items grouped by material
    */
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
-      getMyAggregatedInventory(UUID userId) {
+  public List<GroupedInventoryDto> getMyAggregatedInventory(UUID userId) {
     return inventoryAggregationService.getMyAggregatedInventory(userId);
   }
 
@@ -191,8 +191,8 @@ public class InventoryItemService {
    * @param missionIds optional mission filter
    * @return aggregated items
    */
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
-      getMyAggregatedInventory(UUID userId, List<UUID> jobOrderIds, List<UUID> missionIds) {
+  public List<GroupedInventoryDto> getMyAggregatedInventory(
+      UUID userId, List<UUID> jobOrderIds, List<UUID> missionIds) {
     return inventoryAggregationService.getMyAggregatedInventory(userId, jobOrderIds, missionIds);
   }
 
@@ -209,13 +209,12 @@ public class InventoryItemService {
    * @return aggregated items
    * @throws NotFoundException when the user id is unknown
    */
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
-      getMyAggregatedInventory(
-          UUID userId,
-          List<UUID> materialIds,
-          Integer minQuality,
-          List<UUID> jobOrderIds,
-          List<UUID> missionIds) {
+  public List<GroupedInventoryDto> getMyAggregatedInventory(
+      UUID userId,
+      List<UUID> materialIds,
+      Integer minQuality,
+      List<UUID> jobOrderIds,
+      List<UUID> missionIds) {
     return inventoryAggregationService.getMyAggregatedInventory(
         userId, materialIds, minQuality, jobOrderIds, missionIds);
   }
@@ -240,16 +239,15 @@ public class InventoryItemService {
    * @return aggregated items
    * @throws NotFoundException when the user id is unknown
    */
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
-      getMyAggregatedInventory(
-          UUID userId,
-          List<UUID> materialIds,
-          List<UUID> locationIds,
-          Integer minQuality,
-          List<UUID> jobOrderIds,
-          List<UUID> missionIds,
-          boolean personalOnly,
-          boolean nonPersonalOnly) {
+  public List<GroupedInventoryDto> getMyAggregatedInventory(
+      UUID userId,
+      List<UUID> materialIds,
+      List<UUID> locationIds,
+      Integer minQuality,
+      List<UUID> jobOrderIds,
+      List<UUID> missionIds,
+      boolean personalOnly,
+      boolean nonPersonalOnly) {
     return inventoryAggregationService.getMyAggregatedInventory(
         userId,
         materialIds,
@@ -308,8 +306,8 @@ public class InventoryItemService {
    * @param minQuality optional min-quality filter
    * @return aggregated squadron-wide items
    */
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
-      getAllAggregatedInventory(List<UUID> materialIds, Integer minQuality) {
+  public List<GroupedInventoryDto> getAllAggregatedInventory(
+      List<UUID> materialIds, Integer minQuality) {
     return inventoryAggregationService.getAllAggregatedInventory(materialIds, minQuality);
   }
 
@@ -324,13 +322,12 @@ public class InventoryItemService {
    * @param missionIds optional mission filter
    * @return aggregated items grouped by material
    */
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
-      getAllAggregatedInventory(
-          List<UUID> materialIds,
-          List<UUID> locationIds,
-          Integer minQuality,
-          List<UUID> jobOrderIds,
-          List<UUID> missionIds) {
+  public List<GroupedInventoryDto> getAllAggregatedInventory(
+      List<UUID> materialIds,
+      List<UUID> locationIds,
+      Integer minQuality,
+      List<UUID> jobOrderIds,
+      List<UUID> missionIds) {
     return inventoryAggregationService.getAllAggregatedInventory(
         materialIds, locationIds, minQuality, jobOrderIds, missionIds);
   }

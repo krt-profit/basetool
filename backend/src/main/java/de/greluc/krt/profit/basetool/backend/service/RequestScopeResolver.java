@@ -38,6 +38,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.Hibernate;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.stereotype.Service;
@@ -232,8 +233,8 @@ public class RequestScopeResolver {
     if (authHelper.isAdmin()) {
       Optional<UUID> active = readActiveSquadronFromHeader();
       return active
-          .map(id -> new ScopePredicate(false, id, java.util.Set.of()))
-          .orElseGet(() -> new ScopePredicate(true, null, java.util.Set.of()));
+          .map(id -> new ScopePredicate(false, id, Set.of()))
+          .orElseGet(() -> new ScopePredicate(true, null, Set.of()));
     }
     // R5.e: non-admin path. Read the same active-OrgUnit header the admin switcher uses — once
     // the frontend's R5.e switcher widening lets non-admins pick from their memberships, the
@@ -242,10 +243,10 @@ public class RequestScopeResolver {
     // cascade, so a Bereichsleitung/OL may pin to a descendant unit but never to a foreign one.
     // This is the defence against a spoofed header from a curl call; a pin outside that reach
     // silently collapses to the reach-union read so the user never sees data they did not opt into.
-    java.util.Set<UUID> memberOrgUnitIds = currentMemberOrgUnitIds();
+    Set<UUID> memberOrgUnitIds = currentMemberOrgUnitIds();
     Optional<UUID> pinned = readActiveSquadronFromHeader();
     if (pinned.isPresent() && memberOrgUnitIds.contains(pinned.get())) {
-      return new ScopePredicate(false, pinned.get(), java.util.Set.of());
+      return new ScopePredicate(false, pinned.get(), Set.of());
     }
     return new ScopePredicate(false, null, memberOrgUnitIds);
   }
@@ -283,7 +284,7 @@ public class RequestScopeResolver {
         && base.activeOrgUnitId() == null
         && !authHelper.isAdmin()
         && currentUserIsOlMember()) {
-      return new ScopePredicate(true, null, java.util.Set.of());
+      return new ScopePredicate(true, null, Set.of());
     }
     return base;
   }
@@ -312,7 +313,7 @@ public class RequestScopeResolver {
    * @return the squadron id set the user-list queries filter on, or {@code null} for the unfiltered
    *     admin/leadership all-scope.
    */
-  @org.jetbrains.annotations.Nullable
+  @Nullable
   public Set<UUID> currentUserListScopeSquadronIds() {
     if (authHelper.isAdmin()) {
       Optional<UUID> pin = readActiveSquadronFromHeader();

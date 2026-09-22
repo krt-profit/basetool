@@ -37,6 +37,7 @@ import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -108,8 +109,7 @@ public class SpecialCommandController {
       @RequestParam(required = false) String sort,
       @RequestParam(required = false, defaultValue = "false") boolean includeInactive) {
     if (includeInactive && !authHelperService.isAdmin()) {
-      throw new org.springframework.security.access.AccessDeniedException(
-          "includeInactive=true requires ROLE_ADMIN");
+      throw new AccessDeniedException("includeInactive=true requires ROLE_ADMIN");
     }
     Pageable pageable = PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "name");
     Page<SpecialCommand> p = specialCommandService.getAllSpecialCommands(pageable, includeInactive);

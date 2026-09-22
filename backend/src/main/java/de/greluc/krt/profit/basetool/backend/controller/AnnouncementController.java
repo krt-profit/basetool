@@ -23,6 +23,9 @@ import de.greluc.krt.profit.basetool.backend.mapper.AnnouncementMapper;
 import de.greluc.krt.profit.basetool.backend.model.dto.AnnouncementDto;
 import de.greluc.krt.profit.basetool.backend.service.AnnouncementService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.http.ResponseEntity;
@@ -90,7 +93,7 @@ public class AnnouncementController {
   @PutMapping
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public AnnouncementDto updateAnnouncement(
-      @NotNull @RequestBody @jakarta.validation.Valid AnnouncementRequest request) {
+      @NotNull @RequestBody @Valid AnnouncementRequest request) {
     return announcementMapper.toDto(
         announcementService.updateAnnouncement(request.getContent(), request.getVersion()));
   }
@@ -103,9 +106,9 @@ public class AnnouncementController {
   }
 
   /** Request body for {@link #updateAnnouncement}. */
-  @lombok.Data
+  @Data
   public static class AnnouncementRequest {
-    @jakarta.validation.constraints.NotBlank private String content;
+    @NotBlank private String content;
     @jakarta.validation.constraints.NotNull private Long version;
   }
 }

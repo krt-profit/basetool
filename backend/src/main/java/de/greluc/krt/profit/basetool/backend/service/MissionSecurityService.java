@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
@@ -219,10 +220,7 @@ public class MissionSecurityService {
     MissionFinanceEntry entry =
         missionFinanceEntryRepository
             .findById(entryId)
-            .orElseThrow(
-                () ->
-                    new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                        "Finance entry not found"));
+            .orElseThrow(() -> new NotFoundException("Finance entry not found"));
 
     Collection<? extends GrantedAuthority> reachable =
         roleHierarchy.getReachableGrantedAuthorities(authentication.getAuthorities());

@@ -249,8 +249,7 @@ public class AuthHelperService {
     return scope().canEditOrgUnit(orgUnitId);
   }
 
-  private de.greluc.krt.profit.basetool.backend.service.OwnerScopeService scope() {
-    return applicationContext.getBean(
-        de.greluc.krt.profit.basetool.backend.service.OwnerScopeService.class);
+  private OwnerScopeService scope() {
+    return applicationContext.getBean(OwnerScopeService.class);
   }
 }

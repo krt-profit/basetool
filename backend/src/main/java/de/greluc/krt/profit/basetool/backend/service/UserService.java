@@ -19,17 +19,25 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.MembershipFlagsPatchRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject;
 import de.greluc.krt.profit.basetool.backend.support.HandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Locale;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,6 +47,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
@@ -133,8 +142,7 @@ public class UserService {
       log.error(
           "JWT has no subject (sub). Refusing the request. Claim keys: {}",
           jwt.getClaims().keySet());
-      throw new org.springframework.security.authentication.AuthenticationServiceException(
-          "JWT subject (sub) must be present");
+      throw new AuthenticationServiceException("JWT subject (sub) must be present");
     }
 
     try {
@@ -147,8 +155,7 @@ public class UserService {
       log.error(
           "JWT subject is not a valid UUID: '{}'. Refusing the request to avoid identity mix-up.",
           sub);
-      throw new org.springframework.security.authentication.AuthenticationServiceException(
-          "JWT subject must be a UUID");
+      throw new AuthenticationServiceException("JWT subject must be a UUID");
     }
   }
 
@@ -175,14 +182,9 @@ public class UserService {
       @Nullable String description,
       @Nullable String displayName,
       @Nullable Long version,
-      @Nullable java.time.LocalDate joinDate) {
+      @Nullable LocalDate joinDate) {
     User user =
-        userRepository
-            .findById(id)
-            .orElseThrow(
-                () ->
-                    new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                        "User not found"));
+        userRepository.findById(id).orElseThrow(() -> new NotFoundException("User not found"));
 
     OptimisticLock.checkOptionalClient(user.getVersion(), version, User.class, id);
 
@@ -231,12 +233,7 @@ public class UserService {
       @Nullable String displayName,
       @Nullable Long version) {
     User user =
-        userRepository
-            .findById(id)
-            .orElseThrow(
-                () ->
-                    new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                        "User not found"));
+        userRepository.findById(id).orElseThrow(() -> new NotFoundException("User not found"));
     OptimisticLock.checkOptionalClient(user.getVersion(), version, User.class, id);
     if (description != null) {
       user.setDescription(description);
@@ -274,12 +271,7 @@ public class UserService {
   public User updateUserDefaultPayoutPreference(
       @NotNull UUID id, @NotNull PayoutPreference preference, @Nullable Long version) {
     User user =
-        userRepository
-            .findById(id)
-            .orElseThrow(
-                () ->
-                    new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                        "User not found"));
+        userRepository.findById(id).orElseThrow(() -> new NotFoundException("User not found"));
     OptimisticLock.checkOptionalClient(user.getVersion(), version, User.class, id);
     user.setDefaultPayoutPreference(preference);
     // saveAndFlush so the bumped @Version reaches the response — the profile payout-preference
@@ -310,12 +302,7 @@ public class UserService {
   public User updateUserShareBlueprintsGlobally(
       @NotNull UUID id, boolean shareBlueprintsGlobally, @Nullable Long version) {
     User user =
-        userRepository
-            .findById(id)
-            .orElseThrow(
-                () ->
-                    new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                        "User not found"));
+        userRepository.findById(id).orElseThrow(() -> new NotFoundException("User not found"));
     OptimisticLock.checkOptionalClient(user.getVersion(), version, User.class, id);
     user.setShareBlueprintsGlobally(shareBlueprintsGlobally);
     // saveAndFlush so the bumped @Version reaches the response — the profile blueprint-sharing
@@ -337,12 +324,7 @@ public class UserService {
   @Transactional
   public User updateReadAnnouncement(@NotNull UUID id, @NotNull UUID announcementId) {
     User user =
-        userRepository
-            .findById(id)
-            .orElseThrow(
-                () ->
-                    new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                        "User not found"));
+        userRepository.findById(id).orElseThrow(() -> new NotFoundException("User not found"));
     user.setLastReadAnnouncementId(announcementId);
     return userRepository.save(user);
   }
@@ -356,7 +338,7 @@ public class UserService {
    * @return scoped user list, case-insensitively sorted by username
    */
   public List<User> findAll() {
-    java.util.Set<UUID> scope = ownerScopeService.currentUserListScopeSquadronIds();
+    Set<UUID> scope = ownerScopeService.currentUserListScopeSquadronIds();
     return userRepository.findAllScopedList(
         scope, Sort.by(Sort.Order.asc("username").ignoreCase()));
   }
@@ -368,7 +350,7 @@ public class UserService {
    * @return scoped paged user list
    */
   public Page<User> findAll(@NotNull Pageable pageable) {
-    java.util.Set<UUID> scope = ownerScopeService.currentUserListScopeSquadronIds();
+    Set<UUID> scope = ownerScopeService.currentUserListScopeSquadronIds();
     return userRepository.findAllScoped(scope, pageable);
   }
 
@@ -388,7 +370,7 @@ public class UserService {
    */
   @NotNull
   public Page<User> findEvaluatableMembers(@NotNull Pageable pageable) {
-    java.util.Set<UUID> scope = ownerScopeService.currentUserListScopeSquadronIds();
+    Set<UUID> scope = ownerScopeService.currentUserListScopeSquadronIds();
     return userRepository.findEvaluatableMembers(scope, pageable);
   }
 
@@ -399,8 +381,8 @@ public class UserService {
    *
    * @return lightweight reference projection used by typeaheads
    */
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto> findAllReference() {
-    java.util.Set<UUID> scope = ownerScopeService.currentUserListScopeSquadronIds();
+  public List<UserReferenceDto> findAllReference() {
+    Set<UUID> scope = ownerScopeService.currentUserListScopeSquadronIds();
     return userRepository.findAllReferenceScoped(scope);
   }
 
@@ -412,7 +394,7 @@ public class UserService {
    * @return matching users in the caller's squadron context
    */
   public List<User> searchByUsername(@NotNull String query) {
-    java.util.Set<UUID> scope = ownerScopeService.currentUserListScopeSquadronIds();
+    Set<UUID> scope = ownerScopeService.currentUserListScopeSquadronIds();
     return userRepository.searchScopedList(LikePatterns.escapeNullable(query), scope);
   }
 
@@ -425,7 +407,7 @@ public class UserService {
    * @return matching users in the caller's squadron context
    */
   public Page<User> searchByUsername(@NotNull String query, @NotNull Pageable pageable) {
-    java.util.Set<UUID> scope = ownerScopeService.currentUserListScopeSquadronIds();
+    Set<UUID> scope = ownerScopeService.currentUserListScopeSquadronIds();
     return userRepository.searchScoped(LikePatterns.escapeNullable(query), scope, pageable);
   }
 
@@ -439,9 +421,9 @@ public class UserService {
    * @param pageable page request
    * @return matching user references in the caller's squadron context
    */
-  public Page<de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto>
-      searchReferencesByUsername(@NotNull String query, @NotNull Pageable pageable) {
-    java.util.Set<UUID> scope = ownerScopeService.currentUserListScopeSquadronIds();
+  public Page<UserReferenceDto> searchReferencesByUsername(
+      @NotNull String query, @NotNull Pageable pageable) {
+    Set<UUID> scope = ownerScopeService.currentUserListScopeSquadronIds();
     return userRepository.searchScopedReferences(
         LikePatterns.escapeNullable(query), scope, pageable);
   }
@@ -454,12 +436,7 @@ public class UserService {
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no match
    */
   public User findById(@NotNull UUID id) {
-    return userRepository
-        .findById(id)
-        .orElseThrow(
-            () ->
-                new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                    "User not found"));
+    return userRepository.findById(id).orElseThrow(() -> new NotFoundException("User not found"));
   }
 
   /**
@@ -514,8 +491,7 @@ public class UserService {
       // Deliberately without the value: it reaches the log unfiltered otherwise, and a subject from
       // a deviating realm can be a username (REQ-OBS-004).
       log.error("Authenticated subject is not a UUID. Refusing to avoid an identity mix-up.");
-      throw new org.springframework.security.authentication.AuthenticationServiceException(
-          "Authenticated subject must be a UUID");
+      throw new AuthenticationServiceException("Authenticated subject must be a UUID");
     }
   }
 
@@ -552,10 +528,7 @@ public class UserService {
    * @throws java.util.NoSuchElementException when the user does not exist.
    */
   @Transactional
-  public java.util.List<de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership>
-      applyMembershipDelta(
-          UUID userId,
-          de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest delta) {
+  public List<OrgUnitMembership> applyMembershipDelta(UUID userId, MembershipDeltaRequest delta) {
     User user =
         userRepository
             .findById(userId)
@@ -565,9 +538,7 @@ public class UserService {
       orgUnitMembershipService.reconcileStaffelMemberships(user, delta.staffeln());
     }
     if (delta.specialCommands() != null) {
-      for (de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest
-              .SpecialCommandChange
-          sk : delta.specialCommands()) {
+      for (MembershipDeltaRequest.SpecialCommandChange sk : delta.specialCommands()) {
         applySpecialCommandChange(userId, sk);
       }
     }
@@ -586,13 +557,10 @@ public class UserService {
    * @param change the SK-side change record.
    */
   private void applySpecialCommandChange(
-      UUID userId,
-      de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest.SpecialCommandChange
-          change) {
+      UUID userId, MembershipDeltaRequest.SpecialCommandChange change) {
     switch (change.action()) {
       case ADD -> {
-        de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership fresh =
-            orgUnitMembershipService.addMember(change.orgUnitId(), userId);
+        OrgUnitMembership fresh = orgUnitMembershipService.addMember(change.orgUnitId(), userId);
         if (Boolean.TRUE.equals(change.isLogistician())
             || Boolean.TRUE.equals(change.isMissionManager())) {
           // The freshly-created row has version 0 and is still managed in this transaction.
@@ -612,7 +580,7 @@ public class UserService {
           orgUnitMembershipService.patchFlags(
               change.orgUnitId(),
               userId,
-              new de.greluc.krt.profit.basetool.backend.model.dto.MembershipFlagsPatchRequest(
+              new MembershipFlagsPatchRequest(
                   change.isLogistician(), change.isMissionManager(), change.version()));
       default ->
           throw new IllegalArgumentException(
@@ -657,8 +625,7 @@ public class UserService {
     if (candidate.isEmpty()) {
       return;
     }
-    if (userRepository.existsOtherAccountWithName(
-        candidate.toLowerCase(java.util.Locale.ROOT), selfId)) {
+    if (userRepository.existsOtherAccountWithName(candidate.toLowerCase(Locale.ROOT), selfId)) {
       throw new IllegalArgumentException("This display name is already in use");
     }
   }

@@ -60,6 +60,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -1187,7 +1188,7 @@ public class JobOrderService {
       boolean targetIsSpecialCommand = target.getKind() == OrgUnitKind.SPECIAL_COMMAND;
       boolean mayEditCurrent = current != null && authHelperService.canEditOrgUnit(current.getId());
       if (!(currentIsSquadron && targetIsSpecialCommand && mayEditCurrent)) {
-        throw new org.springframework.security.access.AccessDeniedException(
+        throw new AccessDeniedException(
             "Only an admin may reassign freely; a squadron logistician/officer may only escalate"
                 + " their own squadron's order to a Spezialkommando.");
       }

@@ -34,6 +34,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.springframework.beans.factory.annotation.Autowired;
 
 /** MapStruct mapper between Inventory Item entities and DTOs. */
 @Mapper(
@@ -45,7 +46,7 @@ public abstract class InventoryItemMapper {
   // in by field injection — the same shape as MissionMapper and UserMapper. The mapper depends only
   // on the support-package leaf interface, never on the service layer or on SecurityContextHolder
   // (ArchUnit mapperLayerShouldNotReachIntoSecurityContext).
-  @org.springframework.beans.factory.annotation.Autowired protected StockViewerAccess stockAccess;
+  @Autowired protected StockViewerAccess stockAccess;
 
   /**
    * Resolves the caller-dependent {@code canEdit} projection of one Lager row.

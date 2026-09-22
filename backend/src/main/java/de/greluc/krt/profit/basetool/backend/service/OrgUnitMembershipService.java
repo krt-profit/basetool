@@ -60,6 +60,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
@@ -867,8 +868,8 @@ public class OrgUnitMembershipService {
       @NotNull UUID squadronId,
       @NotNull UUID userId,
       @NotNull MembershipRole rank,
-      @org.jetbrains.annotations.Nullable UUID kommandoGroupId,
-      @org.jetbrains.annotations.Nullable Long version) {
+      @Nullable UUID kommandoGroupId,
+      @Nullable Long version) {
     if (!rank.isSquadronRank()) {
       throw new BadRequestException("Rank " + rank + " is not a squadron rank");
     }
@@ -925,9 +926,7 @@ public class OrgUnitMembershipService {
    */
   @Transactional
   public OrgUnitMembership removeSquadronRank(
-      @NotNull UUID squadronId,
-      @NotNull UUID userId,
-      @org.jetbrains.annotations.Nullable Long version) {
+      @NotNull UUID squadronId, @NotNull UUID userId, @Nullable Long version) {
     OrgUnitMembership m =
         Entities.require(
             membershipRepository.findById(new OrgUnitMembershipId(userId, squadronId)),
@@ -1075,8 +1074,8 @@ public class OrgUnitMembershipService {
       @NotNull UUID squadronId,
       @NotNull UUID userId,
       @NotNull MembershipRole rank,
-      @org.jetbrains.annotations.Nullable UUID kommandoGroupId,
-      @org.jetbrains.annotations.Nullable Long version) {
+      @Nullable UUID kommandoGroupId,
+      @Nullable Long version) {
     return orgUnitMembershipMapper.toDto(
         assignSquadronRank(squadronId, userId, rank, kommandoGroupId, version));
   }
@@ -1096,9 +1095,7 @@ public class OrgUnitMembershipService {
    */
   @Transactional
   public OrgUnitMembershipDto removeSquadronRankDto(
-      @NotNull UUID squadronId,
-      @NotNull UUID userId,
-      @org.jetbrains.annotations.Nullable Long version) {
+      @NotNull UUID squadronId, @NotNull UUID userId, @Nullable Long version) {
     return orgUnitMembershipMapper.toDto(removeSquadronRank(squadronId, userId, version));
   }
 
@@ -1114,11 +1111,9 @@ public class OrgUnitMembershipService {
    * @throws NotFoundException if a referenced group does not exist.
    * @throws BadRequestException on a group pairing that violates the rank's contract.
    */
-  @org.jetbrains.annotations.Nullable
+  @Nullable
   private KommandoGroup resolveKommandoGroupForRank(
-      @NotNull UUID squadronId,
-      @NotNull MembershipRole rank,
-      @org.jetbrains.annotations.Nullable UUID kommandoGroupId) {
+      @NotNull UUID squadronId, @NotNull MembershipRole rank, @Nullable UUID kommandoGroupId) {
     boolean groupRequired =
         rank == MembershipRole.KOMMANDOLEITER || rank == MembershipRole.STELLV_KOMMANDOLEITER;
     boolean groupAllowed = groupRequired || rank == MembershipRole.ENSIGN;
@@ -1163,7 +1158,7 @@ public class OrgUnitMembershipService {
       @NotNull UUID squadronId,
       @NotNull UUID userId,
       @NotNull MembershipRole rank,
-      @org.jetbrains.annotations.Nullable KommandoGroup group) {
+      @Nullable KommandoGroup group) {
     List<OrgUnitMembership> roster =
         membershipRepository.findAllByIdOrgUnitId(squadronId).stream()
             .filter(m -> !m.getId().getUserId().equals(userId))
@@ -1295,7 +1290,7 @@ public class OrgUnitMembershipService {
    * @param orgUnitId the org unit id; never {@code null}.
    * @return the org unit's shorthand/name label, or {@code null}.
    */
-  private @org.jetbrains.annotations.Nullable String orgUnitLabelById(@NotNull UUID orgUnitId) {
+  private @Nullable String orgUnitLabelById(@NotNull UUID orgUnitId) {
     return orgUnitRepository.findById(orgUnitId).map(OrgUnitLabels::shorthandOrName).orElse(null);
   }
 }

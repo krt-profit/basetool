@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
+import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.StarSystem;
 import de.greluc.krt.profit.basetool.backend.repository.StarSystemRepository;
 import java.util.UUID;
@@ -70,10 +71,7 @@ public class StarSystemService {
   public StarSystem getStarSystem(@NotNull UUID id) {
     return starSystemRepository
         .findById(id)
-        .orElseThrow(
-            () ->
-                new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                    "StarSystem not found"));
+        .orElseThrow(() -> new NotFoundException("StarSystem not found"));
   }
 
   /**

@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.service.MaterialExternalAliasServic
 import de.greluc.krt.profit.basetool.backend.service.MaterialNameCanonicalizer;
 import de.greluc.krt.profit.basetool.backend.service.SyncReportService;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -330,7 +331,7 @@ public class ScWikiCommoditySyncService {
       if (canon == null || canon.isBlank()) {
         continue;
       }
-      index.computeIfAbsent(canon, k -> new java.util.ArrayList<>()).add(material);
+      index.computeIfAbsent(canon, k -> new ArrayList<>()).add(material);
     }
     return index;
   }

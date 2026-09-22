@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.ShipMapper;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
+import de.greluc.krt.profit.basetool.backend.model.ShipType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronShipDetailDto;
@@ -38,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import jakarta.persistence.EntityManager;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -198,18 +200,16 @@ public class HangarService {
             normalizedQuery,
             pageable);
 
-    List<de.greluc.krt.profit.basetool.backend.model.ShipType> types =
+    List<ShipType> types =
         includeOwnerDetails
-            ? p.getContent().stream()
-                .map(obj -> (de.greluc.krt.profit.basetool.backend.model.ShipType) obj[0])
-                .toList()
-            : java.util.Collections.emptyList();
+            ? p.getContent().stream().map(obj -> (ShipType) obj[0]).toList()
+            : Collections.emptyList();
 
     List<Ship> ships =
         includeOwnerDetails && !types.isEmpty()
             ? shipRepository.findByShipTypeInScoped(
                 types, scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds())
-            : java.util.Collections.emptyList();
+            : Collections.emptyList();
 
     // Index the ships by their type once (O(ships)) instead of re-scanning the whole list per
     // ship-type row (the former O(types × ships) filter inside the page map).
@@ -218,8 +218,7 @@ public class HangarService {
 
     return p.map(
         obj -> {
-          de.greluc.krt.profit.basetool.backend.model.ShipType type =
-              (de.greluc.krt.profit.basetool.backend.model.ShipType) obj[0];
+          ShipType type = (ShipType) obj[0];
           List<SquadronShipDetailDto> details = null;
           if (includeOwnerDetails) {
             details =

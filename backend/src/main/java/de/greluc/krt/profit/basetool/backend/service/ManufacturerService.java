@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
+import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.repository.ManufacturerRepository;
 import java.util.UUID;
@@ -76,10 +77,7 @@ public class ManufacturerService {
   public Manufacturer getManufacturer(@NotNull UUID id) {
     return manufacturerRepository
         .findById(id)
-        .orElseThrow(
-            () ->
-                new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                    "Manufacturer not found"));
+        .orElseThrow(() -> new NotFoundException("Manufacturer not found"));
   }
 
   /**

@@ -19,7 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.support;
 
+import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderAssigneeDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
+import java.util.List;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Nullable;
 
@@ -94,20 +96,13 @@ public final class UserDtoRedaction {
    * @return the same rows with peer-shaped users, or {@code null} for a {@code null} input.
    */
   @Contract("null -> null; !null -> !null")
-  public static @Nullable java.util.List<
-          de.greluc.krt.profit.basetool.backend.model.dto.JobOrderAssigneeDto>
-      toPeerShapedAssignees(
-          @Nullable
-              java.util.List<de.greluc.krt.profit.basetool.backend.model.dto.JobOrderAssigneeDto>
-                  assignees) {
+  public static @Nullable List<JobOrderAssigneeDto> toPeerShapedAssignees(
+      @Nullable List<JobOrderAssigneeDto> assignees) {
     if (assignees == null) {
       return null;
     }
     return assignees.stream()
-        .map(
-            a ->
-                new de.greluc.krt.profit.basetool.backend.model.dto.JobOrderAssigneeDto(
-                    toPeerShape(a.user()), a.note(), a.version()))
+        .map(a -> new JobOrderAssigneeDto(toPeerShape(a.user()), a.note(), a.version()))
         .toList();
   }
 

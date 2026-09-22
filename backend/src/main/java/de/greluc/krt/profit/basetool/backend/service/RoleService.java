@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
+import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
@@ -139,10 +140,7 @@ public class RoleService {
     Role role =
         roleRepository
             .findByName(roleName)
-            .orElseThrow(
-                () ->
-                    new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                        "Role not found"));
+            .orElseThrow(() -> new NotFoundException("Role not found"));
     // Snapshot BEFORE the setter: setPermissions replaces the ElementCollection wholesale, after
     // which the previous grant is gone from memory as well as from the row.
     Set<String> previous = new HashSet<>(role.getPermissions());
@@ -273,10 +271,7 @@ public class RoleService {
     Role role =
         roleRepository
             .findByName(roleName)
-            .orElseThrow(
-                () ->
-                    new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                        "Role not found"));
+            .orElseThrow(() -> new NotFoundException("Role not found"));
     role.setDescription(description);
     return roleRepository.save(role);
   }

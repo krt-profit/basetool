@@ -20,11 +20,15 @@
 package de.greluc.krt.profit.basetool.backend.repository;
 
 import de.greluc.krt.profit.basetool.backend.model.Mission;
+import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -85,10 +89,10 @@ public interface MissionRepository
       """
           + ScopeSpecifications.MISSION_SCOPE_PREDICATE
           + " ORDER BY m.plannedStartTime DESC NULLS LAST, m.name ASC")
-  List<de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto> findAllActiveReference(
+  List<MissionReferenceDto> findAllActiveReference(
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
       @Param("viewerIsMemberOrAbove") boolean viewerIsMemberOrAbove,
       @Param("cutoff") Instant cutoff);
 
@@ -129,7 +133,7 @@ public interface MissionRepository
    * @return the next matching mission, or empty when none upcoming
    */
   Optional<Mission> findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc(
-      Instant date, java.util.Collection<String> statuses);
+      Instant date, Collection<String> statuses);
 
   /**
    * Org-unit-scoped next-mission lookup (REQ-MISSION-008). Returns the upcoming missions owned by
@@ -176,9 +180,9 @@ public interface MissionRepository
       """)
   List<Mission> findNextScopedMission(
       @Param("now") Instant now,
-      @Param("statuses") java.util.Collection<String> statuses,
+      @Param("statuses") Collection<String> statuses,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
       Pageable pageable);
 
   /**
@@ -230,7 +234,7 @@ public interface MissionRepository
       @Param("operationId") UUID operationId,
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
       @Param("viewerIsMemberOrAbove") boolean viewerIsMemberOrAbove,
       Pageable pageable);
 
@@ -238,24 +242,18 @@ public interface MissionRepository
    * Bulk-reassigns every mission owned by {@code oldUser} to {@code newUser}; used by the
    * user-merge flow so missions are preserved when two Keycloak accounts get consolidated.
    */
-  @org.springframework.data.jpa.repository.Modifying
-  @org.springframework.data.jpa.repository.Query(
-      "UPDATE Mission m SET m.owner = :newUser WHERE m.owner = :oldUser")
-  void updateOwner(
-      @org.jetbrains.annotations.NotNull de.greluc.krt.profit.basetool.backend.model.User oldUser,
-      @org.jetbrains.annotations.NotNull de.greluc.krt.profit.basetool.backend.model.User newUser);
+  @Modifying
+  @Query("UPDATE Mission m SET m.owner = :newUser WHERE m.owner = :oldUser")
+  void updateOwner(@NotNull User oldUser, @NotNull User newUser);
 
   /**
    * Removes the given user from every mission's manager set via direct delete on the join table.
    * Native query because Hibernate cannot bulk-delete a {@code @ManyToMany} association directly -
    * JPQL would require loading every mission first.
    */
-  @org.springframework.data.jpa.repository.Modifying
-  @org.springframework.data.jpa.repository.Query(
-      value = "DELETE FROM mission_managers WHERE user_id = :userId",
-      nativeQuery = true)
-  void removeManager(
-      @org.springframework.data.repository.query.Param("userId") java.util.UUID userId);
+  @Modifying
+  @Query(value = "DELETE FROM mission_managers WHERE user_id = :userId", nativeQuery = true)
+  void removeManager(@Param("userId") UUID userId);
 
   /**
    * Returns {@code true} if the given operation has at least one mission whose actual time window

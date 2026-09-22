@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.HandleAnonymisation;
 import java.util.Collection;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -142,8 +143,8 @@ public class HandleAnonymisationService {
    * column added to the service without being added here is a compile-time-visible omission rather
    * than a silently passing test.
    */
-  public static final java.util.List<String> ANONYMISED_COLUMNS =
-      java.util.List.of(
+  public static final List<String> ANONYMISED_COLUMNS =
+      List.of(
           "audit_event.actor_handle",
           "audit_event.subject_label",
           "bank_audit_event.actor_handle",

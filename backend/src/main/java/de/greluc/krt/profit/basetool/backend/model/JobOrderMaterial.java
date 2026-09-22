@@ -36,6 +36,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.jetbrains.annotations.Nullable;
 
 /** Job Order Material JPA entity. */
 @Entity
@@ -65,7 +66,7 @@ public class JobOrderMaterial extends AbstractEntity<UUID> {
    * floor — inventory of any quality satisfies the requirement). When non-null it is the fixed
    * refining-grade value 650; the DTO boundary rejects any other concrete value.
    */
-  @org.jetbrains.annotations.Nullable
+  @Nullable
   @Column(name = "min_quality")
   private Integer minQuality;
 

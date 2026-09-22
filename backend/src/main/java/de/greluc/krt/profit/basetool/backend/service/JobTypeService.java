@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
+import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.JobType;
 import de.greluc.krt.profit.basetool.backend.model.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobTypeDto;
@@ -118,10 +119,7 @@ public class JobTypeService {
       JobType parent =
           jobTypeRepository
               .findById(jobType.getParent().getId())
-              .orElseThrow(
-                  () ->
-                      new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                          "Parent JobType not found"));
+              .orElseThrow(() -> new NotFoundException("Parent JobType not found"));
       jobType.setParent(parent);
     } else {
       jobType.setParent(null);
@@ -150,10 +148,7 @@ public class JobTypeService {
     JobType jobType =
         jobTypeRepository
             .findById(id)
-            .orElseThrow(
-                () ->
-                    new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                        "JobType not found"));
+            .orElseThrow(() -> new NotFoundException("JobType not found"));
 
     OptimisticLock.check(jobType.getVersion(), jobTypeDto.version(), JobType.class, id);
 
@@ -167,10 +162,7 @@ public class JobTypeService {
       JobType parent =
           jobTypeRepository
               .findById(jobTypeDto.parentId())
-              .orElseThrow(
-                  () ->
-                      new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                          "Parent JobType not found"));
+              .orElseThrow(() -> new NotFoundException("Parent JobType not found"));
       jobType.setParent(parent);
     } else {
       jobType.setParent(null);
@@ -191,10 +183,7 @@ public class JobTypeService {
     JobType jobTypeToDeactivate =
         jobTypeRepository
             .findById(id)
-            .orElseThrow(
-                () ->
-                    new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                        "JobType not found"));
+            .orElseThrow(() -> new NotFoundException("JobType not found"));
 
     jobTypeToDeactivate.setActive(false);
     jobTypeRepository.save(jobTypeToDeactivate);
@@ -211,10 +200,7 @@ public class JobTypeService {
     JobType jobTypeToActivate =
         jobTypeRepository
             .findById(id)
-            .orElseThrow(
-                () ->
-                    new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                        "JobType not found"));
+            .orElseThrow(() -> new NotFoundException("JobType not found"));
 
     jobTypeToActivate.setActive(true);
     jobTypeRepository.save(jobTypeToActivate);

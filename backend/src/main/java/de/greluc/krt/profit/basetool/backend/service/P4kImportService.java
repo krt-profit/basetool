@@ -56,6 +56,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -1253,9 +1255,9 @@ public class P4kImportService {
       @NotNull CountsAccumulator counts,
       @Nullable UUID guid,
       @Nullable UUID existingUuid,
-      @NotNull java.util.function.BooleanSupplier alreadyClaimed,
-      @NotNull java.util.function.Consumer<UUID> setter,
-      @NotNull java.util.function.Consumer<UUID> onConflict,
+      @NotNull BooleanSupplier alreadyClaimed,
+      @NotNull Consumer<UUID> setter,
+      @NotNull Consumer<UUID> onConflict,
       boolean apply,
       @Nullable UUID runId,
       @NotNull String aggregate,
@@ -1344,8 +1346,8 @@ public class P4kImportService {
       boolean apply,
       @Nullable UUID guid,
       @NotNull Instant now,
-      @NotNull java.util.function.Consumer<UUID> uuidSetter,
-      @NotNull java.util.function.Consumer<Instant> syncedAtSetter) {
+      @NotNull Consumer<UUID> uuidSetter,
+      @NotNull Consumer<Instant> syncedAtSetter) {
     if (!apply) {
       return;
     }
@@ -1368,10 +1370,7 @@ public class P4kImportService {
    * @return {@code true} if a write happened (apply) or would happen (dry run)
    */
   private <V> boolean fillIfNull(
-      @Nullable V current,
-      @Nullable V incoming,
-      @NotNull java.util.function.Consumer<V> setter,
-      boolean apply) {
+      @Nullable V current, @Nullable V incoming, @NotNull Consumer<V> setter, boolean apply) {
     if (current != null || incoming == null) {
       return false;
     }

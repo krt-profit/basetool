@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -57,7 +58,7 @@ public class MissionFinanceEntry extends AbstractEntity<UUID> {
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "mission_id", nullable = false)
-  @com.fasterxml.jackson.annotation.JsonIgnore
+  @JsonIgnore
   private Mission mission;
 
   @ManyToOne(fetch = FetchType.LAZY)

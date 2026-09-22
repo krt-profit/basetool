@@ -27,6 +27,9 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /** Spring Data repository for {@link MaterialClaim}. */
@@ -97,8 +100,7 @@ public interface MaterialClaimRepository extends JpaRepository<MaterialClaim, UU
    *
    * @param userId the user whose audit stamp is cleared from every claim
    */
-  @org.springframework.data.jpa.repository.Modifying
-  @org.springframework.data.jpa.repository.Query(
-      "UPDATE MaterialClaim mc SET mc.claimedByUser = null WHERE mc.claimedByUser.id = :userId")
-  void unlinkClaimedByUser(@org.springframework.data.repository.query.Param("userId") UUID userId);
+  @Modifying
+  @Query("UPDATE MaterialClaim mc SET mc.claimedByUser = null WHERE mc.claimedByUser.id = :userId")
+  void unlinkClaimedByUser(@Param("userId") UUID userId);
 }

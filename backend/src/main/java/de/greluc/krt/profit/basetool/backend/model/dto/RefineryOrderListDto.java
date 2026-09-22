@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
@@ -47,7 +48,7 @@ public record RefineryOrderListDto(
   @Nullable
   public Instant getEndsAt() {
     if (startedAt != null && durationMinutes != null) {
-      return startedAt.plus(durationMinutes, java.time.temporal.ChronoUnit.MINUTES);
+      return startedAt.plus(durationMinutes, ChronoUnit.MINUTES);
     }
     return null;
   }

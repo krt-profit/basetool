@@ -27,6 +27,8 @@ import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.JobOrderAuditLabel;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -91,11 +93,11 @@ public class JobOrderPriorityService {
     List<JobOrder> allOrders = jobOrderRepository.lockAllJobOrders();
 
     List<JobOrder> activeOrders =
-        new java.util.ArrayList<>(
+        new ArrayList<>(
             allOrders.stream()
                 .filter(o -> o.getPriority() != null)
                 .sorted(
-                    java.util.Comparator.comparing(JobOrder::getPriority)
+                    Comparator.comparing(JobOrder::getPriority)
                         .thenComparing(JobOrder::getCreatedAt))
                 .toList());
 
@@ -143,8 +145,7 @@ public class JobOrderPriorityService {
         jobOrderRepository.lockAllJobOrders().stream()
             .filter(o -> o.getPriority() != null)
             .sorted(
-                java.util.Comparator.comparing(JobOrder::getPriority)
-                    .thenComparing(JobOrder::getCreatedAt))
+                Comparator.comparing(JobOrder::getPriority).thenComparing(JobOrder::getCreatedAt))
             .toList();
 
     int currentPriority = 1;

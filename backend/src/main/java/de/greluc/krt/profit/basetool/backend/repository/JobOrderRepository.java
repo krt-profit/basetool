@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -171,10 +172,10 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
           + ScopeSpecifications.JOB_ORDER_SCOPE_PREDICATE
           + " AND o.status IN :statuses ORDER BY o.displayId ASC")
   List<JobOrder> findScopedOrdersWithMaterialRequirements(
-      @Param("statuses") java.util.Collection<JobOrderStatus> statuses,
+      @Param("statuses") Collection<JobOrderStatus> statuses,
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds);
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
 
   /**
    * Scoped, paged job-order list — the single entry point behind the {@code GET /api/v1/orders}
@@ -230,10 +231,10 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
   Page<JobOrder> findScopedJobOrders(
       @Param("statuses") List<JobOrderStatus> statuses,
       @Param("noSquadronFilter") boolean noSquadronFilter,
-      @Param("squadronIds") java.util.Collection<UUID> squadronIds,
+      @Param("squadronIds") Collection<UUID> squadronIds,
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
       Pageable pageable);
 
   /**
@@ -262,7 +263,7 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
           + " IN :statuses")
   Page<JobOrder> findRequestedOrders(
       @Param("statuses") List<JobOrderStatus> statuses,
-      @Param("requesterOrgUnitIds") java.util.Collection<UUID> requesterOrgUnitIds,
+      @Param("requesterOrgUnitIds") Collection<UUID> requesterOrgUnitIds,
       Pageable pageable);
 
   /**
@@ -334,12 +335,9 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    * table. Native query because a JPQL bulk-delete on a {@code @ManyToMany} association would
    * require loading every job-order first.
    */
-  @org.springframework.data.jpa.repository.Modifying
-  @org.springframework.data.jpa.repository.Query(
-      value = "DELETE FROM job_order_assignees WHERE user_id = :userId",
-      nativeQuery = true)
-  void removeAssignee(
-      @org.springframework.data.repository.query.Param("userId") java.util.UUID userId);
+  @Modifying
+  @Query(value = "DELETE FROM job_order_assignees WHERE user_id = :userId", nativeQuery = true)
+  void removeAssignee(@Param("userId") UUID userId);
 
   /**
    * Replaces a contact-person handle that is this member's with the erasure sentinel (REQ-SEC-062).

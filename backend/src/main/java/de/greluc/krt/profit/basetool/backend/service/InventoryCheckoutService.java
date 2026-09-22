@@ -205,7 +205,7 @@ public class InventoryCheckoutService {
       if (dto.terminal() == null || dto.terminal().isBlank()) {
         throw new BadRequestException("Terminal is required for selling");
       }
-      if (dto.sellAmount() == null || dto.sellAmount().compareTo(java.math.BigDecimal.ZERO) < 0) {
+      if (dto.sellAmount() == null || dto.sellAmount().compareTo(BigDecimal.ZERO) < 0) {
         throw new BadRequestException("Sell amount is required and must be positive");
       }
     }

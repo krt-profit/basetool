@@ -23,6 +23,7 @@ import io.swagger.v3.oas.models.headers.Header;
 import io.swagger.v3.oas.models.media.StringSchema;
 import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.oas.models.responses.ApiResponses;
+import java.util.LinkedHashMap;
 import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -70,7 +71,7 @@ public class OpenApiCachingConfig {
                                   responses.computeIfAbsent(
                                       "200", k -> new ApiResponse().description("OK"));
                               if (ok.getHeaders() == null) {
-                                ok.setHeaders(new java.util.LinkedHashMap<>());
+                                ok.setHeaders(new LinkedHashMap<>());
                               }
                               ok.getHeaders()
                                   .putIfAbsent(

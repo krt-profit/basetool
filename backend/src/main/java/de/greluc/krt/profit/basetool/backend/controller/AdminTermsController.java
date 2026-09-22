@@ -26,12 +26,14 @@ import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.Locale;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -90,11 +92,10 @@ public class AdminTermsController {
   @ApiResponse(responseCode = "200", description = "One page of consent rows")
   public ResponseEntity<PageResponse<TermsAcceptanceStatusDto>> listAcceptanceStatus(
       @RequestParam(defaultValue = "ALL") @NotNull String filter, @NotNull Pageable pageable) {
-    String normalizedFilter = filter.toUpperCase(java.util.Locale.ROOT);
+    String normalizedFilter = filter.toUpperCase(Locale.ROOT);
     if (!ALLOWED_FILTERS.contains(normalizedFilter)) {
       throw new ResponseStatusException(
-          org.springframework.http.HttpStatus.BAD_REQUEST,
-          "filter must be one of " + ALLOWED_FILTERS);
+          HttpStatus.BAD_REQUEST, "filter must be one of " + ALLOWED_FILTERS);
     }
     validateSort(pageable.getSort());
     return ResponseEntity.ok(
@@ -138,8 +139,7 @@ public class AdminTermsController {
     for (Sort.Order order : sort) {
       if (!ALLOWED_SORT_FIELDS.contains(order.getProperty())) {
         throw new ResponseStatusException(
-            org.springframework.http.HttpStatus.BAD_REQUEST,
-            "Unsupported sort property: " + order.getProperty());
+            HttpStatus.BAD_REQUEST, "Unsupported sort property: " + order.getProperty());
       }
     }
   }
