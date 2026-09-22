@@ -304,10 +304,18 @@ groups:
       # (#1041 item 14) Host saturation. One CPX42 hosts both DBs, Redis, Keycloak, three JVMs and
       # the monitoring plane, so memory pressure is the DESIGNED failure mode (the oom_score_adj
       # sacrifice ordering already OOM-cycled Grafana/Tempo in prod). PSI series are collected by
-      # node_exporter's default `pressure` collector; on a kernel without /proc/pressure they are
-      # simply absent (the alert stays silent, safe). Memory "full" pressure = fraction of wall time
+      # node_exporter's default `pressure` collector. Memory "full" pressure = fraction of wall time
       # ALL tasks were stalled reclaiming memory — the earliest saturation signal, before the OOM
       # kill. baseline-tune: thresholds set in the baseline week.
+      #
+      # THIS COMMENT SAID an absent /proc/pressure leaves the alert "silent, safe" AND THAT WAS
+      # WRONG — corrected 2026-09-22. It was written while the deployment ran on Ubuntu, where PSI
+      # is on by default. Rocky builds the kernel CONFIG_PSI=y with CONFIG_PSI_DEFAULT_DISABLED=y,
+      # so /proc/pressure does not exist without `psi=1` on the kernel command line, and the three
+      # rules below could not fire at all after the cutover. Silent is not safe when the missing
+      # signal is the one that warns first: an alert that cannot fire reads as coverage. The
+      # bootstrap role sets the parameter (27-observability.yml); it takes effect at the next boot,
+      # and `ls /proc/pressure` is what says whether it has.
       - alert: HostMemoryPressureStalled
         expr: rate(node_pressure_memory_stalled_seconds_total[5m]) > 0.10
         for: 10m

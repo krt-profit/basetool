@@ -198,6 +198,12 @@ basetool_host_node_exporter_listen: ":9100"
 # A LIST, joined into ARGS by the task. systemd's EnvironmentFile parser has no line continuation,
 # so the rendered line is one long one whatever happens -- but the flags are chosen here, one per
 # line, where a reviewer can see each of them and why.
+# Pressure stall information. Rocky compiles PSI in and switches it off (CONFIG_PSI=y with
+# CONFIG_PSI_DEFAULT_DISABLED=y), so /proc/pressure exists only with `psi=1` on the kernel command
+# line -- see 27-observability.yml for what stays dead without it. A variable rather than an
+# unconditional task because the parameter is a boot-time property of the machine and a host that
+# is not ours to reboot should be able to decline it; leaving it true is the supported shape.
+basetool_host_enable_psi: true
 basetool_host_node_exporter_flags:
   - "--collector.systemd"
   - "--collector.textfile.directory={{ basetool_host_root_dir }}/monitoring/textfile"
