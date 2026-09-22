@@ -2502,7 +2502,10 @@ async function changeMissionOwner() {
                 if (dto && dto.ownershipVersion != null) {
                     const liveRow = document.getElementById('owner-row');
                     if (liveRow) {
-                        liveRow.setAttribute('data-ownership-version', String(dto.ownershipVersion));
+                        liveRow.setAttribute(
+                            'data-ownership-version',
+                            String(dto.ownershipVersion),
+                        );
                     }
                 }
                 // Re-render the management panel in place and broadcast it to peers (REQ-FE-010),

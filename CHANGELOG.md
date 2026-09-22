@@ -76,6 +76,10 @@
 - **Monitoring: der Restore-Drill meldet einen ausgefallenen Wochenlauf nach 8 statt 35 Tagen**, und
   der Container-Metrik-Kollektor alarmiert auch, wenn er nie geschrieben hat.
 
+- **Betrieb: die Betriebsskripte kennen nur noch Podman.** Die Docker-Zweige in Deploy, Backup,
+  Restore-Drill und Cleanup sind entfernt, ebenso cAdvisor und der Docker-Socket-Proxy im Monitoring
+  (ADR-0203). Für Nutzer ändert sich nichts.
+
 - **Anmeldeseite: Passwortmanager funktionieren, „Angemeldet bleiben" ist nicht mehr
   vorausgewählt.** Benutzername und Passwort werden jetzt von Passwortmanagern ausgefüllt und
   gespeichert. Wer angemeldet bleiben will, setzt den Haken selbst (REQ-SEC-066).
