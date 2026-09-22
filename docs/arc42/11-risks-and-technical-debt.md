@@ -180,6 +180,13 @@ not happened.
   export), step 11 (OTP for `Admin`, in the browser flow **and** the Discord post-login flow) and
   step 12 (the session windows). Every step is an owner-only write against the production realm;
   the runbook's status table is the record.
+- **Two realms agree only while someone runs the provisioner.** `scripts/provision-keycloak-realm.py`
+  (ADR-0202) encodes production's realm shape, but nothing runs it on a schedule and nothing compares
+  the realms automatically: a hand edit on either side drifts until the next
+  `keycloak-config-snapshot.sql` diff. It also encodes production **as it is**, so the three
+  `PROD-AS-IS` oddities it reproduces (the extractor's unused code flow, the ingest scopes on the app
+  and the gateway, the compose-internal frontend origin) are carried into every realm it shapes
+  until production decides them.
 
 ## 11.8 Smaller, known, and deliberately left
 

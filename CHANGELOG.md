@@ -17,11 +17,17 @@
 
 ### Removed
 
-- **API: die 17 veralteten Einsatz-Schnittstellen sind entfernt** (angekündigter Sunset
-  2026-10-20). Ersatz sind die `/slim`-Endpunkte und der versionierte Besitzerwechsel. App-Versionen
-  vor dem Umstieg vom 07.09.2026 können als Einsatzleitung keine Mitglieder mehr per ID eintragen.
+- **API: die 17 veralteten Einsatz-Schnittstellen sind vorzeitig entfernt.** Angekündigt war der
+  Sunset 2026-10-20; per Entscheidung vom 22.09.2026 fielen sie schon mit diesem Release weg. Ersatz
+  sind die `/slim`-Endpunkte und der versionierte Besitzerwechsel. App-Versionen älter als der
+  07.09.2026 müssen aktualisiert werden.
   
 ### Added
+
+- **App: Einsatzleitung kann wieder Mitglieder zu einem Einsatz hinzufügen.** Dafür gibt es einen
+  eigenen, nur für Verwalter freigegebenen Weg, der ein Mitglied ausschließlich per ID einträgt
+  (`POST …/participants/by-id/slim`); die allgemeinen Anmelde-Wege bleiben für die App gesperrt.
+  Die App braucht dafür ein Update.
 
 - **Server: automatische Sicherheitsupdates.** Der Produktionshost spielt Security-Advisories jetzt
   täglich um 07:00 selbst ein (dnf-automatic); die Container-Runtime ist ausgenommen, neu gestartet
@@ -35,7 +41,7 @@
 ### Changed
 
 - **Einsätze: die Weboberfläche nutzt keine der 17 als veraltet markierten Einsatz-Schnittstellen
-  mehr** (Sunset 2026-10-20). Auszahlungsart, Ein-/Auschecken, Teilnehmer, Einheiten und Crew laufen
+  mehr**. Auszahlungsart, Ein-/Auschecken, Teilnehmer, Einheiten und Crew laufen
   über die schlanken Nachfolger; ein Test verhindert künftig jeden Aufruf einer veralteten
   Schnittstelle aus dem Frontend.
 

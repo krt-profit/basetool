@@ -26,11 +26,22 @@ The `discord` identity provider and the membership gate come from the `keycloak-
 `krt-theme` from `keycloak-theme/`. Realm hardening and its per-step status:
 [`KEYCLOAK_HARDENING_RUNBOOK.md`](../KEYCLOAK_HARDENING_RUNBOOK.md).
 
-Two scripts read a realm without changing it: `scripts/keycloak-realm-fingerprint.sh` prints a
+Three scripts read a realm without changing it: `scripts/keycloak-realm-fingerprint.sh` prints a
 secret-free identity list of the realm's database (clients, roles, flows, mappers) to `diff` two
-realms after a move — on the Podman host run it as the service user with `--runtime podman` — and
-`scripts/check-keycloak-issuer.py` asserts that the issuer the apps validate is the one Keycloak
-advertises (ADR-0166).
+realms after a move — on the Podman host run it as the service user with `--runtime podman`;
+`scripts/keycloak-config-snapshot.sql` prints the realm's secret-free **configuration** (client flags
+and attributes, redirect URIs, scope assignments, mapper configs, service-account roles, client
+policies, token settings) to `diff` two **environments**; and `scripts/check-keycloak-issuer.py`
+asserts that the issuer the apps validate is the one Keycloak advertises (ADR-0166).
+
+**One script writes the whole Basetool-owned part of a realm:** `scripts/provision-keycloak-realm.py`
+brings a realm to the production shape of the table above (`grafana` only with `--grafana-origin`),
+dry run by default, never deleting what only the target has, and never printing a secret
+([ADR-0202](../adr/0202-a-realm-is-brought-to-the-production-shape-by-a-provisioner-that-never-deletes.md),
+`REQ-OPS-033`). It imports the Android client's definition from the mobile provisioner below, so the
+two cannot disagree about it. Procedure:
+[`INGEST_KEYCLOAK_SETUP.md` → *New or out-of-date realm*](../INGEST_KEYCLOAK_SETUP.md#new-or-out-of-date-realm-run-the-provisioner).
+The mobile provisioner stays the focused tool for that one client.
 
 ## Files
 
@@ -124,12 +135,18 @@ mapper), update this file in the same PR — secrets stay redacted.
 The backend's user sync (`KeycloakService`, `UserSyncTask`) authenticates to the Keycloak Admin API
 as the `backend-service` confidential client's service account. Because the built-in
 `realm-management` client is omitted from the reference above, the required grants are documented
-here instead. The service account MUST hold **both** `realm-management` client roles:
+here instead. The service account MUST hold **all three** `realm-management` client roles:
 
 |     Role     |                                                                                                 Why                                                                                                 |
 |--------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `view-users` | list users (`GET /users`) and read a user's federated identity (Discord back-fill).                                                                                                                 |
 | `view-realm` | list realm roles (`GET /admin/realms/{realm}/roles`) and read their members (`GET /roles/{name}/users`) — the role-indexed resolution added by the 5000-account hardening (ADR-0085 / REQ-SEC-043). |
+| `manage-users` | the admin-side account writes: moving a Discord link during an account merge (`POST`/`DELETE /users/{id}/federated-identity/discord`) and removing the merged-away account (REQ-SEC-026). |
+
+> **Corrected 2026-09-22.** This table listed only the two `view-` roles. `KeycloakService` names
+> `manage-users` for the merge writes, and production's service account holds it (configuration
+> snapshot of 2026-09-22); the testing realm's did not. `scripts/provision-keycloak-realm.py` grants
+> all three — or, when its identity lacks `manage-users`, prints them for the Admin Console.
 
 **`view-realm` is easy to miss:** before role-indexing the sync read roles per user and needed only
 `view-users`, so an older deployment's service account may carry `view-users` alone. With only
@@ -221,7 +238,10 @@ docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test
 
 `scripts/provision-keycloak-mobile-client.py` creates the client and the refresh-token-only DPoP
 policy of [ADR-0131](../adr/0131-mobile-auth-refresh-only-dpop-binding.md) / REQ-SEC-030. Run it on
-a **test realm first**; production only after that reads clean.
+a **test realm first**; production only after that reads clean. (A realm that lacks more than this
+one client — the testing realm as of 2026-09-22 — is better served by
+`scripts/provision-keycloak-realm.py`, which provisions this client with the same definition along
+with everything else; see above.)
 
 **Three things about kcadm on the production container that cost a procedure attempt if assumed.**
 Production Keycloak serves **HTTPS only on 18443** (`--http-enabled=false`), so the usual
