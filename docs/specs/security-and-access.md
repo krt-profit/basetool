@@ -2073,7 +2073,7 @@ not a client — the remaining boundary is the **default-deny vhost allow-list**
 [REQ-SEC-037](#req-sec-037--the-public-api-vhosts-anonymous-surface-is-enumerated-not-incidental).
 When this was written that list lived in the edge proxy's database, out of reach of any test; since
 2026-09-12 it is `docker/edge/include/api-allowlist.conf` in this repository, read by
-`ExternalContractTest`, checked against the nightly probe by the `probe-vs-allowlist` job and
+`ExternalContractTest`, checked against the nightly probe by the `probe-vs-allowlist` check and
 validated by `scripts/check-edge-nginx.sh` in `repo-lint.yml`. Two consequences, both load-bearing:
 
 - `POST /api/v1/refining-methods` was the one allow-listed path carrying a bare `hasRole('ADMIN')`
@@ -2365,7 +2365,7 @@ for an anonymous write and getting `403`, because the CSRF filter runs ahead of 
 > Proxy Manager, where no PR and no test could read it — several statements below were written in
 > that world. It is now [`docker/edge/include/api-allowlist.conf`](../../docker/edge/include/api-allowlist.conf),
 > included by `conf.d/50-api.conf.template` and applied by the deploy reconcile. Three things read
-> it in CI: `ExternalContractTest`, the `probe-vs-allowlist` job in `repo-lint.yml` (the nightly
+> it in CI: `ExternalContractTest`, the `probe-vs-allowlist` check in `repo-lint.yml` (the nightly
 > probe's rows against the list) and `scripts/check-edge-nginx.sh` (renders and starts the edge).
 > The runbook is archived at [`API_VHOST_ROLLOUT_RUNBOOK.md`](../archive/API_VHOST_ROLLOUT_RUNBOOK.md)
 > and still explains *why* each family was admitted in which phase; it no longer carries the list.

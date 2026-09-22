@@ -2,13 +2,21 @@ name: E2E Smoke
 
 # Non-destructive page-load checks (@Tag("smoke")) against a staging deployment,
 # fanned out over Chromium / Firefox / WebKit. Split out from e2e.yml because
-# this is a post-release / nightly concern, NOT a PR check: it triggers only on a
-# schedule or manual dispatch (never on pull_request), and the job is gated on an
-# E2E_BASE_URL repo variable, so until a staging host exists it simply does not
-# run — and never appears as a skipped matrix placeholder on pull requests.
+# this is a post-release concern, NOT a PR check: it never runs on pull_request,
+# and the job is gated on an E2E_BASE_URL repo variable.
+#
+# PARKED ON MANUAL DISPATCH (since 2026-09-22, audit item CI-12). It had a nightly
+# cron, and no staging host exists, so every night it started, evaluated the gate
+# and skipped -- a run a day that did nothing and read like a check in the Actions
+# list. To re-enable it once a staging deployment exists:
+#   1. set the E2E_BASE_URL repository variable and the E2E_USERNAME / E2E_PASSWORD
+#      secrets (a dedicated, low-privilege staging account -- never a real member);
+#   2. dispatch it once by hand and confirm the artifact carries no session file
+#      (the upload step below deletes and excludes them);
+#   3. add back, above `workflow_dispatch:`,
+#        schedule:
+#          - cron: '23 4 * * *'   # daily; GitHub starts scheduled runs hours late
 on:
-  schedule:
-    - cron: '0 4 * * *' # nightly 04:00 UTC (offset from the e2e flows at 03:00)
   workflow_dispatch:
 
 concurrency:
@@ -38,27 +46,20 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up JDK 25 (Temurin)
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+      - name: Set up JDK 25 and Gradle
+        uses: ./.github/actions/setup-jdk-gradle
         with:
-          distribution: temurin
-          java-version: '25'
+          cache-read-only: 'true'
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
-        with:
-          cache-read-only: true
-
+      # Per browser: `-Pe2e.browser` makes playwrightInstall fetch only this cell's engine, so a
+      # shared key would hold whichever engine saved first (same reasoning as e2e.yml).
       - name: Cache Playwright browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('gradle/libs.versions.toml') }}
+          key: playwright-${{ runner.os }}-${{ matrix.browser }}-${{ hashFiles('gradle/libs.versions.toml') }}
           restore-keys: |
-            playwright-${{ runner.os }}-
-
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
+            playwright-${{ runner.os }}-${{ matrix.browser }}-
 
       # E2E_BASE_URL set => E2eStackExtension targets the external deployment and
       # does not manage Docker (no host.docker.internal remap needed — staging has

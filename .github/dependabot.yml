@@ -5,12 +5,26 @@
 # so the two systems do not generate duplicate PRs.
 version: 2
 updates:
+  # One PR per week for ALL action bumps (audit item CI-13). One PR per action used to mean up to
+  # five PRs a Monday, each re-running the whole CI and each needing its own review and merge. A
+  # group is one review, one CI cycle, one merge. The Docker entries below stay
+  # separate on purpose (see their comment): there a wrong key would silently stop updates to a
+  # base image, and the lever for a faster OS-level patch is this file's interval, not a batch.
+  #
+  # `directories` rather than `directory: /`: the root entry reads .github/workflows only, so the
+  # SHA pins inside the local composite actions (.github/actions/*) were watched by nothing.
   - package-ecosystem: github-actions
-    directory: /
+    directories:
+      - /
+      - /.github/actions/*
     schedule:
       interval: weekly
       day: monday
     open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - "*"
     labels:
       - dependencies
       - github-actions

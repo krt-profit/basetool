@@ -77,6 +77,19 @@ public final class E2eStackExtension implements BeforeAllCallback {
   private static final String IMAGE_TAG = "e2e-local";
 
   /**
+   * The two images {@code docker-compose.build.yml} builds for this stack, named the way compose
+   * names them with {@code IRI_BASETOOL_VERSION} set to {@link #IMAGE_TAG} and {@code
+   * IRI_IMAGE_NAMESPACE} unset. In prebuilt mode ({@code -De2e.prebuilt=true}) they must already be
+   * in the local Docker store; {@code .github/workflows/e2e.yml}'s {@code build-stack} job builds
+   * them under exactly these names, and {@code E2ePrebuiltImageParityTest} pins the three places
+   * together.
+   */
+  static final List<String> BUILT_IMAGES =
+      List.of(
+          "ghcr.io/krt-profit/basetool-backend:" + IMAGE_TAG,
+          "ghcr.io/krt-profit/basetool-frontend:" + IMAGE_TAG);
+
+  /**
    * The JWT {@code aud} value the E2E stack's backend enforces (audit L-1, REQ-SEC-024). Fed to the
    * compose stack as {@code IRI_BACKEND_EXPECTED_AUDIENCES}, which the {@code x-backend} anchor
    * maps onto {@code APP_SECURITY_JWT_EXPECTED_AUDIENCES} → {@code
@@ -258,6 +271,9 @@ public final class E2eStackExtension implements BeforeAllCallback {
   private void bringUpAndSeed(ExtensionContext context) throws Exception {
     Path root = repoRoot();
     stageRealm(root);
+    if (prebuilt()) {
+      requirePrebuiltImages(root);
+    }
     prePullImages(root);
     composeUp(root);
     // Seed UEX-owned catalog reference data (refinery-hosting location, ship type, refining
@@ -292,6 +308,48 @@ public final class E2eStackExtension implements BeforeAllCallback {
         .getRoot()
         .getStore(ExtensionContext.Namespace.GLOBAL)
         .put("e2e-docker-stack", (AutoCloseable) () -> composeDown(root));
+  }
+
+  /**
+   * Reports whether the application images were built before this JVM started ({@code
+   * -De2e.prebuilt=true}, forwarded from {@code -Pe2e.prebuilt} by the Gradle task). CI builds them
+   * once per run and loads them into every matrix cell, so the cells must boot them rather than
+   * spend a full multi-stage image build each on the same commit.
+   *
+   * @return {@code true} when the stack is to be started with {@code --no-build}
+   */
+  static boolean prebuilt() {
+    return Boolean.getBoolean("e2e.prebuilt");
+  }
+
+  /**
+   * Fails the bring-up unless every image in {@link #BUILT_IMAGES} is present in the local Docker
+   * store. Without this, {@code up --no-build} on a missing image would try to PULL it from GHCR --
+   * where {@code :e2e-local} does not exist -- and report a registry error that names neither the
+   * prebuilt mode nor the job that was supposed to load the image.
+   *
+   * @param root the repository root, used as the working directory of the {@code docker} calls
+   * @throws Exception if an image is absent (the message names it and the CI job that builds it)
+   */
+  private void requirePrebuiltImages(Path root) throws Exception {
+    for (String image : BUILT_IMAGES) {
+      try {
+        runProcess(
+            root,
+            "prebuilt-image-check",
+            List.of("docker", "image", "inspect", "--format", "{{.Id}}", image),
+            Map.of(),
+            Duration.ofMinutes(1));
+      } catch (IllegalStateException missing) {
+        throw new IllegalStateException(
+            "e2e.prebuilt=true but "
+                + image
+                + " is not in the local Docker store; e2e.yml's build-stack job builds it and each"
+                + " matrix cell loads it with `docker load`. Run without -Pe2e.prebuilt to build it"
+                + " here instead.",
+            missing);
+      }
+    }
   }
 
   /**
@@ -330,7 +388,8 @@ public final class E2eStackExtension implements BeforeAllCallback {
   }
 
   /**
-   * Builds the images from the current source and brings the dev-profile stack up, blocking until
+   * Builds the images from the current source -- or, in {@link #prebuilt()} mode, boots the ones
+   * already loaded, with {@code --no-build} -- and brings the dev-profile stack up, blocking until
    * every service reports healthy. Retries up to {@link #COMPOSE_UP_ATTEMPTS} times, tearing down
    * between attempts, so a transient image-build flake (e.g. a Maven Central 5xx while downloading
    * Gradle dependencies) does not fail the whole run.
@@ -339,13 +398,14 @@ public final class E2eStackExtension implements BeforeAllCallback {
    * @throws Exception if every {@code docker compose up} attempt exits non-zero or times out
    */
   private void composeUp(Path root) throws Exception {
+    String buildFlag = prebuilt() ? "--no-build" : "--build";
     Exception lastFailure = null;
     for (int attempt = 1; attempt <= COMPOSE_UP_ATTEMPTS; attempt++) {
       try {
         runProcess(
             root,
             "compose-up",
-            composeCommand("up", "-d", "--build", "--wait", "--wait-timeout", "360"),
+            composeCommand("up", "-d", buildFlag, "--wait", "--wait-timeout", "360"),
             throwawayEnv(),
             UP_TIMEOUT);
         return;
