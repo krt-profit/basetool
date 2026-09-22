@@ -20,12 +20,14 @@
 package de.greluc.krt.profit.basetool.frontend.e2e;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.Response;
 import com.microsoft.playwright.assertions.LocatorAssertions;
 import java.nio.file.Path;
 import org.junit.jupiter.api.AfterAll;
@@ -47,7 +49,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  *       list and its detail pane offers the edit control but <em>no</em> delete control (the {@code
  *       removable=false} flag hides it), which is the exact UX the owner chose over a 409.
  *   <li><b>admin curation:</b> the admin default-blueprints page lists the seeded set, and removing
- *       one entry through the confirm modal drops it from the set.
+ *       one entry through the confirm modal drops it from the set in place, without a reload.
  * </ul>
  *
  * <p>Removing an entry in the admin flow does not revoke rows users already hold, so the two tests
@@ -130,7 +132,8 @@ class DefaultBlueprintsE2eTest {
 
   /**
    * Opens the admin default-blueprints page, asserts the seeded set is listed, removes one entry
-   * through the confirm modal, and asserts the set shrank by one after the redirect.
+   * through the confirm modal, and asserts the set shrank by one in place, with the modal closed
+   * and the document never reloaded (REQ-FE-001).
    */
   @Test
   void adminCanRemoveADefaultFromTheSet() {
@@ -152,16 +155,35 @@ class DefaultBlueprintsE2eTest {
         // The set is fully server-rendered on load, so this count is stable here.
         int before = removeButtons.count();
 
-        // Open the confirm modal for the first default, then submit it (the confirm button
-        // JS-submits the row's server-rendered POST form → redirect).
+        // A marker on the window survives only if the document is never reloaded (REQ-FE-001).
+        page.evaluate("() => { window.__krtNoReload = true; }");
+
+        // Open the confirm modal for the first default, then confirm it (the confirm button sends
+        // the row's server-rendered action through krtFetch and re-swaps the list).
         removeButtons.first().click();
         assertThat(page.locator("#krt-dbp-delete-modal")).isVisible();
-        E2eSupport.clickSubmitClearingFooter(page.locator("#krt-dbp-delete-confirm"));
+        // Not clickSubmitClearingFooter: that helper waits for a post-submit NAVIGATION, which an
+        // in-place write never starts. Wait for the XHR remove itself instead, with the fixed
+        // footer moved out of the click's way as the helper would.
+        page.evaluate(
+            "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
+                + " 'none'; } }");
+        Response removed =
+            page.waitForResponse(
+                response ->
+                    response.url().endsWith("/delete")
+                        && "POST".equals(response.request().method()),
+                () -> page.locator("#krt-dbp-delete-confirm").click());
+        assertEquals(200, removed.status(), "the in-place remove must succeed");
 
-        // Web-first count assertion: auto-retries until the reloaded set shows one fewer entry, so
-        // it
-        // never races the post-redirect paint (a one-shot count() flakes on WebKit / Firefox).
+        // Web-first count assertion: auto-retries until the swapped list shows one fewer entry, so
+        // it never races the in-place re-render (a one-shot count() flakes on WebKit / Firefox).
         assertThat(page.locator("[data-trigger='dbp-open-delete']")).hasCount(before - 1);
+        assertThat(page.locator("#krt-dbp-delete-modal")).isHidden();
+        assertEquals(
+            Boolean.TRUE,
+            page.evaluate("() => window.__krtNoReload === true"),
+            "removing a default must not reload the page");
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "default-blueprint-admin-remove");
         throw failure;

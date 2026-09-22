@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Admin: Standard-Blueprints aufnehmen und entfernen aktualisiert die Liste ohne Neuladen.** Die
+  Seite `/admin/default-blueprints` lud nach jeder Änderung komplett neu; jetzt wird nur die Liste
+  ersetzt (REQ-FE-001). Schlägt beim Aufnehmen ein Teil fehl, bleiben genau diese Einträge in der
+  Auswahl stehen und können erneut abgeschickt werden.
+
 ### Fixed
 
 - **Betrieb: Sicherung, Wiederherstellungsprobe und Aufräumen scheitern nicht mehr nach einem Neustart.**

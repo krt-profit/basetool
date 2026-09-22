@@ -59,7 +59,12 @@
     <!-- Current default set -->
     <div class="hud-box krt-personal-inventory mt-2">
         <h2 class="krt-bp-section-title" th:text="#{admin.defaultBlueprints.list.heading}">Aktuelle Standard-Blueprints</h2>
-        <div class="table-responsive krt-pi-table-wrapper">
+        <!-- The list host is the swap target of the in-place refresh after an add or a remove
+             (REQ-FE-001): GET ?fragment=rows re-renders the table inside it, delete forms included,
+             so the page never has to rebuild a row client-side. The fragment sits INSIDE the host
+             because krtFetch.swap replaces the host's innerHTML. -->
+        <div id="krt-dbp-list-host" class="table-responsive krt-pi-table-wrapper">
+            <th:block th:fragment="rows">
             <table class="krt-table krt-pi-table">
                 <thead>
                 <tr>
@@ -71,13 +76,14 @@
                 <tr th:if="${#lists.isEmpty(defaults)}">
                     <td colspan="2" class="krt-pi-empty" th:text="#{admin.defaultBlueprints.empty}">Keine Standard-Blueprints.</td>
                 </tr>
-                <tr th:each="d : ${defaults}">
+                <tr th:each="d : ${defaults}" th:attr="data-product-key=${d.productKey}">
                     <td th:text="${d.productName}">Produkt</td>
                     <td>
                         <!-- Per-row server-rendered POST form: the action is baked by Thymeleaf and
-                             never touched by JS, so no URL flows from the DOM into a form action
+                             never written by JS, so no URL flows from the DOM into a form action
                              (avoids the CodeQL js/xss-through-dom sink). The remove button opens the
-                             shared confirm modal, whose confirm submits THIS form by element id. -->
+                             shared confirm modal, whose confirm sends THIS form's action through
+                             krtFetch, or submits the form natively when krtFetch did not load. -->
                         <form th:id="${'krt-dbp-del-' + d.id}"
                               th:action="@{/admin/default-blueprints/{id}/delete(id=${d.id})}"
                               method="post" class="krt-dbp-del-form">
@@ -93,6 +99,7 @@
                 </tr>
                 </tbody>
             </table>
+            </th:block>
         </div>
     </div>
 </main>
@@ -119,13 +126,19 @@
     /*<![CDATA[*/
     window.krtDefaultBlueprints = {
         searchUrl: /*[[@{/admin/default-blueprints/search}]]*/ '/admin/default-blueprints/search',
-        defaultKeys: /*[[${defaults.![productKey]}]]*/ [],
+        listUrl:   /*[[@{/admin/default-blueprints}]]*/ '/admin/default-blueprints',
         i18n: {
             searching:      /*[[#{admin.defaultBlueprints.searching}]]*/      'Suche...',
             noResults:      /*[[#{admin.defaultBlueprints.noResults}]]*/      'Keine Treffer',
             alreadyDefault: /*[[#{admin.defaultBlueprints.add.alreadyDefault}]]*/ 'Bereits Standard',
             variants:       /*[[#{admin.defaultBlueprints.add.variants}]]*/   'Varianten',
-            removeBody:     /*[[#{admin.defaultBlueprints.modal.remove.body}]]*/ 'Wirklich entfernen?'
+            removeBody:     /*[[#{admin.defaultBlueprints.modal.remove.body}]]*/ 'Wirklich entfernen?',
+            added:          /*[[#{admin.defaultBlueprints.toast.added}]]*/    'Standard-Blueprints aufgenommen.',
+            noneAdded:      /*[[#{admin.defaultBlueprints.toast.noneAdded}]]*/ 'Keine neuen Standard-Blueprints aufgenommen.',
+            removed:        /*[[#{admin.defaultBlueprints.toast.removed}]]*/  'Standard-Blueprint entfernt.',
+            addError:       /*[[#{admin.defaultBlueprints.error.add}]]*/      'Aufnehmen fehlgeschlagen.',
+            removeError:    /*[[#{admin.defaultBlueprints.error.remove}]]*/   'Entfernen fehlgeschlagen.',
+            loadError:      /*[[#{admin.defaultBlueprints.error.load}]]*/     'Die Liste konnte nicht aktualisiert werden.'
         }
     };
     /*]]>*/
