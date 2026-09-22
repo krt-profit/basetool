@@ -190,6 +190,30 @@ class DatabaseIndexMigrationTest {
         "where (is_read = false)");
     assertIndexExists(
         jdbc, "material_exchange_request_interest", "uq_material_exchange_request_interest");
+    // V245 (REQ-DATA-017, BE-PERF-10): the 38 foreign keys the catalogue sweep found uncovered.
+    // ForeignKeyIndexCoverageTest is the exhaustive gate; these are the canaries that the migration
+    // ran, one per shape: a NOT NULL key (plain index) and a nullable one (IS NOT NULL partial).
+    assertIndexExists(jdbc, "material_claim", "idx_material_claim_claimed_by_user_id");
+    assertIndexExists(jdbc, "mission_unit", "idx_mission_unit_responsible_user_id");
+    assertIndexExists(jdbc, "org_unit", "idx_org_unit_grand_admiral_user_id");
+    assertIndexExists(
+        jdbc, "material_exchange_offer", "idx_material_exchange_offer_owning_org_unit_id");
+    assertIndexExists(
+        jdbc, "material_exchange_request", "idx_material_exchange_request_owning_org_unit_id");
+    assertIndexExists(
+        jdbc, "job_order_handover", "idx_job_order_handover_executing_user_id");
+    assertIndexExists(jdbc, "bank_account_grant", "idx_bank_account_grant_granted_by");
+    assertIndexExists(jdbc, "bank_booking_request", "idx_bank_booking_request_decided_by");
+    assertIndexExists(
+        jdbc, "bank_booking_request", "idx_bank_booking_request_resulting_transaction_id");
+    assertIndexDefContains(
+        jdbc, "mission_crew_job_types", "idx_mission_crew_job_types_job_type_id", "job_type_id");
+    assertIndexDefContains(
+        jdbc,
+        "bank_transaction",
+        "idx_bank_transaction_counterparty_user_id",
+        "counterparty_user_id",
+        "where (counterparty_user_id is not null)");
   }
 
   private static void assertIndexExists(JdbcTemplate jdbc, String table, String indexName) {
