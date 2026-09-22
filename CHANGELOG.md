@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.9.1](https://github.com/krt-profit/basetool/releases/tag/v1.9.1) - 2026-09-22
+
 ### Fixed
 
 - **Gelöschte Wiki-Gegenstände werden wieder als entfernt markiert.** Der Abgleich mit dem SC-Wiki
