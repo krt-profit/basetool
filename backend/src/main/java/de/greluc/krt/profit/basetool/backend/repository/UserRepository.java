@@ -52,7 +52,8 @@ import org.springframework.stereotype.Repository;
  * {@code IN} clause never degenerates to {@code IN ()}.
  */
 @Repository
-public interface UserRepository extends JpaRepository<User, UUID> {
+public interface UserRepository
+    extends JpaRepository<User, UUID>, UserRepositoryPlainLookupFragment {
 
   /**
    * Counts users in the given approval status, backing the {@code basetool_registration_pending_*}
@@ -319,8 +320,10 @@ public interface UserRepository extends JpaRepository<User, UUID> {
           java.util.Collection<UUID> scopeSquadronIds);
 
   /**
-   * Derived Spring-Data query - returns entities matching {@code Id}. Eagerly fetches the
-   * configured relations via {@code @EntityGraph}.
+   * Loads a user by id with {@code roles} and {@code roles.permissions} fetched in the same query —
+   * for the authentication path and the caller's own {@code /users/me}, which assemble authorities
+   * from both. A caller that only needs the user as a foreign-key target or reads a scalar uses the
+   * graph-free {@link #findPlainById(UUID)} instead (BE-PERF-12).
    */
   @Override
   @NotNull

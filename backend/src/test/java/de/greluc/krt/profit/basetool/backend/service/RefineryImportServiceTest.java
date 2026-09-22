@@ -129,7 +129,7 @@ class RefineryImportServiceTest {
     caller.setId(CALLER_ID);
     caller.setUsername("uploader");
     caller.setRank(10);
-    lenient().when(userRepository.findById(CALLER_ID)).thenReturn(Optional.of(caller));
+    lenient().when(userRepository.findPlainById(CALLER_ID)).thenReturn(Optional.of(caller));
 
     UserMapper userMapper = new UserMapperImpl();
     ReflectionTestUtils.setField(
@@ -764,7 +764,7 @@ class RefineryImportServiceTest {
   void buildDraft_leavesOwnerNullWhenCallerUnknown() {
     // Given
     UUID strangerId = UUID.randomUUID();
-    lenient().when(userRepository.findById(strangerId)).thenReturn(Optional.empty());
+    lenient().when(userRepository.findPlainById(strangerId)).thenReturn(Optional.empty());
 
     // When
     RefineryImportDraftDto draft =

@@ -153,7 +153,7 @@ class OrgUnitMembershipServiceTest {
   @Test
   void addMember_freshUser_persistsMembership() {
     when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(membershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, scId)).thenReturn(false);
     when(membershipRepository.save(any(OrgUnitMembership.class)))
         .thenAnswer(inv -> inv.getArgument(0));
@@ -173,7 +173,7 @@ class OrgUnitMembershipServiceTest {
   @Test
   void addMember_alreadyMember_throwsDuplicate() {
     when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(membershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, scId)).thenReturn(true);
 
     assertThrows(DuplicateEntityException.class, () -> membershipService.addMember(scId, userId));
@@ -183,7 +183,7 @@ class OrgUnitMembershipServiceTest {
   @Test
   void addMember_unknownUser_throwsNotFound() {
     when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
-    when(userRepository.findById(userId)).thenReturn(Optional.empty());
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.empty());
 
     assertThrows(NotFoundException.class, () -> membershipService.addMember(scId, userId));
     verify(membershipRepository, never()).save(any());
@@ -202,7 +202,7 @@ class OrgUnitMembershipServiceTest {
   @Test
   void addMember_firstMembership_promotesOwnerlessInventory() {
     when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(membershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, scId)).thenReturn(false);
     when(membershipRepository.countByIdUserId(userId)).thenReturn(0L);
     when(membershipRepository.save(any(OrgUnitMembership.class)))
@@ -216,7 +216,7 @@ class OrgUnitMembershipServiceTest {
   @Test
   void addMember_userAlreadyHadMemberships_doesNotPromoteInventory() {
     when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(membershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, scId)).thenReturn(false);
     when(membershipRepository.countByIdUserId(userId)).thenReturn(2L);
     when(membershipRepository.save(any(OrgUnitMembership.class)))
@@ -556,7 +556,7 @@ class OrgUnitMembershipServiceTest {
     Bereich bereich = new Bereich();
     bereich.setId(bereichId);
     when(orgUnitRepository.findById(bereichId)).thenReturn(Optional.of(bereich));
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
         .thenReturn(List.of());
     when(membershipRepository.findById(any(OrgUnitMembershipId.class)))
@@ -583,7 +583,7 @@ class OrgUnitMembershipServiceTest {
     existing.setKind(OrgUnitKind.BEREICH);
     existing.setRole(MembershipRole.BEREICHSLEITER);
     when(orgUnitRepository.findById(bereichId)).thenReturn(Optional.of(bereich));
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
         .thenReturn(List.of());
     when(membershipRepository.findById(any(OrgUnitMembershipId.class)))
@@ -604,7 +604,7 @@ class OrgUnitMembershipServiceTest {
     Bereich bereich = new Bereich();
     bereich.setId(bereichId);
     when(orgUnitRepository.findById(bereichId)).thenReturn(Optional.of(bereich));
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
         .thenReturn(List.of(new OrgUnitMembership()));
 
@@ -636,7 +636,7 @@ class OrgUnitMembershipServiceTest {
     Organisationsleitung ol = new Organisationsleitung();
     ol.setId(olId);
     when(orgUnitRepository.findById(olId)).thenReturn(Optional.of(ol));
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
         .thenReturn(List.of());
     when(membershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, olId)).thenReturn(false);
@@ -657,7 +657,7 @@ class OrgUnitMembershipServiceTest {
     Organisationsleitung ol = new Organisationsleitung();
     ol.setId(olId);
     when(orgUnitRepository.findById(olId)).thenReturn(Optional.of(ol));
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
         .thenReturn(List.of());
     when(membershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, olId)).thenReturn(true);
@@ -672,7 +672,7 @@ class OrgUnitMembershipServiceTest {
     Organisationsleitung ol = new Organisationsleitung();
     ol.setId(olId);
     when(orgUnitRepository.findById(olId)).thenReturn(Optional.of(ol));
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(membershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, olId)).thenReturn(true);
 
     membershipService.setGrandAdmiral(olId, userId);
@@ -869,7 +869,7 @@ class OrgUnitMembershipServiceTest {
   @Test
   void addMemberDto_mapsThePersistedRow() {
     when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(membershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, scId)).thenReturn(false);
     when(membershipRepository.save(any(OrgUnitMembership.class)))
         .thenAnswer(inv -> inv.getArgument(0));

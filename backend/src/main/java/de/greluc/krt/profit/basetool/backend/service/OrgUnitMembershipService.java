@@ -135,7 +135,7 @@ public class OrgUnitMembershipService {
   public OrgUnitMembership addMember(@NotNull UUID specialCommandId, @NotNull UUID userId) {
     SpecialCommand sc = specialCommandService.getSpecialCommandById(specialCommandId);
     User user =
-        userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+        userRepository.findPlainById(userId).orElseThrow(() -> new NotFoundException("User not found"));
     if (membershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, sc.getId())) {
       throw new DuplicateEntityException("User is already a member of this Spezialkommando");
     }
@@ -239,7 +239,7 @@ public class OrgUnitMembershipService {
       throw new BadRequestException("Org unit " + bereichId + " is not a Bereich");
     }
     final User user =
-        userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+        userRepository.findPlainById(userId).orElseThrow(() -> new NotFoundException("User not found"));
     if (userHoldsStaffelMembership(userId)) {
       throw new BadRequestException(
           "User belongs to a Staffel and cannot be a Bereichsleitung member — remove the Staffel"
@@ -345,7 +345,7 @@ public class OrgUnitMembershipService {
           "Org unit " + organisationsleitungId + " is not the Organisationsleitung");
     }
     final User user =
-        userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+        userRepository.findPlainById(userId).orElseThrow(() -> new NotFoundException("User not found"));
     if (userHoldsStaffelMembership(userId)) {
       throw new BadRequestException(
           "User belongs to a Staffel and cannot be an Organisationsleitung member — remove the"
@@ -449,7 +449,7 @@ public class OrgUnitMembershipService {
   @Transactional
   public void setGrandAdmiral(@NotNull UUID organisationsleitungId, @NotNull UUID userId) {
     Organisationsleitung ol = requireOrganisationsleitung(organisationsleitungId);
-    userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+    userRepository.findPlainById(userId).orElseThrow(() -> new NotFoundException("User not found"));
     // Auto-promote to OL member first when needed; an existing OL member is left untouched.
     if (!membershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, organisationsleitungId)) {
       addOlMember(organisationsleitungId, userId);
