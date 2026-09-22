@@ -16,8 +16,9 @@ Hosts note, not here.
 
 The host is provisioned by the Ansible role in [`ansible/`](../../ansible/README.md) (ADR-0188):
 packages, the two accounts below and the subuid range, directory ownership, SELinux contexts,
-`containers.conf`, the CIS level-1 scan, firewalld and fail2ban, haproxy, and the host half of the
-monitoring plane. It provisions and never delivers — nothing it does ships a unit, an image or a
+`containers.conf`, the CIS level-1 scan, firewalld and fail2ban, haproxy, the host half of the
+monitoring plane, and unattended **security** updates (`dnf-automatic`, the container runtime
+excluded, never rebooting — `REQ-OPS-032`, since 2026-09-22). It provisions and never delivers — nothing it does ships a unit, an image or a
 configuration bundle.
 
 | Runs as | What | Why at that level |
@@ -57,6 +58,20 @@ Consequences worth stating:
   capability back (ADR-0189).
 - **Named volumes are pinned** (`VolumeName=edge-certs`), so a volume seeded by hand is *adopted*
   rather than shadowed by a `systemd-` prefixed twin.
+- **A container is stopped with its own grace.** Compose's `stop_grace_period` becomes two keys:
+  `StopTimeout=` (what Quadlet's `podman rm -f` waits before `SIGKILL`) and `TimeoutStopSec=` fifteen
+  seconds longer (what systemd waits for podman). Until 2026-09-22 only the second was generated,
+  and podman killed every container after its 10 s default — the JVMs mid-shutdown, Loki and Tempo
+  mid-drain, PostgreSQL mid-checkpoint.
+- **The config tree is mounted read-only.** Every bind mount from `/var/iri/code` — what the deployer
+  rewrites on each release — carries `:ro`, and the generator refuses one that does not (`REQ-OPS-014`).
+- **The data networks have no egress.** `net-db-*` and `net-redis-*` are `Internal=true` in the
+  units, so the two databases and Redis, which sit on nothing else, cannot reach the internet
+  (ADR-0162, extended 2026-09-22). Compose keeps them non-internal for the local `-dev` twins, which
+  publish their ports there.
+- **Podman features go through Quadlet keys, not raw arguments** — `RunInit=`, `Ulimit=` and the
+  network's `Options=` since 2026-09-22. Only `--cpus` and `--oom-score-adj`, which have no key in
+  podman 5.8, remain `PodmanArgs=`.
 - **The edge publishes on loopback only** and is pinned with `ip=` on every network it joins, so
   the set of addresses haproxy's PROXY header can arrive from is finite (§11.5c).
 
@@ -110,8 +125,8 @@ were missing on cutover day; the fix ships with v1.9.2 (§11.6).
 
 ## 7.4 The operational timers
 
-All six are installed by the Ansible role from [`scripts/`](../../scripts/); none rides the config
-bundle.
+All seven are installed by the Ansible role — six from [`scripts/`](../../scripts/), plus the
+distribution's own `dnf-automatic.timer` with a role drop-in; none rides the config bundle.
 
 | Timer | Schedule | Runs as | Does |
 | --- | --- | --- | --- |
@@ -121,6 +136,7 @@ bundle.
 | `iri-cert-expiry` | daily 03:40, and at boot | `root` | Write `basetool_certificate_expiry_timestamp_seconds` for the certificate *files* |
 | `iri-container-metrics` | every 30 s | `root` | The cgroup textfile collector that replaces part of cAdvisor |
 | `iri-container-cleanup` | Saturday 02:00 UTC | `deploy` | Weekly prune of stopped containers, unused images and networks — runtime-aware (§7.4a) |
+| `dnf-automatic` | daily 07:00 (+ up to 15 min) | `root` | Security advisories only, container runtime excluded, never reboots; each run records itself for `HostSecurityUpdates*` / `HostRebootRequired` (`REQ-OPS-032`) |
 
 ### 7.4a The weekly cleanup is runtime-aware, and two of its steps are not portable
 

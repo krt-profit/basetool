@@ -34,6 +34,12 @@
 
 set -uo pipefail
 
+# The shell on a Windows workstation rewrites any argument that looks like a POSIX path list --
+# `./a:/b` reaches python as a Windows path list -- and the volume fixtures below are exactly
+# that shape. Only arguments starting with `print(` -- the python bodies -- are exempted, so the
+# generator's own path argument is still translated for a native python. Inert on Linux and in CI.
+export MSYS2_ARG_CONV_EXCL='print('
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 GENERATOR="${SCRIPT_DIR}/generate-quadlet.py"
 PY="${PYTHON:-python3}"
@@ -284,6 +290,124 @@ expect "no loopback publish collides with alloy's own OTLP ports" \
 expect "every loopback publish names a service that is still a container" \
   'print(all(g.DISPOSITION.get(s, ("",))[0] != "delete" for s in g.PODMAN_LOOPBACK_PUBLISH))' \
   'True'
+
+echo "== a stop grace is podman's stop timeout, and systemd waits longer than podman (OPS-PERF-01) =="
+# Quadlet's ExecStop is `podman rm -f`, which kills after the CONTAINER's stop timeout -- podman's
+# 10 s default unless StopTimeout= says otherwise. Until 2026-09-22 only TimeoutStopSec= was emitted,
+# so every JVM, Loki, Tempo and both databases were SIGKILLed after 10 s whatever compose said.
+unit_of() { # $1 service -> python that prints that service's rendered unit from the real compose
+  printf 'import io, yaml\nfor p in (g.COMPOSE_APP, g.COMPOSE_MON):\n    d = yaml.safe_load(io.open(p, encoding="utf-8"))\n    s = (d.get("services") or {}).get("%s")\n    if s is not None:\n        print(g.render_container("%s", s))\n' "$1" "$1"
+}
+expect "a 30s grace becomes StopTimeout=30" \
+  'print(g.render_container("x", {"image": "a/b:1", "stop_grace_period": "30s"}))' \
+  'StopTimeout=30'
+expect "...and systemd waits the grace plus the margin" \
+  'print(g.render_container("x", {"image": "a/b:1", "stop_grace_period": "30s"}))' \
+  'TimeoutStopSec=45'
+expect "a compound grace is read as a duration, not stripped of an s" \
+  'print(g.render_container("x", {"image": "a/b:1", "stop_grace_period": "1m30s"}))' \
+  'StopTimeout=90'
+expect "no grace, no stop keys -- podman's default applies and is not restated" \
+  'u = g.render_container("x", {"image": "a/b:1"}); print("StopTimeout" in u or "TimeoutStopSec" in u)' \
+  'False'
+for svc in backend frontend ingest keycloak db-backend loki tempo; do
+  expect "${svc}: every unit with a TimeoutStopSec= also carries a StopTimeout= below it" \
+    "$(unit_of "$svc")"'' \
+    'StopTimeout='
+done
+expect "the rule holds for every generated unit, not only the ones named above" \
+  'files, _ = g.generate()
+bad = []
+for rel, text in files.items():
+    if not rel.endswith(".container"):
+        continue
+    stop = [int(l.split("=", 1)[1]) for l in text.splitlines() if l.startswith("StopTimeout=")]
+    sysd = [int(l.split("=", 1)[1]) for l in text.splitlines() if l.startswith("TimeoutStopSec=")]
+    if bool(stop) != bool(sysd) or (stop and sysd[0] <= stop[0]):
+        bad.append(rel)
+print("mismatched:", bad)' \
+  'mismatched: []'
+
+echo "== native Quadlet keys instead of raw podman arguments (OPS-MOD-01) =="
+# PodmanArgs= is appended to `podman run` unread, so a typo in it ships; a key is validated by the
+# generator. RunInit=, Ulimit= and the network Options= all exist in podman 5.8's
+# podman-systemd.unit(5) -- the comment that said "Quadlet has no Init= key" looked for the wrong
+# name. --cpus and --oom-score-adj have no key and stay arguments.
+expect "init: true becomes RunInit=true" \
+  'print(g.render_container("x", {"image": "a/b:1", "init": True}))' \
+  'RunInit=true'
+expect "a nofile ulimit becomes Ulimit=" \
+  'print(g.render_container("x", {"image": "a/b:1", "ulimits": {"nofile": {"soft": 65536, "hard": 65536}}}))' \
+  'Ulimit=nofile=65536:65536'
+expect "an unknown ulimit is refused rather than dropped" \
+  'print(g.render_container("x", {"image": "a/b:1", "ulimits": {"nproc": 10}}))' \
+  "REFUSAL: x: unrecognised ulimit(s) ['nproc']"
+expect_not "no generated unit passes --init or --ulimit as a raw argument any more" \
+  'files, _ = g.generate(); print("\n".join(l for t in files.values() for l in t.splitlines() if l.startswith("PodmanArgs=")))' \
+  '--init'
+expect_not "...nor --ulimit" \
+  'files, _ = g.generate(); print("\n".join(l for t in files.values() for l in t.splitlines() if l.startswith("PodmanArgs=")))' \
+  '--ulimit'
+expect "the ingress egress block uses the network Options= key" \
+  'files, _ = g.generate(); print(files["quadlet/systemd/net-edge-ingress.network"])' \
+  'Options=no_default_route=true'
+expect_not "...and no network carries PodmanArgs= at all" \
+  'files, _ = g.generate(); print("".join(t for r, t in files.items() if r.endswith(".network")))' \
+  'PodmanArgs='
+expect_not "the measured control no longer reads as an unmeasured hypothesis" \
+  'files, _ = g.generate(); print(files["quadlet/systemd/net-edge-ingress.network"])' \
+  'HYPOTHESIS'
+
+echo "== the config tree is mounted read-only, everywhere (OPS-SEC-04) =="
+# keycloak mounted its theme, its provider directory and realm-export.json writable until
+# 2026-09-22. /var/iri/code is what the deployer rewrites on every release.
+expect "a writable config-tree mount is refused" \
+  'print(g._volume("./keycloak-theme/krt-theme:/opt/keycloak/themes/krt-theme", "keycloak"))' \
+  'REFUSAL: keycloak: mounts /var/iri/code/keycloak-theme/krt-theme from the config tree without `:ro`'
+expect "an absolute config-tree path is held to the same rule" \
+  'print(g._volume("/var/iri/code/keycloak/providers:/opt/keycloak/providers", "keycloak"))' \
+  'without `:ro`'
+expect "the same mount with :ro passes" \
+  'print(g._volume("./keycloak-theme/krt-theme:/opt/keycloak/themes/krt-theme:ro", "keycloak"))' \
+  '/var/iri/code/keycloak-theme/krt-theme:/opt/keycloak/themes/krt-theme:ro'
+expect "a data mount outside the config tree stays writable" \
+  'print(g._volume("/var/iri/keycloak/log:/var/log/keycloak", "keycloak"))' \
+  '/var/iri/keycloak/log:/var/log/keycloak'
+expect_not "the production keycloak unit no longer mounts realm-export.json -- prod runs start, never --import-realm" \
+  'files, _ = g.generate(); print(files["quadlet/systemd/keycloak.container"])' \
+  'realm-export.json'
+expect "every Volume= from /var/iri/code in every generated unit ends in :ro" \
+  'files, _ = g.generate()
+bad = [l for t in files.values() for l in t.splitlines()
+       if l.startswith("Volume=/var/iri/code") and "ro" not in l.split(":")[2:3][0].split(",") ]
+print("writable:", bad)' \
+  'writable: []'
+
+echo "== the data networks are internal under Quadlet (OPS-SEC-05, ADR-0162) =="
+for net in net-db-backend net-db-keycloak net-redis-backend net-redis-frontend net-redis-ingest; do
+  expect "${net} is Internal=true" \
+    "files, _ = g.generate(); print(files['quadlet/systemd/${net}.network'])" \
+    'Internal=true'
+done
+# The networks that carry egress for someone must NOT be internal: the edge's ingress bridge (the
+# only DNAT target for the published ports), acme's egress and the scrape network.
+for net in net-edge-ingress net-acme-egress net-monitoring-scrape net-backend-keycloak; do
+  expect "${net} is not internal" \
+    "files, _ = g.generate(); print('Internal=true' in files['quadlet/systemd/${net}.network'].splitlines())" \
+    'False'
+done
+expect "a container whose every network is internal may not publish a port" \
+  'g.PODMAN_LOOPBACK_PUBLISH["redis"] = ("127.0.0.1:6379:6379",); g.generate()' \
+  'REFUSAL: redis: every network it joins is internal'
+expect "...nor dial the host gateway" \
+  'g.PODMAN_HOST_ALIASES["db-backend"] = ("alloy",); g.generate()' \
+  'REFUSAL: db-backend: every network it joins is internal'
+expect "a stale entry naming a network no container joins is refused" \
+  'g.QUADLET_INTERNAL_NETWORKS = g.QUADLET_INTERNAL_NETWORKS | {"net-nobody"}; g.generate()' \
+  'REFUSAL: QUADLET_INTERNAL_NETWORKS names net-nobody'
+expect "a network compose already makes internal cannot be named a second time" \
+  'print(g.render_network("net-db-backend", {"internal": True}))' \
+  'REFUSAL: net-db-backend: compose already declares it internal'
 
 printf '%d passed, %d failed\n' "$PASSED" "$FAILED"
 [[ $FAILED -eq 0 ]]

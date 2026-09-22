@@ -4,6 +4,15 @@
 
 ### Added
 
+- **Server: automatische Sicherheitsupdates.** Der Produktionshost spielt Security-Advisories jetzt
+  täglich um 07:00 selbst ein (dnf-automatic); die Container-Runtime ist ausgenommen, neu gestartet
+  wird nie automatisch. Neue Alarme melden fehlgeschlagene oder ausbleibende Läufe und einen
+  fälligen Neustart (REQ-OPS-032).
+
+- **Monitoring: Alarme für ausgefallene Datenbanken, Redis und ungesunde Container**
+  (`PostgresDown`, `RedisDown`, `ContainerUnhealthy`) sowie `DeployHeartbeatStale`, wenn der
+  Deploy-Timer eine Stunde lang nichts prüft.
+
 - **Spezialkommandos: SK-Leiter verwalten die Mitglieder ihres SK jetzt selbst.** „Leitung" →
   „Mitglieder verwalten" öffnet die Mitgliederseite des eigenen SK: hinzufügen, entfernen,
   Logistiker/Einsatz-Manager setzen. Das Recht bestand im Backend schon, nur lag die einzige Seite
@@ -14,6 +23,14 @@
   wird bei jedem Build neu erzeugt. Öffentlich wie Impressum und Datenschutz.
 
 ### Changed
+
+- **Server-Härtung.** Datenbank- und Redis-Netze haben in Produktion keinen Internetzugang mehr,
+  Keycloak bindet Theme und Provider nur lesend und `realm-export.json` gar nicht mehr ein, die
+  ungenutzte Prometheus-Lifecycle-API ist abgeschaltet, und das Host-Journal löscht Einträge nach
+  31 Tagen wie Loki (REQ-OBS-010). Die Netzänderung braucht einen einmaligen Neuaufbau der Netze.
+
+- **Monitoring: der Restore-Drill meldet einen ausgefallenen Wochenlauf nach 8 statt 35 Tagen**, und
+  der Container-Metrik-Kollektor alarmiert auch, wenn er nie geschrieben hat.
 
 - **Build: jedes ausgelieferte Modul prüft die Lizenzen seiner Abhängigkeiten gegen eine
   GPL-3.0-kompatible Liste.** Eine unverträgliche Lizenz lässt den Build scheitern. Dabei fiel
@@ -31,6 +48,15 @@
   gesammelt in `docs/archive/`. Rein dokumentarisch.
 
 ### Fixed
+
+- **Betrieb: Container bekommen beim Stoppen wieder ihre Nachlaufzeit.** Podman beendete jeden
+  Container nach 10 s hart — Anwendungen, Datenbanken, Loki und Tempo mitten im geordneten
+  Herunterfahren. Die Units setzen jetzt `StopTimeout=` passend zur konfigurierten Frist.
+
+- **Backup: der wöchentliche Prometheus-Snapshot lief unter Podman nicht.** Der Hilfscontainer
+  wurde abgelehnt und trug das Passwort auf der Kommandozeile; der Snapshot wird jetzt im
+  Prometheus-Container angefordert und dort auch wieder gelöscht. Backup-Helfer und Restore-Drill
+  nutzen das per Digest gepinnte PostgreSQL-Image von db-backend.
 
 - **Benachrichtigungsregeln: vorkonfigurierte Regeln lassen sich wieder bearbeiten.** Bank-,
   Materialbörsen- und Kontolöschungs-Regeln scheiterten beim Speichern, selbst beim Deaktivieren,

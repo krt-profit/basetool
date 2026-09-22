@@ -18,7 +18,8 @@ EnvironmentFile=/var/iri/code/env.d/blackbox-exporter.env
 Exec=--config.file=/etc/blackbox/blackbox.yml
 Memory=64M
 PidsLimit=512
-PodmanArgs=--oom-score-adj=500 --init
+RunInit=true
+PodmanArgs=--oom-score-adj=500
 
 [Service]
 Restart=always

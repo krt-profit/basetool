@@ -20,9 +20,19 @@
 # can bind-mount `/` into a privileged container. Here `deploy` gets a sudoers
 # rule naming TWO commands against ONE target user, and nothing else.
 #
-# WHAT IT DOES NOT GET: no password sudo, no shell as another user, no `podman
-# run` as root, no write access to the unit directory except through the
-# scripts' own paths.
+# WHAT IT DOES NOT GET: no password sudo, no root, no `podman run` as root, no
+# write access to the unit directory except through the scripts' own paths.
+#
+# WHAT IT DOES GET, stated plainly (corrected 2026-09-22, OPS-SEC-08). This file
+# used to add "no shell as another user", and that was false. `/usr/bin/podman *`
+# as the service user is a wildcard over podman's whole command line, so deploy
+# can run ANY code as `iri`: `podman unshare sh`, `podman run -v /var/iri:/x ...`
+# or `podman exec` into any container. In effect `deploy` is `iri` plus the
+# registry token -- which is still strictly narrower than the Docker host, where
+# the `docker` group was root, and still not root here. What bounds it is that
+# `iri` owns nothing but the containers and their data. A wrapper that accepts
+# only the podman subcommands the scripts use would narrow it further; it is
+# optional hardening, not built, and the grant should be read as what it is.
 
 # The service user's uid, looked up HERE rather than taken from the register in
 # 20-user.yml. That file is tagged [user] and this one [user, deploy], so a

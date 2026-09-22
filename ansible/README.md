@@ -40,11 +40,12 @@ The task files themselves carry the measurements behind each step. This README c
 | `10-packages.yml` | `packages` | podman, passt, netavark, aardvark-dns, crun, skopeo, restic, rclone, acl, rsync, firewalld, SELinux tooling; asserts the Podman floor; removes cockpit and refuses a host still listening on 9090 |
 | `15-cosign.yml` | `packages`, `cosign` | the upstream cosign binary, checked against the sha256 pinned in `defaults/main.yml` |
 | `20-user.yml` | `user` | the service user `iri`, its subuid/subgid range, lingering |
-| `22-deploy-user.yml` | `user`, `deploy` | the `deploy` account and the sudoers bridge to `iri` (`podman *`, `systemctl --user *`, `systemctl restart alloy.service`) — and proves it works |
+| `22-deploy-user.yml` | `user`, `deploy` | the `deploy` account and the sudoers bridge to `iri` (`podman *`, `systemctl --user *`, `systemctl restart alloy.service`) — and proves it works. `podman *` means `deploy` can run any code **as `iri`**; it cannot become root |
 | `30-directories.yml` | `directories` | `/var/iri`, `/var/lib/iri`, `/etc/iri`, the setgid `env.d`, the backup staging tree, the unit delivery directory `/etc/containers/systemd/users/<uid>`, every data directory at its **translated** owner |
 | `25-scripts.yml` | `scripts` | `deploy.sh`, `backup.sh`, `restore-drill.sh`, `container-cleanup.sh`, `lib/container-runtime.sh`, `render-env-d.py` (root-owned, `0755`); the four `iri-*` units and timers, logrotate, the lock tmpfiles; timers **enabled, not started** |
 | `40-selinux.yml` | `selinux` | `container_file_t` on the data tree, `bin_t` on the scripts, `restorecon -RF` |
-| `27-observability.yml` | `observability`, `monitoring` | node_exporter, alloy (enabled, not started), prometheus-podman-exporter as a user unit of `iri`, persistent journald, log-source permissions for alloy, the cgroup and certificate-expiry collectors and their timers (started) |
+| `27-observability.yml` | `observability`, `monitoring` | node_exporter, alloy (enabled, not started), prometheus-podman-exporter as a user unit of `iri`, persistent journald bounded to 31 days and 4G (REQ-OBS-010), log-source permissions for alloy, the cgroup and certificate-expiry collectors and their timers (started) |
+| `45-updates.yml` | `updates` | `dnf-automatic` for **security advisories only**, the container runtime excluded, never rebooting; its timer moved to 07:00 (started); an `ExecStopPost=` that records each run and `iri-host-updates-metrics.service`, which re-reads `needs-restarting -r` at boot (REQ-OPS-032) |
 | `50-podman.yml` | `podman` | `~iri/.config/containers/containers.conf` (the pasta `--map-guest-addr` pair, ADR-0196), the public-name alias drop-ins, the optional JVM truststore drop-in |
 | `60-hardening.yml` | `hardening` | an OpenSCAP scan against `cis_server_l1` with the tailoring in `defaults/main.yml`; remediation only with `basetool_host_hardening_remediate: true` |
 | `65-firewall.yml` | `firewall` | firewalld default-deny (SSH, plus the front end's ports), loopback trusted, fail2ban's sshd jail |
@@ -111,7 +112,8 @@ ansible-playbook site.yml --limit production --tags deploy,scripts --check --dif
 ansible-playbook site.yml --limit production --tags deploy,scripts
 ```
 
-`--tags observability` does the same for the two collectors, `--tags podman` for the alias drop-ins,
+`--tags observability` does the same for the two collectors, `--tags updates` for the security-update
+setup, `--tags podman` for the alias drop-ins,
 `--tags cosign` after a cosign pin bump. Each task file that needs the service user's uid looks it
 up itself, so a tag-limited run does not depend on a skipped file.
 

@@ -349,7 +349,7 @@ A restore with **no** compromise suspected keeps the restored secrets as-is.
   token (`REQ-OPS-012`).
 - **A failed backup or drill** is alerted on, not just shown as `failed` in `systemctl`:
   `BackupStaleOrMissing` (no successful backup for 26 h, or the metric absent),
-  `RestoreDrillStaleOrMissing` (35 days) and `RestoreDrillArtifactNotRestorable` (any
+  `RestoreDrillStaleOrMissing` (8 days) and `RestoreDrillArtifactNotRestorable` (any
   `basetool_restore_drill_artifact_ok{artifact=…} == 0`) — all critical, in
   [`monitoring/prometheus/alerts/ops-automation.yml`](../monitoring/prometheus/alerts/ops-automation.yml).
   Treat a failed **restore drill** as a severe incident — it means the latest backup did not

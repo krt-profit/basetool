@@ -292,6 +292,22 @@ jobs:
       - name: Self-test the certificate expiry collector
         run: bash scripts/cert-expiry-metrics.test.sh
 
+  host-updates-selftest:
+    name: host-updates-selftest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # `scripts/host-updates-metrics.sh` records every dnf-automatic run and whether a reboot is
+      # due (REQ-OPS-032), and three alerts read nothing else. The part worth gating is what it
+      # does NOT write: a reboot state `needs-restarting` could not establish must be left out
+      # rather than written as a reassuring 0, and a boot refresh must carry the last run over
+      # instead of erasing it. Stubbed `needs-restarting`, no dnf, no systemd, no host.
+      - name: Self-test the host patch-state collector
+        run: bash scripts/host-updates-metrics.test.sh
+
   container-runtime-selftest:
     name: container-runtime-selftest
     runs-on: ubuntu-latest

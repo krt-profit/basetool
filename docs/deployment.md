@@ -506,6 +506,37 @@ systemctl start iri-deploy.timer
 
 `backend` and `keycloak` are not restarted with it; their pools reconnect.
 
+### Network changes are installed, not applied
+
+A changed `.network` unit reaches the host like any other and is **not** applied by it: Quadlet
+creates a network with `podman network create --ignore`, so an existing network keeps its old
+settings until it is removed and recreated. `deploy.sh` does not do that on its own (it would be a
+full-stack outage behind an automatic tick). Take it as a maintenance, testing host first, with the
+members of the changed networks stopped. For the 2026-09-22 change that made the data networks
+`Internal=true` (ADR-0162):
+
+```bash
+systemctl stop iri-deploy.timer
+# every member of the five networks; stopping a database also stops what Requires= it
+${UCTL} stop frontend.service ingest.service backend.service keycloak.service \
+  postgres-exporter-backend.service postgres-exporter-keycloak.service redis-exporter.service \
+  db-backend.service db-keycloak.service redis.service
+${UPOD} network rm net-db-backend net-db-keycloak net-redis-backend net-redis-frontend net-redis-ingest
+${UCTL} restart net-db-backend-network.service net-db-keycloak-network.service \
+  net-redis-backend-network.service net-redis-frontend-network.service net-redis-ingest-network.service
+for n in net-db-backend net-db-keycloak net-redis-backend net-redis-frontend net-redis-ingest; do
+  ${UPOD} network inspect "$n" --format "$n {{.Internal}}"          # expect: true
+done
+${UCTL} start db-backend.service db-keycloak.service redis.service
+${UCTL} start keycloak.service backend.service ingest.service frontend.service \
+  postgres-exporter-backend.service postgres-exporter-keycloak.service redis-exporter.service
+systemctl start iri-deploy.timer
+```
+
+Then `python scripts/check-conformance.py --ssh <host>` from a workstation, and from inside a
+database container confirm there is no way out: `${UPOD} exec db-backend wget -q -T 5 -O- https://1.1.1.1`
+must fail, while `${UPOD} exec backend …` still resolves `db-backend`.
+
 ### Stateful-infra upgrades
 
 A changed **`postgres:` or `quay.io/keycloak/keycloak:` tag** is operator-gated (REQ-OPS-006).
@@ -553,7 +584,15 @@ deliberate host change:
 ansible-playbook site.yml --limit production --tags deploy,scripts --check --diff
 ansible-playbook site.yml --limit production --tags deploy,scripts
 ansible-playbook site.yml --limit production --tags observability   # the two collectors and their timers
+ansible-playbook site.yml --limit production --tags updates         # dnf-automatic (REQ-OPS-032)
 ```
+
+**Host patching** is `dnf-automatic`, set up by the same role: security advisories daily at 07:00
+(+ up to 15 minutes), the container runtime excluded, **never a reboot** (ADR-0199). A due reboot
+raises `HostRebootRequired`; take it as a maintenance — the stack comes back on its own, because the
+units are `WantedBy=default.target` and `iri` lingers. The runtime (podman, crun, conmon, netavark,
+aardvark-dns, containers-common, passt) is updated by hand, testing host first:
+`dnf upgrade --security podman crun conmon netavark aardvark-dns containers-common passt`.
 
 Confirm by content, never by mtime:
 `sha256sum /var/iri/code/scripts/deploy.sh` against `git show origin/main:scripts/deploy.sh | sha256sum`.

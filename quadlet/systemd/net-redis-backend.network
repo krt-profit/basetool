@@ -3,3 +3,4 @@
 NetworkName=net-redis-backend
 Subnet=172.28.12.0/24
 Gateway=172.28.12.1
+Internal=true
