@@ -73,16 +73,83 @@ money and complexity go into *recoverability* instead: an off-site backup, a res
 proves the snapshot, and a rebuildable host (ADR-0188). The residual risk is honest: a host loss is
 a restore, and a restore is measured in hours, not seconds.
 
+## 11.5a The external probes no longer leave the machine, and the IPv6 ones cannot run
+
+A container on this host cannot reach the machine through its own public address — the container
+networks live in the service user's network namespace and outbound leaves through pasta, which does
+not fold such a connection back into the host. Measured 2026-09-22: its own public IPv4 on 22, 80
+and 443 all refused, its own public IPv6 on 443 refused, `host-gateway` open on all three, and
+Cloudflare DNS over IPv6 open — so egress works and it is specifically the turn-around that does
+not. [ADR-0196](../adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md)
+records the decision that follows: every public name a container dials is aliased to `host-gateway`.
+
+**What that costs the blackbox probes is worth stating precisely, because it is smaller than it
+sounds and larger in one place.**
+
+*Smaller:* a probe still traverses TLS, the certificate, haproxy, the PROXY header, the edge, vhost
+routing and the application. What it no longer traverses is public DNS and internet routing — and it
+never did. The Docker host's hairpin kept the packet on the machine too. What these probes proved
+was *"the name has a record and the edge answers"*, and that is what they still prove.
+
+*Larger:* **the IPv6 modules cannot work here at all.** `host-gateway` is IPv4-only, the host's
+public IPv6 is refused from a container, and the netavark bridge's own gateway is inside the
+namespace where no host process listens — all three measured. `http_2xx_ipv6` and
+`http_2xx_or_401_ipv6` therefore fail with *"no suitable address found"*, and their alerts fire
+against endpoints that are serving IPv6 perfectly well.
+
+Two ways out, neither taken yet and neither a cutover-window decision:
+
+- **Give pasta an IPv6 host mapping.** This is the one worth measuring, because it would make
+  *every* alias in ADR-0196 unnecessary and restore both protocols at once. It means setting
+  `pasta_options` in a `containers.conf` the role keeps deliberately empty — and whose emptiness is
+  itself documented — so it belongs on the testing host first.
+- **Move the IPv6 assertion to a host-level probe.** The host reaches its own public IPv6 without
+  difficulty (measured), so a small timer writing a textfile metric proves exactly what the
+  container-side module used to. Strictly weaker than the first option and strictly simpler.
+
+Until one of them lands, those two modules are red and their redness means nothing — which is the
+state every other entry in this chapter exists to prevent.
+
+## 11.5b The alias drop-ins were hand-written before the role could write them
+
+The cutover placed `10-host-alias.conf` for five services by hand, because the Ansible variable that
+generates them did not exist in the shape the host needed. The role now writes them from
+`basetool_host_public_name_aliases`, **and removes them when that variable is empty** — so a play
+run against an inventory that has not been updated takes the aliases away and stops the backend,
+Grafana and every probe.
+
+The inventory is gitignored, so this cannot be enforced by review of this repository. What guards it
+instead is that the role **refuses to run** when it finds the old singular variable name, which an
+un-migrated inventory still carries. That converts the silent breakage into a failed play with a
+message naming the replacement. **Remove this entry once a full role run has been made against both
+hosts and the drop-ins survived it.**
+
 ## 11.6 Post-cutover follow-ups that are not yet closed
 
-- **The new host's first own backup.** Until it runs, the edge certificates, the ACME account and
-  the redis ACL exist in exactly one place — that host's disk — because every snapshot in the
-  repository was written by the old host, whose deployed `backup.sh` captures none of the three.
-  The restore drill correctly reports those three as `0` until then.
-- **Two prerequisites are verified after the restore, not before it** (`basetool-ca.crt`,
-  `KC_METRICS_ENABLED`): their inputs arrive with the restore itself. A missing CA takes out all
-  four application scrape targets loudly; a missing `KC_METRICS_ENABLED` is silent — Keycloak stays
-  healthy and simply answers `404` on `/metrics`.
+- ~~**The new host's first own backup.**~~ **Closed 2026-09-22.** The edge certificates, the ACME
+  account and the redis ACL were in exactly one place — that host's disk — because every snapshot in
+  the repository had been written by the old host, whose deployed `backup.sh` captured none of the
+  three. The new host's own backup now carries all three and the drill restores them: **all seven
+  artifacts read `1`**.
+
+  It took three attempts, and the two failures are the entry's real lesson. The first two backups
+  skipped `keystore.p12` and `realm-export.json` — one `WARN` line each and a successful exit —
+  because the restore gives those files ownership chosen for the *containers*, and `backup.sh` reads
+  them through a helper that runs as the *service user*. And the drill then aborted before its
+  verification step on a `podman cp -` that reports failure for a copy it completed, writing four
+  artifacts as `0` that it had never got as far as testing. **A backup that exits 0 and a drill that
+  scores an artifact are two different claims**, and only the second is worth anything.
+- ~~**Two prerequisites are verified after the restore, not before it**~~ (`basetool-ca.crt`,
+  `KC_METRICS_ENABLED`). **Both checked 2026-09-22** and both green: the CA is in place with a valid
+  subject and expiry, and the `.env` carries `KC_METRICS_ENABLED=true`. Their inputs arrive with the
+  restore itself, so the ordering stays as it is; the entry remains here because the asymmetry is
+  the part to remember. A missing CA takes out all four application scrape targets loudly; a missing
+  `KC_METRICS_ENABLED` is silent — Keycloak stays healthy and simply answers `404` on `/metrics`.
+- **Container stdout does not reach Loki until the release that states the log driver lands.** Fixed
+  in the repository — every `.container` now carries `LogDriver=journald` and the role gives the
+  host a persistent journal — but the units arrive with the config bundle, so a host stays blind
+  until it has taken that release. Both halves are needed and each is silent on its own; §7.3 has
+  the measurement.
 
 ## 11.7 Smaller, known, and deliberately left
 

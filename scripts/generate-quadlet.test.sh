@@ -217,6 +217,19 @@ for svc in backend frontend ingest keycloak; do
     'True'
 done
 
+echo "== the two addresses the front end depends on =="
+# The peer the edge presents to haproxy is the container's OWN address, and rootlessport picks it
+# from net-proxy-frontend rather than from the pinned ingress network. That network is SHARED with
+# the frontend container and its allocator drifts, so the peer moved .10 -> .11 across one recreate
+# on 2026-09-22: set_real_ip_from stopped matching, nginx discarded the PROXY header, and the edge
+# logged 2340 requests in ten minutes from one bridge address -- one rate-limit bucket for the whole
+# internet, which is the 2026-07-20 outage reached by another road.
+expect "the ingress address is pinned"   'print(g.FRONT_END["edge"]["ip"])'   '172.28.15.10'
+expect "so is the peer address, on the network rootlessport actually uses"   'print(g.FRONT_END["edge"]["peer_network"] + " " + g.FRONT_END["edge"]["peer_ip"])'   'net-proxy-frontend 172.28.3.250'
+# High on purpose: netavark allocates from the low end and both members of that network drift
+# upward, so a low pin is a collision waiting to happen.
+expect "the peer pin is out of the allocator's way"   'print(int(g.FRONT_END["edge"]["peer_ip"].split(".")[-1]) > 200)'   'True'
+
 echo "== the loopback publishes a host service depends on =="
 # AddHost= solves container->host. Nothing solves host->container, because rootless Podman keeps
 # the container network in a user namespace: a published port is the only way in.

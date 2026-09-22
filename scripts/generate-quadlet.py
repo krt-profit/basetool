@@ -77,12 +77,46 @@ ENV_DIR_ON_HOST = "/var/iri/code/env.d"
 # address, would have been broken by the first restart. Three recreations with the
 # pin produced the same peer every time. `IP=` also requires a user-defined bridge
 # network, which net-edge-ingress is.
+#
+# TWO pins, since 2026-09-22, and the second one is the one that matters. The
+# sentence above is right about the mechanism and was wrong about WHICH of the
+# container's own addresses rootlessport presents. Measured on the production host:
+# the peer is the edge's address on `net-proxy-frontend`, not on the pinned
+# `net-edge-ingress` -- and that network is shared with the frontend container and
+# hands out addresses by drift, so the peer moved .10 -> .11 across a single
+# recreate and `set_real_ip_from 172.28.15.10` stopped matching. nginx then discards
+# the PROXY header and falls back to the TCP peer, so the edge logged EVERY request
+# from one bridge address: 2340 of them in ten minutes, including a probe issued
+# from another continent's IPv6. That is the 2026-07-20 outage's shape -- one
+# rate-limit bucket for the whole internet, and every $remote_addr allow-list
+# keyed on it -- reached by a different road.
+#
+# It was not the recreate that broke it. The first deploy after the cutover
+# happened to produce a peer that matched; every recreate since would not have,
+# so the next release would have done it unattended.
+#
+# The peer pin is high on purpose. netavark allocates from the low end of the
+# subnet and both containers on net-proxy-frontend drift upward with each
+# recreate (frontend held .9, the edge .10 then .11), so a low pin is a collision
+# waiting to happen while .250 is one no allocator reaches.
+#
+# WHAT IS NOT SOLVED HERE, stated because the next reader will ask: nothing makes
+# podman's choice of network deterministic, so a future version could present the
+# peer on one of the other four. `EDGE_TRUSTED_PROXY` names ONE address by
+# ADR-0187's design -- a list is rejected by render-and-run.sh as "trusts every
+# client" -- so the guard is behavioural rather than structural:
+# check-conformance.py's client-address-visible fails on exactly this, which is
+# how it was found.
 FRONT_END = {
     "edge": {
         "publish": ["127.0.0.1:8080:8080", "[::1]:8080:8080",
                     "127.0.0.1:8443:8443", "[::1]:8443:8443"],
         "network": "net-edge-ingress",
         "ip": "172.28.15.10",
+        # The network rootlessport actually presents the peer on, and the address
+        # EDGE_TRUSTED_PROXY has to name.
+        "peer_network": "net-proxy-frontend",
+        "peer_ip": "172.28.3.250",
     }
 }
 
@@ -967,6 +1001,25 @@ def render_container(service: str, spec: dict[str, Any]) -> str:
 
     container.append(f"Image={_qualify(_image_defaults(spec['image'], service))}")
     container.append(f"ContainerName={service}")
+    # STATED, not left to podman's default, because the whole log pipeline depends on the answer
+    # and the default is not the same on every host.
+    #
+    # REQ-OBS-019 moved Alloy's container-stdout streams from the Docker API to the JOURNAL when
+    # Alloy became a host service: `loki.source.journal` is what ships `<svc>-stdout`, `mon-*`,
+    # `postgres-*`, `edge` and `ops-cleanup` to Loki. A container whose driver is `k8s-file` writes
+    # into podman's own storage instead and Alloy never sees it.
+    #
+    # That is not hypothetical. Measured on the production host 2026-09-22, hours after the
+    # cutover: every container resolved `k8s-file`, `journalctl CONTAINER_NAME=<any>` had never
+    # returned a line, and Loki held only the FILE-based streams -- the application JSON logs and
+    # the host's auth/audit logs. The edge's access log, which check-conformance.py calls "the only
+    # record of a refused request's origin", was reachable by SSH and nowhere else, and every alert
+    # that reads a container's stdout could not have fired. `log-streams` stayed green throughout,
+    # because it measures Loki's total ingest RATE and the file streams alone produce one.
+    #
+    # The testing host defaulted to `journald` and the production host to `k8s-file`, from the same
+    # release. A promotable artifact cannot depend on which one it lands on.
+    container.append("LogDriver=journald")
 
     run_as = RUN_AS.get(service)
     if run_as is not None:
@@ -1037,6 +1090,11 @@ def render_container(service: str, spec: dict[str, Any]) -> str:
         if front and net == front["network"]:
             # Quadlet takes the address as an option on the Network= line.
             container.append(f"Network={net}.network:ip={front['ip']}")
+        elif front and net == front.get("peer_network"):
+            # The address rootlessport presents to the front end. See FRONT_END: this is the one
+            # EDGE_TRUSTED_PROXY has to name, and it is pinned because the network is shared and
+            # its allocator drifts.
+            container.append(f"Network={net}.network:ip={front['peer_ip']}")
         else:
             container.append(f"Network={net}.network")
 

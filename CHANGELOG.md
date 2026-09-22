@@ -10,6 +10,45 @@
   Container, die einwandfrei liefen. Die fehlenden Größen kommen jetzt aus den Quellen, die dieser
   Host tatsächlich hat. Rein betriebsseitig.
 
+- **Der Edge sieht wieder die echte Client-Adresse.** Die gepinnte Adresse, der er den
+  PROXY-Header glaubt, lag am falschen Netz: die Verbindung kommt über ein anderes, geteiltes
+  Netz herein, dessen Adressen bei jedem Neuanlegen wandern. Der Edge verwarf den Header deshalb
+  und protokollierte **jede** Anfrage als dieselbe Bridge-Adresse — der Per-IP-Rate-Limiter und
+  jede Adress-Allowlist griffen damit auf einen einzigen Topf für das gesamte Internet. Beide
+  Adressen sind jetzt gepinnt.
+
+- **Betrieb: die Container-Ausgaben landen wieder in Loki.** Auf dem Podman-Host schrieben die
+  Container in Podmans eigenen Speicher statt ins Journal, und das Journal selbst lag nur im
+  Arbeitsspeicher — der Sammler las also einen Pfad, den es nicht gab. Dadurch fehlten sämtliche
+  Container-Ströme, darunter das Zugriffsprotokoll des Edge; die Gesamt-Sammelrate blieb trotzdem
+  grün, weil die Dateiströme allein sie erzeugen. Beide Hälften sind jetzt festgelegt statt
+  geerbt. Rein betriebsseitig.
+
+- **Betrieb: die Konformanzprüfung liest Container-Logs jetzt über den tatsächlichen Treiber.**
+  Sie nahm einen an, und auf dem Produktionshost war es der andere — die Prüfung des
+  Client-Adressen-Durchgriffs meldete daraufhin „die Anfrage hat diesen Edge nie erreicht" über
+  einen Edge, der jede Anfrage der Maschine bediente. Rein betriebsseitig.
+
+- **Betrieb: die Container erreichen den eigenen öffentlichen Namen wieder.** Auf einem
+  Rootless-Host kommt ein Container über die öffentliche Adresse gar nicht an die eigene Maschine
+  heran. Die Rolle konnte dafür bisher genau einen Namen umbiegen und tat es für die Produktion
+  überhaupt nicht — unter Docker funktionierte der Umweg noch. Es ist jetzt eine Liste, und Grafana
+  sowie die externen Sonden stehen mit darin; ohne sie schlugen die Keycloak-Anmeldung in Grafana
+  und jede externe Prüfung fehl. Rein betriebsseitig.
+
+- **Die Zertifikatserneuerung fehlte im Auslieferungspaket.** Die ACME-Schleife ist am 16.09. aus
+  der Compose-Datei in eine eigene Skriptdatei gewandert, ohne dass das Paket sie mitnimmt: auf
+  einem frisch aufgesetzten Host startet der Dienst dadurch gar nicht und erneuert keine
+  Zertifikate. Bestehende Hosts merkten davon nichts, weil ihr Container das alte Kommando noch in
+  sich trug. Paket und Auslieferung tragen die Datei jetzt beide, und ein Test prüft künftig jeden
+  Teilbaum statt nur den, der zuerst gefehlt hat.
+
+- **Die wöchentliche Wiederherstellungsprobe läuft wieder durch.** Auf dem Podman-Host brach sie
+  beim zweiten Datenbank-Dump ab und meldete vier Artefakte als nicht wiederherstellbar, die sie
+  gar nicht erst geprüft hatte: `podman cp` gab einen Fehler zurück, obwohl die Datei vollständig
+  im Container angekommen war. Die Dumps wandern jetzt auf einem anderen Weg hinein, und die
+  übertragene Größe wird nachgezählt, statt dem Rückgabewert zu glauben.
+
 ## [v1.9.1](https://github.com/krt-profit/basetool/releases/tag/v1.9.1) - 2026-09-22
 
 ### Fixed
