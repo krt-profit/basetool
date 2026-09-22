@@ -219,7 +219,7 @@ class AnonymousSurfaceE2eTest {
         browser.newContext(new Browser.NewContextOptions().setIgnoreHTTPSErrors(true))) {
       Page page = context.newPage();
       try {
-        for (String path : List.of("/terms", "/privacy", "/impressum")) {
+        for (String path : List.of("/terms", "/privacy", "/impressum", "/licenses")) {
           E2eSupport.navigate(page, baseUrl + path);
           assertEquals(baseUrl + path, page.url(), path + " must render without a login");
         }

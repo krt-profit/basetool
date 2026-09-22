@@ -164,6 +164,8 @@ public final class FrontendPageRoutes {
           // first sweep put it by reporting a route with no footer at all.
           "/admin/p4k-import",
           "/impressum",
+          // The third-party licence notice (REQ-UI-021): a long public page with the app shell.
+          "/licenses",
           // The Android App Link's fallback page (REQ-SEC-038), reached when the link did not
           // resolve to the app. A real page with the app shell, and worth sweeping: the member who
           // sees it is on a phone mid-login, which is exactly the class the touch sweep measures.

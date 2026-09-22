@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="de">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
+    <title th:text="${appTitle} + ' - ' + #{licenses.title}">Profit Basetool - Open-Source-Lizenzen</title>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button" th:aria-label="#{a11y.nav.menu}">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/basetool-logo.svg}" alt="" height="50">
+            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
+        </a>
+    </nav>
+</header>
+<main>
+    <!--
+      REQ-UI-021 / ADR-0197. A PUBLIC page (REQ-SEC-052) with no backend call: the list is the
+      build-time Licensee report of every shipped module plus the bundled fonts and image layers,
+      read once at startup by OssLicenseCatalog. Nothing on it mutates, so there is no live-update
+      wiring; the groups fold with a native <details>, which needs no script.
+    -->
+    <div class="hud-box mt-2">
+        <h1 th:text="#{licenses.title}">Open-Source-Lizenzen</h1>
+        <p th:text="#{licenses.intro}">Das Profit Basetool enth&auml;lt Open-Source-Komponenten Dritter.</p>
+        <p th:text="#{licenses.choice}">Bietet eine Komponente mehrere Lizenzen zur Wahl an, steht sie unter jeder davon.</p>
+        <p>
+            <span th:text="#{licenses.own}">Das Profit Basetool selbst steht unter der GNU General Public License v3.0.</span>
+            <a href="https://github.com/krt-profit/basetool"
+               target="_blank" rel="noopener noreferrer"
+               th:text="#{licenses.own.source}">Quelltext auf GitHub</a>
+        </p>
+
+        <p th:if="${!ossAvailable}" class="oss-unavailable" th:text="#{licenses.unavailable}">
+            Das Lizenzverzeichnis konnte nicht geladen werden.
+        </p>
+
+        <th:block th:if="${ossAvailable}">
+            <p class="oss-meta"
+               th:text="#{licenses.meta(${ossComponentCount}, ${#lists.size(ossGroups)}, ${appVersion})}">
+                247 Komponenten &middot; 13 Lizenzen &middot; v1.9.2
+            </p>
+
+            <details class="hud-details oss-group" th:each="group : ${ossGroups}">
+                <summary>
+                    <span class="oss-group-head">
+                        <span class="oss-group-name" th:text="${group.license().name()}">Apache License 2.0</span>
+                        <span class="oss-group-meta"
+                              th:text="${group.license().spdxId() != null}
+                                       ? #{licenses.group.meta.spdx(${#lists.size(group.components())}, ${group.license().spdxId()})}
+                                       : #{licenses.group.meta(${#lists.size(group.components())})}">217 &middot; SPDX: Apache-2.0</span>
+                    </span>
+                </summary>
+                <p th:if="${group.license().url() != null}" class="oss-license-link">
+                    <a th:href="${group.license().url()}"
+                       target="_blank" rel="noopener noreferrer"
+                       th:text="#{licenses.group.text}">Lizenztext</a>
+                </p>
+                <ul class="oss-list">
+                    <li class="oss-row" th:each="c : ${group.components()}">
+                        <a th:if="${c.url() != null}" class="oss-name" th:href="${c.url()}"
+                           target="_blank" rel="noopener noreferrer" th:text="${c.name()}">org.example:lib</a>
+                        <span th:if="${c.url() == null}" class="oss-name" th:text="${c.name()}">org.example:lib</span>
+                        <span class="oss-version" th:text="${c.version()}">1.0.0</span>
+                        <span class="oss-modules">
+                            <span class="chip chip--muted" th:each="m : ${c.modules()}"
+                                  th:text="#{${'licenses.module.' + m}}">Backend</span>
+                        </span>
+                    </li>
+                </ul>
+            </details>
+
+            <p class="oss-end" th:text="#{licenses.end(${ossGenerator})}">
+                Ende des Verzeichnisses &middot; erzeugt beim Build &middot; licensee 1.14.1
+            </p>
+        </th:block>
+    </div>
+</main>
+</body>
+</html>

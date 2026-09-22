@@ -41,7 +41,7 @@ Der Besucher öffnet eine beliebige Seite des Tools.
    und kein Formular der Seite rendert.
 2. `/` aufrufen: die Startseite zeigt beide Anmelde-Einstiege (`landing-login`,
    `landing-login-discord`) und **keine** Tabelle — die Sieben-Tage-Einsatzübersicht stand hier.
-3. `/terms`, `/privacy`, `/impressum` aufrufen: sie rendern ohne Anmeldung.
+3. `/terms`, `/privacy`, `/impressum`, `/licenses` aufrufen: sie rendern ohne Anmeldung.
 
 ### Hintergrundaufrufe werden abgewiesen, nicht umgeleitet
 
