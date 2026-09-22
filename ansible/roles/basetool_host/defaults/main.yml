@@ -358,29 +358,48 @@ basetool_host_frontend_timeout_server: 15m
 basetool_host_manage_frontend: true
 
 # --- the public-name alias for the application containers ------------------------------------------
-# A non-production host has to reach its OWN public name from inside a container -- the frontend
-# discovers the OIDC issuer over it (`https://<public>/auth/realms/iri`) and will not start if the
-# name resolves to an address the container cannot reach. Production needs nothing here: its public
-# name resolves to the host that serves it.
+# A container has to reach this host's OWN public names from the inside -- the frontend discovers
+# the OIDC issuer over `https://<public>/auth/realms/iri`, Grafana exchanges its OAuth code at the
+# same origin, and the blackbox exporter probes all four vhosts.
 #
-# `hostname:ip`, exactly the form the host `.env` uses for IRI_KEYCLOAK_HOST_ALIAS, and it must
-# MATCH that line -- `scripts/check-conformance.py` compares the two and fails when they disagree
-# silently, which is the whole reason that check exists.
+# EVERY rootless host needs this, production included, and the line that used to say otherwise is
+# the reason it is spelled out at length here. A container on this platform cannot reach the
+# machine through its own public address at all: the container networks live inside the service
+# user's network namespace and outbound leaves through pasta, which does not fold a connection to
+# the host's own address back into the host. Measured on the production host 2026-09-22 -- ports
+# 22, 80 and 443 on its public IPv4 all refused from inside a container, and its public IPv6
+# likewise, while the same ports on `host-gateway` answered. Under Docker the hairpin worked, so
+# the default was empty and nobody had cause to doubt it; on cutover day it cost the backend its
+# startup, Grafana its sign-in and every external probe its result, in three separate
+# investigations before the common cause was visible.
+#
+# A LIST of `hostname:ip` entries, one per AddHost line, since 2026-09-22. One entry was not
+# enough: the blackbox exporter probes four public names and a single alias left three of them
+# resolving to an address no container can reach. `host-gateway` is a legal value and the better
+# one -- podman resolves it itself, and the generator already emits `AddHost=alloy:host-gateway`
+# for the host-native Alloy.
+#
+# The FIRST entry must MATCH IRI_KEYCLOAK_HOST_ALIAS in the host `.env` --
+# `scripts/check-conformance.py` compares the two and fails when they disagree silently, which is
+# the whole reason that check exists.
 #
 # Empty means "write no drop-in and remove any this role wrote", so clearing the variable actually
 # clears the alias instead of leaving a stale one behind.
-basetool_host_public_name_alias: ""
-# The services whose containers need it -- the three JVM modules, which are the ones that resolve
-# the issuer. The generator emits `AddHost=` for exactly these three (their compose templates carry
-# `extra_hosts`), so this list mirrors that rather than guessing.
+basetool_host_public_name_aliases: []
+# The services whose containers need it. The three JVM modules resolve the issuer; grafana's OAuth
+# token exchange is a back-channel call to the same origin; blackbox-exporter dials all four public
+# names. The generator emits `AddHost=` for the first three (their compose templates carry
+# `extra_hosts`); the last two get it only from this drop-in, which is why they were missing.
 basetool_host_public_name_alias_services:
   - backend
   - frontend
   - ingest
+  - grafana
+  - blackbox-exporter
 
 # --- a JVM truststore for a privately-signed edge --------------------------------------------------
 # A non-production host reaches its own public name through an edge holding a certificate from a
-# PRIVATE CA. The name resolving (basetool_host_public_name_alias, above) only gets the JVM as far
+# PRIVATE CA. The name resolving (basetool_host_public_name_aliases, above) only gets the JVM as far
 # as the handshake; it then fails PKIX path building, because the public CA bundle inside the image
 # does not contain that CA. Measured on the testing host 2026-09-20 -- the frontend reached the
 # issuer and still would not start.
@@ -404,6 +423,14 @@ basetool_host_jvm_truststore_path: ""
 # Where the container sees it. A constant rather than a knob: the .env line above has to name the
 # same path, and two places to change is one too many.
 basetool_host_jvm_truststore_dest: /run/secrets/jvm-truststore.p12
+# Its own list, and deliberately not basetool_host_public_name_alias_services. The two coincided
+# until 2026-09-22, when the alias list grew to include grafana and blackbox-exporter -- neither of
+# which is a JVM. One shared list would have mounted a Java truststore into a Go process: inert,
+# and a lie in the unit about what the container is.
+basetool_host_jvm_truststore_services:
+  - backend
+  - frontend
+  - ingest
 
 # --- the host firewall ----------------------------------------------------------------------------
 # Default-deny in front of a host that publishes two ports to the internet is straightforwardly

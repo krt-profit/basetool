@@ -5,6 +5,7 @@ StartLimitIntervalSec=0
 [Container]
 Image=docker.io/grafana/grafana-oss:13.0.2@sha256:5dad0df181cb644a14e13617b913b261a54f7d4fd4510721dba420929f35bea2
 ContainerName=grafana
+LogDriver=journald
 ReadOnly=true
 DropCapability=ALL
 Environment=GF_PLUGINS_PREINSTALL_DISABLED=true

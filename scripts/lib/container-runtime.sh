@@ -975,15 +975,36 @@ rt_cp_to() {
       #
       #     Error: ".../krt_basetool.dump" could not be found on the host: ... permission denied
       #
-      # Measured on the testing host 2026-09-20. `cp -` reads a tar from stdin, so the CALLER reads
-      # the file and the pipe crosses the account boundary. The archive is built here rather than
-      # by the caller so the member lands at the requested name inside the container.
-      local src="$1" ctr="$2" dst="$3"
-      tar -C "$(dirname "${src}")" -cf - "$(basename "${src}")"         | ${RT_CLI} cp - "${ctr}:$(dirname "${dst}")" || return 1
-      # tar preserves the SOURCE basename; rename inside the container when the caller asked for
-      # a different one, so the contract stays "this file, at this path".
-      if [[ "$(basename "${src}")" != "$(basename "${dst}")" ]]; then
-        ${RT_CLI} exec "${ctr}" mv "$(dirname "${dst}")/$(basename "${src}")" "${dst}" || return 1
+      # Measured on the testing host 2026-09-20. The CALLER reads the file and the bytes cross the
+      # account boundary through a pipe.
+      #
+      # `exec -i`, and NOT `podman cp -`, and that is a bug fix rather than a preference. `cp -`
+      # stops reading the moment it has extracted the entry, so tar's trailing blocks land in a
+      # closed pipe and podman reports its own failed write:
+      #
+      #     Error: 1 error occurred:
+      #             * io: read/write on closed pipe
+      #
+      # It exits 125 -- and the file is COMPLETE in the container anyway. Measured on the production
+      # host 2026-09-22, ten rounds each: `cp -` failed 10/10 while delivering the file correctly
+      # 10/10; `exec -i` succeeded 10/10. Deterministic per file size rather than a race: the
+      # restore drill's 12 MiB backend dump keeps podman reading to the end and passes, its 352 KiB
+      # keycloak dump does not -- so the drill aborted on its second copy and reported four
+      # artifacts unrestorable that it had never got as far as testing.
+      #
+      # This also drops the tar, and with it the rename that existed only because tar preserves the
+      # SOURCE basename. `sh -c '…' sh "${dst}"` passes the destination as $1 rather than
+      # interpolating it into the script, so a path with a quote in it cannot rewrite the command.
+      local src="$1" ctr="$2" dst="$3" want got
+      # shellcheck disable=SC2016  # `$1` belongs to the inner sh, not to this shell -- that is the point
+      ${RT_CLI} exec -i "${ctr}" sh -c 'cat > "$1"' sh "${dst}" < "${src}" || return 1
+      # Verify the bytes arrived instead of trusting the exit status -- which is precisely what the
+      # mechanism this replaces got wrong, in the opposite direction.
+      want="$(wc -c < "${src}" | tr -d '[:space:]')"
+      got="$(${RT_CLI} exec "${ctr}" stat -c %s "${dst}" 2>/dev/null | tr -d '[:space:]')"
+      if [[ "${want}" != "${got}" ]]; then
+        echo "rt_cp_to: ${dst} is ${got:-0} bytes in ${ctr}, expected ${want}" >&2
+        return 1
       fi
       ;;
   esac

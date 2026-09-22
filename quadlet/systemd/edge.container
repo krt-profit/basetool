@@ -5,6 +5,7 @@ StartLimitIntervalSec=0
 [Container]
 Image=docker.io/nginxinc/nginx-unprivileged:1.31.6-alpine@sha256:e75f89810bf5bfbcf58a1cfb32a1a11de55b7623d732e67735d513b720d7436a
 ContainerName=edge
+LogDriver=journald
 User=101
 Group=101
 ReadOnly=true

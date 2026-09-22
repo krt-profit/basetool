@@ -380,11 +380,16 @@ class HostRunner:
 
         ``logs`` is the one shape that does **not** survive the runtime swap, which is why it has
         its own method instead of riding on :attr:`container_cli`. Measured on the testing host,
-        2026-09-18: the Quadlet units run with podman's rootless default log driver, ``journald``,
-        and ``podman logs edge --since 60m`` returns **zero lines** for a container that is
-        logging -- while ``journalctl CONTAINER_NAME=edge`` over the same window returns 67
-        access-log lines. Swapping the binary alone would have left two checks reading an empty
-        log and reporting on it.
+        2026-09-18: those Quadlet units ran with the ``journald`` log driver, and
+        ``podman logs edge --since 60m`` returned **zero lines** for a container that was logging,
+        while ``journalctl CONTAINER_NAME=edge`` over the same window returned 67 access-log
+        lines. Swapping the binary alone would have left two checks reading an empty log and
+        reporting on it.
+
+        That measurement was then generalised into "podman's rootless default", and it is not one.
+        The production host resolves ``k8s-file`` -- ``podman info`` says so and every container
+        inspects to it -- where the journalctl form returns zero lines forever. Both defaults are
+        real, neither is safe to assume, so the driver is now READ per container below.
 
         ``journalctl`` needs no ``sudo`` for this: the entries carry no ``_UID`` restriction and
         the runner (``sysadm``, in ``wheel``) read them unprivileged in the same measurement.
@@ -403,10 +408,37 @@ class HostRunner:
         cli = self.container_cli
         if cli.endswith("docker"):
             return f"{cli} logs {name} --since {minutes}m 2>/dev/null"
-        return (
+
+        # ASK which driver this container has; do not assume one. `journalctl CONTAINER_NAME=` only
+        # ever sees a container whose log driver is `journald`, and that is not podman's default
+        # everywhere. The testing host used journald (measured 2026-09-18, which is where the
+        # journalctl form came from); the PRODUCTION host uses `k8s-file` (measured 2026-09-22) and
+        # has never returned a single line to that command -- `journalctl CONTAINER_NAME=edge`
+        # without a time bound: zero, for the whole life of the host.
+        #
+        # What that cost is the reason this asks. `client-address-visible` read an empty log and
+        # concluded "the request did not reach this edge", about an edge that was serving every
+        # request on the machine -- the most misleading verdict the suite can produce, on the check
+        # its own docstring calls "the check the whole suite exists for". The address was in fact
+        # correct: `podman logs edge` showed the probe logged from the prober's real public IPv6.
+        driver = self.run(
+            f"{cli} inspect {name} --format '{{{{.HostConfig.LogConfig.Type}}}}' 2>/dev/null"
+        ).strip()
+
+        journal = (
             f"journalctl CONTAINER_NAME={name} --since '{minutes} min ago' "
             "--no-pager -o cat 2>/dev/null"
         )
+        podman_logs = f"{cli} logs {name} --since {minutes}m 2>/dev/null"
+        if driver == "journald":
+            return journal
+        if driver:
+            return podman_logs
+        # Inconclusive -- and there is no safe default, because each form returns EMPTY rather than
+        # an error against the other driver. Reading both is the only answer that cannot silently
+        # say "nothing happened": every caller greps or counts distinct values, so a duplicate line
+        # costs nothing and a missing one costs the check its meaning.
+        return f"{{ {podman_logs}; {journal}; }}"
 
     def ssh_client_address(self) -> str | None:
         """Report the address this machine presents to the host over SSH.

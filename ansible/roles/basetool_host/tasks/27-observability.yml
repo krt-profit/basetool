@@ -131,6 +131,60 @@
     daemon_reload: true
   when: not ansible_check_mode
 
+# --- the journal alloy reads --------------------------------------------------------------------
+#
+# `config.alloy`'s loki.source.journal names `path = "/var/log/journal"`, and on a host where that
+# directory does not exist systemd keeps the journal in RAM under /run/log/journal instead. Alloy
+# then tails a path that is not there, ships nothing, and reports no error -- it is `active`, its
+# own scrape target is up, and Loki simply never gains a container-stdout stream.
+#
+# Measured on the production host 2026-09-22, hours after the cutover: /var/log/journal absent,
+# `journalctl --disk-usage` 65 MB in /run, and Loki holding only the FILE-based streams (the
+# application JSON logs and the host's auth/audit logs). Every `<svc>-stdout`, `mon-*`,
+# `postgres-*`, `edge` and `ops-cleanup` stream was missing, including the edge access log that
+# check-conformance.py calls "the only record of a refused request's origin".
+#
+# Persistence is also what makes a journal survive the reboot after an incident, which is the one
+# time anybody reads it.
+- name: Give the host a persistent journal
+  ansible.builtin.file:
+    path: /var/log/journal
+    state: directory
+    owner: root
+    group: systemd-journal
+    mode: "2755"
+  notify: Reload systemd-journald
+
+- name: Make room for journald's drop-in
+  ansible.builtin.file:
+    path: /etc/systemd/journald.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Say so in journald's own configuration rather than relying on the directory alone
+  # Storage=auto (the default) means "persistent IF the directory exists", which is true here and
+  # would stop being true the moment somebody removed it. Storage=persistent makes journald create
+  # it instead -- the intent is then in the configuration and not in a filesystem side effect.
+  #
+  # The rate limit is raised deliberately. Under `journald` the container stdout of the whole stack
+  # arrives as journal entries, and the default 10000 messages per 30s per service is a bound the
+  # edge alone can reach during a crawl -- at which point journald DROPS them and says so once, in
+  # a line nobody reads. A dropped access-log line is a client address that never reaches Loki.
+  ansible.builtin.copy:
+    dest: /etc/systemd/journald.conf.d/50-basetool.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by the basetool_host Ansible role. Do not edit by hand.
+      [Journal]
+      Storage=persistent
+      RateLimitIntervalSec=30s
+      RateLimitBurst=100000
+  notify: Reload systemd-journald
+
 # --- alloy ------------------------------------------------------------------------------------
 
 # The restart handler must not start a service the role deliberately left stopped, so it asks
