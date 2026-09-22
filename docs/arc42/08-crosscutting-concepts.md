@@ -128,6 +128,14 @@ tooltips, errors, flash messages, placeholders, titles. No hardcoded text in HTM
 Inside `.properties` files German umlauts are `\uXXXX`-escaped; everywhere else they are literal
 UTF-8.
 
+A browser script gets its wording from the page, never from a literal: a `th:inline` bootstrap
+dictionary (`bookOutI18n`, `ORDER_HANDOVER_I18N`, …, declared in `types/thymeleaf-bootstrap.d.ts`
+and the module's `/* global */` header), a `window.krt*I18n` object from `fragments/head.html`, or
+`data-*` attributes on an element the fragment renders. A literal after `||` is tolerated only as the
+defensive default for a page that forgot its dictionary. The last primary literals — the book-out
+terminal picker, the order handover row and file name, the special-command modal titles, the admin
+chip — moved into the bundles on 2026-09-23 (FE-SIMP-03).
+
 ## 8.11 Configuration
 
 Type-safe `@ConfigurationProperties` with `@Validated` for anything that matters, so a

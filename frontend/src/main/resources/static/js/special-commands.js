@@ -43,10 +43,7 @@
     const descInput = document.getElementById('sc-desc');
 
     function openCreate() {
-        title.textContent =
-            document.documentElement.lang === 'en'
-                ? 'New Special Command'
-                : 'Neues Spezialkommando';
+        title.textContent = SC_MSG.createTitle;
         form.action = '/admin/special-commands';
         versionInput.value = '0';
         nameInput.value = '';
@@ -56,10 +53,7 @@
     }
 
     function openEdit(btn) {
-        title.textContent =
-            document.documentElement.lang === 'en'
-                ? 'Edit Special Command'
-                : 'Spezialkommando bearbeiten';
+        title.textContent = SC_MSG.editTitle;
         form.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
         versionInput.value = btn.getAttribute('data-version') || '0';
         nameInput.value = btn.getAttribute('data-name') || '';

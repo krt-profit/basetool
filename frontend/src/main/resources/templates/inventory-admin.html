@@ -722,9 +722,18 @@
         dismissLabel: /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schlie\u00dfen',
         reloadQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?'
     };
+    // The book-out modal's strings, read by the shared inventory-common.js: the write toasts plus
+    // the terminal picker's placeholders (loading / choose / none / error / no material) and the
+    // "{0} ({1} aUEC)" price label of a terminal that buys the material.
     var bookOutI18n = {
         success: /*[[#{success.inventory.bookout}]]*/ 'Eintrag erfolgreich ausgebucht',
-        error: /*[[#{error.inventory.bookout.failed}]]*/ 'Fehler beim Ausbuchen des Eintrags'
+        error: /*[[#{error.inventory.bookout.failed}]]*/ 'Fehler beim Ausbuchen des Eintrags',
+        terminalLoading: /*[[#{inventory.bookout.terminal.loading}]]*/ '...laden...',
+        terminalChoose: /*[[#{inventory.bookout.terminal.choose}]]*/ '...w\u00e4hlen...',
+        terminalNone: /*[[#{inventory.bookout.terminal.none}]]*/ 'Keine Terminals gefunden',
+        terminalError: /*[[#{inventory.bookout.terminal.error}]]*/ 'Fehler beim Laden',
+        terminalNoMaterial: /*[[#{inventory.bookout.terminal.noMaterial}]]*/ 'Kein Material gew\u00e4hlt',
+        terminalPrice: /*[[#{inventory.bookout.terminal.price}]]*/ '{0} ({1} aUEC)'
     };
     // Umbuchen (rebooking) modal strings — the /all view rebooks transfer-only.
     var umbuchenI18n = {
@@ -777,6 +786,7 @@
 </script>
 <script th:src="@{/js/inventory-note-modal.js}" th:attr="nonce=${cspNonce}"></script>
 <script th:src="@{/js/inventory-herkunft.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/inventory-common.js}" th:attr="nonce=${cspNonce}"></script>
 <script th:src="@{/js/inventory-admin.js}" th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

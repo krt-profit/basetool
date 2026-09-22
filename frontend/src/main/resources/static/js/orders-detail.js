@@ -34,7 +34,7 @@
  * synchronous script at the same end-of-body position, never with defer.
  */
 
-/* global MSG_HANDOVER_SUCCESS, MSG_HANDOVER_FAILED, MSG_HANDOVER_NOITEMS, labelPiece, labelScu, scuHintText, labelMenge, ORDER_AGE_YELLOW, ORDER_AGE_RED, MSG_UNIT_SCU, MSG_UNIT_PIECE, MSG_STATUS_SUCCESS, MSG_STATUS_ERROR, ORDER_CONFLICT, MSG_DELETE_TITLE, MSG_DELETE_MESSAGE, MSG_DELETE_CONFIRM, MSG_DELETE_CANCEL, MSG_DELETE_ERROR, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_MATERIAL_INVALID, MSG_CLAIM_TITLE_ADD, MSG_CLAIM_TITLE_EDIT, MSG_CLAIM_MAX_HINT, MSG_QUALITY_GOOD, MSG_QUALITY_NONE, MSG_CLAIM_SUCCESS, MSG_CLAIM_WITHDRAW_SUCCESS, MSG_CLAIM_ERROR, MSG_CLAIM_VALIDATION_SQUADRON, MSG_CLAIM_VALIDATION_AMOUNT, MSG_CLAIM_VALIDATION_OVERCLAIM, MSG_BP_COUNTING_SUCCESS, MSG_BP_COUNTING_ERROR, MSG_HANDOVER_REPORT_ERROR, MSG_HANDOVER_REPORT_VALIDATION_DATE, MSG_HANDOVER_REPORT_VALIDATION_TIME, MSG_HANDOVER_REPORT_VALIDATION_HANDLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, MSG_HANDOVER_REPORT_VALIDATION_AMOUNT, MSG_HANDOVER_MISSION_HERKUNFT, MSG_HANDOVER_MISSION_REST, MSG_HANDOVER_MISSION_MIN, MSG_OWNER, MSG_LOCATION, MSG_QUALITY, MSG_QUANTITY, MSG_SQUADRON, MSG_LOADING_INVENTORY, MSG_EMPTY_INVENTORY, MSG_INVENTORY_UNLINK_TOOLTIP, MSG_INVENTORY_UNLINK_SUCCESS, MSG_INVENTORY_UNLINK_ERROR, IS_LOGISTICIAN, ORDER_REQUESTING_SQUADRON_ID, I18N_ADDED, I18N_REMOVED, I18N_NOTE_SAVED, I18N_NOTE_DELETED, I18N_ADD_ERROR, I18N_REMOVE_ERROR, I18N_NOTE_ERROR, I18N_NOTE_CONFLICT, I18N_NOTE_FORBIDDEN, I18N_NOTE_FOR, showFrontendErrorToast, showFrontendSuccessToast, KRT_ORDER_LIVESYNC_UPDATES, KRT_ORDER_SECTION_REFRESH_ERROR, PRODUCTION_I18N */
+/* global MSG_HANDOVER_SUCCESS, MSG_HANDOVER_FAILED, MSG_HANDOVER_NOITEMS, labelPiece, labelScu, scuHintText, labelMenge, ORDER_AGE_YELLOW, ORDER_AGE_RED, MSG_UNIT_SCU, MSG_UNIT_PIECE, MSG_STATUS_SUCCESS, MSG_STATUS_ERROR, ORDER_CONFLICT, MSG_DELETE_TITLE, MSG_DELETE_MESSAGE, MSG_DELETE_CONFIRM, MSG_DELETE_CANCEL, MSG_DELETE_ERROR, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_MATERIAL_INVALID, MSG_CLAIM_TITLE_ADD, MSG_CLAIM_TITLE_EDIT, MSG_CLAIM_MAX_HINT, MSG_QUALITY_GOOD, MSG_QUALITY_NONE, MSG_CLAIM_SUCCESS, MSG_CLAIM_WITHDRAW_SUCCESS, MSG_CLAIM_ERROR, MSG_CLAIM_VALIDATION_SQUADRON, MSG_CLAIM_VALIDATION_AMOUNT, MSG_CLAIM_VALIDATION_OVERCLAIM, MSG_BP_COUNTING_SUCCESS, MSG_BP_COUNTING_ERROR, MSG_HANDOVER_REPORT_ERROR, MSG_HANDOVER_REPORT_VALIDATION_DATE, MSG_HANDOVER_REPORT_VALIDATION_TIME, MSG_HANDOVER_REPORT_VALIDATION_HANDLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, MSG_HANDOVER_REPORT_VALIDATION_AMOUNT, MSG_HANDOVER_MISSION_HERKUNFT, MSG_HANDOVER_MISSION_REST, MSG_HANDOVER_MISSION_MIN, MSG_OWNER, MSG_LOCATION, MSG_QUALITY, MSG_QUANTITY, MSG_SQUADRON, MSG_LOADING_INVENTORY, MSG_EMPTY_INVENTORY, MSG_INVENTORY_UNLINK_TOOLTIP, MSG_INVENTORY_UNLINK_SUCCESS, MSG_INVENTORY_UNLINK_ERROR, IS_LOGISTICIAN, ORDER_REQUESTING_SQUADRON_ID, I18N_ADDED, I18N_REMOVED, I18N_NOTE_SAVED, I18N_NOTE_DELETED, I18N_ADD_ERROR, I18N_REMOVE_ERROR, I18N_NOTE_ERROR, I18N_NOTE_CONFLICT, I18N_NOTE_FORBIDDEN, I18N_NOTE_FOR, showFrontendErrorToast, showFrontendSuccessToast, KRT_ORDER_LIVESYNC_UPDATES, KRT_ORDER_SECTION_REFRESH_ERROR, PRODUCTION_I18N, ORDER_HANDOVER_I18N */
 
 let cachedInventoryItems = [];
 let isInventoryCached = false;
@@ -246,6 +246,20 @@ async function openHandoverModal() {
     }
 }
 
+/**
+ * Substitutes `{0}`, `{1}`, … in a localized template with the given values, in order — the
+ * bundle strings of ORDER_HANDOVER_I18N carry their placeholders MessageFormat-style.
+ *
+ * @param {string} template the localized template
+ * @param {Array<unknown>} values the values for {0}, {1}, …
+ * @returns {string} the filled-in text
+ */
+function fillPlaceholders(template, values) {
+    return values.reduce(function (text, value, i) {
+        return text.split('{' + i + '}').join(value == null ? '' : String(value));
+    }, template);
+}
+
 function addHandoverItemRow() {
     const container = document.getElementById('handover-items-container');
     const index = container.children.length;
@@ -261,19 +275,26 @@ function addHandoverItemRow() {
     row.style.padding = '1rem';
     row.style.border = '1px solid var(--color-gray-3)';
 
-    let options = '<option value="" disabled selected>-- Lagereintrag wählen --</option>';
+    let options = `<option value="" disabled selected>${escapeHtml(ORDER_HANDOVER_I18N.choose)}</option>`;
     cachedInventoryItems.forEach((inv) => {
         const isPiece = inv.material && inv.material.quantityType === 'PIECE';
         const qtyLabel = isPiece ? labelPiece : labelScu;
         const formattedAmount = isPiece ? inv.amount.toFixed(0) : inv.amount.toFixed(3);
         const matName = (inv.material && inv.material.name) || '';
         const userName = (inv.user && inv.user.effectiveName) || '';
-        options += `<option value="${escapeAttr(inv.id)}">${escapeHtml(matName)} (Qual. ${escapeHtml(inv.quality)}) - ${escapeHtml(formattedAmount)} ${escapeHtml(qtyLabel)} von ${escapeHtml(userName)}</option>`;
+        const optionLabel = fillPlaceholders(ORDER_HANDOVER_I18N.option, [
+            matName,
+            inv.quality,
+            formattedAmount,
+            qtyLabel,
+            userName,
+        ]);
+        options += `<option value="${escapeAttr(inv.id)}">${escapeHtml(optionLabel)}</option>`;
     });
 
     row.innerHTML = `
             <div>
-                <label class="form-label-sm">Lagereintrag</label>
+                <label class="form-label-sm">${escapeHtml(ORDER_HANDOVER_I18N.entry)}</label>
                 <select name="items[${escapeAttr(index)}].inventoryItemId" required class="w-full">
                     ${options}
                 </select>
@@ -283,7 +304,7 @@ function addHandoverItemRow() {
                 <input type="text" inputmode="decimal" data-scu-decimal step="0.001" name="items[${escapeAttr(index)}].amount" min="0.001" required class="w-full">
             </div>
             <div>
-                <button type="button" class="btn btn-quiet-danger btn-icon od-remove-btn" data-trigger="od-remove-handover-row" title="Entfernen" aria-label="Entfernen"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                <button type="button" class="btn btn-quiet-danger btn-icon od-remove-btn" data-trigger="od-remove-handover-row" title="${escapeAttr(ORDER_HANDOVER_I18N.remove)}" aria-label="${escapeAttr(ORDER_HANDOVER_I18N.remove)}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
             </div>
         `;
     const sel = row.querySelector('select');
@@ -767,9 +788,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     document.getElementById('material-delete-confirm-modal').style.display = 'flex';
                     window.materialRowToDelete = row;
                 } else {
-                    showFrontendErrorToast(
-                        'Es muss mindestens ein Material im Auftrag verbleiben.',
-                    );
+                    showFrontendErrorToast(ORDER_HANDOVER_I18N.keepOneMaterial);
                 }
             }
         });
@@ -1311,7 +1330,11 @@ async function downloadHandoverReport(btn) {
         timeStr =
             String(d.getHours()).padStart(2, '0') + '-' + String(d.getMinutes()).padStart(2, '0');
     }
-    const filename = 'Übergabe Auftrag #' + orderNumber + ' ' + dateStr + ' ' + timeStr + '.pdf';
+    const filename = fillPlaceholders(ORDER_HANDOVER_I18N.reportFilename, [
+        orderNumber,
+        dateStr,
+        timeStr,
+    ]);
     try {
         // Forward the user's actual IANA time zone so the backend can render handover date/time
         // in the user's local time zone instead of the server's ZoneId.systemDefault().
@@ -1372,7 +1395,11 @@ async function downloadItemHandoverReport(btn) {
         timeStr =
             String(d.getHours()).padStart(2, '0') + '-' + String(d.getMinutes()).padStart(2, '0');
     }
-    const filename = 'Übergabe Auftrag #' + orderNumber + ' ' + dateStr + ' ' + timeStr + '.pdf';
+    const filename = fillPlaceholders(ORDER_HANDOVER_I18N.reportFilename, [
+        orderNumber,
+        dateStr,
+        timeStr,
+    ]);
     try {
         const userTimeZone =
             Intl && Intl.DateTimeFormat ? Intl.DateTimeFormat().resolvedOptions().timeZone : '';
@@ -1527,14 +1554,11 @@ async function previewHandoverReport(btn) {
         const previewOrderNumber = previewOrderNumberRaw.replace(/^#/, '');
         const previewDate = datePart;
         const previewTime = timePart ? timePart.replace(':', '-') : '';
-        a.download =
-            'Übergabe Auftrag #' +
-            previewOrderNumber +
-            ' ' +
-            previewDate +
-            ' ' +
-            previewTime +
-            '.pdf';
+        a.download = fillPlaceholders(ORDER_HANDOVER_I18N.reportFilename, [
+            previewOrderNumber,
+            previewDate,
+            previewTime,
+        ]);
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);

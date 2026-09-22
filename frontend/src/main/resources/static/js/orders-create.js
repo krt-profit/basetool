@@ -472,7 +472,7 @@ function loadDerivation(row, qualities) {
             let html = `<strong class="oc-label-strong">${escapeHtml(ITEM_I18N.materialsTitle)}</strong>`;
             (d.materials || []).forEach((m, mi) => {
                 const mat = m.material || {};
-                const unit = mat.quantityType === 'PIECE' ? 'Stk' : 'SCU';
+                const unit = mat.quantityType === 'PIECE' ? MSG_UNIT_PIECE : MSG_UNIT_SCU;
                 const qty =
                     mat.quantityType === 'PIECE'
                         ? Math.round(m.requiredQuantity || 0)

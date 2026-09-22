@@ -362,8 +362,8 @@ full page and the `items` section swap.
 fragment (`itemsSection`, container `#order-items-results`), so it re-renders with the ordered-items
 table. The `item-stock` `order:{id}` section key stays whitelisted on the relay
 (`LiveSyncTopicClass.ORDER`) and in the `ORDER_SECTIONS` seam map, where it is **aliased to the
-items container/fragment** — so the existing external broadcasters (`inventory-my.js` /
-`inventory-admin.js` `broadcastOrdersChanged`, which send `materials`/`aggregated`/`item-stock` to
+items container/fragment** — so the existing external broadcasters (`broadcastOrdersChanged` in
+`inventory-common.js`, shared by both Lager pages, which sends `materials`/`aggregated`/`item-stock` to
 each affected `order:{id}` room) keep refreshing the inline stock unchanged, and
 `LiveSyncSectionMapParityTest` (key set-equality) stays green. The inline stock refreshes live on: a
 production booking (its success list re-renders `items` — the book-in auto-earmarks the produced
@@ -404,7 +404,7 @@ visible after a booked production with auto-earmark) · **Code:** `JobOrderItemS
 `JobOrderItemStockEntryDto`, `JobOrderPageController.viewOrderDetail` (`itemStockByGameItem`,
 `items` dispatch), `orders-detail.html` (`itemsSection` item expand rows), `orders-detail.js`
 (`ORDER_SECTIONS['item-stock']` aliased to the items container), `LiveSyncTopicClass.ORDER`,
-`inventory-my.js` / `inventory-admin.js` (`broadcastOrdersChanged`) · **Issues:** — · **Design:**
+`inventory-common.js` (`broadcastOrdersChanged`) · **Issues:** — · **Design:**
 [`DESIGN_ITEM_INVENTORY.md`](../archive/DESIGN_ITEM_INVENTORY.md) §10 PR 4 / §11.2
 
 ### REQ-ORDERS-029 — Requesting-side viewers see redacted inventory owner/location

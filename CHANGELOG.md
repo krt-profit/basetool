@@ -4,6 +4,16 @@
 
 ### Fixed
 
+- **Oberfläche: die letzten fest verdrahteten Texte kommen aus den Sprachdateien.** Die
+  Terminal-Auswahl beim Ausbuchen, die Lagereintrag-Zeile und der Dateiname des
+  Übergabeprotokolls im Auftrag, die Titel des Spezialkommando-Dialogs und der ADMIN-Hinweis
+  erschienen in der englischen Oberfläche bisher auf Deutsch.
+
+- **Monitoring: „In-flight Requests" statt „Tomcat Busy Threads".** Das Panel im
+  Spring-Apps-Dashboard stand unter virtuellen Threads immer bei -1; es zeigt jetzt die gerade
+  bearbeiteten Requests je Anwendung. Die wirkungslosen `server.tomcat.threads.*`-Einstellungen
+  sind entfernt.
+
 - **Monitoring: Container-Limits werden wieder gelesen.** Der cgroup-Collector las seit der
   Podman-Umstellung die Unit statt des Containers und sah deshalb kein Speicher-, pids- oder
   CPU-Limit: Die Alarme `ContainerMemoryHigh`, `ContainerPidsHigh` und `ContainerCpuThrottledHigh`

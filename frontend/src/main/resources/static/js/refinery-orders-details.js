@@ -298,7 +298,7 @@ function duplicateStoreItem(btn) {
             newBlock.remove();
             reindexStoreItems();
         };
-        btnInNewBlock.setAttribute('title', 'Aufteilung entfernen');
+        btnInNewBlock.setAttribute('title', REFINERY_DETAIL_MSG.storeSplitRemove);
     }
 
     blockToCopy.after(newBlock);

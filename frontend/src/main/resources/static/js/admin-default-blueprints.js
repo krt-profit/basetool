@@ -268,7 +268,7 @@
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
         removeBtn.className = 'krt-bp-chip-remove';
-        removeBtn.setAttribute('aria-label', 'x');
+        removeBtn.setAttribute('aria-label', i18n.chipRemove || '');
         removeBtn.textContent = '×';
         removeBtn.addEventListener('click', function () {
             unstageProduct(stagedKey);

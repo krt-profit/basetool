@@ -43,7 +43,7 @@
  * callbacks here; showFrontendErrorToast is the window-property function from fragments/toast.html
  * that block 5 historically calls without the window. prefix.
  */
-/* global MSG_ERROR_PAYOUT_UPDATE, MSG_ERROR_MANAGER_ADD, MSG_ERROR_MANAGER_REMOVE, MSG_ERROR_OWNER_CHANGE, MSG_CONFIRM_OWNER_CHANGE, MSG_ERROR_OWNING_ORG_UNIT_CHANGE, MSG_CONFIRM_OWNING_ORG_UNIT_CHANGE, MSG_CONFIRM_MANAGER_REMOVE, MSG_ERROR_USER_REQUIRED, missionId, openEditFinanceModal, showFrontendErrorToast */
+/* global MSG_ERROR_PAYOUT_UPDATE, MSG_ERROR_MANAGER_ADD, MSG_ERROR_MANAGER_REMOVE, MSG_ERROR_OWNER_CHANGE, MSG_CONFIRM_OWNER_CHANGE, MSG_ERROR_OWNING_ORG_UNIT_CHANGE, MSG_CONFIRM_OWNING_ORG_UNIT_CHANGE, MSG_CONFIRM_MANAGER_REMOVE, MSG_ERROR_USER_REQUIRED, MSG_ERROR_MISSION_ID_MISSING, missionId, openEditFinanceModal, showFrontendErrorToast */
 
 // ---- #574 in-place AJAX seam (retires window.MissionSubresource) -----------------
 // krtMissionWrite wraps window.krtFetch.write and sources the already-localized section/conflict
@@ -2473,7 +2473,7 @@ async function changeMissionOwner() {
             window.missionId || (typeof missionId !== 'undefined' ? missionId : null);
         if (!currentMissionId) {
             console.error('Mission ID not found');
-            showFrontendErrorToast('Systemfehler: Mission ID nicht gefunden');
+            showFrontendErrorToast(MSG_ERROR_MISSION_ID_MISSING);
             return;
         }
 
@@ -2581,7 +2581,7 @@ async function changeMissionOwningOrgUnit() {
             window.missionId || (typeof missionId !== 'undefined' ? missionId : null);
         if (!currentMissionId) {
             console.error('Mission ID not found');
-            showFrontendErrorToast('Systemfehler: Mission ID nicht gefunden');
+            showFrontendErrorToast(MSG_ERROR_MISSION_ID_MISSING);
             return;
         }
         const cleanMissionId = String(currentMissionId).trim();
@@ -2681,7 +2681,7 @@ async function addMissionManager() {
             window.missionId || (typeof missionId !== 'undefined' ? missionId : null);
         if (!currentMissionId) {
             console.error('Mission ID not found');
-            showFrontendErrorToast('Systemfehler: Mission ID nicht gefunden');
+            showFrontendErrorToast(MSG_ERROR_MISSION_ID_MISSING);
             return;
         }
 
