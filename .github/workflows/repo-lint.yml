@@ -7,7 +7,11 @@ name: Repo Lint
 #   - actionlint -> the GitHub Actions workflows themselves, incl. shellcheck
 #                   over every embedded `run:` script (catches workflow-syntax
 #                   and shell bugs before they burn a CI run to discover them).
+#   - zizmor     -> the workflows' SECURITY, where actionlint covers their shape: persisted
+#                   credentials, template injection, over-broad permissions, cache poisoning.
 #   - hadolint   -> the three multi-stage production Dockerfiles.
+#   - cosign-identity -> every copy of the cosign signer-identity regexp is anchored and they
+#                   all agree (promote, promote-testing, the release reuse gate, deploy.sh).
 #   - probe-vs-allowlist -> the nightly edge probe and the vhost allow-list runbook
 #                   describe one surface from two sides; a refusal row for a path the
 #                   allow-list admits is a contradiction provable without production.
@@ -37,10 +41,11 @@ name: Repo Lint
 #                   the day they were added; it took reading a production log
 #                   export by hand on 2026-09-20 to notice.
 #
-# Each linter runs from its pinned release binary (shellcheck ships
-# preinstalled on the runner), so no third-party action enters the supply
-# chain and the tool version is explicit + Dependabot-free (bump the env pins
-# below). Every job is independent and blocks the PR on findings.
+# Each linter runs from its pinned release binary, verified against a pinned
+# SHA-256 (shellcheck ships preinstalled on the runner; zizmor is hash-pinned
+# through pip), so no third-party action enters the supply chain and the tool
+# version is explicit + Dependabot-free (bump the version AND its digest
+# together). Every job is independent and blocks the PR on findings.
 
 on:
   push:
@@ -64,6 +69,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # shellcheck is preinstalled on ubuntu-latest. Lint every tracked *.sh
       # (not just scripts/) so a future script anywhere is covered automatically.
@@ -85,15 +92,21 @@ jobs:
     timeout-minutes: 5
     env:
       ACTIONLINT_VERSION: 1.7.12
+      # SHA-256 of actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz, from the release's
+      # actionlint_<version>_checksums.txt. Bump BOTH together (audit item CI-SEC-12).
+      ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install actionlint
         run: |
           set -euo pipefail
           url="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
           curl -fsSL "$url" -o /tmp/actionlint.tar.gz
+          echo "${ACTIONLINT_SHA256}  /tmp/actionlint.tar.gz" | sha256sum -c -
           tar -xzf /tmp/actionlint.tar.gz -C /tmp actionlint
           sudo install -m 0755 /tmp/actionlint /usr/local/bin/actionlint
           actionlint -version
@@ -103,21 +116,87 @@ jobs:
       - name: Run actionlint
         run: actionlint -color
 
+  zizmor:
+    name: zizmor
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Hash-pinned through pip rather than a checksummed tarball, because zizmor's release
+      # publishes no checksums; the reasoning lives in .github/requirements/zizmor.txt.
+      - name: Install zizmor
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check --quiet \
+            --require-hashes -r .github/requirements/zizmor.txt
+          zizmor --version
+
+      # actionlint checks that a workflow is well-formed; zizmor checks that it is safe: a
+      # credential persisted into the workspace, an attacker-controlled `${{ }}` pasted into a shell,
+      # a permission broader than the job uses, a cache a release is built from (audit item
+      # CI-SEC-15). Medium severity and up fails; every finding that is deliberately accepted is in
+      # .github/zizmor.yml with its reason.
+      #
+      # GH_TOKEN switches zizmor out of offline mode, which enables the audits that ask GitHub about
+      # the pinned actions -- `known-vulnerable-actions` and `impostor-commit` among them. It is this
+      # job's read-only token; nothing is written.
+      - name: Run zizmor
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # `--config` explicitly: zizmor only discovers .github/zizmor.yml on its own when it is
+        # handed the repository root, and handed the two directories it silently ran without the
+        # accepted-findings list (measured locally with 1.30.1).
+        run: >-
+          zizmor --config .github/zizmor.yml --persona=regular --min-severity=medium
+          --format=plain .github/workflows .github/actions
+
+  cosign-identity:
+    name: cosign-identity
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # REQ-OPS-015 says the CI half and the host half of the signature gate "cannot diverge", and
+      # until 2026-09-22 that was a sentence: four hand-written copies of the signer-identity
+      # regexp, all unanchored, so a signature minted on `refs/heads/main-x` or `refs/tags/vfoo`
+      # verified everywhere (audit item CI-SEC-01). The checker asserts every copy is anchored, the
+      # copies are identical, and they accept and refuse the right subjects. The self-test runs
+      # first, so the gate cannot pass vacuously.
+      - name: Self-test the identity checker
+        run: bash scripts/check-cosign-identity.test.sh
+
+      - name: Check the cosign signer identity
+        run: python3 scripts/check-cosign-identity.py
+
   hadolint:
     name: hadolint
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
       HADOLINT_VERSION: 2.14.0
+      # SHA-256 of hadolint-Linux-x86_64, from the release's hadolint-Linux-x86_64.sha256. Bump
+      # BOTH together (audit item CI-SEC-12).
+      HADOLINT_SHA256: 6bf226944684f56c84dd014e8b979d27425c0148f61b3bd99bcc6f39e9dc5a47
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install hadolint
         run: |
           set -euo pipefail
           url="https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-Linux-x86_64"
           curl -fsSL "$url" -o /tmp/hadolint
+          echo "${HADOLINT_SHA256}  /tmp/hadolint" | sha256sum -c -
           sudo install -m 0755 /tmp/hadolint /usr/local/bin/hadolint
           hadolint --version
 
@@ -138,6 +217,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # `CLAUDE.md` says "@Slf4j - never instantiate loggers manually", and production code has
       # always honoured it, but nothing checked. `lombok.config` enforces the neighbouring half
@@ -163,6 +244,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # Uses the runner's preinstalled python3, like every other script in .github/scripts — no
       # setup-python action, so there is no extra pinned SHA to maintain. PyYAML ships with the
@@ -171,7 +254,7 @@ jobs:
         run: |
           set -eu
           if ! python3 -c "import yaml" >/dev/null 2>&1; then
-            pip3 install --disable-pip-version-check pyyaml
+            pip3 install --disable-pip-version-check 'pyyaml==6.0.3'
           fi
           python3 -c "import yaml; print('PyYAML', yaml.__version__)"
 
@@ -196,12 +279,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Ensure PyYAML
         run: |
           set -eu
           if ! python3 -c "import yaml" >/dev/null 2>&1; then
-            pip3 install --disable-pip-version-check pyyaml
+            pip3 install --disable-pip-version-check 'pyyaml==6.0.3'
           fi
           python3 -c "import yaml; print('PyYAML', yaml.__version__)"
 
@@ -228,6 +313,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # Phase 0 of docs/archive/PODMAN_MIGRATION_PLAN.md. `scripts/check-conformance.py` asserts the
       # deployment's invariants against a RUNNING host -- the client address the edge really
@@ -250,6 +337,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # Phase 4 of docs/archive/PODMAN_MIGRATION_PLAN.md. `scripts/cgroup-container-metrics.py` reads
       # container metrics straight out of cgroup v2 and writes them for node_exporter's textfile
@@ -272,6 +361,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # `scripts/cert-expiry-metrics.py` reports the expiry of certificate FILES, because a
       # blackbox probe can only see a certificate something is SERVING -- and the internal CA is
@@ -299,6 +390,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # Phase 3 of docs/archive/PODMAN_MIGRATION_PLAN.md. `scripts/lib/container-runtime.sh` is the seam
       # between the operational scripts and the container runtime, and it exists because BOTH
@@ -321,6 +414,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # Phase 2 of docs/archive/PODMAN_MIGRATION_PLAN.md. `scripts/render-env-d.py` fills the per-service
       # environment templates from the host `.env`. Under compose this interpolation was compose's
@@ -377,6 +472,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # ADR-0188. `ansible/` provisions hosts; it never deploys, and REQ-OPS-001's pull-only
       # delivery is untouched by it. The role is the reason "production is built from the same
@@ -399,10 +496,20 @@ jobs:
       # Three attempts with a widening pause, matching release-images.yml's cosign retry. A genuine
       # failure — a collection that does not exist, a version that cannot be satisfied — fails all
       # three and still stops the build; only the transient is absorbed.
+      # ansible-core and ansible-lint are pinned by version (audit item CI-SEC-12): unpinned, every
+      # run linted with whatever PyPI served that minute, so a new ansible-lint rule could turn the
+      # gate red on a diff that touched nothing under ansible/, and nothing recorded which version
+      # had passed. Bump them together, by hand, and re-run the job.
       - name: Install ansible-core, ansible-lint and the pinned collections
+        env:
+          ANSIBLE_CORE_VERSION: 2.21.4
+          ANSIBLE_LINT_VERSION: 26.9.0
         run: |
           set -euo pipefail
-          pip install --disable-pip-version-check --quiet ansible-core ansible-lint
+          pip install --disable-pip-version-check --quiet \
+            "ansible-core==${ANSIBLE_CORE_VERSION}" "ansible-lint==${ANSIBLE_LINT_VERSION}"
+          ansible --version | head -n 1
+          ansible-lint --version
           attempts=3
           delay=10
           for i in $(seq 1 "${attempts}"); do
@@ -436,11 +543,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Ensure PyYAML
         run: |
           set -eu
-          python3 -c "import yaml" 2>/dev/null || pip3 install --disable-pip-version-check pyyaml
+          python3 -c "import yaml" 2>/dev/null || pip3 install --disable-pip-version-check 'pyyaml==6.0.3'
 
       # Phase 2 of docs/archive/PODMAN_MIGRATION_PLAN.md. quadlet/ holds the unit files the migration
       # replaces docker-compose.yml with, and for as long as BOTH exist the compose file is
@@ -470,6 +579,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # Five times an admission was written into the runbook while the probe kept its old
       # refusal row, and every time the nightly cron on main was the first to say so -- as a red
@@ -490,6 +601,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # frontend/Dockerfile runs `:frontend:build` with every lint task excluded BY NAME, because
       # the image has no Node toolchain to run them with. So a task wired into `check` is silently
@@ -510,6 +623,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # The E2E matrix's `device:` axis and TouchClassLayoutE2eTest's DEVICE_CLASSES are verbatim
       # copies of one another, and only ONE of the two drift directions is loud. A device the
@@ -535,6 +650,7 @@ jobs:
           # The resolver asks whether a tag exists, so a shallow clone with no
           # tags would make every case look like "not released yet".
           fetch-depth: 0
+          persist-credentials: false
 
       # The version string in the footer is the one kind of output that cannot be
       # wrong loudly, and it WAS wrong: since ADR-0137 the tag run re-tags instead
@@ -552,6 +668,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # REQ-OPS-025. The published SBOM set is read as "these are the components of this release",
       # so a module missing from it does not read as missing -- it reads as absent from the product.
@@ -577,6 +695,7 @@ jobs:
           # base branch; a shallow checkout has none and the base-collision
           # check would silently degrade to "no new ADRs".
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Fetch base branch tip
         if: github.event_name == 'pull_request'
@@ -584,7 +703,12 @@ jobs:
         # the ref and the merge-base against it. Compared against the freshly
         # fetched tip rather than the PR event's base.sha, so a number that
         # landed on main after the PR opened is caught on the next re-run.
-        run: git fetch --no-tags origin "${{ github.base_ref }}"
+        # Through the environment, not `${{ }}` in the script: a branch name is attacker-chosen
+        # text, and an expression is pasted into the shell before it runs (zizmor
+        # `template-injection`).
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: git fetch --no-tags origin "${BASE_REF}"
 
       # The suite runs FIRST so the gate can never pass vacuously: it asserts
       # that a duplicate, a number already held on the base, and an inherited
@@ -616,6 +740,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # The sibling `adr-numbering` job reads FILENAMES only, so until now nothing read
       # docs/adr/README.md at all -- and both ways that bites have already happened.
@@ -654,6 +780,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # Dependabot bumps the image tags in docker-compose.monitoring.yml; nothing used to update the
       # docs that quote them. That drifted unnoticed for months — on 2026-08-02 the monitoring
@@ -683,6 +811,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # The 13 provisioned dashboards had NO validation of any kind until 2026-08-29 (#1708) — not a
       # Gradle test, not a CI job, not a lint script. Every way they can be wrong is silent: invalid
@@ -711,6 +841,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # REQ-OBS-007. Alloy's `stage.replace` does not substitute the match and expands no
       # back-references: it walks EVERY capture group and overwrites each one with the literal
@@ -751,6 +883,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # The OIDC issuer the apps validate has to be the one Keycloak advertises, and until ADR-0167
       # that was manual discipline: the identity base URL is a literal on ~36 lines across 19 files
@@ -791,6 +925,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # The alert rules and their promtool unit tests had no gate of any kind until 2026-09-08 —
       # the same hole the grafana-dashboards job above closed for the dashboards, one surface over.

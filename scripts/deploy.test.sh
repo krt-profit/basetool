@@ -427,6 +427,27 @@ if [[ "${FAKE_COSIGN_RC:-0}" != "0" ]]; then
   # A real mismatch also explains itself on stderr; the abort must quote it.
   echo "Error: no matching signatures" >&2
 fi
+# FAKE_COSIGN_SUBJECT models the certificate SAN the signature actually carries.
+# When it is set, the stub does what real cosign does with it: match the
+# `--certificate-identity-regexp` deploy.sh passed against that subject, and
+# refuse the signature when it does not match. bash's ERE and Go's RE2 agree on
+# everything the identity regexp uses (anchors, a group, `|`, `[0-9]+`, `\.`), and
+# `=~` is unanchored exactly like Go's MatchString, so an unanchored regexp is
+# as permissive here as it would be on the host.
+if [[ -n "${FAKE_COSIGN_SUBJECT:-}" ]]; then
+  identity_re=""
+  prev=""
+  for arg in "$@"; do
+    if [[ "${prev}" == "--certificate-identity-regexp" ]]; then
+      identity_re="${arg}"
+    fi
+    prev="${arg}"
+  done
+  if [[ -z "${identity_re}" ]] || ! [[ "${FAKE_COSIGN_SUBJECT}" =~ ${identity_re} ]]; then
+    echo "Error: none of the expected identities matched what was in the certificate, got subjects [${FAKE_COSIGN_SUBJECT}]" >&2
+    exit 1
+  fi
+fi
 exit "${FAKE_COSIGN_RC:-0}"
 FAKE
   chmod +x "${T_FAKE_BIN}/cosign"
@@ -1247,6 +1268,55 @@ scenario_transient_verify_failure_retries() {
 }
 
 # ---------------------------------------------------------------------------
+# Scenario 14c: the DEFAULT signer identity is anchored (audit item CI-SEC-01).
+# cosign matches `--certificate-identity-regexp` anywhere in the certificate SAN,
+# so the unanchored `…@refs/(heads/main|tags/v.+)` it replaced also trusted a
+# signature minted on `refs/heads/main-x`, `refs/heads/maintenance` or
+# `refs/tags/vfoo`. The stub evaluates the regexp deploy.sh really passes against
+# the subject the signature claims, so this runs the shipped default rather than a
+# copy of it.
+# ---------------------------------------------------------------------------
+scenario_signature_identity_is_anchored() {
+  echo "Scenario: the signer identity regexp accepts main and release tags only"
+  local tmp rc ref subject
+  local prefix="https://github.com/krt-profit/basetool/.github/workflows/release-images.yml@refs/"
+  for ref in heads/main tags/v1.9.2; do
+    tmp="$(mktmp)"
+    setup_host "${tmp}"
+    write_marker "sha256:backend-old|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG}|${DIG_KCSPI}"
+    mapfile -t fake < <(converged_env)
+    rc=0
+    run_deploy -- "${fake[@]}" "FAKE_COSIGN_SUBJECT=${prefix}${ref}" "IRI_COSIGN_VERIFY_DELAY=0" || rc=$?
+    assert_exit 0 "$rc" "a signature minted on refs/${ref} is trusted"
+    assert_contains "backend: signature OK" "refs/${ref}: the gate reports the signature OK"
+    rm -rf "${tmp}"
+  done
+  # Each refused subject differs from an accepted one only by what the unanchored
+  # regexp let through: a suffix after `main`, a longer branch that starts with
+  # `main`, and a `v` tag that is not a version. The last one is a different
+  # workflow file in the same directory, which the `release-images\.yml@` part
+  # already refused and must keep refusing.
+  for subject in \
+    "${prefix}heads/main-x" \
+    "${prefix}heads/maintenance" \
+    "${prefix}tags/vfoo" \
+    "${prefix}tags/v1.9.2-rc1" \
+    "https://github.com/krt-profit/basetool/.github/workflows/promote.yml@refs/heads/main"; do
+    tmp="$(mktmp)"
+    setup_host "${tmp}"
+    write_marker "sha256:backend-old|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG}|${DIG_KCSPI}"
+    mapfile -t fake < <(converged_env)
+    rc=0
+    run_deploy -- "${fake[@]}" "FAKE_COSIGN_SUBJECT=${subject}" "IRI_COSIGN_VERIFY_DELAY=0" || rc=$?
+    assert_exit 1 "$rc" "a signature minted as ${subject##*/workflows/} is refused"
+    assert_contains "none of the expected identities matched" \
+      "${subject##*/workflows/}: the abort quotes cosign's identity mismatch"
+    assert_no_docker " up " "${subject##*/workflows/}: nothing is applied"
+    rm -rf "${tmp}"
+  done
+}
+
+# ---------------------------------------------------------------------------
 # Scenario 15: break-glass IRI_COSIGN_VERIFY=false rides out a Sigstore outage —
 # the deploy proceeds without verifying, but says so loudly and invokes no cosign.
 # ---------------------------------------------------------------------------
@@ -1478,6 +1548,7 @@ scenario_monitoring_flag_read_from_env_file
 scenario_signature_verified_on_apply
 scenario_signature_failure_aborts
 scenario_transient_verify_failure_retries
+scenario_signature_identity_is_anchored
 scenario_break_glass_skips_verify
 scenario_cosign_off_path
 # ---------------------------------------------------------------------------

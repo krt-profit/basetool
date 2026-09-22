@@ -56,10 +56,9 @@ concurrency:
   group: promote-testing
   cancel-in-progress: false
 
-permissions:
-  contents: read
-  packages: write    # push the :testing tag
-  id-token: write    # cosign verify against Sigstore Fulcio
+# Nothing at the workflow level; each job names what it uses (audit item CI-SEC-04). No
+# `id-token: write`: a keyless `cosign verify` needs no OIDC token -- only signing does.
+permissions: {}
 
 env:
   REGISTRY: ghcr.io
@@ -70,7 +69,18 @@ jobs:
     name: Validate
     runs-on: ubuntu-latest
     timeout-minutes: 2
+    permissions: {}
     steps:
+      # The `testing` environment only accepts deployments from `main`; this says so before the
+      # run gets there. Same reasoning as promote.yml's identical step.
+      - name: Refuse a run from any ref other than main
+        if: ${{ github.ref != 'refs/heads/main' }}
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          echo "::error::promote-testing.yml must run from main, not ${REF} — dispatch it with the main branch selected."
+          exit 1
+
       - name: Reject promoting :testing to :testing
         if: ${{ inputs.version == 'testing' }}
         run: |
@@ -98,6 +108,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: testing
+    permissions: {}
     steps:
       - name: Record promotion
         env:
@@ -109,6 +120,9 @@ jobs:
     needs: approve
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Writes the `:testing` tag; reading the signature needs no more than that.
+    permissions:
+      packages: write
 
     strategy:
       # If one promotion fails, do NOT carry on with the others — otherwise the next
@@ -170,8 +184,10 @@ jobs:
         env:
           IMAGE_REF: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-${{ matrix.module }}@${{ steps.resolve.outputs.digest }}
           REPO: ${{ github.repository }}
-        # Identical to promote.yml's gate, deliberately: the identity is pinned to
-        # `heads/main` or `tags/v.+`, so an image built by a workflow_dispatch run of
+        # Identical to promote.yml's gate, deliberately: the identity is anchored and
+        # pinned to `heads/main` or a `tags/vMAJOR.MINOR.PATCH` release tag
+        # (scripts/check-cosign-identity.py keeps the copies byte-identical), so an
+        # image built by a workflow_dispatch run of
         # release-images off an arbitrary feature branch is NOT promotable to testing
         # either. Testing exists to rehearse what may later become production; a path
         # that accepts weaker provenance would make it a rehearsal of something else.
@@ -197,7 +213,7 @@ jobs:
           delay=5
           for i in $(seq 1 "$attempts"); do
             if err="$(cosign verify "${IMAGE_REF}" \
-                 --certificate-identity-regexp "https://github.com/${REPO}/\\.github/workflows/release-images\\.yml@refs/(heads/main|tags/v.+)" \
+                 --certificate-identity-regexp "^https://github\\.com/${REPO}/\\.github/workflows/release-images\\.yml@refs/(heads/main|tags/v[0-9]+\\.[0-9]+\\.[0-9]+)$" \
                  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
                  2>&1 >/dev/null)"; then
               echo "Signature OK"

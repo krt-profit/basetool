@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.10.0](https://github.com/krt-profit/basetool/releases/tag/v1.10.0) - 2026-09-22
+
 ### Added
 
 - **Spezialkommandos: SK-Leiter verwalten die Mitglieder ihres SK jetzt selbst.** „Leitung" →
@@ -28,6 +30,13 @@
   Lauf das ganze Audit-Protokoll bzw. alle Benachrichtigungen gelöscht. Jetzt verweigert das Backend
   den Start unter 30 Tagen (Audit), 1 Tag (Benachrichtigungen, abgelehnte Registrierungen) oder
   einem Intervall unter einer Minute.
+  
+- **CI/Lieferkette: Signaturprüfung und Workflows gehärtet.** Die cosign-Signaturidentität in
+  `promote*.yml`, `release-images.yml` und `deploy.sh` ist jetzt verankert (`^…$`) – Refs wie
+  `main-x` oder `vfoo` gelten nicht mehr als vertrauenswürdig –, und signiert wird nur noch von
+  `main` oder einem Release-Tag auf `main`, von Jobs ohne eigenen Build. Dazu keine gespeicherten
+  Checkout-Credentials, Prüfsummen für CI-Werkzeuge, BuildKit per Digest, ein zizmor-Job und die
+  Gradle-Abhängigkeiten im Dependency Graph; der neue `deploy.sh` kommt über die Ansible-Rolle.
 
 - **Build: jedes ausgelieferte Modul prüft die Lizenzen seiner Abhängigkeiten gegen eine
   GPL-3.0-kompatible Liste.** Eine unverträgliche Lizenz lässt den Build scheitern. Dabei fiel
@@ -65,6 +74,7 @@
 - **Texte: durchgängig „du", und keine fest verdrahteten Beschriftungen mehr.** Zwölf Hinweise und
   Rückfragen siezten noch; „Nutzer zuordnen" und „Eigener Eintrag" beim Einbuchen sowie „Neuer
   Auftrag" in der Auftragsliste waren nicht übersetzbar.
+
 - **Monitoring: der Alarm für Container in einer Neustart-Schleife konnte seit dem Podman-Umzug nicht
   mehr auslösen.** Er las eine Metrik, die nur das entfernte cAdvisor lieferte; jetzt liest er die
   Startzeit aus dem Podman-Exporter. Das Dashboard-Panel „NPM errors & warnings“ zeigt stattdessen
@@ -103,7 +113,6 @@
 - **Betrieb: der monatliche Bankbericht liest die Zahlen wieder.** Das Abfrageskript rief auf dem
   neuen Server noch `docker exec` auf und wäre beim nächsten Lauf gescheitert; es nutzt jetzt
   Podman. Rein betriebsseitig.
-
 
 ## [v1.9.2](https://github.com/krt-profit/basetool/releases/tag/v1.9.2) - 2026-09-22
 

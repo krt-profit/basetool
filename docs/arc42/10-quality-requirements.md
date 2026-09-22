@@ -48,7 +48,8 @@ because a quality goal nobody measures is a preference, and a gate that cannot f
   monitoring image pins, Grafana dashboards, Prometheus rules, log masking, the Keycloak issuer,
   Quadlet drift (which also checks the edge's trusted-address pins), the container runtime, the
   logging facade, PID-1 reaping, probes against the API allow-list, ansible-lint, shellcheck,
-  actionlint, hadolint, gitleaks, SBOM coverage and the E2E device matrix.
+  actionlint, zizmor, hadolint, gitleaks, SBOM coverage, the E2E device matrix and the cosign
+  signer identity (every copy anchored and identical).
 - **A conformance suite** ([`check-conformance.py`](../../scripts/check-conformance.py)) that
   asserts invariants against a **running host** rather than against configuration — the recurring
   defect class here is a configuration that is correct on disk and not in force in the process.

@@ -36,11 +36,15 @@ description: >
 # reach it. No amount of patience on the same host and the same route fixes
 # that — only a different route does. `mirror.gcr.io` is Google's anonymous
 # pull-through cache of Docker Hub: a wholly separate network path and operator,
-# serving (verified at the time of writing) the byte-identical index digest
-# `sha256:2f5adac4ecd194d9f8c10b7b5d7bceb5186853db1b26e5abd3a657af0b7e26ec` for
-# `buildx-stable-1`, with linux/amd64 and linux/arm64 children for both runner
-# fleets. It is consulted ONLY after Docker Hub has refused, so the canonical
-# source still wins whenever it is reachable.
+# serving the byte-identical index for `buildx-stable-1` (re-verified 2026-09-22
+# for the digest now pinned in ./Dockerfile), with linux/amd64 and linux/arm64
+# children for both runner fleets. It is consulted ONLY after Docker Hub has
+# refused, so the canonical source still wins whenever it is reachable — and
+# because the image is pulled BY DIGEST from either source (audit item
+# CI-SEC-13), the mirror can only ever hand over the pinned bytes.
+#
+# The step is fatal in exactly one case: a BuildKit reference that carries no
+# digest. That is a configuration error in this repository, not a flake.
 #
 # This is the same reasoning as the `cosign sign` retry wrappers in
 # release-images.yml / promote.yml: signing and builder-boot are both network
@@ -54,14 +58,18 @@ description: >
 inputs:
   buildkit-image:
     description: >
-      BuildKit image the `docker-container` driver boots. Pinned through to the
-      driver via `driver-opts` so the tag that gets pre-pulled and the tag that
-      gets booted can never diverge. Kept on the floating `buildx-stable-1` tag
-      that setup-buildx-action defaults to, so this wrapper does not silently
-      freeze BuildKit at a version the action no longer tests against. Must stay
-      a Docker Hub reference for `fallback-registry` to resolve (see below).
+      BuildKit image the `docker-container` driver boots. Empty (the default)
+      means the digest-pinned reference in this directory's `Dockerfile`, which
+      is the single place it is written and the file Dependabot bumps (audit
+      item CI-SEC-13); an override is for experiments only. Handed to the driver
+      via `driver-opts` so the image that gets pre-pulled and the image that
+      gets booted can never diverge. It follows the `buildx-stable-1` channel
+      that setup-buildx-action defaults to, so this wrapper does not freeze
+      BuildKit at a version the action no longer tests against — Dependabot
+      moves the digest when the channel moves. Must stay a Docker Hub reference
+      for `fallback-registry` to resolve (see below).
     required: false
-    default: moby/buildkit:buildx-stable-1
+    default: ''
 
   fallback-registry:
     description: >
@@ -78,12 +86,35 @@ runs:
   using: composite
   steps:
     - name: Pre-pull BuildKit image (retry, then fall back to a mirror registry)
+      id: prepull
       shell: bash
       env:
-        BUILDKIT_IMAGE: ${{ inputs.buildkit-image }}
+        BUILDKIT_IMAGE_INPUT: ${{ inputs.buildkit-image }}
         FALLBACK_REGISTRY: ${{ inputs.fallback-registry }}
       run: |
         set -eu
+
+        # The reference comes from the carrier Dockerfile next to this file unless overridden, and
+        # it must carry a digest: a tag alone is whatever the registry serves that minute.
+        if [ -n "$BUILDKIT_IMAGE_INPUT" ]; then
+          BUILDKIT_IMAGE="$BUILDKIT_IMAGE_INPUT"
+        else
+          BUILDKIT_IMAGE="$(sed -n 's/^FROM[[:space:]]\{1,\}\([^[:space:]]\{1,\}\).*/\1/p' "${GITHUB_ACTION_PATH}/Dockerfile" | head -n 1)"
+        fi
+        case "$BUILDKIT_IMAGE" in
+          *@sha256:????????????????????????????????????????????????????????????????) ;;
+          *)
+            echo "::error::BuildKit image '${BUILDKIT_IMAGE}' is not pinned by digest (expected <image>:<tag>@sha256:<64 hex>)" >&2
+            exit 1
+            ;;
+        esac
+        echo "BuildKit image: ${BUILDKIT_IMAGE}"
+
+        # What the driver boots. The canonical reference whenever it is in the local store under
+        # that name; a local alias only on the mirror path, below.
+        emit() {
+          echo "image=$1" >> "$GITHUB_OUTPUT"
+        }
 
         # Pull $1 up to $2 times with exponential backoff capped at 30s. Returns
         # 0 as soon as the image is in the local store, 1 once attempts run out.
@@ -111,31 +142,43 @@ runs:
         # Stage 1: the canonical source. Wins whenever Docker Hub is reachable.
         if pull_with_retry "$BUILDKIT_IMAGE" 4; then
           echo "BuildKit image present locally: ${BUILDKIT_IMAGE}"
+          emit "$BUILDKIT_IMAGE"
           exit 0
         fi
 
         if [ -z "$FALLBACK_REGISTRY" ]; then
           echo "::warning::could not pre-pull ${BUILDKIT_IMAGE} and no fallback registry is configured; letting buildx try its own pull" >&2
+          emit "$BUILDKIT_IMAGE"
           exit 0
         fi
 
-        # Stage 2: a different registry on a different network path.
+        # Stage 2: a different registry on a different network path. Pulled BY THE SAME DIGEST,
+        # so the mirror can only ever hand over the bytes the pin names.
         mirror_ref="${FALLBACK_REGISTRY}/${BUILDKIT_IMAGE}"
         echo "::warning::Docker Hub unreachable for ${BUILDKIT_IMAGE}; falling back to ${mirror_ref}" >&2
         if pull_with_retry "$mirror_ref" 3; then
-          # Re-tag under the exact reference the docker-container driver asks
-          # for: buildx's local-store fallback resolves the image by name, not
-          # by digest, so the mirror-qualified name alone would not satisfy it.
-          docker tag "$mirror_ref" "$BUILDKIT_IMAGE"
-          echo "BuildKit image present locally via ${FALLBACK_REGISTRY}: ${BUILDKIT_IMAGE}"
+          # buildx's local-store fallback resolves the driver image BY NAME, and an image pulled
+          # from the mirror is known locally only under the mirror's name. `docker tag` cannot
+          # write a digest reference, so the canonical `…@sha256:` name cannot be recreated;
+          # instead the verified image gets a local-only alias, and the driver boots that. Its
+          # registry sits under `.invalid`, a TLD reserved never to resolve (RFC 2606), so buildx's
+          # own pull attempt fails on the DNS lookup at once -- measured 0.5 s, where a `localhost`
+          # alias waited out a 60 s dial timeout on Docker Desktop -- and buildx then boots the
+          # local image.
+          digest="${BUILDKIT_IMAGE##*@sha256:}"
+          alias_ref="buildkit-pinned.invalid/moby-buildkit:sha256-${digest}"
+          docker tag "$mirror_ref" "$alias_ref"
+          echo "BuildKit image present locally via ${FALLBACK_REGISTRY}, booted as ${alias_ref}"
+          emit "$alias_ref"
           exit 0
         fi
 
         # Non-fatal on purpose — see the header comment. setup-buildx-action
         # still gets its own attempt at pulling the image.
         echo "::warning::could not pre-pull ${BUILDKIT_IMAGE} from Docker Hub or ${FALLBACK_REGISTRY}; letting buildx try its own pull" >&2
+        emit "$BUILDKIT_IMAGE"
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
       with:
-        driver-opts: image=${{ inputs.buildkit-image }}
+        driver-opts: image=${{ steps.prepull.outputs.image }}

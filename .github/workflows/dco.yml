@@ -64,6 +64,7 @@ jobs:
           # `git log "${BASE_SHA}..${HEAD_SHA}"` walk silently empty.
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
 
       - name: Verify each commit carries a matching Signed-off-by trailer
         env:
