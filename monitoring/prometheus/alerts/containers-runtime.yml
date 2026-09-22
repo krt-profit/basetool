@@ -1,27 +1,21 @@
 ---
 # =================================================================================================
-# One name per container signal, whichever container runtime is serving it.
+# One name per container signal.
 #
-# The Podman migration deletes cAdvisor -- its rootless-Podman support is closed upstream as not
-# planned -- and replaces the families it published with two sources: `prometheus-podman-exporter`
-# for the lifecycle series, and `scripts/cgroup-container-metrics.py`, a node_exporter textfile
-# collector that reads the cgroup v2 tree directly, for everything the exporter does not publish.
+# cAdvisor is deleted on the rootless Podman host -- its rootless-Podman support is closed upstream
+# as not planned -- and its families come from two sources instead: `prometheus-podman-exporter`
+# for the lifecycle and network series, and `scripts/cgroup-container-metrics.py`, a node_exporter
+# textfile collector that reads the cgroup v2 tree directly, for everything the exporter does not
+# publish. Every consumer -- the container alerts and `02-containers.json` -- reads the
+# `basetool:container:*` names recorded here, so a source can change without touching them.
 #
-# That is a rename of every series six alerts and a dashboard are written against, in the middle of
-# a migration where the two shapes must both work: production runs Docker + cAdvisor today, the
-# testing host runs rootless Podman + the collector, and for the length of the cutover they run
-# side by side. Repointing the consumers at the new names would blind production; leaving them on
-# the old ones ships a collector nothing reads. CLAUDE.md calls the second one out by name -- "a
-# renamed/removed metric that breaks a dashboard or alert rule ... is incomplete".
+# Each rule was an `or` of the cAdvisor family and the new source while the Docker host and the
+# Podman host ran side by side through the cutover. The cAdvisor legs were removed on 2026-09-22
+# with the Docker runtime (OPS-SIMP-02): nothing on the remaining host produces them, and a leg
+# that can never match is a claim of coverage that is not there.
 #
-# So the two families are normalised HERE, once, and every consumer reads the normalised name. The
-# cutover then changes nothing downstream: the left side of each `or` simply stops producing
-# samples and the right side takes over, on a per-container basis, with no gap and no edit.
-#
-# `max by (name)` on both sides is not cosmetic. cAdvisor's series carry `id`, `image` and
-# `container_label_*`; the textfile collector's carry only `name`. Reducing both to a single
-# `name` label makes the two halves substitutable AND lets the ratio alerts divide without an
-# `on(...)` clause that would have to be written differently for each shape.
+# `max by (name)` is not cosmetic: it reduces every source to a single `name` label, so the ratio
+# alerts divide without an `on(...)` clause.
 #
 # REQ-OBS-011 (metric naming), REQ-OBS-014 (container signals), ADR-0163, ADR-0189.
 # The per-alert mapping table lives in docs/archive/PODMAN_MIGRATION_PLAN.md -> "The seven alerts, one by
@@ -45,32 +39,27 @@ groups:
       # of them CRITICAL. A critical that is always on is worse than no alert: it is the thing that
       # teaches people to skip criticals.
       #
-      # `memory_usage_bytes` is the presence proxy rather than a synthetic timestamp, because it is
-      # the one series BOTH families publish for every running container, unconditionally --
-      # cAdvisor as `container_memory_usage_bytes`, the collector from `memory.current`. A container
-      # that exists has it; a container that stopped loses it. Nothing reads its VALUE here, only
-      # whether it is there, which is why the differing units of the two sources do not matter.
+      # `memory_usage_bytes` is the presence proxy rather than a synthetic timestamp, because the
+      # collector publishes it for every running container unconditionally, from `memory.current`.
+      # A container that exists has it; a container that stopped loses it. Nothing reads its VALUE
+      # here, only whether it is there.
       - record: basetool:container:present
         expr: >-
-          max by (name) (container_memory_usage_bytes{name=~".+"})
-          or max by (name) (basetool_container_memory_usage_bytes)
+          max by (name) (basetool_container_memory_usage_bytes)
 
       - record: basetool:container:memory_anon_bytes
         expr: >-
-          max by (name) (container_memory_rss{name=~".+"})
-          or max by (name) (basetool_container_memory_anon_bytes)
+          max by (name) (basetool_container_memory_anon_bytes)
 
       - record: basetool:container:memory_limit_bytes
         expr: >-
-          max by (name) (container_spec_memory_limit_bytes{name=~".+"})
-          or max by (name) (basetool_container_memory_limit_bytes)
+          max by (name) (basetool_container_memory_limit_bytes)
 
       # Kept for the dashboard, which explains a gap between anon and the working set. Never size
       # a limit from it.
       - record: basetool:container:memory_working_set_bytes
         expr: >-
-          max by (name) (container_memory_working_set_bytes{name=~".+"})
-          or max by (name) (basetool_container_memory_working_set_bytes)
+          max by (name) (basetool_container_memory_working_set_bytes)
 
       # The other half of that explanation: mapped executables and libraries are page cache, so
       # they count toward the working set and toward no process's RSS. The dashboard read this
@@ -78,29 +67,24 @@ groups:
       # a container that maps nothing looks identical to a metric that does not exist.
       - record: basetool:container:memory_mapped_file_bytes
         expr: >-
-          max by (name) (container_memory_mapped_file{name=~".+"})
-          or max by (name) (basetool_container_memory_mapped_file_bytes)
+          max by (name) (basetool_container_memory_mapped_file_bytes)
 
       # --- cpu ---------------------------------------------------------------------------------
       - record: basetool:container:cpu_usage_seconds_total
         expr: >-
-          max by (name) (container_cpu_usage_seconds_total{name=~".+"})
-          or max by (name) (basetool_container_cpu_usage_seconds_total)
+          max by (name) (basetool_container_cpu_usage_seconds_total)
 
       - record: basetool:container:cpu_periods_total
         expr: >-
-          max by (name) (container_cpu_cfs_periods_total{name=~".+"})
-          or max by (name) (basetool_container_cpu_periods_total)
+          max by (name) (basetool_container_cpu_periods_total)
 
       - record: basetool:container:cpu_throttled_periods_total
         expr: >-
-          max by (name) (container_cpu_cfs_throttled_periods_total{name=~".+"})
-          or max by (name) (basetool_container_cpu_throttled_periods_total)
+          max by (name) (basetool_container_cpu_throttled_periods_total)
 
       - record: basetool:container:cpu_throttled_seconds_total
         expr: >-
-          max by (name) (container_cpu_cfs_throttled_seconds_total{name=~".+"})
-          or max by (name) (basetool_container_cpu_throttled_seconds_total)
+          max by (name) (basetool_container_cpu_throttled_seconds_total)
 
       # --- tasks -------------------------------------------------------------------------------
       # pids.current and pids.max. At the cap the kernel refuses new tasks: a JVM throws "unable to
@@ -108,19 +92,16 @@ groups:
       # OOM and the 2026-07-26 grafana zombie exhaustion.
       - record: basetool:container:pids
         expr: >-
-          max by (name) (container_threads{name=~".+"})
-          or max by (name) (basetool_container_pids)
+          max by (name) (basetool_container_pids)
 
       - record: basetool:container:pids_max
         expr: >-
-          max by (name) (container_threads_max{name=~".+"})
-          or max by (name) (basetool_container_pids_max)
+          max by (name) (basetool_container_pids_max)
 
       # --- oom ---------------------------------------------------------------------------------
       - record: basetool:container:oom_kills_total
         expr: >-
-          max by (name) (container_oom_events_total{name=~".+"})
-          or max by (name) (basetool_container_oom_kills_total)
+          max by (name) (basetool_container_oom_kills_total)
 
       # --- network and lifetime, from the exporter rather than the cgroup collector -------------
       #
@@ -139,8 +120,7 @@ groups:
       # from a panel that has found nothing to report.
       - record: basetool:container:start_time_seconds
         expr: >-
-          max by (name) (container_start_time_seconds{name=~".+"})
-          or max by (name) (
+          max by (name) (
             podman_container_started_seconds * on (id) group_left(name) podman_container_info
           )
 
@@ -149,15 +129,13 @@ groups:
       # exporter ever splits these per interface.
       - record: basetool:container:network_receive_bytes_total
         expr: >-
-          sum by (name) (container_network_receive_bytes_total{name=~".+"})
-          or sum by (name) (
+          sum by (name) (
             podman_container_net_input_total * on (id) group_left(name) podman_container_info
           )
 
       - record: basetool:container:network_transmit_bytes_total
         expr: >-
-          sum by (name) (container_network_transmit_bytes_total{name=~".+"})
-          or sum by (name) (
+          sum by (name) (
             podman_container_net_output_total * on (id) group_left(name) podman_container_info
           )
 

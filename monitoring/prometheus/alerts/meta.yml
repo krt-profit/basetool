@@ -85,7 +85,7 @@ groups:
           severity: warning
         annotations:
           summary: "Prometheus running a stale config (an apply was missed)"
-          description: "deploy.sh applied an on-disk Prometheus config more recently than Prometheus's last SUCCESSFUL reload — the running Prometheus is serving a stale config (scrape targets / alert rules out of date), which PrometheusConfigReloadFailed cannot see. Check the deploy.sh monitoring-reload logs, force-recreate Prometheus (`docker compose -p iri-monitoring -f docker-compose.monitoring.yml up -d --force-recreate prometheus`), and verify the iri-deploy timer is running."
+          description: "deploy.sh applied an on-disk Prometheus config more recently than Prometheus's last SUCCESSFUL reload — the running Prometheus is serving a stale config (scrape targets / alert rules out of date), which PrometheusConfigReloadFailed cannot see. Check the deploy.sh monitoring-reload logs, recreate Prometheus (`sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) systemctl --user restart prometheus.service` -- a restart IS a recreate under Quadlet), and verify the iri-deploy timer is running."
 
       # Catches the failure mode that made PrometheusConfigStale itself go blind (2026-07-13): a host
       # runs the iri-monitoring stack but IRI_MONITORING_ENABLED is unset, so deploy.sh's monitoring
@@ -317,9 +317,10 @@ groups:
   # copied from the corresponding `__path__` in config.alloy; a typo here ships a permanently-firing
   # dead alert (a literal path that matches no series is indistinguishable from a dead tailer).
   #
-  # The docker-shipped streams (<svc>-stdout, keycloak-stdout, mon-<service>, npm, postgres-*) get NO
-  # guard, deliberately: they come from loki.source.docker, which exposes no per-target
-  # loki_source_file_read_lines_total series to take absent() of, and REQ-OBS-014 additionally exempts
+  # The container-stdout streams (<svc>-stdout, keycloak-stdout, mon-<service>, postgres-*) get NO
+  # guard, deliberately: they come from the journal source (loki.source.docker until 2026-09-20),
+  # which exposes no per-target loki_source_file_read_lines_total series to take absent() of, and
+  # REQ-OBS-014 additionally exempts
   # the <svc>-stdout streams on their own merit — a native-error breadcrumb is rare by design, so any
   # per-stream liveness check on such a quiet stream would be a permanent false alarm. Whole-pipeline
   # silence still covers them via LokiIngestSilent.
