@@ -9,30 +9,32 @@
 
 ## Akteure
 
-- **User der Staffel A** (z. B. KRT Member oder Logistician von A) — legt den Job Order an.
-- **User der Staffel B** (KRT Member oder Logistician von B) — verknüpft eigenes, B-besessenes Inventar mit dem Auftrag.
+- **`test-officer`** (OFFICER, Heimat-Staffel IRIDIUM = Staffel A) — treibt die UI.
+- **`test-member`** (KRT Member, Heimat einer frisch angelegten Staffel B „E2E JobOrder B") — Besitzer des verknüpften Lagereintrags; wird nur per REST verwendet.
 
 ## Vorbedingungen
 
-- Zwei Staffeln A und B existieren; je ein Test-User mit Mitgliedschaft.
-- Ein Job-Order-Material (`isJobOrder=true`).
-- Staffel B besitzt einen Lagereintrag dieses Materials (Owner = B, Qualität ≥ `minQuality`).
+Nur im ephemeren Modus per REST geseedet (`STACK.managesStack()`):
+
+- Staffel B (`createSquadron`) und die Mitgliedschaften beider Nutzer (`assignStaffelMembership`).
+- Ein Job-Order-Material und eine Location.
+- Ein Job Order mit IRIDIUM als bearbeitender und anfragender Einheit (`createJobOrder`).
+- Ein Lagereintrag, den `test-member` **mit `jobOrderId` = diesem Auftrag** anlegt (`createInventoryItemForJobOrder`) — der Resolver stempelt ihn damit auf Staffel B.
 
 ## Auslöser
 
-Staffel A braucht Material, das Staffel B liefern soll.
+Staffel A will einen Auftrag erfüllen, zu dem Staffel B Material beigesteuert hat.
 
 ## Hauptablauf
 
-1. **Staffel A** legt unter `/orders/create` einen Job Order an: `responsibleOrgUnitId` = A (bearbeitende Einheit, muss profit-eligible sein), `requestingOrgUnitId` = A, Material + Menge.
-2. **Staffel B** verknüpft einen eigenen Lagereintrag mit dem Auftrag (`POST /api/v1/inventory` mit `jobOrderId` = A's Auftrag; das Item bleibt B-besessen). Die Verknüpfung ist nicht sichtbarkeits-gegatet — B muss den (A-privaten) Auftrag dafür nicht in der eigenen Warteschlange sehen.
-3. **Staffel A** öffnet die Auftragsdetailseite `/orders/{id}` und sieht das von B verknüpfte Material im Auftrags-Kontext.
+1. **Auftragskontext (UI):** `test-officer` meldet sich an, öffnet `/orders/{id}?tab=handovers` und das Handover-Modal (`order-handover-open`); der Test wartet auf den Lazy-Fetch des verknüpften Inventars und fügt eine Zeile hinzu (`#add-handover-item-btn`).
+2. **Lager-View (API):** `GET /api/v1/inventory/material/{materialId}` einmal als `test-member`, einmal als `test-officer`.
 
 ## Erwartetes Ergebnis
 
-- Der Job Order ist **A-verantwortet** (Responsible = A) und damit für A sicht-/bearbeitbar; B trägt über die ungegated Inventar-Verknüpfung bei, ohne den Auftrag sehen zu müssen (Auftrags-Sichtbarkeit nach `responsibleOrgUnit.kind`, REQ-ORG-003 / [UC-18](UC-18-job-order-mandanten-sichtbarkeit.md)).
-- B's verknüpfter Lagereintrag erscheint **im Auftrags-Kontext** (`findByJobOrderIdOrdered`, ungegated) und zählt auf die offene Menge des `JobOrderMaterial` ein.
-- B's Lagereintrag erscheint **nicht** in der Lager-View von Staffel A (`findGlobalByFilters` bleibt gegated) — kein Datenleck.
+- Im Auftragskontext bietet das Dropdown `items[0].inventoryItemId` genau den B-besessenen Eintrag an — A kann den Auftrag damit erfüllen.
+- B's eigene Lager-View listet den Eintrag (Vorbedingung, per `assumeTrue`).
+- A's Lager-View listet ihn **nicht** — kein Leck aus dem Auftragskontext in die staffel-gescopte Lager-Ansicht.
 
 ## Sonderfälle & Lehren
 

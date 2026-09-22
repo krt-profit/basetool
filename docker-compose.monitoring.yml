@@ -17,7 +17,7 @@
 # digest with `docker buildx imagetools inspect <repo>:<tag> --format '{{.Manifest.Digest}}'` and
 # move it in the same commit as the tag. Contains ZERO secrets — every credential is a host-side file
 # under /var/iri/monitoring/secrets/ or an .env value, provisioned by
-# docs/MONITORING_ROLLOUT_RUNBOOK.md.
+# docs/archive/MONITORING_ROLLOUT_RUNBOOK.md.
 #
 # Transport (REQ-OBS-008): the apps are scraped over HTTPS with the pinned public CA; everything
 # else inside the isolated monitoring networks is plain HTTP by the owner-approved carve-out.

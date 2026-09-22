@@ -34,7 +34,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 /**
- * Fail-open matrix for {@link DiscordGuildNicknameReader} (REQ-DATA-008), served by a throwaway
+ * Fail-open matrix for {@link DiscordGuildNicknameReader} (REQ-DATA-018), served by a throwaway
  * in-process HTTP server. Covers: nickname captured on HTTP 200; empty result when {@code nick} is
  * null / blank / absent; and the fail-open empties on a non-200 status, a malformed body and a
  * timeout — capturing a nickname must never throw, so a Discord hiccup can never break the login.
@@ -142,11 +142,11 @@ class DiscordGuildNicknameReaderTest {
 
   @Test
   void readGuildDisplayName_fallsBackToGlobalNameWhenNickAbsent() throws IOException {
-    // The reported conrad7247/MadrukSedras case: no per-guild nick, server name is the global name.
+    // The reported case: no per-guild nick, server name is the global name.
     HttpServer server =
-        start(respond(200, "{\"nick\":null,\"user\":{\"global_name\":\"MadrukSedras\"}}"));
+        start(respond(200, "{\"nick\":null,\"user\":{\"global_name\":\"ExamplePilot\"}}"));
     try {
-      assertEquals(Optional.of("MadrukSedras"), readDisplay(server, Duration.ofSeconds(2)));
+      assertEquals(Optional.of("ExamplePilot"), readDisplay(server, Duration.ofSeconds(2)));
     } finally {
       server.stop(0);
     }
@@ -168,7 +168,7 @@ class DiscordGuildNicknameReaderTest {
     // readNickname (the precheck candidate) must NOT fall back to the global name — otherwise a
     // common display name could trigger a false account-collision denial at first-broker login.
     HttpServer server =
-        start(respond(200, "{\"nick\":null,\"user\":{\"global_name\":\"MadrukSedras\"}}"));
+        start(respond(200, "{\"nick\":null,\"user\":{\"global_name\":\"ExamplePilot\"}}"));
     try {
       assertTrue(read(server, Duration.ofSeconds(2)).isEmpty());
     } finally {

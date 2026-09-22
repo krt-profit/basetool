@@ -56,11 +56,10 @@ import org.springframework.transaction.annotation.Transactional;
  * </ul>
  *
  * <p>Bean identity: this is the {@code ownerScopeService} bean (auto-named from the class), so the
- * existing {@code @PreAuthorize("@ownerScopeService.canX(...)")} SpEL strings and the {@code
- * SquadronScopeService} compatibility shim keep resolving unchanged. The class-level
- * {@code @Transactional(readOnly = true)} mirrors the historical setting — every delegated call is
- * read-only, and the sub-services join this facade's read-only transaction (propagation {@code
- * REQUIRED}).
+ * existing {@code @PreAuthorize("@ownerScopeService.canX(...)")} SpEL strings keep resolving
+ * unchanged. The class-level {@code @Transactional(readOnly = true)} mirrors the historical setting
+ * — every delegated call is read-only, and the sub-services join this facade's read-only
+ * transaction (propagation {@code REQUIRED}).
  */
 @Service
 @RequiredArgsConstructor

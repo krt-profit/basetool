@@ -1,6 +1,6 @@
 # ADR-0062 — Split `JobOrderService` into a facade + four focused collaborators
 
-- **Status:** Proposed
+- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-07-02 (`c3cdf2da6`: `JobOrderOrgUnitResolver`, `JobOrderStockProjectionService`, `JobOrderAssigneeService`, `JobOrderPriorityService`).
 - **Date:** 2026-07-02
 - **Deciders:** Repository owner (@greluc)
 - **Related:** issue #921 (L2, epic #905) · ADR-0061 (the `MissionService` split, same pattern) · ADR-0047 (`support` dependency-leaf) · the CLAUDE.md Concurrency rules (`…WithinTransaction`, bulk-update-after-loop, pessimistic reorder locks)

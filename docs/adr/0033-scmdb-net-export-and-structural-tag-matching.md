@@ -10,7 +10,7 @@
 The personal-blueprint import already accepted three upload shapes — a bare array, the SCMDB
 log-watcher document, and the Basetool Blueprint Extractor document — all of which capture the
 in-game `"Received Blueprint: <name>"` notification and so carry a `blueprints` array of entries
-keyed by `productName`, matched against the master product list by normalized name (REQ-INV-006/007).
+keyed by `productName`, matched against the master product list by normalized name (REQ-INV-006/047).
 
 Users also keep their unlocked blueprints on [scmdb.net](https://scmdb.net), whose profile / tracking
 export (`version` 3) likewise carries a top-level `blueprints` array — but with a different entry
@@ -58,7 +58,7 @@ ahead of the name chain.
 
 - scmdb.net users import their unlocked blueprints through the same modal, with **no UI change** (the
   file picker already accepts `.json`; the button is format-agnostic).
-- The scmdb.net import is **more reliable than name matching** for the cases REQ-INV-007 exists to
+- The scmdb.net import is **more reliable than name matching** for the cases REQ-INV-047 exists to
   patch: a blueprint whose `output_name` is CIG-mislabeled, or a cosmetic-variant spelling, still
   resolves via its structural `tag`. Those resolutions also seed name aliases, improving later
   name-only imports from any source.

@@ -402,7 +402,7 @@
             <div class="pane-grid-2">
                 <!-- LEFT: goals (Ziele), Ablauf checklist, attendance, calendar -->
                 <div class="pane-col">
-                    <!-- Ziele (REQ-MISSION-012): structured goals grouped Hauptziel -> Nebenziel ->
+                    <!-- Ziele (REQ-MISSION-019): structured goals grouped Hauptziel -> Nebenziel ->
                          Nicht-Ziel; read-only here, authored in the Verwaltung tab. Refreshed in place
                          through the 'overview' section swap
                          (krtRefreshMissionSection(['objectives','overview'])); no version attribute
@@ -1188,7 +1188,7 @@
                 </div>
 
                 <div class="pane-col" th:if="${!isNew}">
-                    <!-- Ziele editor (REQ-MISSION-012): classified, sortable goals. In-place AJAX swap
+                    <!-- Ziele editor (REQ-MISSION-019): classified, sortable goals. In-place AJAX swap
                          container — a goal add/edit/remove/reorder re-renders this objectivesEditor
                          fragment via ?fragment=objectives-editor AND the overview Ziele box via
                          ?fragment=overview. Handlers are delegated on document so they survive swaps.

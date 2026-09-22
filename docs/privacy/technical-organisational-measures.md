@@ -1,6 +1,6 @@
 # Technical and organisational measures (Art. 32 GDPR)
 
-> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-09-15.
+> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-09-22.
 
 Art. 32 requires measures appropriate to the risk. This document does not restate them in the
 abstract; each measure names **where it is enforced**, so a reader can check the claim rather than
@@ -45,8 +45,9 @@ measures below are accordingly proportionate rather than exhaustive.
 
 ### Encryption in transit
 
-- **HTTPS everywhere**, terminated at the edge proxy; the certificate is renewed automatically and a
-  renewed certificate is not delivered until the edge can actually open it (REQ-OPS-026).
+- **HTTPS everywhere**, terminated at the edge (native nginx, ADR-0162); the certificate is renewed
+  automatically and a renewed certificate is not delivered until the edge can actually open it
+  (REQ-OPS-026).
 - **The internal hops are TLS as well** — the backend serves HTTPS, and the SMTP transport (when
   enabled) requires STARTTLS and fails rather than falling back to plaintext.
 - **Session cookie** is `Secure`, `HttpOnly`, `SameSite=Strict`.
@@ -56,14 +57,21 @@ measures below are accordingly proportionate rather than exhaustive.
 - **Backups are client-side encrypted** before leaving the host; the storage target only ever
   receives encrypted blobs (REQ-OPS-008). This is the copy that leaves the controller's own
   infrastructure, so it is the one that must be encrypted regardless of the target.
-- **The keystore is not world-readable**: delivered `0640` with a POSIX ACL for the two container
-  uids, so the private key is not readable by other accounts on the host (REQ-OPS-016).
+- **The TLS keystore stays with the service account**: it lives under `/var/iri/secrets`, owned by
+  the unprivileged account the containers run as, and is mounted read-only into the four containers
+  that use it (`quadlet/systemd/{backend,frontend,ingest,keycloak}.container`).
 
 ### Confidentiality of the operational record
 
 - **Names, e-mail addresses and tokens are masked at the logging layer** — every sink, including the
   JSON appender, goes through `PiiMaskingPatternLayout` / `PiiMaskingLogstashEncoder`. This is a
   mechanism, not a convention: a developer who logs a user object does not defeat it.
+- **Streams the application does not write are masked in the log shipper.** Keycloak's log
+  (`username=`, `ipAddress=`), the raw container stdout of the three apps and the operator-script logs
+  pass through masking stages in `monitoring/alloy/config.alloy` before they reach Loki; the stages
+  themselves are gated by `scripts/check-alloy-log-masking.py` in CI (REQ-OBS-007). The edge access
+  log and the host authentication and security logs keep client IPs deliberately, for 31 days
+  (ADR-0072).
 - **Metrics and traces carry no personal data.** `ObservationPrivacyFilter` cuts query strings and
   reduces UUID and numeric path segments to placeholders before they can become metric tags or span
   attributes (REQ-OBS-006/-009).
@@ -105,11 +113,22 @@ measures below are accordingly proportionate rather than exhaustive.
 
 ## Runtime hardening
 
-- **Every production container** runs `no-new-privileges`, `cap_drop: [ALL]` with a minimal explicit
-  add-back, a pid ceiling, and — for the application services — a fixed non-root uid binding only
-  high ports (REQ-OPS-014).
-- **The deploy path is confined** by a systemd sandbox with an empty capability bounding set, a
-  seccomp allow-list, and a narrow set of writable paths (REQ-OPS-016).
+- **Rootless containers.** Since 2026-09-22 production runs on **rootless Podman** under a dedicated
+  unprivileged account, on Rocky Linux 10 with **SELinux enforcing**; no container daemon runs as
+  root (ADR-0163). The host itself is built by an Ansible role that sets SELinux to enforcing and
+  scans the host against the OpenSCAP CIS Server Level 1 profile, with remediation opt-in (ADR-0188,
+  `ansible/roles/basetool_host/tasks/60-hardening.yml`).
+- **Every production container** is a generated Quadlet unit (`scripts/generate-quadlet.py` →
+  `quadlet/systemd/`) with `NoNewPrivileges=true`, `DropCapability=ALL` (the ACME client alone adds
+  back `CHOWN`), a `PidsLimit`, and a **read-only root filesystem** (ADR-0190). The stateful services
+  run as their own uid rather than starting as root (ADR-0189); the application services run as a
+  fixed non-root uid binding only high ports (REQ-OPS-014).
+- **The deploy path is confined** by a systemd sandbox — `ProtectSystem=strict`, kernel and
+  control-group protections, a capability **deny-list** that removes the capabilities able to
+  reconfigure the host, load kernel code or read another process's memory, a seccomp allow-list
+  (`@system-service @mount`), and a narrow set of writable paths (`scripts/iri-deploy.service`,
+  REQ-OPS-016). It reaches the service account through a sudoers rule naming two commands and one
+  target user.
 - **Pull-only delivery**: the host pulls; nothing is pushed into it and no inbound access is required
   (REQ-OPS-001). Backups are outbound-only for the same reason.
 - **Artifacts are digest-pinned and signature-verified** on the host before they are applied
@@ -169,9 +188,11 @@ Stated deliberately, because a measures document that lists only strengths is no
 - **Database storage is not separately encrypted at rest** beyond the host's own protections. The
   copy that leaves the infrastructure — the backup — is encrypted; the volume on the host is not.
   Accepted for the risk level, and revisited if the data categories change.
-- **Docker-group membership on the deploy host remains root-equivalent.** A socket-proxy or
-  rootless-Docker reduction is deferred and documented in the deployment runbook rather than
-  silently ignored (REQ-OPS-016).
+- **The deploy sandbox is looser than it was under Docker.** Rootless Podman needs user namespaces,
+  the mount syscalls and a working `sudo`, so the unit keeps `RestrictNamespaces` off, widens the
+  seccomp set by `@mount` and uses a capability deny-list instead of an empty bounding set — each
+  measured and recorded in `scripts/iri-deploy.service`. The trade is deliberate: the root-equivalent
+  `docker` group membership it replaced was the larger exposure.
 - **An erasure request is not applied to existing backups.** The data leaves as the snapshots expire,
   within roughly six months; re-erasure after a restore is part of the restore procedure.
 - **The project is run voluntarily**, so availability is explicitly not warranted — stated in the

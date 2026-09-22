@@ -1,6 +1,6 @@
 # ADR-0185 — The data export excludes third parties by projection, and scrubs only where a projection cannot reach
 
-- **Status:** Proposed
+- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-09-17 (`f8b6c19ae`, PR #1920: `DataExportScrubCoverageTest`).
 - **Date:** 2026-09-15
 - **Deciders:** @greluc (the export itself and the anonymisation requirement as decision 7 during
   the cloud session; the admin variant and the PDF's depth on 2026-09-15)

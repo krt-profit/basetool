@@ -1,6 +1,6 @@
 # ADR-0038 — Admin-controlled retention purge of the audit logs
 
-- **Status:** Accepted
+- **Status:** Accepted — **amended by [ADR-0179](0179-both-audit-trails-are-swept-on-a-retention-ceiling.md)** (2026-09-15): the manual purge stays, and both audit trails are additionally swept on a 24-month retention ceiling — the automatic sweep this ADR rejected
 - **Date:** 2026-06-22
 - **Deciders:** @greluc
 - **Related:** spec REQ-AUDIT-004 ([`audit.md`](../specs/audit.md)) · amends a consequence of [ADR-0037](0037-shared-multi-domain-activity-audit-log.md) · REQ-BANK-012 ([`bank.md`](../specs/bank.md))

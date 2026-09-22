@@ -113,7 +113,7 @@ DTOs. It has to ship as a deprecation window — both properties served, the old
 > The two schemas are `NotificationRuleSelectorDto` and `NotificationRuleSelectorWriteRequest`, and
 > they belong to the **`/api/v1/notification-rules` admin surface**. That surface is not in
 > `ExternalContractTest`'s frozen set, and the public API vhost's allow-list **deliberately does not
-> admit it** — `docs/API_VHOST_ROLLOUT_RUNBOOK.md` verifies it answers `404` there, and
+> admit it** — `docs/archive/API_VHOST_ROLLOUT_RUNBOOK.md` verifies it answers `404` there, and
 > `ExternalContractTest` says in as many words that the three notification paths are admitted "by
 >
 >> name without admitting the family or the `/notification-rules` admin surface next to it".

@@ -1,12 +1,12 @@
 # ADR-0177 — The app has exactly one dialog shape
 
-- **Status:** Proposed
+- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-09-14 (`0a7c1d592`).
 - **Date:** 2026-09-14
 - **Deciders:** @greluc (pending)
 - **Related:** specs [`REQ-UI-013`](../specs/ui-design-system.md) (amended here) ·
   [`ui-design-system.md`](../specs/ui-design-system.md) ·
-  [ADR-0012](0012-server-rendered-thymeleaf-with-progressive-enhancement.md) ·
-  [ADR-0093](0093-inline-styles-are-migrated-to-utility-classes.md) (the `krtm-*` utilities this
+  [ADR-0012](0012-frontend-krtfetch-json-mutations-csrf-retry.md) ·
+  [ADR-0093](0093-eliminate-inline-style-attributes-csp-style-src-attr-none.md) (the `krtm-*` utilities this
   removes 33 of) · issue #1891
 
 ## Context

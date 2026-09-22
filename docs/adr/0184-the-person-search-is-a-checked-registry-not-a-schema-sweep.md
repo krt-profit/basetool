@@ -1,6 +1,6 @@
 # ADR-0184 — The Personensuche is a written registry checked against the schema, not a schema sweep
 
-- **Status:** Proposed
+- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-09-17 (`f8b6c19ae`, PR #1920: `PersonSearchCoverageTest`).
 - **Date:** 2026-09-15
 - **Deciders:** @greluc (scope: every free-text column, 2026-09-15; case-insensitivity confirmed the
   same day)

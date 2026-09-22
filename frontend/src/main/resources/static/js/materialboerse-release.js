@@ -311,9 +311,11 @@
         }
 
         lastFocused = document.activeElement;
-        // .krt-modal-overlay is display:none by default; open by setting inline display:flex
-        // (the app-wide modal contract), NOT by clearing a hidden attribute — the latter left
-        // the CSS display:none in place, so the modal opened invisibly (REQ-MARKET-002/007).
+        // .krt-modal-overlay is display:none by default; this page opens it with an inline
+        // display:flex, NOT by clearing a hidden attribute — the latter left the CSS
+        // display:none in place, so the modal opened invisibly (REQ-MARKET-002/007). The
+        // app-wide contract is the krtm-modal-open / krtm-hidden class pair (ADR-0093); the
+        // inline style here works because it outranks the stylesheet default.
         modal.style.display = 'flex';
         let first = isNew
             ? q('[data-mb-picker-input]')

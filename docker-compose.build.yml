@@ -68,7 +68,7 @@ x-backend-watch: &backend-watch
       - action: rebuild
         path: ./build.gradle.kts
       - action: rebuild
-        path: ./versions.properties
+        path: ./gradle/libs.versions.toml
 
 x-frontend-watch: &frontend-watch
   develop:
@@ -80,7 +80,7 @@ x-frontend-watch: &frontend-watch
       - action: rebuild
         path: ./build.gradle.kts
       - action: rebuild
-        path: ./versions.properties
+        path: ./gradle/libs.versions.toml
 
 x-ingest-build: &ingest-build
   build:
@@ -98,7 +98,7 @@ x-ingest-watch: &ingest-watch
       - action: rebuild
         path: ./build.gradle.kts
       - action: rebuild
-        path: ./versions.properties
+        path: ./gradle/libs.versions.toml
 
 services:
   backend:

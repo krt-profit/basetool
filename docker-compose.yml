@@ -408,7 +408,7 @@ x-keycloak: &keycloak-template
     KC_SPI_CONNECTIONS_JPA_QUARKUS_ASYNC_COMMIT: "false"
     KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:?KC_BOOTSTRAP_ADMIN_USERNAME must be set in .env}
     KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:?KC_BOOTSTRAP_ADMIN_PASSWORD must be set in .env}
-    # Optional (epic #720, REQ-DATA-008): the das-kartell guild id, read by the Discord federation
+    # Optional (epic #720, REQ-DATA-018): the das-kartell guild id, read by the Discord federation
     # SPI to capture each member's per-guild server nickname for the admin approval queue. The `:-`
     # default makes it optional — when unset the SPI skips nickname capture (fail-open); it never
     # affects the login. Put the value in .env (it is not a secret). The two Keycloak mappers that
@@ -1755,9 +1755,13 @@ services:
   # The hardening is the point of the swap, so each line is load-bearing:
   #   user 101:101        the image is the unprivileged build; the master runs as
   #                       uid 101 too, not just the workers
-  #   cap_drop [ALL]      with NO cap_add. nginx listens on 8080/8443 INSIDE and
-  #                       the host publishes 80/443 onto them, so not even
-  #                       NET_BIND_SERVICE is needed. NPM needed seven.
+  #   cap_drop [ALL]      with NO cap_add. nginx listens on 8080/8443 INSIDE, so
+  #                       not even NET_BIND_SERVICE is needed. NPM needed seven.
+  #                       The `ports:` below publish 80/443 onto them for a
+  #                       Compose stack; the generated Quadlet unit ignores
+  #                       them and publishes 8080/8443 on loopback only, where
+  #                       haproxy on the host (which owns 80/443) forwards with
+  #                       PROXY protocol (ADR-0187).
   #   read_only true      impossible with NPM, whose boot sed-edits its own
   #                       configuration and pip-installs certbot plugins
   #   no egress           its five networks are `internal: true`; ACME lives in
@@ -2248,7 +2252,7 @@ networks:
   # Subnet continues the pinned 172.28.0.0/16 block (.13); .12 (net-redis-backend) was the last one
   # taken. `app.rate-limit.trusted-proxies` already covers the whole /16 and needs no change. The
   # new gateway 172.28.13.1 must be in the Keycloak /admin allow-list before this lands, or the
-  # SSH-tunnel admin route can break — see docs/API_VHOST_ROLLOUT_RUNBOOK.md, phase A.
+  # SSH-tunnel admin route can break — see docs/archive/API_VHOST_ROLLOUT_RUNBOOK.md, phase A.
   #
   # NOTE: adding a top-level network edits the block deploy.sh diffs (`network_block()`), so the
   # apply is a CLEAN-SLATE recreate of the whole stack — a brief full-stack outage, once. That is

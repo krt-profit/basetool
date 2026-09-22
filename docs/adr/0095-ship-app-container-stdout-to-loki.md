@@ -5,6 +5,13 @@
 - **Deciders:** @greluc
 - **Related:** REQ-OBS-007 (amended here) · REQ-OBS-014 · REQ-OBS-004 · ADR-0072 (established the file-only shipping decision this amends) · #1274 (`init: true` zombie-reaping root-cause fix) · #1275 (`ContainerPidsHigh` leading indicator) · #1041 item 24 (`mon-*` stdout shipping precedent) · the 2026-07-12 ingest native-thread pids-cap OOM
 
+> **Note (2026-09-22):** the decision (the `<svc>-stdout` streams, their labels and masking) stands,
+> but its transport changed with the move to rootless Podman: `loki.source.docker` through the
+> socket-proxy was replaced on 2026-09-20 by `loki.source.journal`, reading the containers' journald
+> log driver and relabelling `CONTAINER_NAME` to the same `app=` scheme (`monitoring/alloy/config.alloy`).
+> Decision 5's staged rule is no longer staged: `JvmNativeThreadExhaustion` is active in
+> `monitoring/loki/rules/fake/basetool-log-alerts.yml` (on `main` since v1.7.7, 2026-09-09).
+
 ## Context
 
 REQ-OBS-007 (epic #936, ADR-0072) ships the three JVM modules (backend / frontend / ingest) to

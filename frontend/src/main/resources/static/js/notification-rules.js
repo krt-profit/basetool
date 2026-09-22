@@ -17,310 +17,512 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// @ts-check
+
 /*
  * Admin editor for the data-driven notification rules (epic #622, REQ-NOTIF-007).
  *
  * Manages the dynamic selector editor (add/remove rows, show only the fields a selector kind
  * needs), builds the rule JSON, and creates/updates/deletes via window.krtFetch (CSRF + 403-retry
- * handled centrally). On a successful mutation the page reloads — the rule editor is an admin,
- * low-traffic surface where a reload is the simplest correct refresh (CLAUDE.md no-reload
- * fallback). Destructive delete confirms through the non-native window.showKrtConfirm dialog.
+ * handled centrally). A successful mutation re-fetches the rules table in place — the `rules`
+ * fragment of /admin/notification-rules swapped into #rules-host — and puts the form back into
+ * create mode; the page never reloads (REQ-FE-001). The edit / delete buttons are delegated on the
+ * document, so the swapped-in rows work without re-binding. There is no peer broadcast: no admin
+ * catalogue page takes part in the live multi-user sync, and this one follows them. Destructive
+ * delete confirms through the non-native window.showKrtConfirm dialog.
  */
 (function () {
     const form = document.getElementById('rule-form');
-    if (!form) {
-        return;
-    }
     const container = document.getElementById('selectors-container');
     const template = document.getElementById('selector-row-template');
-    const i18n = readMessages();
-
-    function readMessages() {
-        const holder = document.getElementById('rule-i18n');
-        const data = holder ? holder.dataset : {};
-        return {
-            confirmDeleteTitle: data.confirmDeleteTitle || 'Delete rule',
-            confirmDeleteBody: data.confirmDeleteBody || 'Delete this rule?',
-            confirmOk: data.confirmOk || 'Delete',
-            confirmCancel: data.confirmCancel || 'Cancel',
-            saved: data.saved || 'Saved',
-            deleted: data.deleted || 'Deleted',
-            error: data.error || 'Action failed',
-        };
+    const version = document.getElementById('rule-version');
+    const eventType = document.getElementById('rule-eventType');
+    const notificationType = document.getElementById('rule-notificationType');
+    const description = document.getElementById('rule-description');
+    const enabled = document.getElementById('rule-enabled');
+    const excludeActor = document.getElementById('rule-excludeActor');
+    if (
+        !(form instanceof HTMLFormElement) ||
+        !container ||
+        !(template instanceof HTMLTemplateElement) ||
+        !(version instanceof HTMLInputElement) ||
+        !(eventType instanceof HTMLSelectElement) ||
+        !(notificationType instanceof HTMLSelectElement) ||
+        !(description instanceof HTMLInputElement) ||
+        !(enabled instanceof HTMLInputElement) ||
+        !(excludeActor instanceof HTMLInputElement)
+    ) {
+        return;
     }
+    wire({
+        form: form,
+        container: container,
+        template: template,
+        version: version,
+        eventType: eventType,
+        notificationType: notificationType,
+        description: description,
+        enabled: enabled,
+        excludeActor: excludeActor,
+    });
 
-    // ---- selector rows ------------------------------------------------------
+    /**
+     * The page's form controls, resolved and type-checked once.
+     * @typedef {object} RuleFormElements
+     * @property {HTMLFormElement} form
+     * @property {HTMLElement} container the selector-row list
+     * @property {HTMLTemplateElement} template the selector-row template
+     * @property {HTMLInputElement} version the optimistic-lock version of the rule being edited
+     * @property {HTMLSelectElement} eventType
+     * @property {HTMLSelectElement} notificationType
+     * @property {HTMLInputElement} description
+     * @property {HTMLInputElement} enabled
+     * @property {HTMLInputElement} excludeActor
+     */
 
-    function toggleRow(row) {
-        const kind = row.querySelector('[data-selector-kind]').value;
-        setFieldVisible(row, 'orgRelativeRole', kind === 'ORG_RELATIVE_ROLE');
-        setFieldVisible(row, 'contextRole', kind === 'ORG_RELATIVE_ROLE');
-        setFieldVisible(row, 'roleCode', kind === 'ROLE');
-        setFieldVisible(row, 'userId', kind === 'SPECIFIC_USER');
-    }
+    /**
+     * Installs the editor on the resolved controls.
+     * @param {RuleFormElements} el
+     */
+    function wire(el) {
+        const i18n = readMessages();
 
-    function setFieldVisible(row, field, visible) {
-        const group = row.querySelector('[data-field="' + field + '"]');
-        if (group) {
-            group.hidden = !visible;
+        /**
+         * The selector kinds that take the account or the recipient from the event and have no
+         * further field: the row shows the fromEvent hint and sends only its kind.
+         */
+        const EVENT_DERIVED_KINDS = ['ACCOUNT_GRANT', 'EVENT_RECIPIENT', 'ACCOUNT_RESPONSIBLE'];
+
+        /** The kind a new, empty selector row starts with. */
+        const DEFAULT_KIND = 'ORG_RELATIVE_ROLE';
+
+        function readMessages() {
+            const holder = document.getElementById('rule-i18n');
+            const data = holder ? holder.dataset : /** @type {DOMStringMap} */ ({});
+            return {
+                confirmDeleteTitle: data.confirmDeleteTitle || 'Delete rule',
+                confirmDeleteBody: data.confirmDeleteBody || 'Delete this rule?',
+                confirmOk: data.confirmOk || 'Delete',
+                confirmCancel: data.confirmCancel || 'Cancel',
+                saved: data.saved || 'Saved',
+                deleted: data.deleted || 'Deleted',
+                error: data.error || 'Action failed',
+                unknownValue: data.unknownValue || '{0}',
+            };
         }
-    }
 
-    function addSelectorRow(selector) {
-        const fragment = template.content.cloneNode(true);
-        const row = fragment.querySelector('[data-selector-row]');
-        if (selector) {
-            setValue(row, '[data-selector-kind]', selector.kind);
-            setValue(row, '[data-selector-orgRelativeRole]', selector.orgRelativeRole);
-            setValue(row, '[data-selector-contextRole]', selector.contextRole);
-            setValue(row, '[data-selector-roleCode]', selector.roleCode);
-        }
-        container.appendChild(row);
-        const appended = container.lastElementChild;
-        toggleRow(appended);
-        // Upgrade the freshly cloned selector row's SPECIFIC_USER picker into a searchable combobox.
-        // The picker now searches the roster server-side (remote-users, #1193) instead of preloading
-        // every user, so an existing rule's chosen user is seeded here in edit mode: resolve its
-        // display name via /users/{id}, inject one selected <option>, THEN enhance (the enhancer
-        // seeds its committed value/label from that option). New rows have no user and enhance at
-        // once.
-        enhanceSelectorRow(appended, selector);
-        return appended;
-    }
+        // ---- selects ------------------------------------------------------------
 
-    // Enhances a selector row's SPECIFIC_USER combobox. When the row carries a preselected user
-    // (edit mode), seeds one <option> (value + resolved display name) before enhancing so the box
-    // shows the name, not a blank field; a failed name lookup falls back to the raw id so the value
-    // is never lost. All other rows (and non-user selectors) enhance immediately.
-    function enhanceSelectorRow(row, selector) {
-        const enhance = function () {
-            if (window.krtEnhanceComboboxes) {
-                window.krtEnhanceComboboxes(row);
+        /**
+         * Selects `value` in a `<select>`. A value with no matching option — a backend enum value
+         * newer than this page — is not dropped: an option carrying the raw code is added (marked
+         * data-unknown-option, labelled with the `selector.unknown` text) so the value is shown as
+         * unknown and round-trips unchanged on save instead of silently becoming '' or the first
+         * option.
+         * @param {HTMLSelectElement | null} select
+         * @param {string | null | undefined} value
+         */
+        function selectValue(select, value) {
+            if (!select || value == null || value === '') {
+                return;
             }
-        };
-        if (!selector || selector.kind !== 'SPECIFIC_USER' || !selector.userId) {
-            enhance();
-            return;
+            const code = value;
+            const known = Array.from(select.options).some(function (option) {
+                return option.value === code;
+            });
+            if (!known) {
+                const option = document.createElement('option');
+                option.value = code;
+                option.textContent = unknownLabel(code);
+                option.setAttribute('data-unknown-option', '');
+                select.appendChild(option);
+            }
+            select.value = code;
         }
-        const select = row.querySelector('[data-selector-userId]');
-        fetch('/users/' + encodeURIComponent(selector.userId), {
-            headers: { Accept: 'application/json' },
-        })
-            .then(function (response) {
-                return response.ok ? response.json() : null;
-            })
-            .catch(function () {
-                return null;
-            })
-            .then(function (user) {
-                if (select) {
-                    const option = document.createElement('option');
-                    option.value = selector.userId;
-                    option.textContent =
-                        (user && (user.effectiveName || user.displayName || user.username)) ||
-                        selector.userId;
-                    option.selected = true;
-                    select.appendChild(option);
+
+        /**
+         * The label of an option added for an unknown code: the `selector.unknown` text with its
+         * `{0}` placeholder replaced by the code, or followed by the code when it has none.
+         * @param {string} code
+         * @returns {string}
+         */
+        function unknownLabel(code) {
+            const text = i18n.unknownValue;
+            // A replacer function, so a `$` in the code is never read as a replacement pattern.
+            return text.includes('{0}')
+                ? text.replace('{0}', function () {
+                      return code;
+                  })
+                : text + ' ' + code;
+        }
+
+        /**
+         * Removes the options selectValue added for unknown values, so they do not linger into the
+         * next rule or into create mode.
+         * @param {HTMLSelectElement} select
+         */
+        function dropUnknownOptions(select) {
+            select.querySelectorAll('[data-unknown-option]').forEach(function (option) {
+                option.remove();
+            });
+        }
+
+        /**
+         * @param {ParentNode} row
+         * @param {string} name the data-selector-* attribute suffix
+         * @returns {HTMLSelectElement | null}
+         */
+        function rowSelect(row, name) {
+            return /** @type {HTMLSelectElement | null} */ (
+                row.querySelector('[data-selector-' + name + ']')
+            );
+        }
+
+        // ---- selector rows ------------------------------------------------------
+
+        /** @param {Element} row */
+        function toggleRow(row) {
+            const kindSelect = rowSelect(row, 'kind');
+            const kind = kindSelect ? kindSelect.value : '';
+            setFieldVisible(row, 'orgRelativeRole', kind === 'ORG_RELATIVE_ROLE');
+            setFieldVisible(row, 'contextRole', kind === 'ORG_RELATIVE_ROLE');
+            setFieldVisible(row, 'roleCode', kind === 'ROLE');
+            setFieldVisible(row, 'userId', kind === 'SPECIFIC_USER');
+            setFieldVisible(row, 'fromEvent', EVENT_DERIVED_KINDS.includes(kind));
+        }
+
+        /**
+         * @param {Element} row
+         * @param {string} field
+         * @param {boolean} visible
+         */
+        function setFieldVisible(row, field, visible) {
+            const group = /** @type {HTMLElement | null} */ (
+                row.querySelector('[data-field="' + field + '"]')
+            );
+            if (group) {
+                group.hidden = !visible;
+            }
+        }
+
+        /**
+         * Appends one selector row, prefilled from `selector` in edit mode.
+         * @param {ApiDto<'NotificationRuleSelectorDto'> | null} selector
+         */
+        function addSelectorRow(selector) {
+            const fragment = /** @type {DocumentFragment} */ (el.template.content.cloneNode(true));
+            const row = fragment.querySelector('[data-selector-row]');
+            if (!row) {
+                return;
+            }
+            if (selector) {
+                selectValue(rowSelect(row, 'kind'), selector.kind);
+                selectValue(rowSelect(row, 'orgRelativeRole'), selector.orgRelativeRole);
+                selectValue(rowSelect(row, 'contextRole'), selector.contextRole);
+                selectValue(rowSelect(row, 'roleCode'), selector.roleCode);
+            } else {
+                selectValue(rowSelect(row, 'kind'), DEFAULT_KIND);
+            }
+            el.container.appendChild(row);
+            toggleRow(row);
+            // Upgrade the freshly cloned selector row's SPECIFIC_USER picker into a searchable
+            // combobox. The picker searches the roster server-side (remote-users, #1193) instead of
+            // preloading every user, so an existing rule's chosen user is seeded here in edit mode:
+            // resolve its display name via /users/{id}, inject one selected <option>, THEN enhance
+            // (the enhancer seeds its committed value/label from that option). New rows have no
+            // user and enhance at once.
+            enhanceSelectorRow(row, selector);
+        }
+
+        /**
+         * Enhances a selector row's SPECIFIC_USER combobox. When the row carries a preselected
+         * user (edit mode), seeds one <option> (value + resolved display name) before enhancing so
+         * the box shows the name, not a blank field; a failed name lookup falls back to the raw id
+         * so the value is never lost. All other rows (and non-user selectors) enhance immediately.
+         * @param {Element} row
+         * @param {ApiDto<'NotificationRuleSelectorDto'> | null} selector
+         */
+        function enhanceSelectorRow(row, selector) {
+            const enhance = function () {
+                if (window.krtEnhanceComboboxes) {
+                    window.krtEnhanceComboboxes(row);
                 }
+            };
+            const userId = selector && selector.kind === 'SPECIFIC_USER' ? selector.userId : null;
+            if (!userId) {
                 enhance();
-            });
-    }
-
-    function setValue(row, selector, value) {
-        const el = row.querySelector(selector);
-        if (el && value != null) {
-            el.value = value;
-        }
-    }
-
-    function readValue(row, selector) {
-        const el = row.querySelector(selector);
-        const value = el && el.value != null ? el.value.trim() : '';
-        return value === '' ? null : value;
-    }
-
-    function collectSelectors() {
-        const rows = container.querySelectorAll('[data-selector-row]');
-        return Array.prototype.map.call(rows, function (row) {
-            const kind = row.querySelector('[data-selector-kind]').value;
-            const selector = { kind: kind };
-            if (kind === 'ORG_RELATIVE_ROLE') {
-                selector.orgRelativeRole = readValue(row, '[data-selector-orgRelativeRole]');
-                selector.contextRole = readValue(row, '[data-selector-contextRole]');
-            } else if (kind === 'ROLE') {
-                selector.roleCode = readValue(row, '[data-selector-roleCode]');
-            } else if (kind === 'SPECIFIC_USER') {
-                selector.userId = readValue(row, '[data-selector-userId]');
+                return;
             }
-            return selector;
-        });
-    }
-
-    function buildPayload() {
-        const version = document.getElementById('rule-version').value;
-        const description = document.getElementById('rule-description').value.trim();
-        return {
-            eventType: document.getElementById('rule-eventType').value,
-            notificationType: document.getElementById('rule-notificationType').value,
-            description: description === '' ? null : description,
-            enabled: document.getElementById('rule-enabled').checked,
-            excludeActor: document.getElementById('rule-excludeActor').checked,
-            version: version === '' ? null : Number(version),
-            selectors: collectSelectors(),
-        };
-    }
-
-    // ---- form mode ----------------------------------------------------------
-
-    function resetForm() {
-        form.setAttribute('data-rule-id', '');
-        document.getElementById('rule-version').value = '';
-        document.getElementById('rule-eventType').value = 'JOB_ORDER_CREATED';
-        document.getElementById('rule-notificationType').value = 'JOB_ORDER_CREATED';
-        document.getElementById('rule-description').value = '';
-        document.getElementById('rule-enabled').checked = true;
-        document.getElementById('rule-excludeActor').checked = true;
-        container.innerHTML = '';
-        addSelectorRow(null);
-    }
-
-    function prefillForm(rule) {
-        form.setAttribute('data-rule-id', rule.id);
-        document.getElementById('rule-version').value = rule.version != null ? rule.version : '';
-        document.getElementById('rule-eventType').value = rule.eventType;
-        document.getElementById('rule-notificationType').value = rule.notificationType;
-        document.getElementById('rule-description').value = rule.description || '';
-        document.getElementById('rule-enabled').checked = !!rule.enabled;
-        document.getElementById('rule-excludeActor').checked = !!rule.excludeActor;
-        container.innerHTML = '';
-        const selectors = Array.isArray(rule.selectors) ? rule.selectors : [];
-        if (selectors.length === 0) {
-            addSelectorRow(null);
-        } else {
-            selectors.forEach(addSelectorRow);
+            const select = rowSelect(row, 'userId');
+            fetch('/users/' + encodeURIComponent(userId), {
+                headers: { Accept: 'application/json' },
+            })
+                .then(function (response) {
+                    return response.ok ? response.json() : null;
+                })
+                .catch(function () {
+                    return null;
+                })
+                .then(function (user) {
+                    if (select) {
+                        const option = document.createElement('option');
+                        option.value = userId;
+                        option.textContent =
+                            (user && (user.effectiveName || user.displayName || user.username)) ||
+                            userId;
+                        option.selected = true;
+                        select.appendChild(option);
+                    }
+                    enhance();
+                });
         }
-        form.scrollIntoView({ behavior: 'smooth' });
-    }
 
-    function editRule(id) {
-        fetch('/admin/notification-rules/' + encodeURIComponent(id), {
-            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-        })
-            .then(function (res) {
-                return res.ok ? res.json() : null;
-            })
-            .then(function (rule) {
-                if (rule) {
-                    prefillForm(rule);
+        /**
+         * @param {Element} row
+         * @param {string} name the data-selector-* attribute suffix
+         * @returns {string | null}
+         */
+        function readValue(row, name) {
+            const select = rowSelect(row, name);
+            const value = select ? select.value.trim() : '';
+            return value === '' ? null : value;
+        }
+
+        function collectSelectors() {
+            const rows = el.container.querySelectorAll('[data-selector-row]');
+            return Array.from(rows).map(function (row) {
+                const kind = readValue(row, 'kind');
+                /** @type {Record<string, string | null>} */
+                const selector = { kind: kind };
+                // The event-derived kinds send only their kind: they read no selector field.
+                if (kind === 'ORG_RELATIVE_ROLE') {
+                    selector.orgRelativeRole = readValue(row, 'orgRelativeRole');
+                    selector.contextRole = readValue(row, 'contextRole');
+                } else if (kind === 'ROLE') {
+                    selector.roleCode = readValue(row, 'roleCode');
+                } else if (kind === 'SPECIFIC_USER') {
+                    selector.userId = readValue(row, 'userId');
                 }
-            })
-            .catch(function () {
-                if (typeof window.showFrontendErrorToast === 'function') {
-                    window.showFrontendErrorToast(i18n.error);
-                }
+                return selector;
             });
-    }
-
-    // ---- submit / delete ----------------------------------------------------
-
-    function onSubmit(event) {
-        event.preventDefault();
-        if (!window.krtFetch) {
-            return;
         }
-        const id = form.getAttribute('data-rule-id');
-        const submitter = form.querySelector('button[type="submit"]');
-        window.krtFetch.write({
-            method: id ? 'PUT' : 'POST',
-            url: '/admin/notification-rules' + (id ? '/' + encodeURIComponent(id) : ''),
-            payload: buildPayload(),
-            successMessage: i18n.saved,
-            errorMessage: i18n.error,
-            submitter: submitter,
-            onSuccess: function () {
-                window.location.reload();
-            },
-        });
-    }
 
-    function deleteRule(id, submitter) {
-        if (!window.krtFetch) {
-            return;
+        function buildPayload() {
+            const versionValue = el.version.value;
+            const descriptionValue = el.description.value.trim();
+            return {
+                eventType: el.eventType.value,
+                notificationType: el.notificationType.value,
+                description: descriptionValue === '' ? null : descriptionValue,
+                enabled: el.enabled.checked,
+                excludeActor: el.excludeActor.checked,
+                version: versionValue === '' ? null : Number(versionValue),
+                selectors: collectSelectors(),
+            };
         }
-        confirmThen(function () {
+
+        // ---- form mode ----------------------------------------------------------
+
+        /** Puts the form back into create mode with one empty selector row. */
+        function resetForm() {
+            el.form.setAttribute('data-rule-id', '');
+            el.version.value = '';
+            dropUnknownOptions(el.eventType);
+            dropUnknownOptions(el.notificationType);
+            el.eventType.selectedIndex = 0;
+            el.notificationType.selectedIndex = 0;
+            el.description.value = '';
+            el.enabled.checked = true;
+            el.excludeActor.checked = true;
+            el.container.innerHTML = '';
+            addSelectorRow(null);
+        }
+
+        /** @param {ApiDto<'NotificationRuleDto'>} rule */
+        function prefillForm(rule) {
+            el.form.setAttribute('data-rule-id', rule.id || '');
+            el.version.value = rule.version != null ? String(rule.version) : '';
+            dropUnknownOptions(el.eventType);
+            dropUnknownOptions(el.notificationType);
+            selectValue(el.eventType, rule.eventType);
+            selectValue(el.notificationType, rule.notificationType);
+            el.description.value = rule.description || '';
+            el.enabled.checked = !!rule.enabled;
+            el.excludeActor.checked = !!rule.excludeActor;
+            el.container.innerHTML = '';
+            const selectors = Array.isArray(rule.selectors) ? rule.selectors : [];
+            if (selectors.length === 0) {
+                addSelectorRow(null);
+            } else {
+                selectors.forEach(function (selector) {
+                    addSelectorRow(selector);
+                });
+            }
+            el.form.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        /** @param {string} id */
+        function editRule(id) {
+            fetch('/admin/notification-rules/' + encodeURIComponent(id), {
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            })
+                .then(function (res) {
+                    return res.ok ? res.json() : null;
+                })
+                .then(function (rule) {
+                    if (rule) {
+                        prefillForm(rule);
+                    }
+                })
+                .catch(function () {
+                    if (typeof window.showFrontendErrorToast === 'function') {
+                        window.showFrontendErrorToast(i18n.error);
+                    }
+                });
+        }
+
+        // ---- live refresh -------------------------------------------------------
+
+        /** Re-renders the rules table in place from the `rules` fragment. */
+        function refreshRules() {
+            return window.krtFetch.swap({
+                url: '/admin/notification-rules',
+                container: '#rules-host',
+                fragmentValue: 'rules',
+                errorMessage: i18n.error,
+            });
+        }
+
+        // ---- submit / delete ----------------------------------------------------
+
+        /** @param {SubmitEvent} event */
+        function onSubmit(event) {
+            event.preventDefault();
+            if (!window.krtFetch) {
+                return;
+            }
+            const id = el.form.getAttribute('data-rule-id');
+            const submitter = el.form.querySelector('button[type="submit"]');
             window.krtFetch.write({
-                method: 'DELETE',
-                url: '/admin/notification-rules/' + encodeURIComponent(id),
-                successMessage: i18n.deleted,
+                method: id ? 'PUT' : 'POST',
+                url: '/admin/notification-rules' + (id ? '/' + encodeURIComponent(id) : ''),
+                payload: buildPayload(),
+                successMessage: i18n.saved,
                 errorMessage: i18n.error,
                 submitter: submitter,
                 onSuccess: function () {
-                    window.location.reload();
+                    resetForm();
+                    return refreshRules();
                 },
             });
-        });
-    }
+        }
 
-    function confirmThen(action) {
-        if (typeof window.showKrtConfirm === 'function') {
-            window
-                .showKrtConfirm(
-                    i18n.confirmDeleteTitle,
-                    i18n.confirmDeleteBody,
-                    i18n.confirmOk,
-                    i18n.confirmCancel,
-                )
-                .then(function (ok) {
-                    if (ok) {
-                        action();
-                    }
+        /**
+         * @param {string} id
+         * @param {Element} submitter
+         */
+        function deleteRule(id, submitter) {
+            if (!window.krtFetch) {
+                return;
+            }
+            confirmThen(function () {
+                window.krtFetch.write({
+                    method: 'DELETE',
+                    url: '/admin/notification-rules/' + encodeURIComponent(id),
+                    successMessage: i18n.deleted,
+                    errorMessage: i18n.error,
+                    submitter: submitter,
+                    onSuccess: function () {
+                        // Only the rule being edited is taken out of the form: an admin half-way
+                        // through editing another rule keeps their input.
+                        if (el.form.getAttribute('data-rule-id') === id) {
+                            resetForm();
+                        }
+                        return refreshRules();
+                    },
                 });
-        } else {
-            action();
+            });
         }
-    }
 
-    // ---- wiring -------------------------------------------------------------
-
-    form.addEventListener('submit', onSubmit);
-    document.getElementById('add-selector').addEventListener('click', function () {
-        addSelectorRow(null);
-    });
-    document.getElementById('rule-cancel').addEventListener('click', resetForm);
-
-    container.addEventListener('change', function (event) {
-        const kindSelect = event.target.closest('[data-selector-kind]');
-        if (kindSelect) {
-            toggleRow(kindSelect.closest('[data-selector-row]'));
+        /** @param {() => void} action */
+        function confirmThen(action) {
+            if (typeof window.showKrtConfirm === 'function') {
+                window
+                    .showKrtConfirm(
+                        i18n.confirmDeleteTitle,
+                        i18n.confirmDeleteBody,
+                        i18n.confirmOk,
+                        i18n.confirmCancel,
+                    )
+                    .then(function (ok) {
+                        if (ok) {
+                            action();
+                        }
+                    });
+            } else {
+                action();
+            }
         }
-    });
-    container.addEventListener('click', function (event) {
-        const removeBtn = event.target.closest('[data-selector-remove]');
-        if (removeBtn) {
-            const row = removeBtn.closest('[data-selector-row]');
+
+        // ---- wiring -------------------------------------------------------------
+
+        el.form.addEventListener('submit', onSubmit);
+        const addSelector = document.getElementById('add-selector');
+        if (addSelector) {
+            addSelector.addEventListener('click', function () {
+                addSelectorRow(null);
+            });
+        }
+        const cancel = document.getElementById('rule-cancel');
+        if (cancel) {
+            cancel.addEventListener('click', resetForm);
+        }
+
+        el.container.addEventListener('change', function (event) {
+            const target = event.target;
+            const kindSelect =
+                target instanceof Element ? target.closest('[data-selector-kind]') : null;
+            const row = kindSelect ? kindSelect.closest('[data-selector-row]') : null;
+            if (row) {
+                toggleRow(row);
+            }
+        });
+        el.container.addEventListener('click', function (event) {
+            const target = event.target;
+            const removeBtn =
+                target instanceof Element ? target.closest('[data-selector-remove]') : null;
+            const row = removeBtn ? removeBtn.closest('[data-selector-row]') : null;
             if (row) {
                 row.remove();
             }
-        }
-    });
+        });
 
-    document.addEventListener('click', function (event) {
-        const editBtn = event.target.closest('[data-rule-edit]');
-        if (editBtn) {
-            const tr = editBtn.closest('[data-rule-id]');
-            if (tr) {
-                editRule(tr.getAttribute('data-rule-id'));
+        // Delegated on the document, not bound to the rows: the rows are replaced by every
+        // refreshRules() swap, and these handlers must keep working on the swapped-in ones.
+        document.addEventListener('click', function (event) {
+            const target = event.target;
+            if (!(target instanceof Element)) {
+                return;
             }
-            return;
-        }
-        const deleteBtn = event.target.closest('[data-rule-delete]');
-        if (deleteBtn) {
-            const tr = deleteBtn.closest('[data-rule-id]');
-            if (tr) {
-                deleteRule(tr.getAttribute('data-rule-id'), deleteBtn);
+            const editBtn = target.closest('[data-rule-edit]');
+            if (editBtn) {
+                const tr = editBtn.closest('[data-rule-id]');
+                const id = tr ? tr.getAttribute('data-rule-id') : null;
+                if (id) {
+                    editRule(id);
+                }
+                return;
             }
-        }
-    });
+            const deleteBtn = target.closest('[data-rule-delete]');
+            if (deleteBtn) {
+                const tr = deleteBtn.closest('[data-rule-id]');
+                const id = tr ? tr.getAttribute('data-rule-id') : null;
+                if (id) {
+                    deleteRule(id, deleteBtn);
+                }
+            }
+        });
 
-    resetForm();
+        resetForm();
+    }
 })();

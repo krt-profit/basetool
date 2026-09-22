@@ -35,8 +35,10 @@ import java.util.UUID;
  *       the {@code ORGANISATIONSLEITUNG} (admin only).
  *   <li><b>canManageRoster</b> — may manage the in-unit subordinate ranks: Kommandoleiter / stellv.
  *       Kommandoleiter / Ensign and the Kommandogruppen on a {@code SQUADRON} (its Staffelleiter),
- *       Koordinatoren / Operatoren on a {@code BEREICH} (its Bereichsleiter); always {@code false}
- *       on an SK / OL.
+ *       Koordinatoren / Operatoren on a {@code BEREICH} (its Bereichsleiter), the member list and
+ *       the Logistiker / Einsatzmanager flags on a {@code SPECIAL_COMMAND} (its own SK lead, per
+ *       {@code SpecialCommandSecurityService#canManageMembers}; the page links to the SK member
+ *       page for it); always {@code false} on the OL.
  * </ul>
  *
  * <p>Admin sees and may act on every unit (both caps {@code true}); a delegated leader sees only

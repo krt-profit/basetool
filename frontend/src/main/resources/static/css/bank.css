@@ -1405,7 +1405,7 @@ tr.is-inert td {
 }
 
 /* Bereich department colour classes — mirror the org chart's oc-dept--* over the shared
-   --color-dept-* tokens so both surfaces read from one design-system source (REQ-ORG-018). */
+   --color-dept-* tokens so both surfaces read from one design-system source (REQ-ORG-026). */
 .bank-dept--profit {
     --bank-dept: var(--color-dept-profit);
 }

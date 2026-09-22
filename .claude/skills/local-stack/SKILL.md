@@ -10,16 +10,27 @@ Use Docker Compose profiles:
 ```bash
 docker compose --profile dev up -d db-backend-dev db-keycloak-dev keycloak-dev redis-dev   # deps only, run apps locally
 docker compose --profile dev up -d                                                          # full dev stack with host port exposure
-docker compose --profile prod up -d                                                         # prod-equivalent stack behind nginx-proxy-manager
+docker compose --profile prod up -d                                                         # prod-equivalent stack behind the nginx edge (needs the prod .env)
 docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml \
     --profile dev up -d                                                                     # isolated test stack with throwaway credentials
 docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml \
     -f docker-compose.android.yml --profile dev up -d                                       # ... and this one WHENEVER the client is the Android emulator
 ```
 
-Host ports (dev profile only): backend `11261`, frontend `18081`, Keycloak `18080`, backend DB `15432`, Keycloak DB `15433`, Redis `6379`, NPM admin `10081`. A `.env` at repo root is required for the regular dev/prod profiles (see README for keys). The isolated test stack instead reads `.env.test` plus a locally generated `keystore.p12` and a stripped `realm-export.json` — see the README's `Running the Local Test Stack` section for setup, and never substitute production artifacts for those.
+Further overrides, layered on top in this order when needed: `docker-compose.build.yml` (build the
+images from this checkout, tag `:local`, instead of pulling `:stable`), `docker-compose.e2e.yml`
+(project-scoped volumes, what `:frontend:e2eTest` uses) and `docker-compose.localtest.yml` (append
+**last**: republishes Keycloak for a manual host browser and switches the UEX / SC-wiki syncs off so
+seeded data stays put). Each file's header carries its exact command line.
 
-The backend serves HTTPS with a self-signed cert (`keystore.p12`, password `changeit`); the frontend talks to `https://backend:11261` in prod and `http://localhost:11261` (overridable via `BACKEND_URL`) in dev. There is no Swagger UI — the OpenAPI document is served at `https://localhost:11261/v3/api-docs` in the `dev`/`test` profiles only (disabled in `prod`); the committed `backend/src/main/resources/api/openapi.json` is the single API-documentation artifact.
+Production does **not** run Compose: it runs rootless Podman + Quadlet units generated from these
+files (`scripts/generate-quadlet.py` → `quadlet/`). A change to a service in `docker-compose*.yml`
+therefore needs the units regenerated in the same change (`python3 scripts/generate-quadlet.py`;
+the `quadlet-drift` job in `repo-lint.yml` runs `--check`).
+
+Host ports (dev profile only, bound to `127.0.0.1`): backend `11261`, frontend `18081`, ingest `11262`, Keycloak `18080`, backend DB `15432`, Keycloak DB `15433`, Redis `6379`. A `.env` at repo root is required for the regular dev/prod profiles (see README for keys). The isolated test stack instead reads `.env.test` and a stripped `realm-export.json`; its TLS material is the **committed** throwaway keystore under `docker/test-tls/` (password `basetool-test`, ADR-0139), bound by a hardcoded path — nothing to generate. See the README's *Running the local test stack* section for setup, and never substitute production artifacts for those.
+
+The backend always serves HTTPS (`server.ssl.enabled: true`, key alias `basetool`); the frontend reaches it at `https://backend:11261` by default (`BACKEND_URL`), so a frontend run from Gradle against a backend run from Gradle needs `BACKEND_URL=https://localhost:11261`. There is no Swagger UI — the OpenAPI documents are served at `https://localhost:11261/v3/api-docs` (backend) and `https://localhost:11262/v3/api-docs` (ingest) in the `dev`/`test` profiles only (disabled in `prod`); the committed `backend/src/main/resources/api/openapi.json` and `ingest/src/main/resources/api/openapi.json` are the API-documentation artifacts.
 
 ## Driving the Android emulator against this stack
 

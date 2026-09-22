@@ -140,6 +140,11 @@ moves, every token minted under the old one fails validation and every session t
 sequence, and the fact that the Android app must ship the matching build, are in
 [`docs/deployment.md`](../deployment.md); the old DNS record can be retired once the new path answers.
 
+> **Note (2026-09-22):** The cutover was executed — production serves Keycloak under
+> `https://profit-base.online/auth` — and its one-off sequence (*Identity cutover: Keycloak moves to
+> /auth on the web host*) was removed when `docs/deployment.md` was rewritten for the rootless-Podman
+> host. It can still be read at `git show v1.9.2:docs/deployment.md` (the last release that carries it).
+
 **Production is still the only place the full arrangement exists.** The test stack has no edge, so it
 cannot reproduce the same-*origin* half — it runs Keycloak on its own port as before. It does run the
 same `/auth` **path**, which is the half that configuration gets wrong, and the e2e login exercises it

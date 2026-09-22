@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-12.
-> **Owner area:** REFINERY · **Related:** [`REFINERY_SCREENSHOT_IMPORT_PLAN.md`](../REFINERY_SCREENSHOT_IMPORT_PLAN.md) (epic #439 — historical plan, frozen 2026-06-10), [`DESIGN_SC_EXTRACTOR.md`](../DESIGN_SC_EXTRACTOR.md), [ADR-0007](../adr/0007-client-side-vlm-screenshot-extraction.md), [ADR-0008](../adr/0008-refinery-extract-json-contract.md), [`api-conventions.md`](api-conventions.md), [`security-and-access.md`](security-and-access.md)
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Owner area:** REFINERY · **Related:** [`REFINERY_SCREENSHOT_IMPORT_PLAN.md`](../archive/REFINERY_SCREENSHOT_IMPORT_PLAN.md) (epic #439 — historical plan, frozen 2026-06-10), [`DESIGN_SC_EXTRACTOR.md`](../DESIGN_SC_EXTRACTOR.md), [ADR-0007](../adr/0007-client-side-vlm-screenshot-extraction.md), [ADR-0008](../adr/0008-refinery-extract-json-contract.md), [`api-conventions.md`](api-conventions.md), [`security-and-access.md`](security-and-access.md)
 
 # Refinery screenshot import
 
@@ -16,14 +16,17 @@ backend import endpoint) minted `REQ-REFINERY-001`–`009`, `011` and `012`;
 `REQ-REFINERY-010` hardens the shared alias table the import consults (shipped
 separately, #517); Phase 2 (#435, the frontend upload + pre-filled review form) added
 `REQ-REFINERY-013`–`016`; `REQ-REFINERY-017` (2026-06-11) derives the order start time
-from the screenshots' capture metadata across both repos. The desktop extractor (#436, shipped 2026-06-10 as
-`basetool-bp-extractor` PR #5) lives in its own repo; its binding desktop-side rules —
+from the screenshots' capture metadata across both repos; `REQ-REFINERY-018` pins the one-click
+ingest as a transport only, and `REQ-REFINERY-021` below adds the extractor download
+link. The desktop extractor (#436, shipped 2026-06-10 as PR #5 of
+[`krt-profit/basetool-sc-extractor`](https://github.com/krt-profit/basetool-sc-extractor), then still
+named `basetool-bp-extractor`) lives in its own repo; its binding desktop-side rules —
 the frozen read strategy, the deterministic confidence policy, the resource-safety
 guardrails — are recorded there (`CLAUDE.md`,
 `docs/refinery-extractor/PHASE0_FINDINGS.md`, the contract test pinning the §5 example),
 while the cross-repo contract stays governed by `REQ-REFINERY-001` + ADR-0008 here. The
 original master plan is frozen as a historical record in
-[`REFINERY_SCREENSHOT_IMPORT_PLAN.md`](../REFINERY_SCREENSHOT_IMPORT_PLAN.md).
+[`REFINERY_SCREENSHOT_IMPORT_PLAN.md`](../archive/REFINERY_SCREENSHOT_IMPORT_PLAN.md).
 
 ## Requirements
 
@@ -375,7 +378,9 @@ backend matching (REQ-REFINERY-004), the issue model (REQ-REFINERY-009), and cru
 saved exclusively through `POST /api/v1/refinery-orders` after the user reviews it. Direct
 ingest must never persist a refinery order without that human review-and-save step.
 
-### REQ-REFINERY-019 — SC Extractor release link in the create page's import bar
+### REQ-REFINERY-021 — SC Extractor release link in the create page's import bar
+
+> **Renumbered 2026-09-22:** this requirement was `REQ-REFINERY-019` until 2026-09-22; that id also named the server-side pagination of the refinery-order list in [`refinery-orders-overview.md`](refinery-orders-overview.md), which keeps it.
 
 The screenshot import (REQ-REFINERY-013) consumes an extract the user has to produce with the
 desktop **Basetool SC Extractor** first, so the import bar on `/refinery-orders/create` carries the
@@ -402,10 +407,10 @@ message key and one URL.
 
 **Acceptance criteria:**
 
-- [ ] The create page renders the link inside the import form, directly after the import button,
+- [x] The create page renders the link inside the import form, directly after the import button,
   pointing at the extractor repository's `releases/latest` URL.
-- [ ] The link opens in a new tab and carries `rel="noopener noreferrer"`.
-- [ ] After an in-place import re-render the link is still present and unchanged.
+- [x] The link opens in a new tab and carries `rel="noopener noreferrer"`.
+- [x] After an in-place import re-render the link is still present and unchanged.
 
 **Enforced by:** `RefineryOrderCreateImportRenderTest#createPage_rendersScExtractorReleaseLink_besideTheImportButton`
 · **Code:** [`refinery-orders-create.html`](../../frontend/src/main/resources/templates/refinery-orders-create.html)

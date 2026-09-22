@@ -25,7 +25,8 @@ Der User öffnet die Auftrags-Detailseite `/refinery-orders/{id}` und klickt **E
 
 1. Detailseite öffnen; der **Einlagern**-Button erscheint nur für einen editierbaren `OPEN`/`IN_PROGRESS`-Auftrag.
 2. Klick öffnet das Store-Modal (`#storeModal`); der Detail-Controller füllt es aus den Waren des Auftrags vor (Menge, Qualität, Auftrags-Location, aktueller Nutzer) — ein blanker Submit ist also gültig.
-3. Submit über den Store-Form-Button (`#storeForm button[type=submit]`, via `clickSubmitClearingFooter`); der Erfolg leitet auf die Liste `/refinery-orders` um.
+3. Den fixierten Footer ausblenden und über `#storeForm button[type=submit]` absenden; der Test wartet auf die Antwort des `POST /refinery-orders/{id}/store`.
+4. Ein erfolgreiches Einlagern **bleibt auf der Detailseite** (REQ-FE-001): das Modal schließt, der Auftragsabschnitt wird aus dem nun `COMPLETED`-Auftrag neu gerendert, und der Einlagern-Button verschwindet, weil sein Status-Gate nicht mehr greift.
 
 API-Edges (rein über die REST-API): erneutes Einlagern eines bereits `COMPLETED`-Auftrags, Notiz-Propagation.
 
@@ -42,4 +43,5 @@ API-Edges (rein über die REST-API): erneutes Einlagern eines bereits `COMPLETED
 - **Status-Guard ist asymmetrisch.** `storeRefineryOrder` lehnt nur einen bereits `COMPLETED`-Auftrag ab (400) — ein `OPEN`/`IN_PROGRESS`/`CANCELED`-Auftrag ist einlagerbar. Genau `COMPLETED` ist die Doppel-Einlagerungs-Sperre.
 - **Output-Material = Eingangsmaterial** für ein manuelles RAW ohne `refinedMaterial`; deshalb verifiziert der Test das Lager über die Material-Id des Eingangsmaterials.
 - **Stempelung auf die OrgUnit des Empfängers** (nicht des Auftrags) — siehe UC-21; dieser Flow nutzt durchgehend `test-admin`/IRIDIUM, sodass Auftrag und Empfänger denselben Pool teilen.
+- **Kein Navigations-Warten.** `E2eSupport#clickSubmitClearingFooter` wird hier bewusst nicht benutzt: es wartet auf ein Dokument nach einer Navigation, und seit #1238 navigiert ein erfolgreiches Einlagern nicht mehr — der Helfer liefe in seinen Timeout. Das Verschwinden des Einlagern-Buttons ist das Erfolgssignal; bei einem Fehler bleibt das Modal mit Button offen.
 - **UI treiben, API verifizieren.** Die gruppierte Lager-Ansicht lädt lazy; gegen die gescopten Endpunkte zu assertieren ist die etablierte, race-freie Methode (vgl. UC-13/UC-14).

@@ -1,22 +1,24 @@
 ; systemd service for the nightly Profit Basetool off-site backup.
 ;
-; Installation (on the production host, one-time — see docs/backup.md):
-;   sudo cp /var/iri/code/scripts/iri-backup.service /etc/systemd/system/
-;   sudo cp /var/iri/code/scripts/iri-backup.timer   /etc/systemd/system/
-;   sudo systemctl daemon-reload
-;   sudo systemctl enable --now iri-backup.timer
+; Installation is by the Ansible role (ansible/roles/basetool_host/tasks/25-scripts.yml), not by
+; hand: it copies this unit and iri-backup.timer to /etc/systemd/system/, verifies them with
+; `systemd-analyze verify`, and enables the timer without starting it.
 ;
 ; Run an immediate backup (bypassing the next scheduled tick):
 ;   sudo systemctl start iri-backup.service
 ;
 ; Inspect:
 ;   systemctl status iri-backup.timer
-;   journalctl -u iri-backup.service -f
+;   journalctl -u iri-backup.service -f     # unit lifecycle ONLY -- no script output
+;   tail -f /var/log/iri-backup.log         # what the script actually printed
+; Off-host (no SSH needed): Grafana -> Explore -> Loki, `{app="ops-backup"}`.
 ;
-; Runs as the same unprivileged `deploy` user as iri-deploy (member of the
-; `docker` group, no shell, no sudo): it needs Docker (stop/start/exec/run) and
-; read access to the host config, nothing more. The root-owned NPM bind mount
-; is read via a throwaway root container, not by this user directly.
+; Runs as the same unprivileged `deploy` user as iri-deploy (no shell, no password sudo): it drives
+; the service user's containers (stop/start/exec/run) through the sudoers bridge of
+; ansible/roles/basetool_host/tasks/22-deploy-user.yml and reads the host config, nothing more.
+; What it cannot open itself -- the edge's certificate volumes, the keystore, grafana.db -- is
+; streamed out through a throwaway helper container (rt_read_mount in
+; scripts/lib/container-runtime.sh), not read by this user directly.
 
 [Unit]
 Description=Profit Basetool — nightly encrypted off-site backup to Nextcloud
@@ -67,7 +69,8 @@ User=deploy
 
 ExecStart=/var/iri/code/scripts/backup.sh
 
-; stdout/stderr to journald AND to /var/log/iri-backup.log for logrotate-kept history.
+; stdout/stderr to /var/log/iri-backup.log for logrotate-kept history. `append:` REPLACES
+; journald for these streams rather than teeing to it (see iri-deploy.service).
 StandardOutput=append:/var/log/iri-backup.log
 StandardError=append:/var/log/iri-backup.log
 
@@ -118,19 +121,21 @@ RestrictRealtime=true
 LockPersonality=true
 ; Writable paths the script needs:
 ;   /var/lib/iri — restic cache + docker config (deploy has no usable $HOME)
-;   /var/iri     — the /var/iri/backup staging tree (Docker volume hierarchy)
+;   /var/iri     — the /var/iri/backup staging tree
 ;   /var/log     — append to iri-backup.log
 ;   /var/lock    — the shared deploy flock
 ; /etc/iri/backup.env is read-only (default under ProtectSystem=strict) — fine, we only read it.
 ReadWritePaths=/var/lib/iri /var/iri /var/log /var/lock
 
 ; restic + a brief pg_dump are light on this host; cap generously. The heavy
-; lifting is delegated to docker and the restic process.
+; lifting is delegated to the container runtime and the restic process.
 MemoryMax=1G
 CPUQuota=200%
 
-; A failed backup must be loud, not silent. (Wire an OnFailure= alerting unit
-; here if/when one exists — see docs/backup.md.)
+; A failed backup must be loud, not silent -- and it is, without an OnFailure= unit: backup.sh
+; writes its outcome as node_exporter textfile metrics, and BackupStaleOrMissing
+; (monitoring/prometheus/alerts/ops-automation.yml) fires on a success older than 26h or on the
+; metric being absent, which covers a failed run, a timed-out run and a unit that never fired.
 TimeoutStartSec=3600
 
 [Install]

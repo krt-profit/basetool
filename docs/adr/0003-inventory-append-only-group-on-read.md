@@ -1,9 +1,9 @@
 # ADR-0003 — Inventory: append-only entries with group-on-read display
 
-- **Status:** Accepted — **amended by [ADR-0097](0097-inventory-piece-scu-stock-merge.md)** (write-time merge for `PIECE` automatically and `SCU` on a per-action opt-in; append-only stays the default and the SCU behaviour)
+- **Status:** Accepted — **amended by [ADR-0097](0097-inventory-piece-scu-stock-merge.md)** (write-time merge for `PIECE` automatically and `SCU` on a per-action opt-in; append-only stays the default and the SCU behaviour); its associations are **amended by [ADR-0098](0098-inventory-associations-as-to-many-quantity-splits.md)** (to-many quantity splits)
 - **Date:** 2026-06-06
 - **Deciders:** Repository owner (@greluc)
-- **Related:** spec [`inventory-lager.md`](../specs/inventory-lager.md) `REQ-INV-001..005` · [`org-unit-tenancy.md`](../specs/org-unit-tenancy.md) `REQ-ORG-003` · issue #466
+- **Related:** spec [`inventory-lager.md`](../specs/inventory-lager.md) `REQ-INV-001`, `-002`, `-004`, `-005`, `-044` · [`org-unit-tenancy.md`](../specs/org-unit-tenancy.md) `REQ-ORG-003` · issue #466
 
 ## Context
 

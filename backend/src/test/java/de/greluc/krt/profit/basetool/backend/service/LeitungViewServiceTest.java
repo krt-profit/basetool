@@ -58,14 +58,16 @@ import org.springframework.security.core.Authentication;
  * Mockito unit tests for {@link LeitungViewService} (epic #800, REQ-ROLE-004): the delegated view
  * returns exactly the units the caller's tier may appoint into. Pins the admin short-circuit (sees
  * everything without consulting the delegated authoriser), the pure-OL-member slice (every Bereich,
- * lead-appointment only), the Staffelleiter slice (own squadron, roster management) and the empty
- * view for a plain member.
+ * lead-appointment only), the Staffelleiter slice (own squadron, roster management), the SK slices
+ * (the SK lead manages its roster, the Bereichsleiter appoints its lead, a plain SK member sees
+ * nothing) and the empty view for a plain member.
  */
 @ExtendWith(MockitoExtension.class)
 class LeitungViewServiceTest {
 
   @Mock private AuthHelperService authHelperService;
   @Mock private OrgRoleManagementSecurityService roleSecurity;
+  @Mock private SpecialCommandSecurityService specialCommandSecurity;
   @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private OrgUnitMembershipRepository membershipRepository;
   @Mock private KommandoGroupRepository kommandoGroupRepository;
@@ -153,8 +155,10 @@ class LeitungViewServiceTest {
     assertTrue(view.squadrons().getFirst().canManageRoster());
     assertEquals(1, view.specialCommands().size());
     assertTrue(view.specialCommands().getFirst().canAppointLead());
+    assertTrue(view.specialCommands().getFirst().canManageRoster());
     // The admin short-circuit decides every cap; the delegated authoriser is never consulted.
     verifyNoInteractions(roleSecurity);
+    verifyNoInteractions(specialCommandSecurity);
   }
 
   @Test
@@ -241,6 +245,60 @@ class LeitungViewServiceTest {
     assertTrue(view.organisationsleitungen().isEmpty());
     assertTrue(view.bereiche().isEmpty());
     assertTrue(view.squadrons().isEmpty());
+    assertTrue(view.specialCommands().isEmpty());
+  }
+
+  @Test
+  void skLead_seesOwnSpecialCommandWithRosterManagementButNoLeadAppointment() {
+    when(authHelperService.isAdmin()).thenReturn(false);
+    when(orgUnitRepository.findActiveOrganisationsleitung()).thenReturn(List.of());
+    when(orgUnitRepository.findActiveBereiche()).thenReturn(List.of());
+    when(orgUnitRepository.findActiveSquadronsAndSpecialCommands())
+        .thenReturn(List.of(specialCommand()));
+    when(roleSecurity.canAppointSkLead(skId, auth)).thenReturn(false);
+    when(specialCommandSecurity.canManageMembers(skId, auth)).thenReturn(true);
+    when(membershipRepository.findAllByIdOrgUnitId(skId)).thenReturn(List.of());
+
+    LeitungViewDto view = service.buildView(auth);
+
+    assertEquals(1, view.specialCommands().size());
+    LeitungUnitDto sk = view.specialCommands().getFirst();
+    assertEquals(skId, sk.id());
+    assertFalse(sk.canAppointLead(), "an SK lead never appoints the SK lead");
+    assertTrue(sk.canManageRoster(), "an SK lead manages their own SK's members");
+  }
+
+  @Test
+  void bereichsleiter_seesSpecialCommandForLeadAppointmentWithoutRosterManagement() {
+    when(authHelperService.isAdmin()).thenReturn(false);
+    when(orgUnitRepository.findActiveOrganisationsleitung()).thenReturn(List.of());
+    when(orgUnitRepository.findActiveBereiche()).thenReturn(List.of());
+    when(orgUnitRepository.findActiveSquadronsAndSpecialCommands())
+        .thenReturn(List.of(specialCommand()));
+    when(roleSecurity.canAppointSkLead(skId, auth)).thenReturn(true);
+    when(specialCommandSecurity.canManageMembers(skId, auth)).thenReturn(false);
+    when(membershipRepository.findAllByIdOrgUnitId(skId)).thenReturn(List.of());
+
+    LeitungViewDto view = service.buildView(auth);
+
+    assertEquals(1, view.specialCommands().size());
+    LeitungUnitDto sk = view.specialCommands().getFirst();
+    assertTrue(sk.canAppointLead());
+    assertFalse(sk.canManageRoster(), "the roster cap follows canManageMembers, not the Bereich");
+  }
+
+  @Test
+  void plainSkMember_doesNotSeeTheirSpecialCommand() {
+    when(authHelperService.isAdmin()).thenReturn(false);
+    when(orgUnitRepository.findActiveOrganisationsleitung()).thenReturn(List.of());
+    when(orgUnitRepository.findActiveBereiche()).thenReturn(List.of());
+    when(orgUnitRepository.findActiveSquadronsAndSpecialCommands())
+        .thenReturn(List.of(specialCommand()));
+    when(roleSecurity.canAppointSkLead(skId, auth)).thenReturn(false);
+    when(specialCommandSecurity.canManageMembers(skId, auth)).thenReturn(false);
+
+    LeitungViewDto view = service.buildView(auth);
+
     assertTrue(view.specialCommands().isEmpty());
   }
 }

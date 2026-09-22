@@ -14,7 +14,7 @@
   REQ-SEC-007 (the member-peer redaction that survives), REQ-SEC-017 (the pending gate this pattern
   is modelled on), REQ-SEC-018 and REQ-SEC-021 (superseded), REQ-SEC-032 (the amplification lever),
   REQ-API-010 (the forced-update read that stays public)
-- **Plan:** [`docs/MEMBERS_ONLY_PLAN.md`](../MEMBERS_ONLY_PLAN.md) — the inventory, the thirteen
+- **Plan:** [`docs/archive/MEMBERS_ONLY_PLAN.md`](../archive/MEMBERS_ONLY_PLAN.md) — the inventory, the thirteen
   owner decisions of 2026-09-05, and the work packages this ADR records the decision for
 
 ## Context

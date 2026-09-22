@@ -3,10 +3,12 @@
 #
 # ADR-0188. This role PROVISIONS; it does not deploy. It installs packages, creates the service
 # user and its subuid range, lays out and owns the directories, sets SELinux contexts and writes
-# containers.conf. It never ships unit files, never pulls an image, and must never be run against a
-# host that is serving traffic -- REQ-OPS-001's pull-only delivery is untouched by it.
+# containers.conf. It never ships the stack's unit files, never pulls an image, and is never
+# scheduled -- REQ-OPS-001's pull-only delivery is untouched by it. It runs in full only against a
+# host that is not serving yet; on a serving host only for a deliberate host change, tag-limited
+# and owner-approved, --check --diff first (ansible/README.md, ADR-0188).
 #
-# The reasoning behind every step is in docs/PODMAN_HOST_BOOTSTRAP.md. This file is the what; that
+# The reasoning behind every step is in docs/archive/PODMAN_HOST_BOOTSTRAP.md. This file is the what; that
 # document is the why, and it is not duplicated here on purpose.
 
 - name: Preflight -- the host is what this role assumes

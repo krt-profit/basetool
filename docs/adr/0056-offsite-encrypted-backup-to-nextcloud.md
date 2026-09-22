@@ -5,6 +5,13 @@
 - **Deciders:** @greluc
 - **Related:** spec `REQ-OPS-008..012` ([`backup-recovery.md`](../specs/backup-recovery.md)) · runbook [`docs/backup.md`](../backup.md) · builds on `REQ-OPS-001` (pull-only host) and `REQ-OPS-005` (no secrets in the config bundle)
 
+> **Note (2026-09-22):** two statements below never described the production host. There is no
+> WireGuard on it — the management VPN was planned and not carried out
+> ([`MGMT_VPN_PLAN.md`](../archive/MGMT_VPN_PLAN.md)) — so there is no `wg0.conf` to exclude or to
+> back up, and the "SMB over the existing WireGuard tunnel" alternative had no tunnel to use. The
+> maintenance page during the quiesce is served by the native-nginx edge (ADR-0162), not NPM. The
+> restic-over-rclone design itself stands; the current procedure is [`backup.md`](../backup.md).
+
 ## Context
 
 The production host carried irreplaceable state with **no automated backup**: the backend

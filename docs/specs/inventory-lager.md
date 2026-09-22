@@ -1,5 +1,6 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-25.
-> **Owner area:** INV · **Related ADRs:** ADR-0003, ADR-0097, ADR-0098, ADR-0104
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Owner area:** INV · **Related ADRs:** ADR-0003, ADR-0097, ADR-0098, ADR-0101, ADR-0104,
+> ADR-0120, ADR-0124
 
 # Inventory Lager — append-only entries & group-on-read
 
@@ -48,9 +49,13 @@ The **stock identity** ("stack key") is the inventory **physical** natural key: 
 A write path does **not** fold a new or edited `InventoryItem` into a different existing row
 **unless the scoped stock merge of [REQ-INV-026](#req-inv-026--write-time-stock-merge-for-piece-auto-and-scu-per-action-opt-in)
 applies** — a `PIECE` material always, an `SCU` material only on the caller's per-action opt-in.
-Outside that merge, each of create, update, book-out **TRANSFER** (the moved quantity at the
-target), refinery store and any future inbound path inserts (or edits in place) its own row; two
-rows that share the stock identity coexist as separate rows and are never summed in the database. In
+Outside that merge, each of create (Einbuchen), book-out **TRANSFER** (the moved quantity at the
+target), personal rebooking (REQ-INV-007), bulk rebooking (REQ-INV-036), refinery store and any
+future inbound path inserts its own row, and an in-place edit (note, allocation, delivered flag)
+changes only the row it targets; two rows that share the stock identity coexist as separate rows
+and are never summed in the database. (A general "edit the row" write no longer exists: the former
+`PUT /api/v1/inventory/{id}` association update was removed with Variante C in favour of the
+per-allocation endpoints of REQ-INV-027.) In
 particular an **`SCU`** write with no opt-in stays append-only exactly as before. The former
 *unconditional* read-add-write merge — and the pessimistic lock that guarded its lost-update race —
 remain removed for the append-only paths; the merge re-introduces a pessimistic lock only on its own
@@ -60,8 +65,8 @@ path (REQ-INV-026).
 
 - [ ] Creating **`SCU`** stock (no opt-in) that matches an existing row's stock identity yields a
   second row; the existing row's amount is unchanged.
-- [ ] Updating an **`SCU`** row (no opt-in) never deletes it in favour of a matching row; it is saved
-  in place.
+- [ ] An in-place edit of a row (note, allocation, delivered flag) never deletes it in favour of a
+  matching row; it is saved in place.
 - [ ] A partial **`SCU`** TRANSFER (no opt-in) decrements the source and inserts a new row at the
   target even when an identical target stack already exists; the existing target row is unchanged.
 - [ ] Storing a refinery output inserts a new row with its own note; no existing row's amount or note
@@ -75,13 +80,14 @@ path (REQ-INV-026).
 ### REQ-INV-002 — Group-on-read display: Material → Stack
 
 The grouped Lager views (`/inventory/my`, `/inventory/all`) present each material as a group
-whose stacks are computed **in SQL** (a `GROUP BY` over the stock identity) at read time. Three
-stock-identity dimensions — `jobOrder`, `mission` and `owningOrgUnit` — are nullable, so the
-grouping query **left-joins** them and groups on the join aliases: a stack whose rows carry no job
-order and no mission (the common case for plain Lager stock), or a personal stack with no owning
-org-unit, must still surface. (A constructor-expression projection over a nullable to-one otherwise
-renders an implicit inner join that silently drops every such stack — the regression that emptied
-both grouped views in v0.4.0.) Each stack shows the summed amount, the amount-weighted mean
+whose stacks are computed **in SQL** (a `GROUP BY` over the stock identity) at read time. The
+nullable to-one in the stack key — `owningOrgUnit` — (and `material`, which is null on game-item
+rows) is **left-joined** and grouped on its join alias: a stack with no owning org-unit (a personal
+stack, or a membershipless owner's shared stack) must still surface. (A constructor-expression
+projection over a nullable to-one otherwise renders an implicit inner join that silently drops every
+such stack — the regression that emptied both grouped views in v0.4.0, when `jobOrder` and `mission`
+were still nullable stack dimensions; since Variante C they are per-entry allocations and no longer
+part of the key, REQ-INV-027.) Each stack shows the summed amount, the amount-weighted mean
 quality, the max quality and the entry count. The grouped response carries **only** the collapsed stack rows — it does **not** inline
 the underlying entries (those are loaded on demand, see REQ-INV-005). The UI renders two server
 levels — material group → stack row — and a stack row expands to fetch its entries. Both grouped pages present these two levels (plus the lazy
@@ -102,7 +108,7 @@ Both tree levels are collapsible, and their expand/collapse state is **persisted
 (`localStorage`, keyed by the viewer's id — `expanded_rows_lager_*` for material groups,
 `expanded_stacks_lager_*` for location stacks) and re-applied on initial load **and after every
 in-place grouped-table re-swap** — a filter change or a modal write (book-out, Umbuchen and
-bulk-checkout all re-swap `#inventoryTable` on success, REQ-INV-003/REQ-INV-007). A fragment swap
+bulk-checkout all re-swap `#inventoryTable` on success, REQ-INV-044/REQ-INV-007). A fragment swap
 does not re-fire `DOMContentLoaded`, so the expansion is restored explicitly after the swap; a
 restored stack re-fetches its (now up-to-date) entries. A modal mutation therefore never collapses
 the tree the user was working in.
@@ -112,9 +118,8 @@ the tree the user was working in.
 - [ ] Rows sharing the stock identity appear as one stack row with the correct summed amount,
   amount-weighted mean quality and entry count.
 - [ ] Rows differing in any stock-identity dimension appear as separate stacks.
-- [ ] A stack whose nullable stock-identity dimensions are absent — a non-personal stack with no
-  job order and no mission, or a personal stack with no owning org-unit — still appears in the
-  grouped view; a `null` in a nullable dimension never hides the stack.
+- [ ] A stack with no owning org-unit, and a stack whose entries carry no job-order or mission
+  allocation, still appears in the grouped view; a `null` owning org-unit never hides the stack.
 - [ ] The grouped response contains no per-entry rows (entries are lazy — REQ-INV-005).
 - [ ] Both grouped pages render the collapsed stack rows without error.
 - [ ] After an in-place grouped-table re-swap (filter change or modal write), the material groups
@@ -123,28 +128,40 @@ the tree the user was working in.
 
 **Enforced by:** `InventoryItemServiceAggregateTest`, `InventoryItemStackQueryTest`,
 `InventoryItemStackQueryDataTest`, `InventoryPageControllerMvcTest`, `InventoryOperationsE2eTest`
-· **Code:** `InventoryItemService#buildGroupedFromStacks`,
+· **Code:** `InventoryAggregationService#buildGroupedFromStacks`,
 `InventoryItemRepository#findUserStacks` / `#findGlobalStacks`, `InventoryStackAggregate`,
 `InventoryStackDto`, `GroupedInventoryDto`, `inventory-my.html`, `inventory-admin.html`,
 `static/js/inventory-my.js`, `static/js/inventory-admin.js` (tree expand/collapse persistence) ·
 **Issues:** #466
 
-### REQ-INV-003 — Actions operate per entry
+### REQ-INV-044 — Actions operate per entry
 
-Every mutating Lager action — book-out (consume / transfer / sell), personal-marker rebooking
-(Umbuchung, REQ-INV-007), note edit, delivered toggle, association change, bulk check-out — targets
-a single `InventoryItem` by id and `version`. The grouped stack row is display-and-expand only; it carries no aggregate
-mutation. Optimistic locking and the frontend `data-version` DOM-sync therefore continue to
-work unchanged at the entry level.
+> **Renumbered 2026-09-22:** this requirement was `REQ-INV-003` until 2026-09-22; that id also named the server-side SCU/PIECE enforcement and storage scale in [`inv-material-quantities.md`](inv-material-quantities.md), which keeps it.
+
+Every single-row Lager action — book-out (consume / transfer / sell), personal-marker rebooking
+(Umbuchung, REQ-INV-007), note edit, delivered toggle, allocation add / change / remove
+(REQ-INV-027) — targets a single `InventoryItem` by id and `version`. The grouped stack row is
+display-and-expand only; it carries no aggregate mutation. Optimistic locking and the frontend
+`data-version` DOM-sync therefore continue to work unchanged at the entry level.
+
+The two **bulk** actions — bulk check-out and bulk rebooking (REQ-INV-034 / REQ-INV-036) — are the
+deliberate exception: they act on a list of the caller's own entry ids, which the bulk bar and the
+server-resolved select-all set hold without versions, so each listed row is loaded under a
+pessimistic write lock (`InventoryItemRepository#findByIdForUpdate` / `#findByIdForRebook`) instead
+of an optimistic `version` check. They are still per-entry: each listed row is checked out or moved
+on its own, never a stack aggregate.
 
 **Acceptance**
 
-- [ ] Book-out / note / delivered / association endpoints accept an item id + version and
-  affect only that row.
+- [ ] Book-out / personal-rebook / note / delivered / allocation endpoints accept an item id +
+  version and affect only that row.
+- [ ] The bulk check-out / bulk rebook endpoints act only on the listed ids, each row locked
+  pessimistically; they never mutate a stack as a whole.
 - [ ] The expanded entry view exposes those actions per entry; the stack row exposes none.
 
 **Enforced by:** `InventoryItemControllerTest`, `InventoryPageControllerMvcTest` · **Code:**
-`InventoryItemController`, `InventoryPageController` · **Issues:** #466
+`InventoryItemController`, `InventoryCheckoutService#bulkCheckout` / `#bulkRebook`,
+`InventoryPageController`, `InventoryWriteController` · **Issues:** #466
 
 ### REQ-INV-004 — Org-unit reconcile re-stamps without merging
 
@@ -166,20 +183,23 @@ they remain separate and are collapsed only for display.
 A stack does not inline its entries: an append-only stack grows unboundedly as contributions
 accumulate, so materialising every entry on each grouped read does not scale. Entries are
 fetched on expand from `GET /api/v1/inventory/{my-inventory|all}/stack/entries`, addressed by
-the stock-identity fields the stack already exposes (a `null` job-order / mission / owning
-org-unit selects the rows where that association is itself absent), returned **oldest-first** by
+the stock-identity fields the stack already exposes (`materialId`, `locationId`, `quality`,
+`personal` on `/my`, the owning `userId` on `/all`, and `owningOrgUnitId`, whose absence selects the
+rows with no owning org unit), returned **oldest-first** by
 `createdAt` and **paginated** (default 20, max 100 per page). A composite index
 `idx_inventory_item_stack_key` on the inventory natural key backs both the grouped `GROUP BY`
 and the per-stack entries lookup. The `/all` drill-down re-applies the same org-unit scope
 predicate as the grouped view; the `/my` drill-down is owner-scoped from the JWT (no
-impersonation). Per-entry actions (REQ-INV-003) operate on the fetched rows unchanged. Each
-drill-down row shows the entry's amount, its job-order / mission association and the per-entry
-actions (book-out, note), with the note preview rendered beside the action buttons rather than
-below them; `createdAt` is the entries' ordering key, not a displayed column. Both per-entry
-actions are compact icon buttons (book-out = outbound arrow, note = pencil; their labels carried in
-`aria-label` / `title`) so the dense action column never crowds — or overlaps — the amount beside
-it; on tablet-width and narrower (≤ 1024px) the amount and actions reflow onto their own line
-beneath the Auftrag/Einsatz controls. The **item variant** (`catalog=ITEM`, REQ-INV-030)
+impersonation). Per-entry actions (REQ-INV-044) operate on the fetched rows unchanged. Each
+drill-down row shows the entry's amount, its job-order / mission allocation chips with the
+`+ Zuordnen` picker (REQ-INV-027) and the per-entry actions (book-out, Umbuchen, note — plus, on
+`/inventory/my`, the Materialbörse release toggle of [`materialboerse.md`](materialboerse.md)),
+with the note preview rendered beside the action buttons rather than below them; `createdAt` is the
+entries' ordering key, not a displayed column. The three per-entry actions are compact icon buttons
+(`krt-icon-bookout`, `krt-icon-rebook`, `krt-icon-edit`; their labels carried in `aria-label` /
+`title`) so the dense action column never crowds — or overlaps — the amount beside it; on
+tablet-width and narrower (≤ 1024px) the amount and actions reflow onto their own line beneath the
+Auftrag/Einsatz controls. The **item variant** (`catalog=ITEM`, REQ-INV-030)
 addresses a stack by `gameItemId` with **no quality key** — item rows carry no quality
 dimension ([`inventory-items.md`](inventory-items.md) REQ-INV-029); paging and ordering are
 identical.
@@ -190,9 +210,9 @@ identical.
 - [ ] A requested page size above 100 is clamped to 100; an absent page/size yields the first 20.
 - [ ] The drill-down never returns rows outside the caller's org-unit / owner scope.
 - [ ] Expanding a stack on either grouped page fetches and renders its entries without error.
-- [ ] At any viewport width the per-entry amount and action buttons never overlap; the book-out and
-  note actions are icon buttons and, on tablet-width and narrower (≤ 1024px), amount + actions reflow
-  onto their own line beneath the Auftrag/Einsatz controls.
+- [ ] At any viewport width the per-entry amount and action buttons never overlap; the book-out,
+  Umbuchen and note actions are icon buttons and, on tablet-width and narrower (≤ 1024px),
+  amount + actions reflow onto their own line beneath the Auftrag/Einsatz controls.
 
 **Enforced by:** `InventoryItemStackQueryTest`, `InventoryItemControllerTest`,
 `InventoryPageControllerMvcTest`, `DatabaseIndexMigrationTest` · **Code:**
@@ -200,10 +220,14 @@ identical.
 `InventoryItemRepository#findUserStackEntries` / `#findGlobalStackEntries`,
 `InventoryPageController#viewMyStackEntries` / `#viewAllStackEntries`,
 `fragments/inventory-stack-entries.html`, `static/css/styles.css` (`.tree-row--leaf`, `.btn-icon`),
-`inventory-my.html` / `inventory-admin.html` (note-button DOM sync), `V143__add_inventory_item_stack_key_index.sql` ·
+`inventory-my.html` / `inventory-admin.html` (note-button DOM sync),
+`V143__add_inventory_item_stack_key_index.sql` (index rebuilt without the job-order / mission
+columns by `V218__drop_inventory_scalar_associations.sql`) ·
 **Issues:** #466
 
-### REQ-INV-006 — "Mein Lager" personal- / non-personal-entries-only filters
+### REQ-INV-046 — "Mein Lager" personal- / non-personal-entries-only filters
+
+> **Renumbered 2026-09-22:** this requirement was `REQ-INV-006` until 2026-09-22; that id also named the blueprint import's match on the normalized `output_name` in [`blueprint-import-name-matching.md`](blueprint-import-name-matching.md), which keeps it.
 
 The personal Lager view (`/inventory/my`) offers two **mutually exclusive** stock-kind filters
 alongside the existing material / min-quality / job-order / mission filters: a **personal-entries-only**
@@ -266,7 +290,7 @@ the source row's current flag, never from the client:
 The operation is an **append-only split** (REQ-INV-001), structurally identical to the book-out
 `TRANSFER` branch: the moved `amount` is decremented off the source row (the source row is deleted
 when it depletes below the quantity epsilon) and inserted as its own new row with the opposite
-`personal` flag — it is never folded into an existing stack. It is per-entry (REQ-INV-003), guarded
+`personal` flag — it is never folded into an existing stack. It is per-entry (REQ-INV-044), guarded
 by optimistic locking on the source row's `version`, and owner-scoped (`@ownerScopeService.canEditInventoryItem`;
 an admin/logistician may act within scope). Every rebooking records its own audit event
 (`INVENTORY_ITEM_DEPERSONALIZED` / `INVENTORY_ITEM_PERSONALIZED`, REQ-AUDIT-001).
@@ -343,35 +367,37 @@ audit event, consistent with the audit contract that only committed state mutati
 A write that lands a row whose material's quantity type is **`PIECE`** (Stück) is merged into a
 single Lager entry with every existing row that shares its stock identity; a write whose material is
 **`SCU`** does the same **only when the caller opts in for that one action** — a modal checkbox that
-is per-transaction and **never persisted**. The merge runs on the four inbound write paths: create
-(Einbuchen), the association edit (Ändern — material / quality / location / job order / mission), the
-book-out **TRANSFER** target, and the personal-rebooking / transfer (Umbuchen). An `SCU` write
-without the opt-in stays append-only (REQ-INV-001); the opt-in checkbox is offered only on `SCU` rows
-(a `PIECE` row always merges, so no choice is shown).
+is per-transaction and **never persisted**. The merge runs on the inbound write paths that land a
+row: create (Einbuchen), the book-out **TRANSFER** target (the Umbuchen modal's location / user
+transfer), the personal rebooking (Umbuchen, REQ-INV-007) and every row moved by the bulk rebooking
+(REQ-INV-036); the item-production book-in ([`inventory-items.md`](inventory-items.md)
+REQ-INV-032) runs it with the opt-in off, so only its always-merging rows fold. The refinery store
+does not merge. An `SCU` write without the opt-in stays append-only (REQ-INV-001); the single-row
+modals offer the opt-in checkbox only on `SCU` rows (a `PIECE` row always merges, so no choice is
+shown), while the bulk modal always offers it because a selection can mix both.
 
-The **merge identity** is the append-only stack key *minus* `delivered`: owner · material · location
-· quality · `personal` · optional `jobOrder` / `mission` · owning org-unit pool (the three nullable
-dimensions match `NULL = NULL`). The just-written row is the **survivor**; every other row sharing
-that identity is folded into it — `amount`s summed and **distinct notes concatenated** (first-seen
-order, newline-joined, truncated to the 1000-char note column) — and then deleted. Because
-`delivered` is deliberately **not** part of the merge key, the merged survivor is reset to
-**not-delivered** (combining a delivered with a non-delivered contribution has no single truth; owner
-decision).
+The **merge identity** is the **physical** stack key (Variante C, REQ-INV-027): owner · material ·
+location · quality · `personal` · owning org-unit pool (a `NULL` pool matches `NULL`); job-order /
+mission earmarks are **not** part of it. The just-written row is the **survivor**; every other row
+sharing that identity is folded into it — `amount`s summed, **distinct notes concatenated**
+(first-seen order, newline-joined, truncated to the 1000-char note column) and the folded rows'
+allocations **unioned** into the survivor (summed per target, the per-slice job-order `delivered`
+flag OR-combined — rule R1 of REQ-INV-027) — and then deleted.
 
 **Game-item rows (REQ-INV-029).** A **game-item** stock row
 ([`inventory-items.md`](inventory-items.md)) follows the `PIECE` auto-merge rule — items are
-whole units, so they always merge on write regardless of the client's opt-in flag (the item
-UI, PR 3, accordingly never renders the SCU opt-in checkbox for them). The merge identity of an item row is its item stack key (owner · gameItem · location
-· `personal` · owning org-unit pool), and the `FOR UPDATE` merge-group query carries NULL-safe
+whole units, so they always merge on write regardless of the client's opt-in flag (the Items
+view accordingly never renders the SCU opt-in checkbox for them). The merge identity of an item row
+is its item stack key (owner · gameItem · location · `personal` · owning org-unit pool), and the
+`FOR UPDATE` merge-group query carries NULL-safe
 material **and** quality branches plus the `gameItem` key — without them the item merge would
 silently degenerate to a permanent no-op.
 
 **Materialbörse invariant.** A merge **never** changes a Materialbörse entry (see
 [`materialboerse.md`](materialboerse.md)). A row that backs *any* `MaterialExchangeOffer` (any status)
 is excluded from the merge — it is never a survivor whose amount changes and never folded away: the
-`inventory_item` FK is `ON DELETE CASCADE`, so deleting such a row would silently destroy the offer,
-and the offer reads its material/amount live from the row. The offered quantity is therefore never
-increased by a merge.
+`inventory_item` FK is `ON DELETE CASCADE` (V210), so deleting such a row would silently destroy the
+offer. The offered quantity is therefore never increased by a merge.
 
 **Concurrency.** The merge group is loaded `FOR UPDATE` (pessimistic write lock) so two racing
 same-stack writers serialise instead of double-counting or losing stock — this re-introduces, **only
@@ -388,11 +414,12 @@ dataset matches the new write behaviour. `SCU` rows and offer-backed rows are le
 
 **Acceptance**
 
-- [ ] A `PIECE` create / edit / transfer / rebook that matches an existing stack folds the rows into
-  one: amounts summed, distinct notes combined, the survivor reset to not-delivered, the folded rows
+- [ ] A `PIECE` create / transfer / rebook that matches an existing stack folds the rows into one:
+  amounts summed, distinct notes combined, allocations unioned (REQ-INV-027 R1), the folded rows
   deleted.
 - [ ] An `SCU` write merges only when the per-action opt-in is set; without it the row stays separate
-  (append-only). The opt-in checkbox renders only for `SCU` materials.
+  (append-only). In the single-row Einbuchen / Umbuchen modals the opt-in checkbox renders only for
+  `SCU` materials.
 - [ ] A row backing a Materialbörse offer is never merged (neither survivor nor folded), and the
   offered quantity is unchanged by any merge.
 - [ ] Two concurrent same-stack writers do not double-count or lose stock (the `FOR UPDATE` group
@@ -407,9 +434,8 @@ dataset matches the new write behaviour. `SCU` rows and offer-backed rows are le
 `InventoryCheckoutService#mergeStockIfRequested`, `InventoryItemRepository#findMergeGroupForUpdate`,
 `MaterialExchangeOfferRepository#existsByInventoryItemId`, `InventoryItemService`,
 `V216__merge_piece_inventory_rows.sql`, `inventory-input.html` / `inventory-input.js`,
-`inventory-my.html` / `inventory-my.js`, `inventory-admin.html` / `inventory-admin.js` · **Issues:**
-
-# 1182 · **ADR:** ADR-0097
+`inventory-my.html` / `inventory-my.js`, `inventory-admin.html` / `inventory-admin.js`
+· **Issues:** #1182 · **ADR:** ADR-0097
 
 ### REQ-INV-027 — Inventory associations are to-many quantity splits (Variante C)
 
@@ -437,8 +463,8 @@ tables — an order is credited only its **allocated** share of a split entry, n
 
 **Projection (chips only).** The outbound `InventoryItemDto` carries the two allocation lists
 (`jobOrderAllocations` / `missionAllocations`) with their per-dimension unallocated rest, and **no**
-per-entry association scalar (the transitional first-allocation `jobOrderId` / `missionId` fields are
-gone once every reader consumes the allocations). Every read-only inventory listing that shows an
+per-entry association scalar (the transitional first-allocation `jobOrderId` / `missionId` fields
+have been removed). Every read-only inventory listing that shows an
 entry's orders — including the mission detail page's Lagereinträge table — renders **all** of the
 entry's order chips with their amounts, not just the first. Every amount the split UI shows — the
 order / mission chips, the rest chip, the book-out / Umbuchen and handover deduct-from pickers and
@@ -706,11 +732,11 @@ no-silent-cap principle).
 - **Server-resolved id set.** The button fetches `GET /inventory/my/entry-ids`, which relays the
   page's active filter + `view` to the backend `GET /api/v1/inventory/my-inventory/entry-ids`. That
   endpoint returns the ids of every one of the caller's own entries matching the same optional-filter
-  contract as the grouped view (`catalog=MATERIAL` uses material / min-quality / job-order / mission
-  + the mutually exclusive personal toggles; `catalog=ITEM` uses gameItem / job-order + personal, and
-    rejects the material-only filters with 400 exactly like the grouped endpoint, REQ-INV-029/031). It
-    is owner-scoped from the JWT (no impersonation) and can never return an id outside the grouped
-    view.
+  contract as the grouped view (`catalog=MATERIAL` uses material / location / min-quality /
+  job-order / mission + the mutually exclusive personal toggles; `catalog=ITEM` uses gameItem /
+  location / job-order + the personal toggles, and rejects the material-only filters with 400
+  exactly like the grouped endpoint, REQ-INV-029/031). It is owner-scoped from the JWT (no
+  impersonation) and can never return an id outside the grouped view.
 - **Selection is a decoupled set, not the DOM.** The frontend holds the selection in a Set that is
   independent of the lazily-loaded checkboxes: a loaded checkbox's checked state is derived from the
   set, a stack expanded after select-all comes up already ticked, and the "Markierte ausbuchen"
@@ -723,7 +749,7 @@ no-silent-cap principle).
   already removed (the backend bulk-checkout 404s on any unknown id). Select-all itself does not
   re-swap the table, so a live selection survives drill-down expansion.
 - **No new mutation.** Select-all is a read that feeds the existing bulk check-out
-  (`POST /inventory/bulk-checkout`, REQ-INV-003); it adds no new write path and no new audit event
+  (`POST /inventory/bulk-checkout`, REQ-INV-044); it adds no new write path and no new audit event
   (the bulk check-out's `INVENTORY_BULK_CHECKED_OUT` audit is unchanged).
 
 **Acceptance**
@@ -750,7 +776,7 @@ no-silent-cap principle).
 The refinery-order **store dialog** (`/refinery-orders/{id}`, "Einlagern") offers a per-output-row
 **personal marker** — the same `inventory_item.personal` flag the Einbuchen dialog
 (`InventoryItemService#createInventoryItem`) and the item-production book-in
-([`orders-item-production.md`](orders-item-production.md) REQ-INV-032) already carry. Before this,
+([`inventory-items.md`](inventory-items.md) REQ-INV-032) already carry. Before this,
 refinery output was **always** shared squadron stock: a member who refined their own ore had to
 store it shared and then run the personal-rebooking split of
 [REQ-INV-007](#req-inv-007--personal-marker-rebooking-umbuchung-is-an-append-only-split) on
@@ -877,33 +903,41 @@ action bar, toggled by a **Filter** button in that bar. Both views (Material and
 the active view's form exists in the DOM (REQ-INV-030), so one panel serves both.
 
 **Both Lager pages carry the same panel**, with page-local ids and storage keys: "Mein Lager"
-(`myFilterToggle` / `myFilterPanel`, stored in `inventory_my_filters`) and the shared "Globales
-Lager" (`globalFilterToggle` / `globalFilterPanel`, stored in `inventory_admin_filters`). The two
-preferences are deliberately independent — they describe two different pages' chrome. The shared
-Lager has no personal-entry flags (those are a "Mein Lager" dimension), so its count never includes
-them; everything else below holds verbatim on both.
+(`myFilterPanel`, `data-filter-panel="inventory-my"`) and the shared "Globales Lager"
+(`globalFilterPanel`, `data-filter-panel="inventory-all"`). The two preferences are deliberately
+independent — they describe two different pages' chrome. The shared Lager has no personal-entry
+flags (those are a "Mein Lager" dimension), so its count never includes them; everything else below
+holds verbatim on both.
+
+> **Correction (2026-09-22).** This requirement first shipped with page-local collapse code, a
+> first-visit rule "collapse only when nothing is filtered" and the preference stored inside the
+> REQ-UI-017 filter object. All three were replaced when the mechanism was generalised to every list
+> page by [`frontend-ajax-mutations.md`](frontend-ajax-mutations.md) REQ-FE-021: the Lager pages now
+> use the shared `filterToggle` fragment and `krt-filter-panel.js`, which **always** start collapsed
+> without a stored preference (owner decision, 2026-09-14) and keep the preference under their own
+> key. The bullets below state the current behaviour; the generic contract is REQ-FE-021's.
 
 - **A collapsed panel must never hide the fact that the table is filtered.** The toggle carries a
   chip with the number of filter dimensions currently narrowing the view, shown whenever that number
-  is greater than zero. Without it the page's worst state is reachable in one click: a short table,
-  no visible reason, and the explanation folded away. The count is derived from the same snapshot
+  is greater than zero. The Lager pages cannot be counted by REQ-FE-021's generic scan of the
+  panel's own controls (the multi-selects hold their state in a widget, and the location dimension
+  is derived), so each registers its own counter through `window.krtFilterPanel.registerCounter` —
+  from its `DOMContentLoaded` handler, after the REQ-UI-017 restore — and re-states it with
+  `refresh()` after every in-place filter swap. The counter is derived from the same snapshot
   REQ-UI-017 persists, so a dimension added there is counted automatically rather than quietly
   missing from the chip. A multi-select with **all** boxes ticked counts as no filter, matching what
   that state already means everywhere else on this page.
 - **Rendered expanded, collapsed by script.** The server always emits the panel open; `hidden` is
-  the collapse mechanism and the script applies it on load. A server-rendered collapsed panel would
-  leave a client without JavaScript no way to reach the filters at all — the collapse is a
-  convenience and must degrade to "always visible", never to "unreachable".
-- **First visit collapses only when nothing is filtered.** With no stored preference the panel
-  starts closed on an unfiltered table and open on a filtered one, so a restored filter selection
-  (REQ-UI-017) is never presented as an unexplained short table. Once the user toggles it, their
-  choice wins on every later visit.
-- **The preference is per browser and not per view.** It is stored in the top level of the same
-  per-page object REQ-UI-017 uses (`inventory_my_filters` / `inventory_admin_filters`), beside — not
-  inside — the two per-view filter slots, because it describes the page's chrome rather than one
-  view's selection: switching Material ↔ Items must not re-open a panel the user closed. Storage
-  access stays guarded, so a privacy mode that denies it degrades to the default instead of breaking
-  the page.
+  the collapse mechanism and the script applies it on load, so a client without JavaScript keeps
+  working filters (REQ-FE-021).
+- **Collapsed by default; the member's own choice wins.** With no stored preference the panel starts
+  collapsed — filtered or not; the count chip is what keeps a filtered table explained. Once the
+  user toggles it, their choice wins on every later visit.
+- **The preference is per browser and per page, not per view.** `krt-filter-panel.js` stores it
+  under `krt.filterPanel.inventory-my` / `krt.filterPanel.inventory-all`, separately from the
+  REQ-UI-017 filter objects (`inventory_my_filters` / `inventory_admin_filters`), so switching
+  Material ↔ Items does not re-open a panel the user closed. Storage access stays guarded, so a
+  privacy mode that denies it degrades to the default instead of breaking the page.
 - **Accessible by construction.** The toggle is a real `<button>` carrying `aria-expanded` and
   `aria-controls`, and the chip pairs its digit with a visually-hidden "Aktive Filter: N". The count
   is *not* pushed into a dynamic `aria-label` on the button — that would shadow the visible "Filter"
@@ -915,10 +949,8 @@ them; everything else below holds verbatim on both.
   `/inventory/all?view=items` render the toggle, and the filter form sits inside the panel, between
   the toggle and the table (on "Mein Lager": between the toggle and the bulk bar).
 - [ ] The panel is served expanded (`hidden` absent) on every one of those views.
-- [ ] Collapsing, then reloading, keeps the panel collapsed; the same holds after switching between
-  the Material and the Items view.
-- [ ] With no stored preference, an unfiltered Lager opens collapsed and a filtered one opens
-  expanded.
+- [ ] With no stored preference the panel opens collapsed; expanding or collapsing, then reloading,
+  keeps that state, and the same holds after switching between the Material and the Items view.
 - [ ] Selecting a filter, resetting the filters, and a restored REQ-UI-017 selection all leave the
   chip's number equal to the number of active dimensions; at zero the chip is hidden.
 - [ ] A multi-select with every box ticked leaves the chip hidden.
@@ -928,11 +960,11 @@ them; everything else below holds verbatim on both.
 (`viewMyInventory_rendersTheFilterRowInsideACollapsiblePanel`,
 `viewAllInventory_rendersTheFilterRowInsideACollapsiblePanel`),
 `InventoryFilterPanelCollapseE2eTest` · **Code:**
-`templates/inventory-my.html`, `static/js/inventory-my.js`
-(`toggleMyFilterPanel` / `initMyFilterPanel` / `countActiveMyInventoryFilters` /
-`updateMyFilterCountBadge`), `templates/inventory-admin.html`, `static/js/inventory-admin.js`
-(`toggleAdminFilterPanel` / `initAdminFilterPanel` / `countActiveAdminInventoryFilters` /
-`updateAdminFilterCountBadge`) · **Issues:** — · **ADR:** — (extends REQ-UI-017 / ADR-0120)
+`templates/inventory-my.html`, `templates/inventory-admin.html` (`fragments/components ::
+filterToggle`), `static/js/krt-filter-panel.js` (collapse, persistence, chip),
+`static/js/inventory-my.js` (`countActiveMyInventoryFilters`), `static/js/inventory-admin.js`
+(`countActiveAdminInventoryFilters`) · **Issues:** — · **ADR:** — (extends REQ-UI-017 / ADR-0120;
+mechanism generalised by REQ-FE-021)
 
 ### REQ-INV-039 — The allocation pickers say what each order still needs
 
@@ -1155,13 +1187,51 @@ queries), `InventoryAggregationService`, `InventoryItemService`, `InventoryItemC
 `static/js/inventory-admin.js` · **Issues:** #1879 · **ADR:** — (extends REQ-INV-030 / REQ-INV-034 /
 REQ-INV-037)
 
+### REQ-INV-041 — "Globales Lager leeren": the admin-only wipe of the shared stock in scope
+
+The shared "Globales Lager" page (`/inventory/all`) offers an admin a **"Globales Lager leeren"**
+button behind a danger confirmation modal. It deletes every **non-personal** Lager row inside the
+caller's current org-unit scope in one statement; personal rows (`personal = true`) are never
+touched. The scope is the standard predicate triple
+([`org-unit-tenancy.md`](org-unit-tenancy.md) REQ-ORG-003): an admin in all-scope wipes the shared
+stock of every org unit, an admin pinned to one org unit wipes only that unit's. The rows' job-order
+/ mission allocations and any Materialbörse offer they back go with them through the
+`ON DELETE CASCADE` foreign keys (V217, V210).
+
+- **Admin-only on both layers.** The backend `DELETE /api/v1/inventory/all` is gated by
+  `hasRole('ADMIN')` (neither `OFFICER` nor `LOGISTICIAN` qualifies), and the frontend proxy
+  `DELETE /inventory/all` (`InventoryDeleteAllProxyController`) repeats the gate so a non-admin call
+  never leaves the frontend; the button and its modal render only for an admin.
+- **Audited once.** The wipe records one `INVENTORY_WIPED` event carrying the scope and the number of
+  removed rows (REQ-AUDIT-001); the unified viewer's Lager filter lists it.
+- **In place.** On success the page clears the grouped table through its existing filter swap, not
+  a reload ([`frontend-ajax-mutations.md`](frontend-ajax-mutations.md) REQ-FE-005).
+
+**Acceptance**
+
+- [ ] An admin's wipe removes every non-personal row in the current scope and leaves every personal
+  row and every out-of-scope row in place; the backend answers 204.
+- [ ] A non-admin (including `OFFICER` and `LOGISTICIAN`) gets 403 from both the frontend proxy and
+  the backend, and sees no button.
+- [ ] The wipe records exactly one `INVENTORY_WIPED` audit event with the scope and the removed-row
+  count.
+
+**Enforced by:** `InventoryItemServiceTest` (`deleteAllGlobalInventory_*`),
+`InventoryCheckoutServiceAuditTest#deleteAllGlobalInventory_recordsWipedAuditWithScopeAndCount`,
+`InventoryItemControllerTest#deleteAllGlobalInventory_returns204_andDelegatesToService`,
+`InventoryDeleteAllProxyControllerTest` (backend 403 propagated) — the two `hasRole('ADMIN')` gates
+themselves are not yet pinned by a test · **Code:**
+`InventoryItemController#deleteAllGlobalInventory`, `InventoryCheckoutService#deleteAllGlobalInventory`,
+`InventoryItemRepository#deleteAllNonPersonal`, `InventoryDeleteAllProxyController`,
+`templates/inventory-admin.html`, `static/js/inventory-admin.js` · **Issues:** — · **ADR:** —
+
 ## Out of scope
 
 - Tenancy / visibility scope of inventory (strict-staffel Lager-View) is governed by
   [`org-unit-tenancy.md`](org-unit-tenancy.md) `REQ-ORG-003`; this spec does not change it.
   Grouping is a display concern and never widens visibility.
 - The optimistic-locking, `@Version` and `*WithinTransaction` concurrency rules live in
-  [`data-persistence.md`](data-persistence.md) and `CLAUDE.md`.
+  [`data-persistence.md`](data-persistence.md) and [`backend/CLAUDE.md`](../../backend/CLAUDE.md).
 
 ## Open questions
 

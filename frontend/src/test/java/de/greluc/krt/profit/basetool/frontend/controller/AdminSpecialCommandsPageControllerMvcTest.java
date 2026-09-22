@@ -33,6 +33,7 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
@@ -186,29 +187,56 @@ class AdminSpecialCommandsPageControllerMvcTest {
         .andExpect(status().isOk());
   }
 
-  // covers #582 / REQ-FE-005 — the NEW member-roster fragment GET renders only the membersResults
-  // fragment; the add-member modal (which lives outside the fragment) is not present.
+  // The SK member page moved to /organisation/special-commands/{id} (SK leads manage members
+  // too, and the admin area stays admin-only); the old admin URL only redirects there so bookmarks
+  // and links keep working. The roster tests live in SpecialCommandMembersPageControllerMvcTest.
   @Test
   @WithMockUser(roles = "ADMIN")
-  void detail_fragmentMembers_rendersOnlyMembersFragment() throws Exception {
+  void detail_oldAdminUrl_redirectsToMemberPage() throws Exception {
     UUID skId = UUID.randomUUID();
-    Map<String, Object> sc = new HashMap<>();
-    sc.put("id", skId.toString());
-    sc.put("name", "Detail SK");
-    sc.put("shorthand", "DSK");
-    sc.put("description", "desc");
-    sc.put("active", true);
-    sc.put("isProfitEligible", false);
-    sc.put("version", 0);
-    when(backendApiClient.get(eq("/api/v1/special-commands/" + skId), anyTypeRef())).thenReturn(sc);
-    when(backendApiClient.get(eq("/api/v1/special-commands/" + skId + "/members"), anyTypeRef()))
-        .thenReturn(List.of());
 
     mockMvc
-        .perform(get("/admin/special-commands/" + skId).param("fragment", "members"))
-        .andExpect(status().isOk())
-        .andExpect(view().name("admin/special-command-detail :: membersResults"))
-        .andExpect(content().string(not(containsString("add-member-modal"))));
+        .perform(get("/admin/special-commands/" + skId))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/organisation/special-commands/" + skId));
+  }
+
+  // The classic lead-toggle fallback now lands on the SK member page, not the old admin URL.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void toggleMemberLead_classic_redirectsToMemberPage() throws Exception {
+    UUID skId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    when(backendApiClient.patch(contains("/lead"), any(), eq(Void.class))).thenReturn(null);
+
+    mockMvc
+        .perform(
+            post("/admin/special-commands/" + skId + "/members/" + userId + "/lead")
+                .with(csrf())
+                .param("isLead", "true")
+                .param("version", "0"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/organisation/special-commands/" + skId));
+  }
+
+  // The lead toggle stays admin-only: an officer (e.g. an SK lead) is refused before any backend
+  // call, even though the SK member page itself is open to officers.
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void toggleMemberLeadAjax_officer_returns403() throws Exception {
+    UUID skId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            post("/admin/special-commands/" + skId + "/members/" + userId + "/lead")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .param("isLead", "true")
+                .param("version", "0"))
+        .andExpect(status().isForbidden());
+
+    verify(backendApiClient, never()).patch(contains("/lead"), any(), eq(Void.class));
   }
 
   // covers #582 — header routing: the same SK-create URL WITHOUT the header still hits the classic
@@ -230,9 +258,9 @@ class AdminSpecialCommandsPageControllerMvcTest {
         .andExpect(status().is3xxRedirection());
   }
 
-  // REQ-DATA-007 — every SK lifecycle mutation evicts STATIC_DATA_CACHE so the cached org-units
-  // pickers + OrgUnitContextAdvice's SK catalogue cannot serve a stale name/active/profit-eligible
-  // up to the TTL. Classic create path.
+  // REQ-DATA-007 — every SK lifecycle mutation evicts the SQUADRON + ORG_UNIT caches so the cached
+  // org-units pickers + OrgUnitContextAdvice's SK catalogue cannot serve a stale
+  // name/active/profit-eligible up to the TTL. Classic create path.
   @Test
   @WithMockUser(roles = "ADMIN")
   void createSpecialCommand_classic_evictsStaticDataCache() throws Exception {

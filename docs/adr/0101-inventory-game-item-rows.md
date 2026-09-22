@@ -5,7 +5,7 @@
 - **Deciders:** @greluc
 - **Related:** ADR-0098 (Variante-C allocations), ADR-0099 (production booking), ADR-0053
   (searchable combobox, extended by REQ-FE-016) · spec `docs/specs/inventory-items.md`
-  (REQ-INV-029..032) · design `docs/DESIGN_ITEM_INVENTORY.md`
+  (REQ-INV-029..032) · design `docs/archive/DESIGN_ITEM_INVENTORY.md`
 
 ## Context
 

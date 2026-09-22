@@ -146,7 +146,7 @@ class GeneratedDtoAgreementTest {
    * introduced the guard. Removing an entry is the fix; adding one needs the same justification.
    *
    * <p><b>They are recorded outside this constant as well</b>, so a test literal is not the only
-   * place they exist: {@code docs/WIRE_PROTOCOL_EVALUATION.md} §8.2 names both with their
+   * place they exist: {@code docs/archive/WIRE_PROTOCOL_EVALUATION.md} §8.2 names both with their
    * consequences, and ADR-0161's consequences section carries them into the decision record.
    *
    * <ul>

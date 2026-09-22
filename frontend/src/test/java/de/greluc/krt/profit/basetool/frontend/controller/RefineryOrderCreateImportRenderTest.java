@@ -195,7 +195,7 @@ class RefineryOrderCreateImportRenderTest {
 
   @Test
   void createPage_rendersScExtractorReleaseLink_besideTheImportButton() throws Exception {
-    // covers REQ-REFINERY-019 — the import bar carries a link to the desktop SC Extractor's latest
+    // covers REQ-REFINERY-021 — the import bar carries a link to the desktop SC Extractor's latest
     // release next to the import trigger it feeds, opened in a new tab with a safe rel. It must
     // render INSIDE the upload form, because .import-extract-bar puts the flex row on the form.
     mockMvc

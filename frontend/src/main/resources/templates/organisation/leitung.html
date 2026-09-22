@@ -210,6 +210,11 @@
                 <div class="hud-box mt-2 leitung-unit" th:each="sk : ${leitung.specialCommands()}" th:data-unit-id="${sk.id()}">
                     <div class="leitung-unit-head">
                         <h3 class="leitung-unit-title" th:text="${sk.name()}">Spezialkommando</h3>
+                        <!-- The SK's own lead (and admin) manages its members + Logistiker /
+                             Einsatzmanager flags on the SK member page, outside the admin area. -->
+                        <a class="btn btn-outline" th:if="${sk.canManageRoster()}"
+                           th:href="@{/organisation/special-commands/{id}(id=${sk.id()})}"
+                           th:text="#{leitung.sk.manageMembers}">Mitglieder verwalten</a>
                     </div>
                     <p class="leitung-empty" th:if="${#lists.isEmpty(sk.members())}" th:text="#{leitung.empty.squadronMembers}">Keine Mitglieder.</p>
                     <div class="table-responsive" th:if="${!#lists.isEmpty(sk.members())}">
@@ -218,7 +223,9 @@
                                 <tr>
                                     <th th:text="#{leitung.column.name}">Name</th>
                                     <th th:text="#{leitung.column.rank}">Rang</th>
-                                    <th class="leitung-col-action" th:text="#{leitung.column.action}">Aktion</th>
+                                    <!-- The lead toggle is the parent Bereichsleiter's (and admin's) only: an
+                                         SK lead sees the roster read-only here. -->
+                                    <th class="leitung-col-action" th:if="${sk.canAppointLead()}" th:text="#{leitung.column.action}">Aktion</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -228,7 +235,7 @@
                                         <span th:if="${m.role() == 'SK_LEAD'}" class="chip chip--primary" th:text="#{leitung.rank.SK_LEAD}">SK-Leiter</span>
                                         <span th:unless="${m.role() == 'SK_LEAD'}" class="chip chip--muted" th:text="#{leitung.rank.MEMBER}">Mitglied</span>
                                     </td>
-                                    <td class="leitung-col-action">
+                                    <td class="leitung-col-action" th:if="${sk.canAppointLead()}">
                                         <button type="button" class="btn btn-ghost" data-leitung-action="toggle-sk-lead" th:data-unit-id="${sk.id()}"
                                                 th:data-lead="${m.role() == 'SK_LEAD'}"
                                                 th:text="${m.role() == 'SK_LEAD'} ? #{leitung.sk.demote} : #{leitung.sk.promote}">Leiter umschalten</button>
@@ -242,7 +249,7 @@
 
             <div class="hud-box mt-2 leitung-empty-all"
                  th:if="${#lists.isEmpty(leitung.organisationsleitungen()) and #lists.isEmpty(leitung.bereiche()) and #lists.isEmpty(leitung.squadrons()) and #lists.isEmpty(leitung.specialCommands())}"
-                 th:text="#{leitung.empty.all}">Sie verwalten derzeit keine Einheiten.</div>
+                 th:text="#{leitung.empty.all}">Du verwaltest derzeit keine Einheiten.</div>
         </th:block>
     </th:block>
     </div>

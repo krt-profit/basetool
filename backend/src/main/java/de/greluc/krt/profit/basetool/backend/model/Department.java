@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.backend.model;
 
 /**
  * The fixed set of Kartell departments ("Bereiche") and their frozen brand colour identity (epic
- * #692, REQ-ORG-018). A {@link Bereich} org unit optionally carries one of these so the org chart
+ * #692, REQ-ORG-026). A {@link Bereich} org unit optionally carries one of these so the org chart
  * (and any other Bereich-coloured surface) can tint its nodes with the department's Bereichsfarbe.
  *
  * <p>Each value maps one-to-one to a design-system department-colour token (the {@code

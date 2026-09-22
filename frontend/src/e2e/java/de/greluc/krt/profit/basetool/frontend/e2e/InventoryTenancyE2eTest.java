@@ -40,9 +40,11 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 /**
  * Multi-org-unit tenancy matrix for the squadron Lager (REQ-ORG-002/003/004/008): who may SEE,
  * CREATE and EDIT inventory across every membership profile — a squadron-only member, an SK-only
- * member, a member of both a squadron and an SK, an admin, and a user with no membership at all —
- * plus the unauthenticated guest. The direct Lager-View is <em>strict-staffel</em>: an item is
- * scoped to its {@code owning_org_unit_id} pool and never escapes it (REQ-ORG-003).
+ * member, a member of both a squadron and an SK, an admin, and a user with no membership at all.
+ * The unauthenticated visitor is not covered here: since ADR-0159 there is no guest surface, and
+ * who may reach the page at all is swept by {@code AnonymousSurfaceE2eTest} (REQ-SEC-052). The
+ * direct Lager-View is <em>strict-staffel</em>: an item is scoped to its {@code owning_org_unit_id}
+ * pool and never escapes it (REQ-ORG-003).
  *
  * <p><b>Fixtures.</b> Five real Keycloak users carry distinct membership profiles, assigned via the
  * REST seeder: {@code test-admin} (ADMIN, IRIDIUM = Staffel A), {@code test-member} (Staffel A
@@ -56,9 +58,8 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * visibility/stamping/edit matrix is asserted by calling the scoped backend endpoints as each user
  * through {@link BackendSeeder} — the established, race-free way to assert tenancy boundaries —
  * with the boundary additionally driven through the real {@code /inventory/all} UI for a
- * representative viewer and for the guest redirect. The admin pin is exercised by sending the
- * {@code X-Active-Org-Unit-Id} header the frontend relays, which the backend honours as the active
- * scope.
+ * representative viewer. The admin pin is exercised by sending the {@code X-Active-Org-Unit-Id}
+ * header the frontend relays, which the backend honours as the active scope.
  *
  * <p><b>The visibility grid this asserts</b> — for a non-personal item owned by org unit O, in the
  * global Lager-View ({@code /inventory/all}):
@@ -68,7 +69,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  *   <li>Admin pinned to O → scoped to O exactly like a member.
  *   <li>Member of O → sees O's stock; a member of another unit does not.
  *   <li>Member of (squadron + SK) → sees the union of both.
- *   <li>Membershipless user / guest → sees no shared stock.
+ *   <li>Membershipless user → sees no shared stock.
  *   <li>Ownerless stock → only the admin-without-pin and the owning user (in their personal view).
  * </ul>
  *

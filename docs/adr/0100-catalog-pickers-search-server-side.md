@@ -6,7 +6,7 @@
 - **Related:** spec [`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md)
   `REQ-FE-016` · extends [ADR-0053](0053-standardize-user-selection-on-searchable-combobox.md)
   (searchable-combobox standard) and the remote-source registry of
-  [ADR-0089](0089-bank-scoped-user-search.md) (#1193)
+  [ADR-0089](0089-dedicated-bank-user-search-endpoint.md) (#1193)
 
 ## Context
 

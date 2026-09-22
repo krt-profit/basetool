@@ -37,8 +37,10 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * Regression for the Materialbörse release modal opening <em>invisibly</em> (REQ-MARKET-002/007).
  *
  * <p>The shared release/edit modal is a {@code .krt-modal-overlay}, whose global default in {@code
- * styles.css} is {@code display:none}; the app-wide contract is that a modal is opened by setting
- * an inline {@code display:flex}, NOT by clearing a {@code hidden} attribute. The first cut of
+ * styles.css} is {@code display:none}; a modal is opened by switching it to {@code display:flex},
+ * NOT by clearing a {@code hidden} attribute. The app-wide handlers do that by adding the {@code
+ * krtm-modal-open} class (ADR-0093, {@code common-handlers.js open-modal-display}); this page's own
+ * {@code materialboerse-release.js} sets {@code modal.style.display = 'flex'}. The first cut of
  * {@code materialboerse-release.js} opened with {@code modal.hidden = false}, which removed the
  * attribute but left the CSS {@code display:none} in place — so clicking "Material anbieten" (and
  * the Mein-Lager "Für Börse freigeben" checkbox) ran the open logic and even fetched the picker,

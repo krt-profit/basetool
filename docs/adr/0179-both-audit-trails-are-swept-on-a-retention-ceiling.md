@@ -1,6 +1,6 @@
 # ADR-0179 — Both audit trails are swept on a retention ceiling, which is not the same act as a purge
 
-- **Status:** Proposed
+- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-09-17 (`f8b6c19ae`, PR #1920: `AuditRetentionTask`, REQ-AUDIT-006).
 - **Date:** 2026-09-15
 - **Deciders:** @greluc
 - **Related:** spec `REQ-AUDIT-006` (new) · [`audit.md`](../specs/audit.md) (`REQ-AUDIT-001` the

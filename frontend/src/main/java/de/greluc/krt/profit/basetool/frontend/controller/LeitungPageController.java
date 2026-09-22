@@ -52,7 +52,10 @@ import org.springframework.web.bind.annotation.ResponseBody;
  * the ranks their tier delegates to them: a Bereichsleiter manages their Bereich's Koordinatoren /
  * Operatoren and their child Staffeln's / SKs' leads, a Staffelleiter manages their Staffel's
  * Kommandoleiter / Stellvertreter / Ensigns and Kommandogruppen, the OL appoints Bereichsleiter,
- * and admin does everything.
+ * and admin does everything. An SK lead sees their own SK here with its roster read-only and a link
+ * to the SK member page ({@code /organisation/special-commands/{id}}, {@link
+ * SpecialCommandMembersPageController}), where they add and remove members and set the Logistiker /
+ * Einsatzmanager flags; the SK-lead toggle itself stays with the tier above.
  *
  * <p>The page and its write proxies are gated to {@code ADMIN} / {@code OFFICER} only ({@link
  * Roles#ADMIN_OR_OFFICER}): every functional leader carries the operative {@code OFFICER} grant

@@ -11,32 +11,31 @@
 
 ## Akteure
 
-- **Ersteller (Staffel A)** — legt einen **organisationsweiten** Einsatz an (`is_internal = false`).
-- **Teilnehmer (Staffel B)** — sieht den Einsatz und tritt ihm bei.
+- **`test-officer`** (Heimat-Staffel IRIDIUM = Staffel A) — Besitzer beider Einsätze; wird nur per REST verwendet.
+- **`test-member`** (Heimat einer frisch angelegten Staffel B „E2E Mission B") — treibt die UI.
 
 ## Vorbedingungen
 
-- Zwei Staffeln A und B; je ein Test-User mit Mitgliedschaft.
+Nur im ephemeren Modus per REST geseedet: Staffel B und beide Mitgliedschaften; `test-officer` legt einen **organisationsweiten** (`is_internal = false`) und einen **internen** Einsatz an (`createMission`), beide auf Staffel A gestempelt.
 
 ## Auslöser
 
-Staffel A öffnet einen Einsatz für staffel-übergreifende Teilnahme.
+Ein Mitglied der Staffel B öffnet die Einsatzliste.
 
 ## Hauptablauf
 
-1. **Staffel A** legt unter `/missions/new` einen Einsatz an und lässt ihn **organisationsweit** (`is_internal = false`).
-2. **Staffel B** öffnet `/missions` und sieht A's organisationsweiten Einsatz (Cross-Staffel-Escape).
-3. **Staffel B** tritt dem Einsatz als Teilnehmer bei.
+1. `test-member` meldet sich an und öffnet `/missions`.
+2. Er öffnet die Detailseite `/missions/{id}` des organisationsweiten Einsatzes.
 
 ## Erwartetes Ergebnis
 
-- Der organisationsweite Einsatz ist für B **sichtbar**; ein **interner** Einsatz (`is_internal = true`) wäre es nicht. „Öffentlich“ hieß das bis 2026-09-06 und meinte zwei Dinge; nur eines davon gilt noch (ADR-0159).
-- B's Teilnahme wird mit seiner **Heimat-Staffel** vermerkt (`MissionParticipant.squadron = B`).
-- Finanz-/Beteiligungs-Auswertungen splitten nach `participant.squadron` (A vs. B sichtbar).
-- Editieren des Einsatzes bleibt der besitzenden Staffel A (+ Admins) vorbehalten — B kann teilnehmen, aber den Einsatz nicht bearbeiten.
+- Der organisationsweite Einsatz steht in B's Liste; der interne Einsatz von A steht dort **nicht** (`hasCount(0)`).
+- Die Detailseite des organisationsweiten Einsatzes rendert für B mit seinem Namen.
+- Der Beitritt als Teilnehmer ist **nicht** automatisiert (er hängt an geseedeten Job-Typen); getestet sind Sichtbarkeit und Detailzugriff, auf denen er aufbaut.
 
 ## Sonderfälle & Lehren
 
-- **Public-Escape ist die einzige Cross-Staffel-Sichtbarkeit für Einsätze:** Das Repository-`searchMissions` setzt die Klausel `owning_org_unit.id IN (:memberOrgUnitIds) OR is_internal = false` — interne Einsätze bleiben strikt bei der Eigentümer-Staffel.
-- **`MissionParticipant.squadron`** ist eine der wenigen grandfatherten `squadron_id`-Referenzen; sie hält fest, *aus welcher* Staffel ein Teilnehmer kommt — Grundlage für staffel-übergreifende Beteiligungsabrechnung.
-- Anlegen ist `isAuthenticated()` (jeder Auth-User, auch ein einfaches Mitglied); **Editieren/Verwalten** gaten `canEditMission` / `MissionSecurityService.canManageMission` auf Eigentümer-Staffel + Admins.
+- **Der organisationsweite Escape ist die einzige Cross-Staffel-Sichtbarkeit für Einsätze:** Das Repository-`searchMissions` setzt die Klausel `owning_org_unit.id IN (:memberOrgUnitIds) OR is_internal = false` — interne Einsätze bleiben strikt bei der Eigentümer-Staffel.
+- **Regressionswächter für ADR-0159:** Die Klasse hieß bis dahin `PublicMissionCrossStaffelE2eTest`. „Öffentlich" meinte zweierlei, und nur eines davon gilt noch: `is_internal = false` öffnet einen Einsatz weiterhin der ganzen Organisation, aber nicht mehr dem Internet. Ein Gate, das beim Umbau eine Stufe zu eng geschrieben worden wäre, hätte den Escape geschlossen — jedes Mitglied außerhalb der besitzenden Staffel hätte den Einsatz still nicht mehr gesehen.
+- Die Staffel-Zugehörigkeit eines Teilnehmers steht heute in der Zuordnungstabelle `mission_participant_org_unit` (`MissionParticipant.orgUnits`) — Grundlage für die staffel-übergreifende Beteiligungsauswertung; dieser Test prüft sie nicht.
+- Anlegen ist `isAuthenticated() and @authHelperService.isMemberOrAbove()`; **Verwalten** gatet `@missionSecurityService.canManageMission(#id, authentication)` auf Eigentümer-Staffel + Admins.

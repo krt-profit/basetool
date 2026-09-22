@@ -1029,14 +1029,14 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
 
   /**
    * Drops the job-order allocations of one specific material under the order (Variante C,
-   * REQ-INV-027) — the allocation counterpart of {@link #unlinkJobOrderMaterial(UUID, UUID)}, run
-   * alongside it in the handover / material-removal flows so released stock loses only that order's
-   * slice while the entry (its other allocations and its amount) survives (R2). The material filter
-   * is a subquery over {@link InventoryItem} because {@code a.inventoryItem.material.id} would
-   * imply a join a bulk {@code DELETE} may not carry, whereas {@code a.inventoryItem.id} is the
-   * allocation's own FK column. Carries {@code clearAutomatically = flushAutomatically = true} so a
-   * subsequent {@code repository.save(entity)} in the same handover loop does not collide with a
-   * stale {@code @Version} — the loop-bulk-update discipline (CLAUDE.md).
+   * REQ-INV-027), run in the handover / material-removal flows so released stock loses only that
+   * order's slice while the entry (its other allocations and its amount) survives (R2). The
+   * material filter is a subquery over {@link InventoryItem} because {@code
+   * a.inventoryItem.material.id} would imply a join a bulk {@code DELETE} may not carry, whereas
+   * {@code a.inventoryItem.id} is the allocation's own FK column. Carries {@code clearAutomatically
+   * = flushAutomatically = true} so a subsequent {@code repository.save(entity)} in the same
+   * handover loop does not collide with a stale {@code @Version} — the loop-bulk-update discipline
+   * (CLAUDE.md).
    *
    * @param jobOrderId the order whose allocations to drop.
    * @param materialId the material to restrict the drop to.

@@ -1,6 +1,6 @@
 # ADR-0136 — The endpoints a shipped client consumes are a frozen contract
 
-- **Status:** Proposed
+- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since v1.7.7 (2026-09-09) at the latest (`ExternalContractTest`, REQ-API-009).
 - **Date:** 2026-08-18
 - **Amended:** 2026-09-02 (owner-approved) — "keeps every field it had" narrowed to "keeps every
   **recorded** field", matching `ExternalContractTest` and REQ-API-009's acceptance criteria (see
@@ -8,7 +8,7 @@
 - **Related:** [ADR-0135](0135-public-api-vhost-not-a-gateway.md) ·
   [ADR-0003](0003-inventory-append-only-group-on-read.md) (the carve-out this narrows) ·
   specs `REQ-API-001`, `REQ-API-007`, `REQ-API-009`, `REQ-SEC-027` ·
-  [`ANDROID_API_EXPOSURE_PLAN.md`](../ANDROID_API_EXPOSURE_PLAN.md) item B3 ·
+  [`ANDROID_API_EXPOSURE_PLAN.md`](../archive/ANDROID_API_EXPOSURE_PLAN.md) item B3 ·
   `ExternalContractTest`
 
 ## Context

@@ -113,6 +113,13 @@ make_container "${USER_SLICE}/acme.service" 268435456 100 3 7
 # a directory that matches the pattern but publishes nothing: a container that exited between
 # the walk and the read. It must be dropped, not emitted with zeros.
 mkdir -p "${USER_SLICE}/ghost.service"
+# The two HOST services, in the system slice where systemd puts them. alloy has a limit and has been
+# OOM-killed once; node-exporter has a limit and a clean record. Neither matches the container
+# pattern, so only the host-service lookup can find them.
+make_container "${FAKE}/system.slice/alloy.service" 536870912 max 1 0
+make_container "${FAKE}/system.slice/prometheus-node-exporter.service" 67108864 max 0 0
+# A system unit that is NOT named must stay invisible: the host runs dozens of them.
+make_container "${FAKE}/system.slice/sshd.service" max max 0 0
 
 # =============================================================================================
 say ""
@@ -131,6 +138,44 @@ assert_line "finds acme"                      '^basetool_container_pids\{name="a
 assert_absent "drops a cgroup that publishes nothing" 'name="ghost"'
 assert_line "counts only the containers it emitted" '^basetool_container_metrics_containers 3$'
 assert_line "stamps when it ran"              '^basetool_container_metrics_timestamp_seconds [0-9]'
+
+# =============================================================================================
+say ""
+say "== the two host services are read too, under the names they had as containers =="
+# =============================================================================================
+# Under Compose alloy and node-exporter were containers and the container alerts watched them.
+# Under Podman they are host services, and until 2026-09-22 nothing read their cgroups at all.
+assert_line "alloy is read from system.slice/alloy.service" \
+  '^basetool_container_memory_limit_bytes\{name="alloy"\} 536870912$'
+assert_line "...under its container name, so ContainerOomKilled keeps its meaning" \
+  '^basetool_container_oom_kills_total\{name="alloy"\} 1$'
+assert_line "node-exporter is read from its package's unit name" \
+  '^basetool_container_memory_limit_bytes\{name="node-exporter"\} 67108864$'
+assert_absent "an unnamed system unit stays invisible" 'name="sshd'
+assert_line "host services are counted on their own" '^basetool_container_metrics_host_services 2$'
+# The container count must not include them, or FoundNothing could never fire on a host whose
+# container layout stopped matching while its host services kept running.
+assert_line "...and not as containers" '^basetool_container_metrics_containers 3$'
+
+if "$PY" "$COLLECTOR" --cgroup-root "$FAKE" --no-host-services --dry-run 2>/dev/null \
+     | grep -q 'name="alloy"'; then
+  bad "--no-host-services reads containers only"
+else
+  ok "--no-host-services reads containers only"
+fi
+if "$PY" "$COLLECTOR" --cgroup-root "$FAKE" --host-service 'alloy.service' --dry-run >/dev/null 2>&1; then
+  bad "a --host-service without =NAME is rejected"
+else
+  ok "a --host-service without =NAME is rejected"
+fi
+# A host whose stack is deliberately down still gets a file, and it says "0 containers" -- which is
+# what ContainerCgroupCollectorFoundNothing reads -- instead of no file at all.
+if "$PY" "$COLLECTOR" --cgroup-root "$FAKE" --pattern 'nothing-(?P<name>x)$' --dry-run 2>/dev/null \
+     | grep -q '^basetool_container_metrics_containers 0$'; then
+  ok "no containers but running host services writes containers 0"
+else
+  bad "no containers but running host services writes containers 0"
+fi
 
 # =============================================================================================
 say ""
@@ -207,8 +252,10 @@ say ""
 say "== it refuses to produce a misleading file =="
 # =============================================================================================
 # An empty metrics file and a broken pattern look identical to Prometheus, and only one of them
-# is benign -- so finding nothing is an error rather than a file with nothing in it.
-if "$PY" "$COLLECTOR" --cgroup-root "$FAKE" --pattern 'nothing-(?P<name>x)$' --dry-run >/dev/null 2>&1; then
+# is benign -- so finding nothing is an error rather than a file with nothing in it. "Nothing" means
+# no container AND no host service; the fake tree has host services, so they are switched off here.
+if "$PY" "$COLLECTOR" --cgroup-root "$FAKE" --no-host-services --pattern 'nothing-(?P<name>x)$' \
+     --dry-run >/dev/null 2>&1; then
   bad "a pattern that matches nothing is an error"
 else
   ok "a pattern that matches nothing is an error"

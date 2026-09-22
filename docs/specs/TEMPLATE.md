@@ -28,6 +28,14 @@ atomic and testable.
 
 …
 
+### REQ-<AREA>-003 — <short title> *(superseded)*
+
+> [!warning] Superseded YYYY-MM-DD by REQ-<AREA>-NNN / ADR-NNNN — kept for the reasoning
+
+A requirement that no longer applies keeps its heading and id (ids are never reused — take the next
+free one from [`INDEX.md`](INDEX.md#2-requirement-ids-traceability-anchors)); the callout says what
+replaced it.
+
 ## Out of scope
 
 What this spec deliberately does NOT cover, and where that lives instead.

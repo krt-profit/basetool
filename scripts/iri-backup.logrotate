@@ -1,13 +1,14 @@
 # logrotate(8) configuration for /var/log/iri-backup.log.
 #
-# Installation (on the production host, one-time):
-#   sudo cp /var/iri/code/scripts/iri-backup.logrotate /etc/logrotate.d/iri-backup
-#   sudo chown root:root /etc/logrotate.d/iri-backup
-#   sudo chmod 0644       /etc/logrotate.d/iri-backup
+# Installed to /etc/logrotate.d/iri-backup (root:root 0644) by
+# ansible/roles/basetool_host/tasks/25-scripts.yml — not by hand.
 #
 # `copytruncate` is required because iri-backup.service appends via
 # `StandardOutput=append:...`, holding the fd open across logrotate's run — a
 # naive `create` would leave systemd writing into the rotated file.
+#
+# logrotate ignores `create` when `copytruncate` is set: the live file stays in
+# place and keeps whatever owner and mode it already has.
 
 /var/log/iri-backup.log {
     weekly

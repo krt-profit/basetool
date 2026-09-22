@@ -43,7 +43,7 @@ Zusätzlich abgedeckt:
 - **Fremd-Scope-Gates:** ein Viewer außerhalb des besitzenden Pools kann den Auftrag weder lesen (`GET …/{id}` → 403) noch bearbeiten (`PUT` → 403) noch einlagern (`POST …/{id}/store` → 403).
 - **Owner-Gate:** ein Staffel-A-Mitglied, das weder Eigentümer noch Logistician ist, kann einen fremden A-Auftrag nicht bearbeiten (Org-Gate passiert, Service-Owner-Check → 403).
 - **Einlager-Stempelung:** das Einlagern eines Staffel-B-Auftrags an einen IRIDIUM-Empfänger erzeugt **IRIDIUM**-Bestand (sichtbar für das IRIDIUM-Mitglied, unsichtbar für das B+SK-Mitglied) — die OrgUnit des Empfängers gewinnt, nicht die des Auftrags. Einlagern an einen Mehrfach-Mitglied-Empfänger → 400 (das Store-Formular hat keinen Pro-Output-Picker).
-- **BAC-004:** ein auf Staffel B gescopter Viewer sieht über `…/mission/{id}` **keinen** A-Auftrag des öffentlichen A-Einsatzes; der ungepinnte Admin (All-Scope) schon.
+- **BAC-004:** ein auf Staffel B gescopter Viewer sieht über `…/mission/{id}` **keinen** A-Auftrag des organisationsweiten A-Einsatzes; der ungepinnte Admin (All-Scope) schon.
 
 ## Sonderfälle & Lehren
 

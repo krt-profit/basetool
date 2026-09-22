@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-06.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
 > **Owner area:** MISSION · **Related ADRs:** ADR-0159
 
 # Home-page upcoming-missions overview
@@ -21,8 +21,10 @@ former "guest" tier had no other rule of its own than "public missions, no descr
 gone with its audience.
 
 The single-mission `GET /api/v1/missions/next` endpoint (REQ-MISSION-003, REQ-MISSION-008) is
-**retained** for API consumers — the Android app is one — but it is no longer what the home page
-renders, and it too requires a login.
+**retained**, but it is no longer what the home page renders, and it too requires a login. Nothing
+in the frontend calls it today, and it is not on the public API vhost's allow-list
+(`docker/edge/include/api-allowlist.conf`), so the Android app cannot reach it yet — its plan lists
+it for a future dashboard.
 
 The `/next` lookup must surface only missions that are still **operationally relevant**. A mission
 that has already been `COMPLETED` or `CANCELLED` but happens to carry a future planned-start time
@@ -46,10 +48,9 @@ strictly after "now" is the next mission.
 
 - A `COMPLETED` or `CANCELLED` mission is **never** the next mission, even if its `plannedStartTime`
   is in the future and earlier than every eligible mission's.
-- Every caller is authenticated, so `allowInternal = true` throughout and internal missions in
-  scope are eligible. The `allowInternal = false` variant existed for the anonymous and role-less
-  tier and has no caller left (ADR-0159); the query variant itself survives because the
-  membershipless fallback below still uses the scope, not the flag.
+- Every caller is authenticated, so internal missions in scope are always eligible. The former
+  `allowInternal = false` variant (and its `…IsInternalFalse…` finder) served the anonymous and
+  role-less tier and was removed with it (ADR-0159); `getNextMission()` takes no flag.
 - When no eligible mission is upcoming, the endpoint returns `204 No Content` and the page renders
   its empty state — unchanged.
 
@@ -64,8 +65,7 @@ strictly after "now" is the next mission.
 `MissionRepositoryLookupOrderingTest`
 (`findFirstByPlannedStartTimeAfterAndStatusIn_skipsTerminalStatusEvenWhenItSortsEarlier`).
 **Code:** `MissionService#getNextMission`,
-`MissionRepository#findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc` +
-`#findFirstByPlannedStartTimeAfterAndIsInternalFalseAndStatusInOrderByPlannedStartTimeAsc`,
+`MissionRepository#findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc`,
 `MissionController` `/api/v1/missions/next`. (The home page no longer consumes `/next` — its
 upcoming-missions grid is REQ-MISSION-012.)
 
@@ -102,11 +102,10 @@ the viewer has any:
 (`getNextMission_scopedMember_usesScopedQueryThenRefetches`,
 `getNextMission_scopedPinned_passesActiveOrgUnitId`,
 `getNextMission_scopedMember_noUpcoming_returnsEmptyWithoutRefetch`,
-`getNextMission_allowInternal_refetchesByIdThroughGraph` (admin all-scope fallback),
-`getNextMission_allowInternalFalse_usesTheIsInternalFalseVariantThenRefetches`),
+`getNextMission_refetchesByIdThroughGraph` (unscoped fallback)),
 `MissionRepositoryLookupOrderingTest`
 (`findNextScopedMission_returnsOwnUnitNextSkippingForeignAndTerminal`,
-`findNextScopedMission_allowInternalFalse_excludesOwnInternalMission`).
+`findNextScopedMission_includesOwnInternalMission`).
 **Code:** `MissionService#getNextMission` + `#findNextScopedMissionHead`,
 `MissionRepository#findNextScopedMission`,
 `OwnerScopeService#currentScopePredicate` (scope vector + leadership cascade).
@@ -119,7 +118,8 @@ nearest planned start first. This replaces the former single next-mission banner
 the soonest upcoming mission.
 
 - **Source & scope.** The grid is populated from `GET /api/v1/missions/search` with `start = now`,
-  `end = now + 7d`, `status = PLANNED, ACTIVE`, `sort = plannedStartTime,asc`. It therefore uses the
+  `end = now + 7d`, `status = PLANNED, ACTIVE`, `sort = plannedStartTime,asc`, `size = 50` — one
+  page, so a week with more than 50 eligible missions shows the nearest 50. It therefore uses the
   **broad mission-list scope** — the viewer's own org units' missions (internal and public) **plus**
   every unit's public missions via the cross-staffel public escape ([`org-unit-tenancy.md`](org-unit-tenancy.md)) —
   deliberately **wider** than the own-unit-only scope of the `/next` lookup (REQ-MISSION-008). This

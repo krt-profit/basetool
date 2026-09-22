@@ -7,7 +7,7 @@ so a later reader does not mistake a constraint for a preference and "improve" i
 
 | Constraint | Consequence for the architecture |
 | --- | --- |
-| **One maintainer, one deployment.** There is no ops team and no second environment that runs continuously. | Every operational action has to be a runbook or a script, not tribal knowledge. Delivery is a timer pulling a signed bundle rather than a pipeline somebody drives. |
+| **One maintainer, one production deployment.** There is no ops team. The only other environment is a testing host that serves no users and is fed by its own `:testing` promotion channel (`REQ-OPS-022`). | Every operational action has to be a runbook, a script or the Ansible role, not tribal knowledge. Delivery is a timer pulling a signed bundle rather than a pipeline somebody drives. |
 | **Unofficial, non-commercial *Star Citizen* fan project.** Not affiliated with or endorsed by Cloud Imperium. | Game data may be used within the fan-content terms; the tool can never present itself as official. Asset provenance is tracked (`docs/images/fankit/`). |
 | **GPL-3.0-only**, with a DCO sign-off on every commit. | Third-party code has to be licence-compatible, and that is gated: every shipped module runs Licensee against a GPL-3.0-compatible allow-list in `check`, and `/licenses` lists what ships (ADR-0197). SBOMs are produced per module (CycloneDX) and dependency CVEs gate the build. |
 | **GDPR: the maintainer is the controller** for real members' personal data. | Export and erasure are product features, not manual database work — including the free-text surfaces no foreign key points at. Retention is bounded and specified rather than open-ended. |
@@ -22,7 +22,7 @@ so a later reader does not mistake a constraint for a preference and "improve" i
 | **Keycloak 26** as the only identity provider | The applications never manage credentials. Authorisation is carried in the JWT and enforced with `@PreAuthorize`. |
 | **Redis** as the session store | Sessions must survive a frontend restart and be shared across replicas; the same Redis carries the live-sync pub/sub fanout. |
 | **Gradle 9, Kotlin DSL, version catalog** | Versions live in `gradle/libs.versions.toml` and nowhere else. `versions.properties` is vestigial and reads nothing. |
-| **Rootless Podman with Quadlet units** on Rocky Linux | The post-cutover runtime. Containers are systemd units owned by an unprivileged service user; there is no Docker socket to hand anything. See §7. |
+| **Rootless Podman with Quadlet units** on Rocky Linux 10, SELinux enforcing | The production runtime since 2026-09-22 (ADR-0163). Containers are systemd units owned by an unprivileged service user; there is no Docker socket to hand anything. The Compose files remain the *source* the units are generated from, and the local and test stacks still run on Compose. See §7. |
 | **Images are pinned by digest, Cosign-signed, and verified before they run** | A tag is not an identity. The deploy refuses an image whose signature does not verify against the pinned workflow identity. |
 | **Node 24 for the frontend's asset toolchain** | It is a build-time dependency only; nothing in the served application is a Node runtime. |
 

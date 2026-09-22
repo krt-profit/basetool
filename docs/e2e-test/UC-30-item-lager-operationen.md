@@ -28,7 +28,8 @@ Der User öffnet das Einbuchen-Formular im Item-Modus bzw. eine der beiden Item-
 1. **Einbuchen (Item-Modus)** — Katalog-Toggle auf „Item", Item über die remote-gesuchte Combobox wählen, Ort + ganze Menge, absenden; danach ist die neue Zeile im Item-Baum (`Item → Stack → Eintrag`) erreichbar.
 2. **Umbuchen + Ausbuchen** — Item-Baum zum Eintrag aufklappen (dabei: **keine** Qualitätsspalte, **kein** Einsatz-Split — Locator-Abwesenheit), 20 Einheiten per Umbuchen-Modal an eine andere Location transferieren (Quelle behält 30, Ziel erhält 20), dann die restlichen 30 als DISCARD ausbuchen — der Quell-Stack verschwindet.
 3. **Zuordnungs-Gate (REQ-INV-031)** — im Item-Modus mit gewähltem Item bietet die „+ Auftrag"-Zeile nur ITEM-Aufträge an, deren Zeilen das Item anfragen (`data-game-items`-CSV-Filter); die Option des MATERIAL-Auftrags ist deaktiviert, der Einsatz-Abschnitt ist komplett ausgeblendet.
-4. **Live-Peer-Sync (REQ-FE-010/015)** — zwei Kontexte auf `/inventory/all?view=items` mit aufgeklapptem Widget; Kontext B bucht 40 von 100 Einheiten aus, Kontext A zeigt die reduzierte Gruppensumme **in place** (einziger `inventory`/`stock`-Seam, `view=` reitet auf der Fragment-URL) — ohne Reload.
+4. **Restmenge an der Item-Auftragsoption (REQ-INV-039, #1742)** — im Item-Modus einen Auftrag über 7 Stück (nichts gebaut, geliefert oder zugeordnet) wählen und eine Zuordnungszeile hinzufügen: die Option trägt `· noch 7 Stück`; der Qualitäts-Hinweis der Material-Variante („benötigt …") erscheint nie, weil Item-Zeilen keine Qualität tragen (REQ-INV-029).
+5. **Live-Peer-Sync (REQ-FE-010/015)** — zwei Kontexte auf `/inventory/all?view=items` mit aufgeklapptem Widget; Kontext B bucht 40 von 100 Einheiten aus, Kontext A zeigt die reduzierte Gruppensumme **in place** (einziger `inventory`/`stock`-Seam, `view=` reitet auf der Fragment-URL) — ohne Reload.
 
 ## Erwartetes Ergebnis
 

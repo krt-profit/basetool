@@ -377,8 +377,8 @@ public class UserRegistrationService {
    * discord_user_id} (see {@link #resolveDiscordLink}): the Keycloak read makes linking work even
    * when the claim mapper never persisted the id locally, and the local fallback recovers a
    * registration whose throwaway Keycloak user was already deleted by an earlier partial failure
-   * (the reported conrad7247/MardukSedras case, stranded by the missing {@code LINKED}
-   * check-constraint value — see V223).
+   * (the reported case of a member stranded by the missing {@code LINKED} check-constraint value —
+   * see V223).
    *
    * @param pendingId the pending Discord registration to link away
    * @param targetUserId the existing account to link the Discord identity into

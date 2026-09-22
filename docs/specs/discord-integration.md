@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-29.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
 > **Owner area:** AUTH/SEC · **Related ADRs:** ADR-0030 (federation + first-login gate); ADR-0036 (Discord link recognised from the federated identity); ADR-0051 (account-existence precheck denies a colliding first-login); ADR-0111 (admin-mediated linking of a Discord registration to an existing account); role/unit sync (planned — Track 2)
 
 # Discord integration — login, membership gate & admin approval
@@ -15,6 +15,16 @@ the existing tooling — the automated Discord-role → app-role/unit **sync is 
 
 This is epic **#720, Track 1** (issues #721–#725). The federation and the gate are implemented in an
 owned Keycloak provider module (`keycloak-spi/`), per [ADR-0030](../adr/0030-discord-federation-first-login-membership-gate.md).
+The backend half — login-time reconciliation, the approval queue and the account merge — lives in
+`UserReconciliationService` (sync), `UserRegistrationService` (approve / reject / reopen / link) and
+`UserDeletionService` (FK-safe delete).
+
+> **Numbering note.** Requirement ids are stable. Two ids in this file were renumbered once, on
+> 2026-09-22 and on the owner's decision, because each had also named a different requirement: this
+> file keeps `REQ-DATA-006` (Discord account link), while the guild-nickname requirement below was
+> `REQ-DATA-008` and is now `REQ-DATA-018` — `REQ-DATA-008` stays with the user-deletion FK handling
+> in [`data-persistence.md`](data-persistence.md), whose covering-index rule moved to `REQ-DATA-017`.
+> See the renumbering table in [`INDEX.md`](INDEX.md).
 
 ## Requirements
 
@@ -29,9 +39,9 @@ Account Console (ADR-0036) or an admin linked a pending registration onto it fro
 (REQ-SEC-026, ADR-0111). It reaches the backend two ways, both
 persisting onto this column: (1) the `discord_user_id` token claim, emitted by the SPI
 `DiscordFederatedIdentityMapper` from the federated link on **every** login (so even a pure
-credential login of a linked user carries it), persisted by `UserService.syncUser(Jwt)`; and (2) the
+credential login of a linked user carries it), persisted by `UserReconciliationService.syncUser(Jwt)`; and (2) the
 scheduled Admin-API user sync, which reads `GET /users/{id}/federated-identity` and persists the
-`discord` link via `UserService.syncUser(KeycloakUserDto)` — back-filling accounts with no re-login.
+`discord` link via `UserReconciliationService.syncUser(KeycloakUserDto)` — back-filling accounts with no re-login.
 Path (2) is **incremental** (5000-account scaling, ADR-0085): the sync reads the federated-identity
 endpoint only for roster users who do **not** already carry a local link (`getKnownDiscordLinkedUserIds`
 is the skip-set), so the already-linked majority is never re-read; a *relink* to a different Discord
@@ -77,12 +87,12 @@ all credential-only users coexist.
   linking (REQ-SEC-022). That comparison never links and never inherits, so the no-silent-inheritance
   guarantee is preserved — and strengthened.
 
-**Enforced by:** `BackendApplicationTests` (schema validate) · `UserServiceDiscordSyncTest` (subject-only recognition: a Discord login never consults `findByUsername`) · `UserServiceSyncTest` (scheduled sync back-fills the Discord link, and leaves it untouched on a `null`) · `UserReconciliationServiceTest` (a snowflake held by another account is skipped and counted on both write paths; an unclaimed one is still written) · `KeycloakServiceTest` (the Admin-API sync attaches the `discord` federated id, ignores other IdPs) · `DiscordFederatedIdentityMapperTest` (claim derived from the federated link) · **Code:** `User`, `V172__add_discord_user_id_to_app_user.sql`, `UserService.syncUser`, `UserReconciliationService.applyDiscordLink`, `UserRepository.findIdByDiscordUserId`, `KeycloakService.fetchUsers`, `DiscordFederatedIdentityMapper` · **Issues:** #721, #724, #1826 · **Decision:** ADR-0036
+**Enforced by:** `BackendApplicationTests` (schema validate) · `UserReconciliationServiceTest` — `DiscordSyncTests` (subject-only recognition: a Discord login never consults `findByUsername`; a snowflake held by another account is skipped and counted, an unclaimed one is written) and `SyncKeycloakUserTests` (scheduled sync back-fills the Discord link, and leaves it untouched on a `null`) · `KeycloakServiceTest` (the Admin-API sync attaches the `discord` federated id, ignores other IdPs) · `DiscordFederatedIdentityMapperTest` (claim derived from the federated link) · **Code:** `User`, `V172__add_discord_user_id_to_app_user.sql`, `UserReconciliationService.syncUser` / `.applyDiscordLink`, `UserRepository.findIdByDiscordUserId`, `KeycloakService.fetchUsers`, `DiscordFederatedIdentityMapper` · **Issues:** #721, #724, #1826 · **Decision:** ADR-0036
 
 ### REQ-SEC-019 — Discord-link indicator in member management (admin-only, no raw id)
 
 The admin member-management page (`/members`) surfaces whether each account is Discord-linked, as a
-read-only column **between** the "Missions-Manager" and "Status" columns. The signal is a derived
+read-only column **between** the "Rang" and "Status" columns. The signal is a derived
 boolean `UserDto.discordLinked` — `true` iff the user has a non-blank `discord_user_id`
 (REQ-DATA-006) — computed in `UserMapper.toDto`. The **raw Discord id (snowflake) is never carried
 in any DTO**; only the boolean fact of the link leaves the backend, consistent with the
@@ -92,10 +102,13 @@ never-log/never-expose-Discord-id posture of REQ-SEC-016. The page is already `@
 "never reaches non-admins through any shared-`UserDto` path (mission participants, pickers, etc.)",
 and that was false for its own example. Only surfaces that apply the peer projection strip it — `GET
 /api/v1/users/{id}`, the user list/search, and (since the 2026-08-30 audit) the job-order assignees.
-`GET /api/v1/missions/{id}` still hands every member the full nested `UserDto` for participants and
-ship owners, by the documented member tier of `UserMapper#toDto`. Closing that is a separate change
-with a wider blast radius than the orders instance had; until it lands, the honest statement is that
-`discordLinked` is admin-only **on the surfaces that redact**, not on every nested one. The visual treatment follows the monochrome-icon
+The mission surfaces (`GET /api/v1/missions/{id}` and the finance ledger) strip it for every caller
+below Logistician since ADR-0159 — participants and assigned-ship owners go through
+`MissionPeerRedactor.cleanupUserForPeer` — but a Logistician-or-above caller still receives the full
+nested `UserDto`, `discordLinked` included, by the documented member tier of `UserMapper#toDto`. So
+the honest statement is that `discordLinked` is admin-only **on the surfaces that redact**, not on
+every nested one. *(Updated 2026-09-22: this used to say the mission detail handed it to every
+member.)* The visual treatment follows the monochrome-icon
 design-system convention: linked → the Discord brand mark in the inherited link/text colour
 (`currentColor`, like the sibling GitHub mark), not linked → a muted em-dash.
 
@@ -103,7 +116,7 @@ design-system convention: linked → the Discord brand mark in the inherited lin
 
 - [x] `UserDto.discordLinked` is `true` exactly when `app_user.discord_user_id` is non-null and
   non-blank, derived in `UserMapper.toDto`; the raw id is never added to any DTO.
-- [x] `/members` renders a Discord column between "Missions-Manager" and "Status": a linked account
+- [x] `/members` renders a Discord column between "Rang" and "Status": a linked account
   shows the `krt-icon-discord` brand mark (neutral `currentColor`, with a localized title/aria-label),
   a non-linked account shows a muted em-dash.
 - [x] The peer redaction shapes (`UserController.redactToPeerShape` and the shared
@@ -199,7 +212,7 @@ truststore, and a TLS failure simply fails open.
 A member who already has a Basetool account but signs in via Discord **can slip past the fail-open
 collision precheck (REQ-SEC-022)** and land in the PENDING approval queue as a seemingly-new
 registration — typically because their Discord **username** differs from their in-app/server name
-(the reported conrad7247/MadrukSedras case). For exactly this, an admin can **link** such a pending
+(the reported `<discord-handle>`/`<in-app-name>` case; *example anonymised 2026-09-22*). For exactly this, an admin can **link** such a pending
 registration onto the existing account from the approval queue (`/admin/discord-registrations`,
 ADMIN-gated) instead of approving a duplicate: the third **"Verknüpfen"** action opens a
 server-searched account picker (the `remote-users` combobox over `/users/search`, so the admin finds
@@ -209,7 +222,7 @@ Linking moves the Discord identity onto the **surviving existing account** and d
 throwaway Discord-registered account. It is orchestrated by
 `UserRegistrationService.linkRegistrationToExistingAccount` as a **non-transactional orchestrator**
 (Keycloak writes are external side-effects that cannot roll back with the DB, mirroring the
-`OperationService.setPayoutStatus` pattern):
+`OperationPayoutService.setPayoutStatus` pattern):
 
 1. The pending row is optimistic-locked (client `version` echoed from `PendingRegistrationDto`,
    checked via `OptimisticLock.checkOptionalClient`) and must still be `PENDING` — else a `409`
@@ -401,7 +414,7 @@ new PENDING registration (REQ-NOTIF-012), keyed off the PENDING transition itsel
   re-login, and confirms it (`pendingApproval.approved`) before redirecting. A caller already
   `REJECTED` at page load is served no poll script at all.
 
-**Enforced by:** `CustomJwtGrantedAuthoritiesConverterTest` (gate) + `UserServiceApprovalTest` (approve/reject + 409) + `UserServiceDiscordSyncTest` (new credential ⇒ PENDING, new admin ⇒ ACTIVE) + `UserServiceSyncTest` (scheduled-sync fail-safe) + `UserServiceDeleteTest` (approval-audit cleanup precedes the user delete) + `BackendRoleSyncFilterTest` (verdict expiry + poll-path exemption + `forgetApprovalVerdict`) + `PendingApprovalPageControllerTest` (status poll + the per-state render branch, incl. the unreadable-backend fallback and the redirect-loop regression) + `PendingApprovalRenderMvcTest` (the rendered page for all three states: which block exists, which is visible, which copy it carries, and whether the poll is wired) + `PendingApprovalAccessFilterTest` (backend `/api/**` gate, incl. the percent-encoded-prefix bypass) · **Code:** `CustomJwtGrantedAuthoritiesConverter`, `PendingApprovalAccessFilter`, `UserService.deleteUser`, `UserApprovalEventRepository` / `UserRepository.clearApprovedBy` (delete-time FK cleanup), `DiscordRegistrationAdminController`, `BackendRoleSyncFilter` (waiting-page route), `PendingApprovalPageController`, `pending-approval.html`, `pending-approval.js`, `messages*.properties` (`pendingApproval.*`) · **Issues:** #724, post-approval double re-login · **ADR:** ADR-0122
+**Enforced by:** `CustomJwtGrantedAuthoritiesConverterTest` (gate) + `UserRegistrationServiceTest` (approve/reject + 409) + `UserReconciliationServiceTest` (`DiscordSyncTests`: new credential ⇒ PENDING, new admin ⇒ ACTIVE; `SyncKeycloakUserTests`: scheduled-sync fail-safe) + `UserDeletionServiceTest` (approval-audit cleanup precedes the user delete) + `BackendRoleSyncFilterTest` (verdict expiry + poll-path exemption + `forgetApprovalVerdict`) + `PendingApprovalPageControllerTest` (status poll + the per-state render branch, incl. the unreadable-backend fallback and the redirect-loop regression) + `PendingApprovalRenderMvcTest` (the rendered page for all three states: which block exists, which is visible, which copy it carries, and whether the poll is wired) + `PendingApprovalAccessFilterTest` (backend `/api/**` gate, incl. the percent-encoded-prefix bypass) · **Code:** `CustomJwtGrantedAuthoritiesConverter`, `PendingApprovalAccessFilter`, `UserRegistrationService`, `UserDeletionService.deleteUser`, `UserApprovalEventRepository` / `UserRepository.clearApprovedBy` (delete-time FK cleanup), `DiscordRegistrationAdminController`, `BackendRoleSyncFilter` (waiting-page route), `PendingApprovalPageController`, `pending-approval.html`, `pending-approval.js`, `messages*.properties` (`pendingApproval.*`) · **Issues:** #724, post-approval double re-login · **ADR:** ADR-0122
 
 ### REQ-NOTIF-012 — Admins notified on new PENDING registration
 
@@ -430,7 +443,7 @@ same after-commit trigger additionally e-mails every admin the same notice on a 
 - [x] Exactly one notification per admin, end to end (the `created` gate makes the two sync paths
   mutually exclusive for a given row).
 
-**Enforced by:** `NotificationRuleEngineIntegrationTest#discordRegistrationPendingRuleNotifiesEveryAdmin` (V174 rule → ADMIN recipient → exactly one unread row, end to end) · `UserServiceDiscordSyncTest#newPendingRegistration_notifiesAdmins_evenWithoutDiscordClaim` (fires with the claim absent) · `UserServiceSyncTest` (scheduled path fires for a new non-admin, stays silent for an admin and for an already-persisted row) · `DiscordRegistrationPendingEvent` (no PII by construction) + `V174` seed · **Code:** `UserService.syncUser(Jwt)` / `UserService.syncUser(KeycloakUserDto)`, `DiscordRegistrationPendingEvent`, `V174` · **Issues:** #724
+**Enforced by:** `NotificationRuleEngineIntegrationTest#discordRegistrationPendingRuleNotifiesEveryAdmin` (V174 rule → ADMIN recipient → exactly one unread row, end to end) · `UserReconciliationServiceTest` — `DiscordSyncTests#newPendingRegistration_notifiesAdmins_evenWithoutDiscordClaim` (fires with the claim absent) and `SyncKeycloakUserTests` (scheduled path fires for a new non-admin, stays silent for an admin and for an already-persisted row) · `DiscordRegistrationPendingEvent` (no PII by construction) + `V174` seed · **Code:** `UserReconciliationService.syncUser(Jwt)` / `.syncUser(KeycloakUserDto)`, `UserRegistrationService.stampNewPendingRegistration`, `DiscordRegistrationPendingEvent`, `V174` · **Issues:** #724
 
 ### REQ-NOTIF-014 — User notified by e-mail on approval / rejection (reason included)
 
@@ -450,9 +463,9 @@ reason are **never logged** (REQ-OBS).
 
 - [x] Approving a PENDING registration publishes an approval `UserApprovalDecidedEvent`
   (`approved = true`, no reason); rejecting publishes a rejection event carrying the admin's reason
-  (`UserServiceApprovalTest`).
+  (`UserRegistrationServiceTest`).
 - [x] A stale-version (409) or non-PENDING (409) decision publishes **no** decision-mail event
-  (`UserServiceApprovalTest`).
+  (`UserRegistrationServiceTest`).
 - [x] The composed approval mail carries the approval subject/body; the rejection mail carries the
   rejection subject/body plus the reason (or a localized "no reason given" placeholder when blank)
   (`UserApprovalMailServiceTest`).
@@ -461,10 +474,10 @@ reason are **never logged** (REQ-OBS).
 - [x] The `email.*` subject/body/greeting/sign-off/reason keys exist in all three backend bundles
   (default/de/en, umlauts `\uXXXX`-escaped) (`MessageBundleConsistencyTest`).
 
-**Enforced by:** `UserServiceApprovalTest` (publish on decide, none on 409) · `UserApprovalMailServiceTest`
+**Enforced by:** `UserRegistrationServiceTest` (publish on decide, none on 409) · `UserApprovalMailServiceTest`
 (approval/rejection composition, reason placeholder, skip-on-no-email) · `UserApprovalMailEventListenerTest`
 (delegate + swallow) · `MessageBundleConsistencyTest` (key parity + umlaut escaping) · **Code:**
-`UserService.approveUser`/`rejectUser`, `event/UserApprovalDecidedEvent`, `service/UserApprovalMailService`,
+`UserRegistrationService.approveUser`/`rejectUser`, `event/UserApprovalDecidedEvent`, `service/UserApprovalMailService`,
 `service/UserApprovalMailEventListener`, `messages*.properties` (`email.*`) · **Decision:** ADR-0064 · **Issues:** #720
 
 ### REQ-NOTIF-015 — Admins notified by e-mail on new PENDING registration
@@ -512,7 +525,9 @@ name-less body, empty-admins no-op) · `PendingRegistrationMailEventListenerTest
 `event/DiscordRegistrationPendingEvent`, `repository/UserRepository#findAllAdmins`,
 `messages*.properties` (`email.pendingRegistration.*`) · **Decision:** ADR-0064 · **Issues:** #720
 
-### REQ-DATA-008 — Discord guild nickname captured at login & shown at approval (admin-only)
+### REQ-DATA-018 — Discord guild nickname captured at login & shown at approval (admin-only)
+
+> **Renumbered 2026-09-22:** this requirement was `REQ-DATA-008` until 2026-09-22; that id also named the user-deletion FK handling in [`data-persistence.md`](data-persistence.md), which keeps it.
 
 To let an admin recognise who a pending Discord registration actually is, Basetool captures the
 name the guild **displays** for the user — the per-guild `nick` they set inside the `das-kartell`
@@ -520,8 +535,8 @@ guild, **falling back to the account's global display name (`user.global_name`) 
 nick is set** — and shows it beside the name in the admin registration-approval queue. The fallback
 matters because Discord renders a member as `nick ?? global_name ?? username`: a member who never
 set a server nickname would otherwise surface as a blank em-dash even though the guild clearly shows
-their global name (the reported conrad7247/MadrukSedras case, where the Discord handle differs from
-the recognisable server name). The `app_user.discord_guild_nickname` column (nullable,
+their global name (the reported `<discord-handle>`/`<in-app-name>` case, where the Discord handle
+differs from the recognisable server name; *example anonymised 2026-09-22*). The `app_user.discord_guild_nickname` column (nullable,
 `VARCHAR(255)`) holds it. Capture is **best-effort and fail-open**: `DiscordIdentityProvider` fetches
 the guild-member object (`GET /users/@me/guilds/{guildId}/member`, guild id from the
 `DISCORD_GUILD_ID` env var, scope `guilds.members.read`) via
@@ -545,8 +560,9 @@ first-broker-login collision precheck's nickname candidate deliberately stays **
   else `user.global_name`; a Discord error/timeout or neither name present yields no value and never
   breaks the login. The precheck's `readNickname` view stays nick-only
   (`DiscordGuildNicknameReaderTest`).
-- [x] `UserService.syncUser(Jwt)` persists a non-blank `discord_guild_nickname` claim (trimmed,
-  length-bounded) and leaves the field `null` when the claim is absent (`UserServiceDiscordSyncTest`).
+- [x] `UserReconciliationService.syncUser(Jwt)` persists a non-blank `discord_guild_nickname` claim
+  (trimmed, length-bounded) and leaves the field `null` when the claim is absent
+  (`UserReconciliationServiceTest`, `DiscordSyncTests`).
 - [x] The admin approval queue renders the captured nickname beside the name; a registration with no
   captured nickname falls back to a muted em-dash (`AdminDiscordRegistrationsNicknameRenderTest`).
 - [x] The nickname rides only the admin-only `PendingRegistrationDto` — never added to any shared
@@ -555,12 +571,13 @@ first-broker-login collision precheck's nickname candidate deliberately stays **
   `guild_nick` → `discord_guild_nickname`, sync mode FORCE; the `discord_guild_nickname` protocol
   mapper) are configured per the runbook. If absent, the column stays `null` (graceful no-op).
 
-**Enforced by:** `DiscordGuildNicknameReaderTest` (keycloak-spi fail-open matrix) · `UserServiceDiscordSyncTest` (claim persisted / absent) · `AdminDiscordRegistrationsNicknameRenderTest` (frontend column) · `DtoOpenApiContractTest` (frontend mirror ⊆ committed `openapi.json`) · `MessageBundleConsistencyTest` (key parity) · **Code:** `DiscordIdentityProvider`, `DiscordGuildNicknameReader`, `User`, `V178__add_discord_guild_nickname_to_app_user.sql`, `UserService.syncUser`, `PendingRegistrationDto` (backend + frontend), `DiscordRegistrationAdminController`, `admin/discord-registrations.html` · **Issues:** #720
+**Enforced by:** `DiscordGuildNicknameReaderTest` (keycloak-spi fail-open matrix) · `UserReconciliationServiceTest` (claim persisted / absent) · `AdminDiscordRegistrationsNicknameRenderTest` (frontend column) · `DtoOpenApiContractTest` (frontend mirror ⊆ committed `openapi.json`) · `MessageBundleConsistencyTest` (key parity) · **Code:** `DiscordIdentityProvider`, `DiscordGuildNicknameReader`, `User`, `V178__add_discord_guild_nickname_to_app_user.sql`, `UserReconciliationService.syncUser`, `PendingRegistrationDto` (backend + frontend), `DiscordRegistrationAdminController`, `admin/discord-registrations.html` · **Issues:** #720
 
 ## Out of scope
 
 - **Automated Discord-role → app-role/org-unit sync** and the Discord **bot** — Track 2 (#726–#730),
-  ADR-0031 (planned). Track 1 keeps Basetool roles manual.
+  its ADR not yet written (the number ADR-0031 once pencilled in for it now belongs to the live
+  mission sync). Track 1 keeps Basetool roles manual.
 - **Continuous membership enforcement.** The guild + KRT-Mitglied gate (REQ-SEC-016) runs **once**,
   at first-broker-login when the Discord identity is first linked. A member later removed from the
   guild or stripped of `KRT-Mitglied` keeps Basetool access until the Track 2 role-sync revokes it —
@@ -571,8 +588,11 @@ first-broker-login collision precheck's nickname candidate deliberately stays **
 
 ## Open questions
 
-- **Baseline floor on approval** — does approval auto-grant a baseline `KRT_MEMBER`, or does the
-  admin seat every role by hand? Track-1 default: by hand (epic open decision #1).
+- ~~**Baseline floor on approval** — does approval auto-grant a baseline `KRT_MEMBER`, or does the
+  admin seat every role by hand? (epic open decision #1)~~ **Settled by the code and REQ-SEC-053:**
+  approval grants no role (`UserRegistrationService.approveUser`); the roles are the Keycloak realm
+  roles an admin assigns, and an approved account that still maps to no role is refused `403 NO_ROLE`
+  until one is assigned.
 - **Existing-member migration** — ~~link an existing credential account to a Discord identity, or only
   forward via Discord login? (epic open decision #2)~~ **Resolved (ADR-0036):** an existing account
   may be linked to Discord via the Keycloak Account Console and is recognised exactly like a Discord

@@ -1,83 +1,116 @@
 # E2E-Test Use Cases
 
-Dieses Verzeichnis dokumentiert die End-to-end-Testszenarien des Profit Basetool als Use Cases — je ein Dokument pro funktionalem Flow. Jeder Use Case beschreibt Akteur, Vorbedingungen, Ablauf und erwartetes Ergebnis und verlinkt die implementierende Playwright-Testklasse.
+Dieses Verzeichnis dokumentiert die End-to-end-Testszenarien des Profit Basetool als Use Cases. Jeder Use Case beschreibt Akteur, Vorbedingungen, Ablauf und erwartetes Ergebnis und verlinkt die implementierenden Playwright-Testklassen; eng verwandte Klassen eines Bereichs teilen sich einen Use Case. **Jede Testklasse der Suite gehört zu genau einem Use Case** — mit Ausnahme der vier Ad-hoc-Prüfharnische am Ende dieser Seite.
 
-Für Aufbau, Cross-Browser-Matrix und CI-Workflows der E2E-Suite siehe den Testing-Abschnitt im [Projekt-README](../../README.md).
+Die Suite liegt im Source-Set `e2e` des Moduls `frontend` (`frontend/src/e2e/java/…/frontend/e2e/`). Für Aufbau, Cross-Browser-Matrix und Befehle siehe auch den Abschnitt *End-to-end (E2E) tests* im [Projekt-README](../../README.md).
 
 ## Übersicht
 
-|                            ID                            |                       Use Case                        |   Tag   |            Testklasse            |
-|----------------------------------------------------------|-------------------------------------------------------|---------|----------------------------------|
-| [UC-01](UC-01-login.md)                                  | Login via Keycloak                                    | `e2e`   | `LoginSmokeE2eTest`              |
-| [UC-02](UC-02-mission-anlegen.md)                        | Einsatz anlegen                                       | `e2e`   | `MissionCreateE2eTest`           |
-| [UC-03](UC-03-job-order-anlegen.md)                      | Job Order anlegen                                     | `e2e`   | `JobOrderCreateE2eTest`          |
-| [UC-04](UC-04-refinery-order-anlegen.md)                 | Refinery Order anlegen                                | `e2e`   | `RefineryOrderCreateE2eTest`     |
-| [UC-05](UC-05-hangar-schiff-hinzufuegen.md)              | Schiff zum Hangar hinzufügen                          | `e2e`   | `HangarAddShipE2eTest`           |
-| [UC-06](UC-06-job-order-handover.md)                     | Job-Order-Handover protokollieren                     | `e2e`   | `JobOrderHandoverE2eTest`        |
-| [UC-07](UC-07-kernseiten-smoke.md)                       | Kernseiten-Smoke (nicht-destruktiv)                   | `smoke` | `CorePagesSmokeE2eTest`          |
-| [UC-13](UC-13-inventar-operationen.md)                   | Inventar: Ein-/Aus-/Umbuchen, Verkauf, Zuweisung      | `e2e`   | `InventoryOperationsE2eTest`     |
-| [UC-15](UC-15-job-order-bearbeiten.md)                   | Job Order bearbeiten                                  | `e2e`   | `JobOrderEditE2eTest`            |
-| [UC-16](UC-16-job-order-status.md)                       | Job-Order-Status ändern                               | `e2e`   | `JobOrderStatusE2eTest`          |
-| [UC-17](UC-17-item-order-handover.md)                    | Item-Auftrag & Item-Handover                          | `e2e`   | `JobOrderItemHandoverE2eTest`    |
-| [UC-19](UC-19-refinery-order-einlagern.md)               | Refinery Order einlagern (in das Lager)               | `e2e`   | `RefineryOrderStoreE2eTest`      |
-| [UC-20](UC-20-refinery-order-lifecycle.md)               | Refinery Order: Bearbeiten/Abbrechen/Filter/Edges     | `e2e`   | `RefineryOrderLifecycleE2eTest`  |
-| [UC-22](UC-22-mission-finanzeintrag.md)                  | Einsatz: Finanzeintrag anlegen & Detail erneut öffnen | `e2e`   | `MissionFinanceEntryE2eTest`     |
-| [UC-23](UC-23-job-order-bearbeiter-notizen.md)           | Job Order: Bearbeiter ein-/austragen & Notizen (AJAX) | `e2e`   | `JobOrderAssigneeNotesE2eTest`   |
-| [UC-24](UC-24-refinery-import-extract.md)                | Refinery Order aus Screenshot-Extract importieren     | `e2e`   | `RefineryImportE2eTest`          |
-| [UC-25](UC-25-befoerderung-themenbereich-crud.md)        | Beförderung: Themenbereich anlegen/umbenennen/löschen | `e2e`   | `PromotionTopicCrudE2eTest`      |
-| [UC-26](UC-26-mein-inventar-crud.md)                     | Mein Inventar: Eintrag anlegen & löschen              | `e2e`   | `PersonalInventoryCrudE2eTest`   |
-| [UC-27](UC-27-benachrichtigung-gelesen.md)               | Benachrichtigung erhalten & als gelesen markieren     | `e2e`   | `NotificationCenterE2eTest`      |
-| [UC-28](UC-28-mitglied-bearbeiten.md)                    | Mitglied bearbeiten (In-Place-Save)                   | `e2e`   | `MemberEditInPlaceE2eTest`       |
-| [UC-29](UC-29-admin-missions-stammdaten-staffel-crud.md) | Admin Missions-Stammdaten: Staffel anlegen & löschen  | `e2e`   | `AdminMissionDataCrudE2eTest`    |
-| [UC-30](UC-30-item-lager-operationen.md)                 | Item-Lager: Ein-/Um-/Ausbuchen, Zuordnungs-Gate, Sync | `e2e`   | `ItemInventoryOperationsE2eTest` |
+### Grund-Flows
 
-UC-25 bis UC-29 schließen die zuvor offenen E2E-Lücken der auditierten Bereiche **Beförderung** (UC-25) und **Mein Inventar** (UC-26), der **Benachrichtigungen** (UC-27), der ADMIN-**Mitgliederverwaltung** (UC-28) und des Admin-Datenpflege-Clusters (UC-29). Ergänzend deckt der ADMIN-authentifizierte [`AdminPagesSmokeE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/AdminPagesSmokeE2eTest.java) (`@Tag("e2e")`) die reinen Lese-Adminseiten als Page-Load-Smoke ab, und `CorePagesSmokeE2eTest` (`@Tag("smoke")`) lädt jetzt zusätzlich die zuvor ungesmokten Lese-Seiten (`/operations`, `/materials`, `/materials/overview`, `/materials/profit-calculation`, `/ship-data`, `/blueprint-overview`, `/org-chart`, `/notifications`, `/personal-inventory`, `/personal-inventory/blueprints`).
+|                         ID                          |                        Use Case                         |   Tag   |                                          Testklasse                                          |
+|-----------------------------------------------------|---------------------------------------------------------|---------|----------------------------------------------------------------------------------------------|
+| [UC-01](UC-01-login.md)                             | Login via Keycloak                                      | `e2e`   | `LoginSmokeE2eTest`                                                                          |
+| [UC-02](UC-02-mission-anlegen.md)                   | Einsatz anlegen                                         | `e2e`   | `MissionCreateE2eTest`                                                                       |
+| [UC-03](UC-03-job-order-anlegen.md)                 | Job Order anlegen                                       | `e2e`   | `JobOrderCreateE2eTest`                                                                      |
+| [UC-04](UC-04-refinery-order-anlegen.md)            | Refinery Order anlegen                                  | `e2e`   | `RefineryOrderCreateE2eTest`                                                                 |
+| [UC-05](UC-05-hangar-schiff-hinzufuegen.md)         | Schiff zum Hangar hinzufügen                            | `e2e`   | `HangarAddShipE2eTest`                                                                       |
+| [UC-06](UC-06-job-order-handover.md)                | Job-Order-Handover protokollieren                       | `e2e`   | `JobOrderHandoverE2eTest`                                                                    |
+| [UC-07](UC-07-kernseiten-smoke.md)                  | Kernseiten-Smoke (nicht-destruktiv)                     | `smoke` | `CorePagesSmokeE2eTest`                                                                      |
+| [UC-13](UC-13-inventar-operationen.md)              | Inventar: Ein-/Aus-/Umbuchen, Verkauf, Zuordnung        | `e2e`   | `InventoryOperationsE2eTest`                                                                 |
+| [UC-15](UC-15-job-order-bearbeiten.md)              | Job Order bearbeiten                                    | `e2e`   | `JobOrderEditE2eTest`                                                                        |
+| [UC-16](UC-16-job-order-status.md)                  | Job-Order-Status ändern                                 | `e2e`   | `JobOrderStatusE2eTest`                                                                      |
+| [UC-17](UC-17-item-order-handover.md)               | Item-Auftrag & Item-Handover                            | `e2e`   | `JobOrderItemHandoverE2eTest`                                                                |
+| [UC-19](UC-19-refinery-order-einlagern.md)          | Refinery Order einlagern (in das Lager)                 | `e2e`   | `RefineryOrderStoreE2eTest`                                                                  |
+| [UC-20](UC-20-refinery-order-lifecycle.md)          | Refinery Order: Bearbeiten/Abbrechen/Filter/Live-Sync   | `e2e`   | `RefineryOrderLifecycleE2eTest` · `RefineryOrderLiveSyncE2eTest`                             |
+| [UC-22](UC-22-mission-finanzeintrag.md)             | Einsatz: Finanzeintrag anlegen & Detail erneut öffnen   | `e2e`   | `MissionFinanceEntryE2eTest`                                                                 |
+| [UC-23](UC-23-job-order-bearbeiter-notizen.md)      | Job Order: Bearbeiter ein-/austragen & Notizen          | `e2e`   | `JobOrderAssigneeNotesE2eTest`                                                               |
+| [UC-24](UC-24-refinery-import-extract.md)           | Refinery Order aus Screenshot-Extract importieren       | `e2e`   | `RefineryImportE2eTest`                                                                      |
+| [UC-25](UC-25-befoerderung-themenbereich-crud.md)   | Beförderung: Themenbereich anlegen/umbenennen/löschen   | `e2e`   | `PromotionTopicCrudE2eTest`                                                                  |
+| [UC-26](UC-26-mein-inventar-crud.md)                | Mein Inventar: Eintrag anlegen & löschen                | `e2e`   | `PersonalInventoryCrudE2eTest`                                                               |
+| [UC-27](UC-27-benachrichtigung-gelesen.md)          | Benachrichtigung erhalten & als gelesen markieren       | `e2e`   | `NotificationCenterE2eTest`                                                                  |
+| [UC-28](UC-28-mitglied-bearbeiten.md)               | Mitglied bearbeiten (In-Place-Save, zweite Staffel)     | `e2e`   | `MemberEditInPlaceE2eTest`                                                                   |
+| [UC-29](UC-29-admin-missions-stammdaten-staffel-crud.md) | Admin Missions-Stammdaten: Staffel anlegen & löschen | `e2e`   | `AdminMissionDataCrudE2eTest`                                                                |
+| [UC-30](UC-30-item-lager-operationen.md)            | Item-Lager: Ein-/Um-/Ausbuchen, Zuordnungs-Gate, Sync   | `e2e`   | `ItemInventoryOperationsE2eTest`                                                             |
 
-UC-01 bis UC-07 sowie UC-13 sind als Playwright-Tests implementiert (Happy Path als Admin/IRIDIUM-Mitglied); UC-15 bis UC-17 erweitern die Job-Order-Flows (Bearbeiten, Status-Wechsel, Item-Auftrag/Item-Handover), UC-19 und UC-20 die Refinery-Flows (Einlagern, Lifecycle/Edge Cases), UC-22 den Einsatz-Finanzeintrag (Regressionsschutz gegen den Detail-500, wenn ein Einsatz einen Finanzeintrag besitzt) — ebenfalls `@Tag("e2e")`. Zusammen mit UC-04 (Anlegen) bilden UC-19/UC-20 den vollen Refinery-Funktionsumfang ab.
+### Rollen, Mandanten & staffel-/SK-übergreifend
 
-### Rollen & staffel-/SK-übergreifend
+|                      ID                            |                                        Thema                                         |  Tag  |                   Testklasse                   |
+|----------------------------------------------------|---------------------------------------------------------------------------------------|-------|------------------------------------------------|
+| [Rollen & Scope](rollen-und-scope.md)              | Referenz: Rollen × Flow-Matrix, Mandanten-Scope, Admin-Pin, SK-Grundlagen             | `e2e` | `RolePermissionsE2eTest` (Control-Gating je Rolle) |
+| [UC-08](UC-08-job-order-staffel-uebergreifend.md)  | Job Order: Staffel A bestellt, Staffel B liefert                                      | `e2e` | `CrossStaffelJobOrderE2eTest`                  |
+| [UC-09](UC-09-handover-staffel-uebergreifend.md)   | Handover staffel-übergreifend                                                         | `e2e` | `CrossStaffelHandoverE2eTest`                  |
+| [UC-10](UC-10-mission-staffel-uebergreifend.md)    | Organisationsweiter Einsatz, gesehen von einer anderen Staffel                        | `e2e` | `OrgWideMissionCrossStaffelE2eTest`            |
+| [UC-11](UC-11-sk-spezialkommando.md)               | Spezialkommando anlegen/deaktivieren, Grenze der Profit-Eligibility                   | `e2e` | `SpecialCommandE2eTest`                        |
+| [UC-12](UC-12-mitgliederbereich.md)                | Mitgliederbereich: ohne Anmeldung nur Startseite und Rechtsseiten; Konto ohne Rolle   | `e2e` | `AnonymousSurfaceE2eTest` · `NoRoleGateE2eTest` |
+| [UC-14](UC-14-inventar-mandanten-scope.md)         | Inventar-Mandanten-Scope über alle Mitgliedschaftsprofile + Admin-Pin                 | `e2e` | `InventoryTenancyE2eTest`                      |
+| [UC-18](UC-18-job-order-mandanten-sichtbarkeit.md) | Job Order: SK-Warteschlange vs. staffel-privat, Requester-Escape                      | `e2e` | `JobOrderTenancyE2eTest`                       |
+| [UC-21](UC-21-refinery-order-mandanten-scope.md)   | Refinery-Mandanten-Scope + Admin-Pin + BAC-004                                        | `e2e` | `RefineryOrderTenancyE2eTest`                  |
+| [UC-40](UC-40-organigramm-hierarchie-ernennungen.md) | Organigramm, Bereichs-Hierarchie & Ernennungen                                      | `e2e` | `OrgChartPositionCrudE2eTest` · `OrgChartKeyboardA11yE2eTest` · `OrgHierarchyVisibilityMatrixE2eTest` · `RoleAppointmentMatrixE2eTest` |
 
-Die folgenden Dokumente erweitern die Grund-Flows um **Rollen** (Offizier, einfaches Mitglied) und **Mehr-Staffel-/SK-Szenarien** — inkl. der Fälle, in denen eine Staffel etwas anlegt und eine andere damit weiterarbeitet. Sie sind **spezifiziert und als Playwright-Tests implementiert** (`@Tag("e2e")`).
+> **Hinweis zur Abdeckung:** Einsätze/Operationen und Refinery Orders sind **strict-staffel**. Die staffel-übergreifende Zusammenarbeit läuft über organisationsweite Einsätze (UC-10) und den Job-Order-Workspace inkl. Handover (UC-08/UC-09). Details in [Rollen & Scope](rollen-und-scope.md).
 
-|                      Dokument                      |                                                                             Thema                                                                              |                   Testklasse                   |
-|----------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------|
-| [Rollen & Scope](rollen-und-scope.md)              | Rollen × Flow-Matrix, Mandanten-Scope-Modell, Admin-Pin, SK-Grundlagen (Referenz); Control-Gating Handover/Edit/Delete je Rolle                                | `RolePermissionsE2eTest`                       |
-| [UC-08](UC-08-job-order-staffel-uebergreifend.md)  | Job Order: Staffel A bestellt, Staffel B liefert (B's Inventar verknüpft)                                                                                      | `CrossStaffelJobOrderE2eTest`                  |
-| [UC-09](UC-09-handover-staffel-uebergreifend.md)   | Handover staffel-übergreifend (Material von B, Empfänger ggf. dritte Staffel)                                                                                  | `CrossStaffelHandoverE2eTest`                  |
-| [UC-10](UC-10-mission-staffel-uebergreifend.md)    | Organisationsweiter Einsatz mit Teilnehmern aus anderer Staffel                                                                                                | `OrgWideMissionCrossStaffelE2eTest`            |
-| [UC-11](UC-11-sk-spezialkommando.md)               | Spezialkommando (SK) als OrgUnit (Lifecycle, Mitglieder, aktuelle Grenzen)                                                                                     | `SpecialCommandE2eTest`                        |
-| [UC-12](UC-12-mitgliederbereich.md)                | Mitgliederbereich: ohne Anmeldung nur Startseite und Rechtsseiten, Deep-Link führt nach der Anmeldung zurück, ein Konto ohne Rolle landet auf der Hinweisseite | `AnonymousSurfaceE2eTest`, `NoRoleGateE2eTest` |
-| [UC-14](UC-14-inventar-mandanten-scope.md)         | Inventar-Mandanten-Scope: Sicht/Anlage/Edit über Staffel-, SK-, beide und keine Zugehörigkeit + Admin-Pin                                                      | `InventoryTenancyE2eTest`                      |
-| [UC-18](UC-18-job-order-mandanten-sichtbarkeit.md) | Job Order: wer sieht was — SK-öffentliche Warteschlange vs. staffel-privat, Profit-Gate (REQ-ORG-003)                                                          | `JobOrderTenancyE2eTest`                       |
-| [UC-21](UC-21-refinery-order-mandanten-scope.md)   | Refinery-Mandanten-Scope: Sicht/Anlage/Edit/Einlagern über Staffel-, SK-, beide und keine Zugehörigkeit + Admin-Pin + BAC-004                                  | `RefineryOrderTenancyE2eTest`                  |
+### Weitere Bereiche
 
-> **Hinweis zur Abdeckung:** Einsätze/Operationen und Refinery Orders sind **strict-staffel** (nicht staffel-übergreifend). Die Refinery-Mandanten-Regeln (Sicht/Anlage/Edit/Einlagern, Admin-Pin, BAC-004) sind in [UC-21](UC-21-refinery-order-mandanten-scope.md) abgedeckt. Die staffel-übergreifende Zusammenarbeit läuft über organisationsweite Einsätze (UC-10) und den Job-Order-Workspace inkl. Handover (UC-08/UC-09). Details in [Rollen & Scope](rollen-und-scope.md).
+|                         ID                           |                              Use Case                               |      Tag      |                                                                                         Testklasse                                                                                         |
+|------------------------------------------------------|----------------------------------------------------------------------|---------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| [UC-31](UC-31-kartellbank-buchen-dashboard.md)       | Kartellbank: Buchen, Dashboard & Admin-Reset                         | `e2e`         | `BankBookingE2eTest` · `BankDashboardE2eTest` · `BankAdminResetE2eTest`                                                                                                                    |
+| [UC-32](UC-32-kartellbank-antraege-berechtigungen.md) | Kartellbank: Einheiten-Anträge, Berechtigungen & Sichtbarkeit       | `e2e`         | `BankOrgUnitRequestsE2eTest` · `BankPermissionsE2eTest` · `BankRequestsLiveSyncE2eTest` · `OrgUnitBankVisibilityMatrixE2eTest`                                                            |
+| [UC-33](UC-33-einsatz-bearbeiten-live-sync.md)       | Einsatz: In-Place-Bearbeitung, Crew-Board & Live-Sync                | `e2e`         | `MissionCoreEditInPlaceE2eTest` · `MissionUnitResponsibleClearE2eTest` · `MissionParticipantCountE2eTest` · `MissionListFilterInPlaceE2eTest` · `MissionLiveSyncE2eTest` · `MissionOrganisationLiveSyncE2eTest` · `MissionCrewBoardTouchDragE2eTest` |
+| [UC-34](UC-34-operationen-in-place-live-sync.md)     | Operationen: In-Place-Schreibvorgänge & Live-Sync                    | `e2e`         | `OperationWritesInPlaceE2eTest` · `OperationLiveSyncE2eTest` · `OperationMissionCrossPublishLiveSyncE2eTest`                                                                               |
+| [UC-35](UC-35-job-order-materialbedarf-produktion.md) | Job Order: Materialbedarf, Herstellung, Lager-Verknüpfung lösen     | `e2e`         | `JobOrderMaterialDemandE2eTest` · `JobOrderProductionE2eTest` · `JobOrderInventoryUnlinkInPlaceE2eTest`                                                                                    |
+| [UC-36](UC-36-auftragswarteschlange-auftragsformular.md) | Auftragswarteschlange & Auftragsformular                          | `e2e`         | `JobOrderQueueLiveSyncE2eTest` · `JobOrderReactivatePriorityInPlaceE2eTest` · `OrdersSquadronFilterE2eTest` · `OrdersCreateItemLineRendersE2eTest` · `OrdersCreateScuHintRevealE2eTest`   |
+| [UC-37](UC-37-materialboerse-materialsammlung.md)    | Materialbörse & Materialsammlung eines Auftrags                      | `e2e`         | `MaterialboardItemStockOfferE2eTest` · `MaterialboardOfferedAmountFieldE2eTest` · `MaterialboardPickerServerSearchE2eTest` · `MaterialboardQuantityFieldExclusivityE2eTest` · `MaterialboardReleaseModalOpensE2eTest` · `MaterialboardRequestModalE2eTest` · `MaterialCollectionDeliveredInPlaceE2eTest` · `MaterialCollectionTransferInPlaceE2eTest` |
+| [UC-38](UC-38-materialien-seiten.md)                 | Materialien: Preisübersicht, Preiskalkulation & Kategorien           | `e2e`         | `MaterialsOverviewMatrixRendersE2eTest` · `MaterialsOverviewFilterPersistenceE2eTest` · `MaterialsProfitCalculationRendersE2eTest` · `MaterialsCategoryEmptyStateInPlaceE2eTest`          |
+| [UC-39](UC-39-lager-hangar-ansichten-filter.md)      | Lager & Hangar: Ansichten, Filter, Paginierung & Live-Sync           | `e2e`         | `InventoryStackViewE2eTest` · `InventoryFilterPanelCollapseE2eTest` · `LagerLocationFilterE2eTest` · `InventorySharedLagerLiveSyncE2eTest` · `FilterPersistenceE2eTest` · `HangarPaginationE2eTest` |
+| [UC-41](UC-41-profil-blaupausen.md)                  | Profil & Standard-Blaupausen                                         | `e2e`         | `ProfileDescriptionInPlaceE2eTest` · `ProfilePayoutPreferenceInPlaceE2eTest` · `ProfileBlueprintSharingInPlaceE2eTest` · `DefaultBlueprintsE2eTest`                                        |
+| [UC-42](UC-42-admin-einstellungen-audit-log.md)      | Admin: Systemeinstellungen, Audit-Log & Adminseiten-Smoke            | `e2e`         | `AdminSettingsInPlaceE2eTest` · `AuditLogE2eTest` · `AdminPagesSmokeE2eTest`                                                                                                               |
+| [UC-43](UC-43-ingest-uebergabe.md)                   | Ingest-Übergabe aus dem Desktop-Extractor                            | `e2e`         | `IngestHandoffE2eTest`                                                                                                                                                                      |
+| [UC-44](UC-44-barrierefreiheit-touch-layout.md)      | Barrierefreiheit & Layout je Geräteklasse                            | `e2e` `smoke` | `AccessibilitySmokeE2eTest` (`e2e` + `smoke`) · `TouchClassLayoutE2eTest` (`e2e`)                                                                                                           |
+| [UC-45](UC-45-ui-regressionen-formular-navigation.md) | UI-Regressionen: Zurück-Cache, Combobox, Datum/Zeit-Layout          | `e2e`         | `BfcacheRefreshE2eTest` · `ComboboxBlurRestoresValueE2eTest` · `MissionDatetimeSplitLayoutE2eTest`                                                                                          |
+
+### Ad-hoc-Prüfharnische (kein Use Case)
+
+Vier Klassen tragen `@Tag("e2e")`, sind aber keine Tests im Sinne dieser Suite: Sie gehen gegen einen **schon laufenden** lokalen Stack (`E2E_BASE_URL`), schießen Screenshots für einen visuellen Abgleich mit einem Mockup und tun nichts, solange ihre Umgebungsvariable nicht gesetzt ist. In der CI kehren sie daher sofort zurück und werden grün, ohne etwas zu prüfen.
+
+| Klasse                           | Aktiviert durch            | Prüft                                   |
+|----------------------------------|----------------------------|-----------------------------------------|
+| `BlueprintsMockupCheckE2eTest`   | `BP_CHECK=true`            | Blaupausen-Master-Detail-Seite          |
+| `ItemsMockupCheckE2eTest`        | `PI_CHECK=true`            | Item-Seite von Mein Inventar            |
+| `MissionDesignFixesCheckE2eTest` | `MISSION_FIX_CHECK=true`   | Design-Korrekturen der Einsatzseite     |
+| `MissionTabsMockupCheckE2eTest`  | `MISSION_ID=<uuid>`        | Tabs einer bestimmten Einsatz-Detailseite |
 
 ## Gemeinsamer Rahmen
 
-**Akteur.** Sofern nicht anders genannt, ist der Akteur der synthetische Test-User `test-admin` (Keycloak) — nach dem Login eine authentifizierte Session mit Mitgliedschaft in der IRIDIUM-Staffel. Der Test-User hat die ADMIN-Rolle; staffel-scoped Aktionen (Einsatz, Ship, Refinery Order) verlangen eine OrgUnit-Mitgliedschaft, die der Seeder herstellt.
+**Akteur.** Sofern nicht anders genannt, ist der Akteur der synthetische Test-User `test-admin` (Keycloak) mit der ADMIN-Rolle und — über den Seeder — einer Mitgliedschaft in der IRIDIUM-Staffel; staffel-gescopte Aktionen (Einsatz, Schiff, Refinery Order) verlangen sie. Weitere Wegwerf-Nutzer (`test-member`, `test-officer`, `test-bank-*`, `test-bereich`, `test-norole` …) stehen im Realm-Fixture `frontend/src/e2e/resources/realm-export.e2e.json`. Seit [ADR-0159](../adr/0159-the-basetool-has-no-anonymous-or-guest-surface.md) gibt es keine anonyme Oberfläche mehr; ohne Anmeldung rendern nur Startseite und Rechtsseiten ([UC-12](UC-12-mitgliederbereich.md)).
 
 **Ziel-Modi.** Die Suite ist ziel-agnostisch:
 
-- *Ephemerer Stack* (Default): `E2eStackExtension` fährt den vollen Stack (Postgres ×2 + Keycloak + Redis + Backend + Frontend) per `docker compose` hoch, seedet die Vorbedingungen und reißt ihn danach ab (`down --volumes`).
-- *Staging*: Mit gesetztem `E2E_BASE_URL` laufen die Tests gegen ein externes Deployment; Docker wird nicht angefasst.
+- *Ephemerer Stack* (Default): `E2eStackExtension` baut die App-Images und fährt `db-backend-dev`, `db-keycloak-dev`, `keycloak-dev`, `redis-dev`, `backend-dev` und `frontend-dev` per `docker compose` aus `docker-compose.yml`, `docker-compose.test.yml`, `docker-compose.build.yml` und `docker-compose.e2e.yml` hoch (Wegwerf-Credentials aus `.env.test`), seedet die Vorbedingungen und reißt den Stack danach mit `down --volumes --remove-orphans` ab. Der Ingest-Dienst läuft hier nicht mit ([UC-43](UC-43-ingest-uebergabe.md)).
+- *Staging*: Mit gesetztem `E2E_BASE_URL` laufen die Tests gegen ein externes Deployment; Docker wird nicht angefasst, und Tests, die Seed-Daten brauchen, überspringen sich per `assumeTrue(STACK.managesStack())`.
 
 **Daten-Setup.** Die Vorbedingungen werden im `@BeforeAll` hergestellt (nur im ephemeren Modus):
 
-- `BackendSeeder` — über die Backend-REST-API mit Bearer-Token (Keycloak-Password-Grant): IRIDIUM-Mitgliedschaft, Materialien, Locations, Job Orders, verknüpftes Inventar.
-- UEX-Katalog-Snapshot (`uex-catalog-seed.sql`) — per JDBC: refinery-fähige Location, ShipType und Refining Method. Diese sind normalerweise UEX-synced und über die Admin-API auf einer frischen DB nicht anlegbar.
+- `BackendSeeder` — über die Backend-REST-API mit Bearer-Token (Keycloak-Password-Grant): Mitgliedschaften, Materialien, Locations, Aufträge, verknüpftes Inventar, Bankkonten usw.
+- UEX-Katalog-Snapshot (`uex-catalog-seed.sql`) — per JDBC: Städte, eine refinery-fähige Location, Hersteller, ShipType, Refining Method und ein Terminal. Diese sind normalerweise UEX-synchronisiert und über die Admin-API auf einer frischen DB nicht anlegbar. Weitere JDBC-Seeds des `BackendSeeder` (`seedOrderableItem`, `seedSellableTerminal`) legen bestellbare Items und Verkaufspreise an.
 
-**Browser.** Chromium (Default), Firefox und WebKit — wählbar via `-Pe2e.browser`, in der CI als Matrix.
+**Reihenfolge.** Die Klassen laufen nacheinander auf demselben Stack; `junit-platform.properties` wählt `ClassOrderer.OrderAnnotation`, und `TouchClassLayoutE2eTest` läuft bewusst als letzte ([UC-44](UC-44-barrierefreiheit-touch-layout.md)). Tests, die globale Zustände ändern (etwa der Bank-Wipe), verlassen sich darauf.
+
+**Browser und Geräteklassen.** Chromium (Default), Firefox und WebKit — wählbar via `-Pe2e.browser`. `-Pe2e.device=<BxH>` beschränkt den Layout-Sweep auf eine Geräteklasse.
 
 **Ausführen.**
 
 ```bash
-./gradlew :frontend:e2eTest                           # alle e2e-Flows (UC-01..06)
+./gradlew :frontend:e2eTest                           # alle Klassen mit @Tag("e2e")
 ./gradlew :frontend:e2eTest -Pe2e.browser=firefox     # andere Engine
-./gradlew :frontend:e2eTest --tests "*MissionCreate*" # ein einzelner Flow
-./gradlew :frontend:smokeTest                         # nur der Smoke-Subset (UC-07)
+./gradlew :frontend:e2eTest --tests "*MissionCreate*" # eine einzelne Klasse
+./gradlew :frontend:smokeTest                         # nur @Tag("smoke"): UC-07 und der axe-Scan aus UC-44
 ```
+
+**CI.** [`e2e.yml`](../../.github/workflows/e2e.yml) läuft nächtlich (03:00 UTC), per `workflow_dispatch` und auf Pull Requests mit dem Label `e2e` — als Matrix aus drei Engines × fünf Geräteklassen (`375x812`, `810x1080`, `1024x768`, `1280x800`, `1600x900`). [`e2e-smoke.yml`](../../.github/workflows/e2e-smoke.yml) läuft nächtlich (04:00 UTC) und per `workflow_dispatch` gegen Staging, aber nur wenn die Repository-Variable `E2E_BASE_URL` gesetzt ist.
 
 ## Use-Case-Schema
 
-Jedes Dokument folgt demselben Schema: **Akteur**, **Vorbedingungen**, **Auslöser**, **Hauptablauf**, **Erwartetes Ergebnis** und **Sonderfälle & Lehren** — letztere halten die CI-, Timing- und Tenancy-Eigenheiten fest, die der jeweilige Flow beim Aufbau aufgedeckt hat.
+Jedes Dokument folgt demselben Schema: **Akteur**, **Vorbedingungen**, **Auslöser**, **Hauptablauf**, **Erwartetes Ergebnis** und **Sonderfälle & Lehren** — letztere halten die CI-, Timing- und Tenancy-Eigenheiten fest, die der jeweilige Flow beim Aufbau aufgedeckt hat. Ein Use Case mit mehreren Testklassen gliedert seinen Hauptablauf in Abschnitte je Klasse.
+
+Wer eine Testklasse hinzufügt, entfernt oder umbenennt, passt im selben Change den zugehörigen Use Case und diese Übersicht an.

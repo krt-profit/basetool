@@ -36,7 +36,15 @@ public enum AuditEventType {
   /** A warehouse inventory row was created. */
   INVENTORY_ITEM_CREATED(AuditDomain.INVENTORY),
 
-  /** A warehouse inventory row's associations / quality / amount were edited. */
+  /**
+   * A warehouse inventory row's associations / quality / amount were edited.
+   *
+   * @deprecated Historical only — no longer emitted since the in-place edit endpoint {@code PUT
+   *     /api/v1/inventory/{id}} was removed (commit d03a9238b, 2026-07-14); allocations are now
+   *     changed through their own endpoints. Retained because {@code audit_event.event_type} stores
+   *     the enum name, so existing rows would become unreadable if the constant were removed.
+   */
+  @Deprecated
   INVENTORY_ITEM_UPDATED(AuditDomain.INVENTORY),
 
   /**
@@ -271,9 +279,9 @@ public enum AuditEventType {
 
   /**
    * A deleted user's complete "Mein Inventar" and personal blueprints were purged along with their
-   * account (REQ-DATA-008). Summary event carrying the two affected-row counts; these tables key on
-   * the Keycloak subject with no foreign key to {@code app_user}, so nothing else would ever have
-   * removed them.
+   * account (REQ-DATA-008). Summary event carrying the two affected-row counts. Both tables key on
+   * the user id and, since V235, cascade from {@code app_user}; the explicit purge is what makes
+   * the counts recordable here.
    */
   PERSONAL_DATA_PURGED_ON_USER_DELETION(AuditDomain.PERSONAL_INVENTORY),
 

@@ -1,6 +1,6 @@
 # ADR-0174 — The authorities cache TTL is an operational knob, defaulting to five minutes
 
-- **Status:** Proposed
+- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-09-13 (`e401742db`: `support.AuthoritiesCacheProperties`, `APP_SECURITY_AUTHORITIES_CACHE_TTL`).
 - **Date:** 2026-09-13
 - **Deciders:** @greluc (pending)
 - **Related:** specs `REQ-SEC-056` (new), `REQ-DATA-016` (new) ·

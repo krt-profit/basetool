@@ -102,11 +102,12 @@ Dockerfile text eol=lf
 # core.autocrlf — the same reasoning as the Keycloak templates above.
 docker/edge/** text eol=lf
 
-# The maintenance page's nginx snippets, for the identical reason, and missed when the block above
-# was written: `docker-compose.yml` bind-mounts `docker/maintenance/nginx/http.conf` and
-# `server_proxy.conf` into nginx-proxy-manager's `/data/nginx/custom` hook. A local test stack
-# started from a Windows checkout mounts the CRLF copy — precisely the case the edge rule exists
-# to prevent.
+# The maintenance page, for the identical reason: `docker-compose.yml` (and the generated
+# `quadlet/systemd/edge.container`) bind-mounts `docker/maintenance/static/` into the edge at
+# `/usr/share/nginx/html/maintenance`. A local test stack started from a Windows checkout would
+# mount the CRLF copy — precisely the case the edge rule exists to prevent. (The rule was added for
+# the two Nginx Proxy Manager snippets that lived beside it under `docker/maintenance/nginx/`; those
+# were deleted on 2026-09-22, and the rule stays for what remains.)
 docker/maintenance/** text eol=lf
 
 # Alloy's configuration is bind-mounted into `grafana/alloy` and format-checked with

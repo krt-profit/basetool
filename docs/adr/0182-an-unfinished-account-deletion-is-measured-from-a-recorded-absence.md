@@ -1,6 +1,6 @@
 # ADR-0182 — An unfinished account deletion is measured from a recorded absence, not inferred from an existing timestamp
 
-- **Status:** Proposed
+- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-09-17 (`f8b6c19ae`, PR #1920: migration `V241__add_keycloak_absent_since_to_app_user.sql`).
 - **Date:** 2026-09-15
 - **Deciders:** @greluc
 - **Related:** spec `REQ-SEC-059` (new) ·

@@ -17,9 +17,11 @@
 # Neither is visible in `docker compose config`, in a syntax check, or on a
 # first run against an empty volume. Both are visible here.
 #
-# What makes this a real gate: the script under test is EXTRACTED FROM
-# docker-compose.yml, not restated. A fix applied to a copy in this file would
-# leave production broken and this check green.
+# What makes this a real gate: the script under test is READ FROM
+# docker/acme/publish-loop.sh -- the file the acme container actually executes --
+# not restated, and docker-compose.yml (the source the Quadlet unit is generated
+# from) is checked to still point at it. A fix applied to a copy in this file
+# would leave production broken and this check green.
 #
 # lego itself is stubbed out — the publishing step is what is under test, and a
 # config check must never depend on reaching Let's Encrypt.

@@ -4,7 +4,9 @@
   compute-on-read decision stands; the **holder-coupling aspect** (every posting names a
   holder; per-`(account, holder)` sub-balance; holder-level overdraft) is **superseded by
   [ADR-0039](0039-bank-holder-ledger-decoupled-from-accounts.md)** (2026-06-22), which moves
-  the holder dimension into its own append-only ledger, decoupled from accounts.
+  the holder dimension into its own append-only ledger, decoupled from accounts. The insert-only
+  ledger is further **amended by [ADR-0183](0183-a-granted-erasure-anonymises-the-handle-snapshots-in-place.md)**
+  (2026-09-15) by exactly one named method, the in-place anonymisation of a granted erasure.
 - **Date:** 2026-06-12
 - **Deciders:** Repository owner (@greluc)
 - **Related:** spec REQ-BANK-003..006, REQ-BANK-013 (`docs/specs/bank.md`) · ADR-0003 ·

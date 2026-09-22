@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-27.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
 > **Owner area:** HANGAR/UI · **Related ADRs:** none
 
 # Personal hangar overview — pagination & server-side sort/filter

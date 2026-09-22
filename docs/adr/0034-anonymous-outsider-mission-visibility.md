@@ -1,6 +1,6 @@
 # ADR-0034 — Anonymous outsider view of public missions is operational by design, minus payout and free-text comment
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-0159](0159-the-basetool-has-no-anonymous-or-guest-surface.md) (2026-09-06) — the Basetool has no anonymous surface any more, so the outsider view this ADR shaped no longer exists. *Status corrected 2026-09-22:* it read "Accepted", although ADR-0159 has named itself its successor since 2026-09-06.
 - **Date:** 2026-06-21
 - **Deciders:** @greluc
 - **Related:** spec REQ-SEC-021 · security audit finding L3 · MULTI_SQUADRON_PLAN §7 (historical plan; cited only in code Javadoc, no file in-repo) · issue (none)

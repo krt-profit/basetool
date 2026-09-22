@@ -1,6 +1,6 @@
 # ADR-0169 — The E2E concurrency group is keyed on the gate's own verdict
 
-- **Status:** Proposed
+- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-09-13 (`c489902d4`: the verdict-keyed `concurrency.group` in `e2e.yml` and `.github/scripts/check_e2e_gate_mirror.py`).
 - **Date:** 2026-09-13
 - **Deciders:** @greluc (pending)
 - **Related:** specs `REQ-OPS-027` · [`deployment-delivery.md`](../specs/deployment-delivery.md) ·

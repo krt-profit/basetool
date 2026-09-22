@@ -4,9 +4,10 @@
 #
 # Guarded on the unit ALREADY running, from an explicit check rather than from `ansible_facts`:
 # service facts are only present when `service_facts` has been gathered, and a handler that assumes
-# them fails on a host where it has not. This role provisions a host that is not serving yet, where
-# haproxy is enabled but deliberately not started -- reloading it there would start a front end in
-# front of an edge that does not exist.
+# them fails on a host where it has not. The role's full run targets a host that is not serving
+# yet, where haproxy is enabled but deliberately not started -- reloading it there would start a
+# front end in front of an edge that does not exist. On a serving host (a deliberate, tag-limited
+# host change, ansible/README.md) haproxy is running and the reload goes through.
 - name: Reload haproxy
   ansible.builtin.systemd_service:
     name: haproxy

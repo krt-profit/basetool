@@ -503,10 +503,10 @@ public class InventoryItemController {
    * Lazily loads one of the caller's own stacks' entries, oldest-first and paginated — the
    * drill-down behind a collapsed stack on the "my inventory" page. The stack is identified by the
    * stock-identity query params the grouped view already exposes on each {@code InventoryStackDto};
-   * {@code null} job-order / mission / owning-org-unit params select the rows where that
-   * association is itself absent. Owner-scoped to the calling user (no impersonation). Append-only
-   * inventory grows unboundedly per stack, so this is the only path that materialises the
-   * individual entries.
+   * a {@code null} owning-org-unit param selects the rows where that association is itself absent
+   * (job-order / mission allocations are not part of the stack key). Owner-scoped to the calling
+   * user (no impersonation). Append-only inventory grows unboundedly per stack, so this is the only
+   * path that materialises the individual entries.
    *
    * <p>{@code catalog=MATERIAL} (the default) addresses the stack by {@code materialId} (+ optional
    * {@code quality}); {@code catalog=ITEM} addresses it by {@code gameItemId} and rejects a {@code

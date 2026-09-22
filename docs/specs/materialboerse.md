@@ -1,5 +1,13 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-21.
-> **Owner area:** MARKET · **Related ADRs:** ADR-0082, ADR-0086, ADR-0087, ADR-0101, ADR-0108, ADR-0116
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Owner area:** MARKET · **Related ADRs:** [ADR-0082](../adr/0082-materialboerse-offer-model.md),
+> [ADR-0086](../adr/0086-materialboerse-partial-offer-amount.md),
+> [ADR-0087](../adr/0087-materialboerse-item-offers.md),
+> [ADR-0094](../adr/0094-tool-wide-topic-room-live-sync-relay.md),
+> [ADR-0101](../adr/0101-inventory-game-item-rows.md),
+> [ADR-0108](../adr/0108-materialboerse-stock-backed-item-offers.md),
+> [ADR-0116](../adr/0116-materialboerse-request-model.md) · **Plans (historical, shipped):**
+> [`materialboerse_PLAN.md`](../archive/materialboerse_PLAN.md),
+> [`DESIGN_ITEM_INVENTORY.md`](../archive/DESIGN_ITEM_INVENTORY.md) (§8 = stock-backed item offers)
 
 # Materialbörse — material-exchange trade board
 
@@ -21,7 +29,8 @@ offer:
   offer. Either way an item offer has no quality.
 
 Either way other members register interest and the anbieter takes the negotiation from there. The
-design is fixed by the DAS KARTELL design proposal `proposals/materialboerse-final.html` (locked
+design is fixed by the DAS KARTELL design proposal
+`.claude/skills/das-kartell-design/proposals/materialboerse-final.html` (locked
 master-detail layout). Data model + visibility decisions are recorded in ADR-0082 (offer model),
 ADR-0086 (partial offers) and ADR-0087 (item offers).
 
@@ -43,8 +52,9 @@ REQ-MARKET-015…020.
 ### REQ-MARKET-001 — Org-wide, member-only board
 
 Every `ACTIVE` offer is visible to every real member (`KRT_MEMBER`) regardless of the offer's owning
-org unit — the board is a single org-wide marketplace, not staffel-scoped. Authenticated-but-roleless
-an account below member does **not** see the board. The board shows per offer: material, quality (0–1000), quantity in
+org unit — the board is a single org-wide marketplace, not staffel-scoped. An authenticated account
+below member does **not** see the board (both the `/materialboerse` page and the
+`/api/v1/material-exchange` / `/api/v1/material-requests` APIs are gated on `KRT_MEMBER`). The board shows per offer: material, quality (0–1000), quantity in
 the material's own unit (SCU for bulk materials, Stück/piece for `PIECE` materials — never a
 hardcoded SCU), the anbieter (username) followed by their org-unit affiliation badges, when it was
 released, and the interessenten count.
@@ -129,15 +139,19 @@ picker's row cap is still reachable; switching kind clears any already-picked ro
 
 **Enforced by:** `MaterialExchangeServiceTest`, `MaterialExchangeRepositoryDataTest`,
 `InventoryItemCatalogQueryDataTest`, `MaterialExchangeControllerTest`,
-`MaterialboardReleaseModalOpensE2eTest`, `MaterialboardItemStockOfferE2eTest` · **Code:**
-`MaterialExchangeService#release/updateOffer`, `MaterialExchangeBoardService#myReleasableItems`,
-`InventoryItemRepository#findReleasableForUser`, `MaterialExchangeReleaseRequest`,
-`MaterialExchangeOfferUpdateRequest`, `V212` offered-amount column, `V210` partial-unique index
+`MaterialboardReleaseModalOpensE2eTest`, `MaterialboardItemStockOfferE2eTest`,
+`MaterialboardOfferedAmountFieldE2eTest`, `MaterialboardPickerServerSearchE2eTest` · **Code:**
+`MaterialExchangeService#release/updateOffer`, `MaterialExchangeBoardService#myReleasableItems`
+(50-row picker cap), `InventoryItemRepository#findReleasableForUser`, `MaterialExchangeReleaseRequest`,
+`MaterialExchangeOfferUpdateRequest`, `fragments/materialboerse-modal.html`,
+`materialboerse-release.js`, `V212` offered-amount column, `V210` partial-unique index,
+`V216` (historical PIECE merge skips offer-backed rows)
 
 ### REQ-MARKET-013 — Stock decrease ratchets the offer down (persisted); an increase never changes it
 
 When the Lager row backing an **active** offer is **reduced** — book-out (consume / sell / transfer),
-personal rebooking, job-order handover, or production consumption — and the stored offered quantity is no longer
+personal rebooking, job-order handover / item delivery, or job-order production booking — and the
+stored offered quantity is no longer
 covered, it is **persisted down** to the row's new stock **in the same transaction as the decrement**,
 via an atomic conditional update (`ACTIVE` offers only; only when the stored value `> newStock`). This
 is **kind-aware** (REQ-MARKET-014, ADR-0108): a **material** offer clamps its `offeredAmount`
@@ -163,17 +177,17 @@ owner edit is guarded independently by the release/edit `offeredAmount <= curren
 
 **Acceptance**
 - [ ] Reducing a backing row below its active offer's `offeredAmount` persists `offeredAmount` down to
-the new stock (book-out, transfer, rebooking, handover, production consumption).
+the new stock (book-out, transfer, rebooking, handover / item delivery, production booking).
 - [ ] Increasing the backing row leaves the offer's `offeredAmount` unchanged (no auto-expand).
 - [ ] A deactivated offer is not touched by the ratchet.
 - [ ] A fully booked-out row's offer is cascade-removed (unchanged from REQ-MARKET-002).
 
 **Enforced by:** `MaterialExchangeOfferClampDataTest`, `InventoryItemServiceBookOutTest` · **Code:**
 `MaterialExchangeOfferRepository#clampOfferedAmountToStock` / `#clampItemQuantityToStock`,
-`InventoryCheckoutService` (book-out / transfer / rebooking via `ratchetBoardOffersToStock`),
-`JobOrderHandoverService#createHandover`, `JobOrderItemHandoverService#createItemHandover`
-(item-delivery decrement, REQ-ORDERS-030), `JobOrderItemProductionService` (production
-consumption, REQ-ORDERS-025) · **Issues:** #1182
+`InventoryCheckoutService#bookOutInventoryItem` / `#rebookPersonal` / transfer path (via
+`ratchetBoardOffersToStock`), `JobOrderHandoverService#createHandover`,
+`JobOrderItemHandoverService#createItemHandover` (item-delivery decrement, REQ-ORDERS-030),
+`JobOrderItemProductionService` (production consumption, REQ-ORDERS-025) · **Issues:** #1182
 
 ### REQ-MARKET-003 — Signal-only
 
@@ -238,15 +252,18 @@ listed.
 
 ### REQ-MARKET-008 — Audited area
 
-Every state-mutating Materialbörse activity (offer release, offer edit, offer deactivate, interest
-register, interest withdraw) writes exactly one `audit_event` row under `AuditDomain.MARKET`, in the
+Every state-mutating Materialbörse activity (offer release `MARKET_OFFER_RELEASED`, offer edit
+`MARKET_REMARK_UPDATED` — amount and/or remark, offer deactivate `MARKET_OFFER_DEACTIVATED`, interest
+register `MARKET_INTEREST_REGISTERED`, interest withdraw `MARKET_INTEREST_WITHDRAWN`) writes exactly
+one `audit_event` row under `AuditDomain.MARKET`, in the
 business transaction, with a PII-free `key=value` details payload (kind/ids/quality/offered
 amount/stock/remark **length** only — never the remark body, never usernames). Item offers
 (REQ-MARKET-012) **reuse** the same five `MARKET_*` event types with a kind-aware details payload
 (`kind`/`product` key/`qty` instead of the material `q`/`amt`/`stock`); the subject label is the
 material name for a material offer or the item's display name for an item offer (both non-personal
-game-asset names). The unified audit viewer gains a Materialbörse tab. See `docs/specs/audit.md`
-(REQ-AUDIT-001/002).
+game-asset names). The unified audit viewer has a Materialbörse tab, whose event-type filter also
+carries the area's generic `MARKET_AUDIT_EXPORTED` / `MARKET_AUDIT_PURGED` events. See
+[`audit.md`](audit.md) (REQ-AUDIT-001/002).
 
 **Acceptance**
 - [ ] Each mutation records its `MARKET_*` event; no name or remark body appears in `details`.
@@ -275,7 +292,8 @@ Complies with `docs/specs/frontend-ajax-mutations.md` (REQ-FE-001…014).
 - [ ] Master-list rows are native `<button>`s stripped of UA button chrome — no light `buttonface` fill on unselected rows and no beveled/white border around entries (#1184).
 
 **Enforced by:** `MaterialboersePageControllerMvcTest`, CI Playwright (e2e) · **Code:**
-`materialboerse.html`, `materialboerse.js`, `materialboerse-release.js`, `materialboerse.css`
+`materialboerse.html`, `fragments/materialboerse-modal.html`, `materialboerse.js`,
+`materialboerse-release.js`, `materialboerse.css`
 
 ### REQ-MARKET-010 — Live multi-user board sync
 
@@ -293,21 +311,31 @@ refresh (no deferred-refresh pill) — only the transport is now shared. The pre
 `/ws/materialboerse/board` alias (kept one release for tabs opened before the migration) was
 removed in #1236; every board tab now rides the `materialboard` room on `/ws/sync`.
 
+The `board` key is also sent from **outside** the board, by every Lager write that can change an
+offer: the Mein-Lager item-leaf "Für Börse freigeben" toggle (`inventory-materialboerse.js`) and the
+stock-reducing book-out / bulk check-out / (bulk) Umbuchen flows on Mein Lager (`inventory-my.js`)
+and the global Lager (`inventory-admin.js`), because those reductions ratchet or cascade-remove
+offers (REQ-MARKET-013, #1309).
+
 **Acceptance**
 - [ ] A release/deactivate/interest by one member refreshes the board of another member viewing it,
 with no location or interessent identity crossing the socket.
+- [ ] A stock-reducing Lager write refreshes open board views.
 
-**Enforced by:** code review, CI Playwright (e2e) · **Code:** the shared `LiveSyncWebSocketHandler`
-(topic `materialboard`) + `materialboerse.js` receiver (`window.krtLiveSync`)
+**Enforced by:** `LiveSyncSectionMapParityTest` (every `materialboard` key sent by the
+materialboerse / Lager modules is whitelisted), code review, CI Playwright (e2e) · **Code:** the
+shared `LiveSyncWebSocketHandler` + `LiveSyncTopicClass.MATERIALBOARD` + `materialboerse.js`
+receiver (`window.krtLiveSync`), `inventory-materialboerse.js`, `inventory-my.js`,
+`inventory-admin.js`
 
 ### REQ-MARKET-011 — Notify the owner when a member registers interest
 
 When a member registers interest in an offer (REQ-MARKET-006), the offer's owner (the Anbieter)
 receives an in-app notification so they learn about the interested party without polling the board
 (#1187). This reuses the data-driven notification engine (REQ-NOTIF-007, ADR-0015) exactly like the
-bank booking-request decision (REQ-NOTIF-011): the release path publishes a
+bank booking-request decision (REQ-NOTIF-011): the interest-registration path publishes a
 `MaterialExchangeInterestRegisteredEvent` carrying the owner as the directed recipient
-(`contextRecipientSub`), and a seeded default rule (V211) resolves it through a single
+(`contextRecipientUserId`), and a seeded default rule (V211) resolves it through a single
 `EVENT_RECIPIENT` selector with `exclude_actor = TRUE`. The notification is emitted **only** on a
 genuinely new registration — a duplicate/idempotent registration (REQ-MARKET-006) emits nothing — and
 after the registration transaction commits (REQ-NOTIF-002), so a rolled-back registration produces no
@@ -334,8 +362,8 @@ EN + base bundles, `{interessent}`/`{material}` placeholders).
 
 ### REQ-MARKET-012 — Offer a craftable item (blueprint product) with a stated quantity
 
-> This requirement describes the **free-stated** item offer (no backing Lager row). Since design §8
-> shipped, a member may instead release an item offer **from item stock** — a **stock-backed** item
+> This requirement describes the **free-stated** item offer (no backing Lager row). Since
+> [design §8](../archive/DESIGN_ITEM_INVENTORY.md) shipped, a member may instead release an item offer **from item stock** — a **stock-backed** item
 > offer whose quantity is read/clamped against a game-item Lager row exactly like a material offer
 > (REQ-MARKET-014, ADR-0108). The two are flavours of the one `ITEM` kind; everything below still holds
 > for the free-stated flavour, and the free-stated flavour remains fully supported.
@@ -385,7 +413,8 @@ anbieten" (item field hidden), an item offer only "Menge (Stück)" (amount field
 `MaterialExchangeItemReleaseRequest`, `MaterialExchangeOffer` (`kind`/`itemProductKey`/`itemName`/
 `itemQuantity`), `MaterialExchangeOfferRepository#findBoard`,
 `db/migration/V213__add_material_exchange_item_offers.sql`, `materialboerse.html`,
-`materialboerse-release.js`, `materialboerse.css`
+`fragments/materialboerse-modal.html` (the shared modal), `materialboerse-release.js`,
+`materialboerse.css`
 
 ### REQ-MARKET-014 — Release an item offer from item stock (stock-backed item offer)
 
@@ -462,7 +491,9 @@ leaf (owner-only; the global item view has no toggle). Its checked state comes f
 quantity + releasable picker), `InventoryCheckoutService#ratchetBoardOffersToStock`,
 `InventoryPageController#viewMyGameItemStackEntries` (item-leaf `releasedItemIds`),
 `db/migration/V221__relax_material_exchange_item_offer_stock_link.sql`, `materialboerse.html`,
-`inventory-stack-entries.html`, `inventory-materialboerse.js`, `materialboerse-release.js`
+`fragments/materialboerse-modal.html`, `fragments/inventory-stack-entries.html`,
+`inventory-materialboerse.js`,
+`materialboerse-release.js`
 
 ### REQ-MARKET-015 — Post a request (Gesuch) for a material or item
 
@@ -487,8 +518,9 @@ never exposed (REQ-MARKET-004 holds verbatim), and posting is signal-only (REQ-M
 - [ ] A material request stores its material id, desired amount and optional min quality; an item
 request resolves + snapshots the blueprint product (404 if the key resolves to no active blueprint)
 and stores the whole-piece quantity + optional min quality. Neither carries a Lager row.
-- [ ] A min quality outside 0–1000 is rejected (DB `CHECK`); a non-positive amount / non-whole item
-quantity is rejected (400).
+- [ ] A min quality outside 0–1000 is rejected (400, `@Min(0) @Max(1000)` on the request DTOs,
+backed by the `ck_material_exchange_request_min_quality` DB `CHECK`); a non-positive amount /
+non-whole item quantity is rejected (400).
 - [ ] An account below member is refused; a `KRT_MEMBER` sees requests from every squadron.
 
 **Enforced by:** `MaterialRequestServiceTest`, `MaterialExchangeRequestRepositoryDataTest`,
@@ -517,7 +549,8 @@ subject (material / item) itself is fixed once posted — an edit changes only q
 Any member who can supply a request signals it ("Ich kann liefern"); the requester (owner) alone
 sees the supplier names, every other viewer sees only the count — the request-side mirror of
 REQ-MARKET-006. A member cannot signal on their own request; the signal is idempotent and guarded by
-a unique `(request, user)` constraint through the CLAUDE.md non-transactional find-or-create retry
+a unique `(request, user)` constraint through the non-transactional find-or-create retry of
+`backend/CLAUDE.md`
 (`ObjectProvider<Self>` self-proxy, `REQUIRES_NEW` inner method, catch `DataIntegrityViolationException`).
 Withdrawing removes the signal (idempotent). Supplier identities never cross the live-sync socket.
 
@@ -584,11 +617,11 @@ appears in `details`.
 When a member signals they can supply a request (REQ-MARKET-017), the request's owner receives an
 in-app notification (the request-side mirror of REQ-MARKET-011). This reuses the data-driven engine
 (REQ-NOTIF-007, ADR-0015): the signal path publishes a `MaterialRequestFulfillmentSignalledEvent`
-carrying the owner as the directed recipient (`contextRecipientSub`), and a seeded default rule (V225)
+carrying the owner as the directed recipient (`contextRecipientUserId`), and a seeded default rule (V225)
 resolves it through a single `EVENT_RECIPIENT` selector with `exclude_actor = TRUE`. The notification
 is emitted only on a genuinely new signal, after commit (REQ-NOTIF-002). The supplier's name is a
 render parameter — a permitted disclosure because the notification reaches only the owner
-(REQ-MARKET-019 owner-only anonymity). Adding the `MATERIAL_REQUEST_FULFILLMENT_SIGNALLED` event /
+(REQ-MARKET-017 owner-only supplier anonymity). Adding the `MATERIAL_REQUEST_FULFILLMENT_SIGNALLED` event /
 notification types needs no schema migration (open enums, REQ-NOTIF-003).
 
 **Acceptance**
@@ -602,6 +635,14 @@ EN + base bundles, `{lieferant}`/`{material}` placeholders).
 `event/MaterialRequestFulfillmentSignalledEvent`, `model/NotificationEventType`,
 `model/NotificationType`,
 `db/migration/V225__seed_material_exchange_request_fulfillment_notification_rule.sql`
+
+## Monitoring
+
+Active offers and active requests are exported as the gauges
+`basetool_material_exchange_active_count` / `basetool_material_request_open_count`
+(`BusinessMetricsCollector`; REQ-OBS-011 in [`observability.md`](observability.md)). The `MARKET`
+audit domain is deliberately excluded from the `AuditDomainSilenceAnomaly` alert
+(`monitoring/prometheus/alerts/business.yml`) because board traffic is bursty.
 
 ## Out of scope
 

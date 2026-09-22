@@ -90,13 +90,13 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Concurrency-relevant (CLAUDE.md): inventory is <em>append-only</em> — book-out {@code
  * TRANSFER} and {@code rebookPersonal} always insert a new target row and decrement (or delete) the
  * source row, never folding into an existing stack, which removes the read-add-write race a merge
- * path would carry. {@link #bulkCheckout} follows the bulk-update-after-loop discipline: it clears
- * the job-order / mission associations on the managed rows inside the loop (Hibernate
- * dirty-checking, no {@code @Modifying} query inside the loop), flushes once, then deletes all ids
- * in a single batch. {@link #deleteAllGlobalInventory} is a one-shot bulk {@code DELETE} (the
- * load-bearing FK was dropped in {@code V64}), so no clearing loop is required. Partial book-outs /
- * rebookings {@code saveAndFlush} the reduced source row so its {@code @Version} stays current
- * within the transaction and a follow-up in-place edit cannot 409 (REQ-FE-003).
+ * path would carry. {@link #bulkCheckout} follows the bulk-update-after-loop discipline: the loop
+ * only locks and ownership-checks each row, then all ids are deleted in a single batch, their
+ * job-order / mission allocations cascading away with them (V217). {@link
+ * #deleteAllGlobalInventory} is a one-shot bulk {@code DELETE} (the load-bearing FK was dropped in
+ * {@code V64}), so no clearing loop is required. Partial book-outs / rebookings {@code
+ * saveAndFlush} the reduced source row so its {@code @Version} stays current within the transaction
+ * and a follow-up in-place edit cannot 409 (REQ-FE-003).
  *
  * <p>Each public method opens its own read-write {@code @Transactional} (the class carries no
  * class-level {@code readOnly} default), so a mutating method is never accidentally trapped in a
@@ -774,10 +774,10 @@ public class InventoryCheckoutService {
    * and avoids the {@code ON DELETE CASCADE} FK (V210) silently destroying an offer.
    *
    * <p>Propagation is {@code MANDATORY}: this must join the caller's read-write transaction (the
-   * create / update / transfer / rebook flow), never open its own.
+   * create / book-out transfer / personal rebook / bulk rebook / production book-in flow), never
+   * open its own.
    *
-   * @param row the just-created / just-edited / just-inserted target row (managed); the merge
-   *     survivor.
+   * @param row the just-created / just-inserted target row (managed); the merge survivor.
    * @param clientRequestedMerge the per-action opt-in for an {@code SCU} material (ignored for
    *     {@code PIECE} materials and game-item rows, which always merge).
    * @return the surviving merged row (== {@code row}) with the summed amount and combined notes, or
@@ -1014,9 +1014,10 @@ public class InventoryCheckoutService {
 
   /**
    * Bulk-checkout: removes all inventory items with the given IDs that belong to the authenticated
-   * user. Associations to JobOrders and Missions are cleared on the managed entities inside the
-   * loop (no @Modifying bulk-update inside the loop). The actual deleteAllById call happens after
-   * the loop, in one batch.
+   * user. Each row is loaded {@code FOR UPDATE} and ownership-checked inside the loop, which writes
+   * nothing; the single {@code deleteAllById} happens after the loop, in one batch. The rows'
+   * job-order / mission allocations cascade away with them (FK {@code ON DELETE CASCADE}, V217), so
+   * no per-row association clear is needed.
    *
    * @param request the bulk checkout request containing item IDs
    * @param currentUserId the UUID of the authenticated user (JWT sub)

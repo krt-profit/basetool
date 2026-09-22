@@ -1,7 +1,7 @@
 # Architecture documentation (arc42)
 
-**Doc type:** living spec · **Baseline:** the system **as it stands after the Podman cutover**
-(`docs/PODMAN_CUTOVER_RUNBOOK.md`) · **Last reviewed:** 2026-09-21
+**Doc type:** living spec · **Baseline:** production **as it has run since the Podman cutover of
+2026-09-22** · **Last reviewed:** 2026-09-22
 
 This folder documents the architecture of the **Profit Basetool** along the
 [arc42](https://arc42.org) template. It is the map, not the territory: where a subject already has
@@ -35,12 +35,16 @@ and the reader cannot tell which one is current.
 
 ## Why the baseline is stated at the top
 
-This documentation describes the **post-cutover** system: rootless Podman with Quadlet units on
-Rocky Linux, an nginx edge with its own ACME client, three observability components moved out of
-containers and onto the host, and cAdvisor gone. A reader who takes this folder for the Docker-era
-system will misread §7 completely, and parts of §8 with it. The Docker-era shape is not lost — it
-is recorded in the migration plan and the cutover runbook, which exist precisely so the transition
-is legible in both directions.
+This documentation describes the system **as it runs today**: rootless Podman with Quadlet units on
+Rocky Linux 10, bootstrapped by the Ansible role (ADR-0188); a host-level haproxy handing the client
+address to an nginx edge over PROXY protocol (ADR-0187); an ACME client of its own; three
+observability components on the host instead of in containers; and cAdvisor gone. Production moved
+onto that host on 2026-09-22; the Docker host it replaced is shut down but not yet decommissioned
+(§11). A reader who takes this folder for the Docker-era system will misread §7 completely, and
+parts of §8 with it. The Docker-era shape is not lost — it is recorded in the archived
+[migration plan](../archive/PODMAN_MIGRATION_PLAN.md) and
+[cutover runbook](../archive/PODMAN_CUTOVER_RUNBOOK.md), which are history, not the current
+description.
 
 > [!important] This folder is binding, and updating it is part of the change
 > [`CLAUDE.md`](../../CLAUDE.md) states the rule explicitly: **the arc42 documentation moves with the

@@ -36,8 +36,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Unit tests for {@link BlueprintProductController}. The caller's JWT subject arrives via
- * {@code @CurrentUserSub} (guarded by {@code CurrentUserArgumentResolver}, tested in {@code
+ * Unit tests for {@link BlueprintProductController}. The caller's user id arrives via
+ * {@code @CurrentUserId} (guarded by {@code CurrentUserArgumentResolver}, tested in {@code
  * CurrentUserArgumentResolverTest}); these tests pin the search pass-through and default-limit
  * logic.
  */

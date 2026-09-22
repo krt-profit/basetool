@@ -265,7 +265,7 @@ public class UserReconciliationService {
       changed = true;
     }
 
-    // Persist the per-guild Discord server nickname (REQ-DATA-008) from the optional IdP-mapped
+    // Persist the per-guild Discord server nickname (REQ-DATA-018) from the optional IdP-mapped
     // claim. Display-only — shown to admins in the registration-approval queue so a decision can be
     // tied to a recognisable in-server identity. Captured best-effort, so it may be absent (no
     // nickname set, non-Discord login, or capture mappers not configured); refreshes on every
@@ -732,7 +732,7 @@ public class UserReconciliationService {
    * Normalises a raw Discord guild-nickname claim for storage: trims it, maps blank/empty to {@code
    * null}, and bounds it to the {@code discord_guild_nickname} column width (255 chars) so a
    * pathologically long attribute can never fail the login save. The Keycloak SPI already caps the
-   * captured value, so this length bound is only a defensive backstop (REQ-DATA-008).
+   * captured value, so this length bound is only a defensive backstop (REQ-DATA-018).
    *
    * @param raw the raw {@code discord_guild_nickname} claim value, possibly {@code null}
    * @return the trimmed, length-bounded nickname, or {@code null} when the claim is absent or blank

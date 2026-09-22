@@ -80,13 +80,6 @@ public final class BackendSeeder {
   private static final String DB_PASSWORD = "basetool-e2e-pw-do-not-use-in-prod";
 
   /**
-   * How many times to re-read the user and retry the squadron PATCH on a 409. The per-request
-   * {@code syncUser} can bump the {@code @Version} between our read and write; each retry re-reads
-   * the fresh version, so a small bound converges.
-   */
-  private static final int MAX_VERSION_RETRIES = 4;
-
-  /**
    * Users whose Terms-of-Use consent this run has already recorded. {@link #passwordGrant} runs on
    * every seeder entry point, so without this the acceptance call would repeat ~30 times per run.
    */
@@ -2028,40 +2021,6 @@ public final class BackendSeeder {
       throw e;
     } catch (Exception e) {
       throw new IllegalStateException("BackendSeeder.setSpecialCommandProfitEligible failed", e);
-    }
-  }
-
-  /**
-   * Sets a system setting's value via {@code PUT /api/v1/settings/{key}} (admin-only, body {@code
-   * {value, version}}), re-reading the optimistic-lock version on a 409 like {@link
-   * #ensureIridiumMembership}. Used to point {@code job_order.intake_special_command_id} at the
-   * seeded intake Spezialkommando, so guest order creations — and the create form's
-   * responsible-picker preselection — resolve to it. Throws once retries are exhausted.
-   *
-   * @param adminUser an admin Keycloak username (the endpoint is ADMIN-gated)
-   * @param adminPassword the admin password
-   * @param key the setting key (table primary key)
-   * @param value the new setting value
-   */
-  public void setSystemSetting(String adminUser, String adminPassword, String key, String value) {
-    try {
-      String token = passwordGrant(adminUser, adminPassword);
-      for (int attempt = 1; attempt <= MAX_VERSION_RETRIES; attempt++) {
-        long version = getJson("/api/v1/settings/" + key, token).get("version").getAsLong();
-        String body = "{\"value\":\"" + value + "\",\"version\":" + version + "}";
-        int status = put(token, "/api/v1/settings/" + key, body);
-        if (status >= 200 && status < 300) {
-          return;
-        }
-        if (status != 409) {
-          throw new IllegalStateException("Setting PUT failed: HTTP " + status);
-        }
-      }
-      throw new IllegalStateException("System-setting update exhausted retries on HTTP 409");
-    } catch (IllegalStateException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new IllegalStateException("BackendSeeder.setSystemSetting failed", e);
     }
   }
 

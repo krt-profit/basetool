@@ -3,7 +3,7 @@
 - **Status:** Accepted (owner-approved)
 - **Date:** 2026-06-30
 - **Deciders:** Repository owner (@greluc)
-- **Related:** spec REQ-MISSION-004/-010/-012 ([`docs/specs/mission-detail-tabs.md`](../specs/mission-detail-tabs.md)) ·
+- **Related:** spec REQ-MISSION-004/-010/-019 ([`docs/specs/mission-detail-tabs.md`](../specs/mission-detail-tabs.md)) ·
   REQ-AUDIT-001 ([`docs/specs/audit.md`](../specs/audit.md)) ·
   REQ-FE-001…010 ([`docs/specs/frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md)) ·
   [ADR-0012](0012-frontend-krtfetch-json-mutations-csrf-retry.md) /
@@ -32,7 +32,7 @@ presence-socket live-sync stack (ADR-0044), so the goals reuse them rather than 
 
 ## Decision
 
-1. **Persisted ordered child `MissionObjective` (REQ-MISSION-012), replacing the single objective.** A new
+1. **Persisted ordered child `MissionObjective` (REQ-MISSION-019), replacing the single objective.** A new
    `mission_objective` table (V199), `@OneToMany(cascade=ALL, orphanRemoval=true) @OrderBy("orderIndex
    ASC") @OptimisticLock(excluded = true) Set<MissionObjective>` on `Mission`, mirroring `MissionStep`.
    `title` is required (≤250, sized to never truncate a migrated objective), `kind` is the classification,

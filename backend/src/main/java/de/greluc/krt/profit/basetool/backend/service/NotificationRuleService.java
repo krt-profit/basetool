@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.mapper.NotificationRuleMapper;
 import de.greluc.krt.profit.basetool.backend.model.NotificationRule;
 import de.greluc.krt.profit.basetool.backend.model.NotificationRuleSelector;
 import de.greluc.krt.profit.basetool.backend.model.Role;
+import de.greluc.krt.profit.basetool.backend.model.SelectorKind;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleSelectorWriteRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleWriteRequest;
@@ -48,6 +49,10 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Updates replace the selector collection wholesale (clear + re-add, relying on orphan removal)
  * and use an explicit optimistic-lock check mirrored from {@code SystemSettingService}; {@code
  * saveAndFlush} returns the bumped version so the admin form can write it straight back.
+ *
+ * <p>All six {@link SelectorKind}s are writable (REQ-NOTIF-007: every rule, seeded or not, is
+ * editable at runtime). The three event-derived kinds ({@code ACCOUNT_GRANT}, {@code
+ * EVENT_RECIPIENT}, {@code ACCOUNT_RESPONSIBLE}) are stored with every selector column null.
  */
 @Service
 @RequiredArgsConstructor
@@ -155,6 +160,14 @@ public class NotificationRuleService {
       // the write transaction - so a rule with eight role selectors issued sixteen reads to answer
       // eight questions. The validation now returns what it looked up.
       Role resolvedRole = validateSelector(selectorRequest);
+      if (readsOnlyTheEvent(selectorRequest.kind())) {
+        // ACCOUNT_GRANT / EVENT_RECIPIENT / ACCOUNT_RESPONSIBLE take the account or the recipient
+        // from the event and read none of the selector columns. Whatever the request carried in
+        // them is dropped, so a stray value can never sit in a row looking as if it meant
+        // something.
+        rule.addSelector(NotificationRuleSelector.builder().kind(selectorRequest.kind()).build());
+        continue;
+      }
       rule.addSelector(
           NotificationRuleSelector.builder()
               .kind(selectorRequest.kind())
@@ -211,11 +224,32 @@ public class NotificationRuleService {
               "ORG_RELATIVE_ROLE selector requires orgRelativeRole and contextRole");
         }
       }
+      case ACCOUNT_GRANT, EVENT_RECIPIENT, ACCOUNT_RESPONSIBLE -> {
+        // Nothing to validate: these kinds need no selector field, the account or the recipient
+        // comes from the event. They used to be refused here as "seed-only", which made every
+        // seeded rule carrying one (all the bank booking-request rules among them) impossible to
+        // save from the admin editor - not even to disable it - against REQ-NOTIF-007.
+      }
       default ->
           throw new IllegalArgumentException("Unsupported selector kind: " + selector.kind());
     }
     // Every arm but ROLE resolves no role, and the caller stores null for their roleCode.
     return null;
+  }
+
+  /**
+   * Tells whether a selector kind resolves its recipients purely from the event and therefore reads
+   * none of the selector columns ({@code userId}, {@code roleCode}, {@code orgRelativeRole}, {@code
+   * contextRole}).
+   *
+   * @param kind the selector kind
+   * @return {@code true} for {@code ACCOUNT_GRANT}, {@code EVENT_RECIPIENT} and {@code
+   *     ACCOUNT_RESPONSIBLE}, {@code false} for every kind that is configured through its columns
+   */
+  private static boolean readsOnlyTheEvent(@NotNull SelectorKind kind) {
+    return kind == SelectorKind.ACCOUNT_GRANT
+        || kind == SelectorKind.EVENT_RECIPIENT
+        || kind == SelectorKind.ACCOUNT_RESPONSIBLE;
   }
 
   @NotNull

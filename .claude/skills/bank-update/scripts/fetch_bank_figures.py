@@ -29,6 +29,11 @@ from decimal import Decimal
 DB_CONTAINER = "db-backend"
 DB_PORT = "15432"
 
+# Since the 2026-09-22 cutover production runs rootless Podman: the containers belong to the
+# service user, so `podman` has to run as that user (the same `sudo -n -u <user> podman` form
+# scripts/lib/container-runtime.sh uses). There is no Docker daemon on the host any more.
+SERVICE_USER = "iri"
+
 # Windows-only detail that decides whether SSH authenticates at all: only the
 # Windows OpenSSH client reaches the ssh-agent service holding the key. The MSYS /
 # Git-Bash ssh fails "Permission denied (publickey)" even when pointed at the key
@@ -181,7 +186,9 @@ UNION ALL SELECT 'req_krt_rej_sum', COALESCE(SUM(r.amount), 0)::text
 def run_query(host: str, sql: str) -> dict[str, Decimal]:
     """Execute the query on the production host and return the labelled figures."""
     remote = (
-        f'docker exec -i {DB_CONTAINER} sh -c '
+        # `cd /` first: the SSH session starts in /root, which the service user cannot enter, and
+        # podman refuses to run from a cwd it cannot chdir into.
+        f'cd / && sudo -n -u {SERVICE_USER} podman exec -i {DB_CONTAINER} sh -c '
         f'"psql -qAt -U \\$POSTGRES_USER -d \\$POSTGRES_DB -p {DB_PORT} -f -"'
     )
     proc = subprocess.run(
