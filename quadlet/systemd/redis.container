@@ -5,6 +5,7 @@ StartLimitIntervalSec=0
 [Container]
 Image=docker.io/redis:8-alpine@sha256:becdda6c7f4b3fb42e42fd7f120bbf5c54c4caaaf16f26da24e4563d2c1f0576
 ContainerName=redis
+LogDriver=journald
 User=999
 Group=999
 ReadOnly=true

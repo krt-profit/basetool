@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Betrieb: die Container-Ausgaben landen wieder in Loki.** Auf dem Podman-Host schrieben die
+  Container in Podmans eigenen Speicher statt ins Journal, und das Journal selbst lag nur im
+  Arbeitsspeicher — der Sammler las also einen Pfad, den es nicht gab. Dadurch fehlten sämtliche
+  Container-Ströme, darunter das Zugriffsprotokoll des Edge; die Gesamt-Sammelrate blieb trotzdem
+  grün, weil die Dateiströme allein sie erzeugen. Beide Hälften sind jetzt festgelegt statt
+  geerbt. Rein betriebsseitig.
+
+- **Betrieb: die Konformanzprüfung liest Container-Logs jetzt über den tatsächlichen Treiber.**
+  Sie nahm einen an, und auf dem Produktionshost war es der andere — die Prüfung des
+  Client-Adressen-Durchgriffs meldete daraufhin „die Anfrage hat diesen Edge nie erreicht" über
+  einen Edge, der jede Anfrage der Maschine bediente. Rein betriebsseitig.
+
 ## [v1.9.1](https://github.com/krt-profit/basetool/releases/tag/v1.9.1) - 2026-09-22
 
 ### Fixed

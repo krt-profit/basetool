@@ -99,3 +99,13 @@
   environment:
     XDG_RUNTIME_DIR: "/run/user/{{ basetool_host_service_uid }}"
   when: not ansible_check_mode
+
+# A RESTART, not a reload: journald re-reads its configuration and re-opens its storage only on
+# start, so `Storage=persistent` and a newly created /var/log/journal take effect at no other
+# moment. The cost is the in-memory journal of a host that is being provisioned, which is the
+# cheapest possible moment to pay it.
+- name: Reload systemd-journald
+  ansible.builtin.systemd_service:
+    name: systemd-journald.service
+    state: restarted
+  when: not ansible_check_mode

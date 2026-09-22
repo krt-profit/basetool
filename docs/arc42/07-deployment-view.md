@@ -64,6 +64,21 @@ Alloy also changed *how* it reads container logs: it reads the **journal**, keye
 Docker runtime would therefore lose its container-stdout streams — which is why the rollback path
 insists the old host's deploy timer is **disabled**, not merely stopped.
 
+That path has **two** host-side preconditions, and both are stated rather than inherited, because
+neither is a default one can rely on:
+
+- every `.container` carries **`LogDriver=journald`**. Podman's rootless default is not the same
+  everywhere — the testing host resolved `journald`, the production host `k8s-file`, from the same
+  release — and a container on `k8s-file` writes into podman's own storage where Alloy never looks.
+- the host has a **persistent journal** (`/var/log/journal`, `Storage=persistent`), because
+  `loki.source.journal` names that path and systemd keeps the journal in RAM under
+  `/run/log/journal` when the directory is absent.
+
+Either one missing is silent in the same way: Alloy is `active`, its scrape target is up, and Loki
+simply never gains `<svc>-stdout`, `mon-*`, `postgres-*`, `edge` or `ops-cleanup`. `log-streams`
+stays green throughout, because it measures Loki's total ingest *rate* and the file-based streams
+alone produce one. Measured on the production host on cutover day, 2026-09-22, with both missing.
+
 ## 7.4 The operational timers
 
 | Timer | Does |
