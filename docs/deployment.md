@@ -126,6 +126,8 @@ opens SSH, 80 and 443 only; the provider's cloud firewall sits in front of it, d
 Run from `/`, as root. `sudo -u <user>` keeps the caller's working directory, and neither `deploy`
 nor `iri` can enter `/root` — from there every rootless call fails with `cannot chdir to /root:
 Permission denied`, which the runtime detection reports as "no lingering user could be found".
+`deploy.sh` and `container-cleanup.sh` change to `/` themselves (deploy.sh since 2026-09-22), so for
+them the `cd /` below is belt and braces; for the ad-hoc `${UCTL}` / `${UPOD}` commands it is not.
 
 ```bash
 cd /
@@ -476,15 +478,18 @@ compose changed (`generate-quadlet.py`), merge, cut a release, promote. The next
 bundle, installs the changed units and restarts exactly the application services whose definition
 moved. Dependabot's image-pin bumps take this path too.
 
-> [!warning] A changed **monitoring** or **`acme`** unit is installed but not restarted
-> The deployer restarts changed units only for the eight application services it names
-> (`db-backend db-keycloak redis keycloak backend ingest frontend edge`). For the nine monitoring
-> units it runs `systemctl --user start`, which does nothing to a unit that is already active, and
-> `acme` it does not touch at all (known gap, REQ-OPS-013). Prometheus, Alloy and the blackbox
-> exporter are still recreated when their *config files* change. After a release that changes any
-> other of these units — a memory limit, an image pin, an environment line — restart it by hand:
-> `${UCTL} restart <svc>.service`, then confirm with
-> `${UPOD} container inspect <svc> --format '{{.ImageName}}'`. A config-only change still needs a promotion — the
+> [!note] Monitoring and `acme` units are restarted like the rest — fixed 2026-09-22
+> Every unit a release re-defines is **restarted**, every other one merely **started**: the nine
+> application services (`db-backend db-keycloak redis keycloak backend ingest frontend edge acme`)
+> in the gated apply, the nine monitoring units in the non-gating monitoring apply after it. A
+> restarted monitoring unit is restarted once per release, not once per apply pass. Until
+> 2026-09-22 this was a known gap (REQ-OPS-013): the monitoring apply only ever said
+> `systemctl --user start`, a no-op on an active unit, and `acme` was in neither list, so a changed
+> unit was installed and left running its old definition. Prometheus, Alloy and the blackbox
+> exporter are additionally recreated when their *config files* change. To confirm a unit change
+> landed: `${UPOD} container inspect <svc> --format '{{.ImageName}}'`.
+
+A config-only change still needs a promotion — the
 human gate is deliberate (REQ-OPS-002); cut a patch release if it cannot wait.
 
 **A Postgres `-c` flag change auto-applies** and restarts `db-backend` / `db-keycloak` on the next

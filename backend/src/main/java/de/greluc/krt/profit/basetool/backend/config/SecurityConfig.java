@@ -651,20 +651,16 @@ public class SecurityConfig {
                     .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER)
                     .requestMatchers(HttpMethod.GET, "/api/v1/users/*")
                     .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER)
-                    // Post Phase-4 lockdown (docs/archive/MULTI_SQUADRON_PLAN.md section 2):
-                    // granting the flags (logistician / mission manager) and patching attributes
-                    // are admin-only. The method-level @PreAuthorize on
-                    // UserController#updateAttributes already requires hasRole('ADMIN'); the path
-                    // matchers here were a relic of the pre-Phase-4 configuration and were
-                    // aligned with the method-level annotation so that SecurityConfig no longer
-                    // suggests OFFICER may reach these endpoints. The two PATCH .../logistician
-                    // and .../mission-manager endpoints no longer exist in UserController (the
-                    // flags are patched through SquadronMembershipController); their matchers
-                    // only keep those paths admin-only should anything be mapped there again.
-                    .requestMatchers(HttpMethod.PATCH, "/api/v1/users/*/logistician")
-                    .hasRole(Roles.ADMIN)
-                    .requestMatchers(HttpMethod.PATCH, "/api/v1/users/*/mission-manager")
-                    .hasRole(Roles.ADMIN)
+                    // Attribute edits are admin-only since the Phase-4 lockdown
+                    // (docs/archive/MULTI_SQUADRON_PLAN.md section 2), matching the
+                    // method-level @PreAuthorize on UserController#updateUserAttributes. Two
+                    // sibling matchers for PATCH .../logistician and .../mission-manager stood here
+                    // until 2026-09-22; those endpoints were removed when the flags moved
+                    // onto the per-Staffel membership row
+                    // (PATCH /api/v1/squadrons/{id}/members/{userId}), so the matchers
+                    // guarded URLs nothing serves. The catch-all /api/v1/users/** below
+                    // still answers them ADMIN-only, which
+                    // SecurityConfigLegacyUserFlagRoutesTest pins.
                     .requestMatchers(HttpMethod.PUT, "/api/v1/users/*/attributes")
                     .hasRole(Roles.ADMIN)
                     // GET .../memberships is the picker read variant

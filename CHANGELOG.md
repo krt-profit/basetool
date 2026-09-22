@@ -41,6 +41,24 @@
 - **Texte: durchgängig „du", und keine fest verdrahteten Beschriftungen mehr.** Zwölf Hinweise und
   Rückfragen siezten noch; „Nutzer zuordnen" und „Eigener Eintrag" beim Einbuchen sowie „Neuer
   Auftrag" in der Auftragsliste waren nicht übersetzbar.
+- **Monitoring: der Alarm für Container in einer Neustart-Schleife konnte seit dem Podman-Umzug nicht
+  mehr auslösen.** Er las eine Metrik, die nur das entfernte cAdvisor lieferte; jetzt liest er die
+  Startzeit aus dem Podman-Exporter. Das Dashboard-Panel „NPM errors & warnings“ zeigt stattdessen
+  die Fehler- und Warnzeilen der Edge.
+
+- **Monitoring: Alloy und node_exporter haben wieder ein Speicherlimit und werden wieder überwacht.**
+  Als Host-Dienste liefen sie seit dem Umzug ohne Limit und außerhalb aller Speicher-Alarme; die
+  Ansible-Rolle setzt jetzt `MemoryMax` und `GOMEMLIMIT`, und der cgroup-Collector liest beide mit.
+  Neuer Alarm `HostServiceMetricsMissing`, falls diese Abdeckung wieder verschwindet.
+
+- **Betrieb: eine geänderte Monitoring- oder `acme`-Unit wird beim Deploy jetzt auch neu gestartet.**
+  Bisher wurde sie nur installiert und der alte Container lief weiter. `deploy.sh` läuft außerdem von
+  Hand gestartet aus `/` und prüft vor dem Deploy den Keystore-Pfad, den die Units tatsächlich
+  einbinden, statt den aus `.env`. Rein betriebsseitig.
+
+- **Aufgeräumt: die toten NPM-Snippets unter `docker/maintenance/nginx/` und zwei Security-Regeln für
+  längst entfernte Endpunkte.** Die Release-Prüfung verlangt jetzt auch `docker/edge` und `docker/acme`
+  im Konfigurationspaket. Kein sichtbarer Unterschied.
 
 - **Betrieb: Sicherung, Wiederherstellungsprobe und Aufräumen scheitern nicht mehr nach einem Neustart.**
   Ihre Nachhol-Läufe starteten Sekunden nach dem Hochfahren, bevor die Container-Laufzeit bereitstand,

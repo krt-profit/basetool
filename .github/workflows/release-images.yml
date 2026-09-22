@@ -1064,9 +1064,19 @@ jobs:
             test -f "/tmp/config-bundle/${f}" \
               || { echo "::error::config bundle is missing file: ${f}" >&2; missing=1; }
           done
-          for d in docker/maintenance keycloak-theme monitoring quadlet/systemd quadlet/env.d; do
+          # docker/edge and docker/acme joined 2026-09-22. docker/acme was already missing from the
+          # Dockerfile's COPY list once (2026-09-16 to the cutover) and this guard did not notice,
+          # because it did not name it: the fresh Podman host then refused to start acme at all
+          # ("statfs /var/iri/code/docker/acme: no such file or directory"). The FILE checks below
+          # the loop are the other half: an edge or acme directory that exists but is empty passes
+          # `test -d` and still ships nothing either unit can run.
+          for d in docker/maintenance/static docker/edge docker/acme keycloak-theme monitoring quadlet/systemd quadlet/env.d; do
             test -d "/tmp/config-bundle/${d}" \
               || { echo "::error::config bundle is missing directory: ${d}" >&2; missing=1; }
+          done
+          for f in docker/edge/nginx.conf docker/edge/include/maintenance.conf docker/acme/publish-loop.sh; do
+            test -s "/tmp/config-bundle/${f}" \
+              || { echo "::error::config bundle is missing or has an empty: ${f}" >&2; missing=1; }
           done
           # The Quadlet units ARE the deployment on a Podman host, the way docker-compose.yml is
           # on a Docker one, so a bundle without them ships a release that cannot change anything

@@ -1191,9 +1191,11 @@ the table says 200** means the backend's rule moved under the vhost, which is wo
 
 5. A path that is no longer consumed comes back **out** on the same terms.
 
-The edge per-IP rate limiter needs no entry here: `docker/maintenance/nginx/server_proxy.conf` is
-included into **every** proxy host's server block, so the 20 r/s (burst 80) safety net of
-REQ-SEC-023 already applies to this host, keyed per IPv4 address and per IPv6 `/64`.
+The edge per-IP rate limiter needs no entry here: `docker/edge/include/limits.conf` is included
+into **every** vhost, so the 20 r/s (burst 80) safety net of REQ-SEC-023 already applies to this
+host, keyed per IPv4 address and per IPv6 `/64`. (Written against NPM, where the same values lived
+in `docker/maintenance/nginx/server_proxy.conf`; that snippet was deleted on 2026-09-22, ten days
+after the native edge replaced NPM and stopped reading it.)
 
 ### D.4 The Keycloak token endpoint
 
@@ -1207,8 +1209,9 @@ limit_req zone=krt_req_perip burst=10 nodelay;
 limit_req_status 429;
 ```
 
-The zone itself is version-controlled in `docker/maintenance/nginx/http.conf`; only the per-location
-`limit_req` lives in the NPM database. A dedicated, stricter zone is a repo change — ask for it if
+The zone itself is version-controlled — in `docker/maintenance/nginx/http.conf` when this was
+written, in `docker/edge/conf.d/00-maps.conf` since the native edge (ADR-0162); only the
+per-location `limit_req` lived in the NPM database. A dedicated, stricter zone is a repo change — ask for it if
 this burst turns out too generous once real app traffic exists.
 
 **Rollback for the whole phase:** toggle the proxy host to *Disabled*. It keeps its certificate and
