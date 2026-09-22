@@ -47,6 +47,7 @@ import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.MissionParticipantService;
 import de.greluc.krt.profit.basetool.backend.service.MissionService;
+import de.greluc.krt.profit.basetool.backend.service.ParticipantTargetResolver;
 import de.greluc.krt.profit.basetool.backend.service.ScopePredicate;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -88,6 +89,13 @@ class MissionServiceTest {
 
   @Mock private AuditService auditService;
 
+  /**
+   * The name resolution is its own unit ({@code ParticipantTargetResolverTest}); here it passes
+   * every submission through unresolved by default, and the one case about name matching stubs the
+   * match it needs.
+   */
+  @Mock private ParticipantTargetResolver participantTargetResolver;
+
   @InjectMocks private MissionParticipantService missionParticipantService;
   // Constructed in the @BeforeEach rather than by @InjectMocks: the REAL participant sub-service
   // is one of its arguments
@@ -95,6 +103,12 @@ class MissionServiceTest {
 
   @BeforeEach
   void wireExtractedParticipantService() {
+    org.mockito.Mockito.lenient()
+        .when(participantTargetResolver.resolve(any(), any(), any()))
+        .thenAnswer(
+            inv ->
+                new ParticipantTargetResolver.ParticipantTarget(
+                    inv.getArgument(0), inv.getArgument(1)));
     // MissionService delegates the participant methods to the extracted MissionParticipantService
     // (L1 step 2, #920). Wire a real instance (built from this class's mocks) into the CUT via
     // reflection, since Mockito does not inject one @InjectMocks target into another.
@@ -246,8 +260,8 @@ class MissionServiceTest {
     existingUser.setUsername("testuser");
 
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
-    when(userRepository.findByUsernameIgnoreCaseOrDisplayNameIgnoreCase("TestUser", "TestUser"))
-        .thenReturn(Optional.of(existingUser));
+    when(participantTargetResolver.resolve(null, "TestUser", "Participant name is ambiguous."))
+        .thenReturn(new ParticipantTargetResolver.ParticipantTarget(userId, null));
     when(userRepository.findById(userId)).thenReturn(Optional.of(existingUser));
     // The resolved user has no memberships, so the participant gets no org-unit affiliation —
     // there is deliberately no IRIDIUM fallback anymore.

@@ -1384,9 +1384,11 @@
                                     <div class="data-value krtm-background-var-color-surface-input-padding-0-fd20">
                                         <span th:text="${mission.owner != null ? mission.owner.effectiveName : '-'}">Besitzer Name</span>
                                     </div>
-                                    <div th:if="${mission.canEdit}" class="flex-gap-xs">
+                                    <!-- data-ownership-version: the owner change's optimistic-lock counter (BE-SIMP-03),
+                                         echoed on the next change and rewritten in place after one. -->
+                                    <div th:if="${mission.canEdit}" class="flex-gap-xs" id="owner-row" th:attr="data-ownership-version=${mission.ownershipVersion}">
                                         <!-- Server-side searchable combobox (remote-users, #1193): roster is searched on demand, not preloaded. -->
-                                        <select id="new-owner-id" class="flex-1" data-krt-combobox="remote-users">
+                                        <select id="new-owner-id" class="flex-1" data-krt-combobox="remote-users" data-testid="mission-owner-picker">
                                             <option value="" th:text="#{mission.owner.select}">-- Neuen Besitzer w&auml;hlen --</option>
                                         </select>
                                         <button type="button" class="btn btn-outline" data-trigger="mission-change-owner"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{general.save}">Speichern</span></button>

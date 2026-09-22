@@ -350,7 +350,7 @@ public class MissionWriteController {
       RedirectAttributes redirectAttributes) {
     try {
       backendApiClient.post(
-          "/api/v1/missions/" + id + "/participants/" + participantId + "/check-in",
+          "/api/v1/missions/" + id + "/participants/" + participantId + "/check-in/slim",
           null,
           Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
@@ -378,7 +378,7 @@ public class MissionWriteController {
       RedirectAttributes redirectAttributes) {
     try {
       backendApiClient.post(
-          "/api/v1/missions/" + id + "/participants/" + participantId + "/check-out",
+          "/api/v1/missions/" + id + "/participants/" + participantId + "/check-out/slim",
           null,
           Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
@@ -393,36 +393,40 @@ public class MissionWriteController {
   }
 
   /**
-   * AJAX endpoint that updates a participant's payout preference (target wallet / split rules).
-   * Public so guests can change their own preference on missions they joined unauthenticated.
+   * AJAX endpoint that updates one participant's payout preference ({@code PAYOUT} / {@code
+   * DONATE}) through the slim backend endpoint and answers with that participant row alone — the
+   * {@code MissionParticipantDto}, carrying its bumped {@code version}, which {@code
+   * mission-detail.js} fans out to every element of the row. It used to call the deprecated
+   * full-Einsatz twin and pick the row out of the whole mission on the client.
    *
-   * @return the updated mission, or the propagated backend status on failure
+   * @param id mission id
+   * @param participantId the participant row
+   * @param request the new preference
+   * @param principal the signed-in member (unused; the backend decides from the token)
+   * @return the updated participant row, or the backend's status and RFC 7807 problem relayed
+   *     unchanged — a 403 for a row the caller may not touch, a 409 on a concurrent change
    */
   @PostMapping("/{id}/participants/{participantId}/payout-preference")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<MissionDto> updatePayoutPreference(
+  public org.springframework.http.ResponseEntity<Object> updatePayoutPreference(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
       @RequestBody UpdatePayoutPreferenceRequest request,
       @AuthenticationPrincipal OidcUser principal) {
     try {
-      MissionDto updatedMission =
+      Object updatedParticipant =
           backendApiClient.put(
-              "/api/v1/missions/" + id + "/participants/" + participantId + "/payout-preference",
+              "/api/v1/missions/"
+                  + id
+                  + "/participants/"
+                  + participantId
+                  + "/payout-preference/slim",
               request,
-              MissionDto.class);
-      return org.springframework.http.ResponseEntity.ok(updatedMission);
+              Object.class);
+      return org.springframework.http.ResponseEntity.ok(updatedParticipant);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
-      log.debug(
-          "Update payout preference failed with status {}: {}", e.getStatusCode(), e.getMessage());
-      if (e.getStatusCode() == 403 || e.getStatusCode() == 401) {
-        return org.springframework.http.ResponseEntity.status(
-                org.springframework.http.HttpStatus.FORBIDDEN)
-            .build();
-      }
-      return org.springframework.http.ResponseEntity.status(
-              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
-          .build();
+      log.debug("Update payout preference failed with status {}", e.getStatusCode());
+      return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Update payout preference failed", e);
       return org.springframework.http.ResponseEntity.status(
@@ -509,7 +513,7 @@ public class MissionWriteController {
       RedirectAttributes redirectAttributes) {
     try {
       backendApiClient.delete(
-          "/api/v1/missions/" + id + "/participants/" + participantId, Void.class);
+          "/api/v1/missions/" + id + "/participants/" + participantId + "/slim", Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "deleteParticipant", participantId, e);
@@ -573,7 +577,7 @@ public class MissionWriteController {
       }
 
       backendApiClient.put(
-          "/api/v1/missions/" + id + "/participants/" + participantId, body, Void.class);
+          "/api/v1/missions/" + id + "/participants/" + participantId + "/slim", body, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Update participant failed", e);
@@ -611,7 +615,7 @@ public class MissionWriteController {
       body.put("responsibleUserId", responsibleUserId);
       body.put("note", note);
 
-      backendApiClient.post("/api/v1/missions/" + id + "/units", body, Void.class);
+      backendApiClient.post("/api/v1/missions/" + id + "/units/slim", body, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Add unit failed", e);
@@ -650,7 +654,8 @@ public class MissionWriteController {
       body.put("responsibleUserId", responsibleUserId);
       body.put("note", note);
 
-      backendApiClient.put("/api/v1/missions/" + id + "/units/" + unitId, body, Void.class);
+      backendApiClient.put(
+          "/api/v1/missions/" + id + "/units/" + unitId + "/slim", body, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Update unit failed", e);
@@ -672,7 +677,7 @@ public class MissionWriteController {
       @PathVariable @NotNull UUID unitId,
       RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/missions/" + id + "/units/" + unitId, Void.class);
+      backendApiClient.delete("/api/v1/missions/" + id + "/units/" + unitId + "/slim", Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (Exception e) {
       log.error("Delete unit failed", e);
@@ -708,7 +713,7 @@ public class MissionWriteController {
       }
 
       backendApiClient.post(
-          "/api/v1/missions/" + id + "/units/" + unitId + "/crew", body, Void.class);
+          "/api/v1/missions/" + id + "/units/" + unitId + "/crew/slim", body, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Add crew failed", e);
@@ -747,7 +752,9 @@ public class MissionWriteController {
       }
 
       backendApiClient.put(
-          "/api/v1/missions/" + id + "/units/" + unitId + "/crew/" + crewId, body, Void.class);
+          "/api/v1/missions/" + id + "/units/" + unitId + "/crew/" + crewId + "/slim",
+          body,
+          Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Update crew failed", e);
@@ -771,7 +778,7 @@ public class MissionWriteController {
       RedirectAttributes redirectAttributes) {
     try {
       backendApiClient.delete(
-          "/api/v1/missions/" + id + "/units/" + unitId + "/crew/" + crewId, Void.class);
+          "/api/v1/missions/" + id + "/units/" + unitId + "/crew/" + crewId + "/slim", Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (Exception e) {
       log.error("Delete crew failed", e);
@@ -1219,63 +1226,59 @@ public class MissionWriteController {
   }
 
   /**
-   * AJAX endpoint that transfers mission ownership to another user. Backend ensures the old owner
-   * stays as a co-manager so they don't lose all access in one click.
+   * AJAX endpoint that hands a mission to another owner, version-checked (BE-SIMP-03). Forwards the
+   * JSON body — the new owner's {@code userId} and the {@code version} the page last read, i.e. the
+   * mission's {@code ownershipVersion} — to {@code PUT /api/v1/missions/{id}/owner}, then re-reads
+   * the mission and returns it, so the page can write the bumped {@code ownershipVersion} back onto
+   * the owner row before a second change is sent. The previous owner is not added to the
+   * co-managers.
    *
-   * @return 200 on success, propagated backend status on failure
+   * <p>It used to call the deprecated {@code PUT …/owner/{userId}}, which took no version: of two
+   * managers handing the same Einsatz to different people, the later one silently won. A stale
+   * version is now the backend's {@code 409} with the {@code OPTIMISTIC_LOCK} code, and it is
+   * relayed verbatim — status and RFC 7807 body — so {@code krtFetch} offers the conflict dialog
+   * instead of a generic error toast.
+   *
+   * @param id mission id (path)
+   * @param body owner-change JSON: {@code userId} (a UUID string) plus {@code version}
+   * @return {@code 200} with the refreshed mission, {@code 400} for a missing or malformed {@code
+   *     userId}, or the upstream RFC 7807 error passed through
    */
-  @PutMapping("/{id}/owner/{userId}")
+  @PutMapping(
+      value = "/{id}/owner/ajax",
+      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
   public org.springframework.http.ResponseEntity<Object> setMissionOwner(
-      @PathVariable String id, @PathVariable String userId) {
-    log.debug("START setMissionOwner - id: '{}', userId: '{}'", id, userId);
+      @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
+    UUID userId;
     try {
-      if (id == null || id.isBlank() || userId == null || userId.isBlank()) {
-        log.debug("MISSING PARAMETERS in setMissionOwner - id: '{}', userId: '{}'", id, userId);
+      Object raw = body.get("userId");
+      if (raw == null || String.valueOf(raw).isBlank()) {
         return org.springframework.http.ResponseEntity.badRequest().build();
       }
-      java.util.UUID missionUuid;
-      java.util.UUID userUuid;
-      try {
-        missionUuid = java.util.UUID.fromString(id.trim());
-      } catch (IllegalArgumentException e) {
-        log.debug(
-            "INVALID MISSION ID FORMAT in setMissionOwner - id: '{}', Error: {}",
-            id,
-            e.getMessage());
-        return org.springframework.http.ResponseEntity.badRequest().build();
-      }
-      try {
-        userUuid = java.util.UUID.fromString(userId.trim());
-      } catch (IllegalArgumentException e) {
-        log.debug(
-            "INVALID USER ID FORMAT in setMissionOwner - userId: '{}', Error: {}",
-            userId,
-            e.getMessage());
-        return org.springframework.http.ResponseEntity.badRequest().build();
-      }
-
-      log.debug("CALLING BACKEND PUT - Mission: {}, User: {}", missionUuid, userUuid);
-      try {
-        backendApiClient.put(
-            "/api/v1/missions/" + missionUuid + "/owner/" + userUuid, null, Void.class);
-        log.debug("SUCCESS - Owner of mission {} changed to user {}", missionUuid, userUuid);
-        return org.springframework.http.ResponseEntity.ok().build();
-      } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
-        log.debug(
-            "BACKEND ERROR changing owner: Status={}, Message={}, Readable={}",
-            e.getStatusCode(),
-            e.getMessage(),
-            e.getReadableErrorMessage());
+      userId = UUID.fromString(String.valueOf(raw).trim());
+    } catch (IllegalArgumentException e) {
+      log.debug("Owner change refused: userId is not a UUID");
+      return org.springframework.http.ResponseEntity.badRequest().build();
+    }
+    try {
+      Map<String, Object> out = new HashMap<>();
+      out.put("userId", userId);
+      out.put("version", body.get("version") != null ? body.get("version") : 0L);
+      backendApiClient.put("/api/v1/missions/" + id + "/owner", out, Void.class);
+      MissionDto mission = backendApiClient.get("/api/v1/missions/" + id, MISSION);
+      return org.springframework.http.ResponseEntity.ok(mission);
+    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      if (e.getStatusCode() == 409) {
+        // Somebody else changed the owner since this page read its ownershipVersion. Relayed as-is:
+        // the OPTIMISTIC_LOCK code in the body is what makes krtFetch offer the reload.
+        log.debug("Owner change for mission {} conflicted with a concurrent change", id);
         return propagateBackendError(e);
       }
+      log.debug("Owner change (AJAX) failed: status={}", e.getStatusCode());
+      return propagateBackendError(e);
     } catch (Exception e) {
-      log.debug(
-          "UNEXPECTED ERROR in setMissionOwner: id='{}', userId='{}', error={}",
-          id,
-          userId,
-          e.getMessage(),
-          e);
+      log.debug("UNEXPECTED ERROR in setMissionOwner for mission {}", id, e);
       return org.springframework.http.ResponseEntity.internalServerError().build();
     }
   }

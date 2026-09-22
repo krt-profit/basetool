@@ -40,7 +40,6 @@ import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.MissionSectionVersions.MissionSection;
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -91,6 +90,9 @@ public class MissionParticipantService {
   private final AuditService auditService;
 
   private final MissionSecurityService missionSecurityService;
+
+  /** Resolves a free-text participant name to a registered member or an external name. */
+  private final ParticipantTargetResolver participantTargetResolver;
 
   /**
    * Adds an authenticated user as a participant on a mission. Convenience overload that delegates
@@ -174,18 +176,14 @@ public class MissionParticipantService {
               + "). Remove inactive participants before adding more.");
     }
 
-    UUID effectiveUserId = userId;
-    String effectiveGuestName = guestName;
-
-    if (effectiveUserId == null && effectiveGuestName != null && !effectiveGuestName.isBlank()) {
-      Optional<User> matchedUser =
-          userRepository.findByUsernameIgnoreCaseOrDisplayNameIgnoreCase(
-              effectiveGuestName.trim(), effectiveGuestName.trim());
-      if (matchedUser.isPresent()) {
-        effectiveUserId = matchedUser.orElseThrow().getId();
-        effectiveGuestName = null;
-      }
-    }
+    // The controllers resolve the name before they get here, so a name arriving is normally one
+    // that
+    // matched nobody. This is the safety net for any other caller, through the same resolver: an
+    // ambiguous name is the 409 the controllers raise, not the 500 a single-result query threw.
+    ParticipantTargetResolver.ParticipantTarget target =
+        participantTargetResolver.resolve(userId, guestName, "Participant name is ambiguous.");
+    UUID effectiveUserId = target.userId();
+    String effectiveGuestName = target.guestName();
 
     if (effectiveUserId == null && (effectiveGuestName == null || effectiveGuestName.isBlank())) {
       throw new IllegalArgumentException("Either User ID or Guest Name must be provided.");

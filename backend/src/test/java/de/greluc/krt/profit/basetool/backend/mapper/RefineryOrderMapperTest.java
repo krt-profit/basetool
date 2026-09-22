@@ -255,7 +255,8 @@ class RefineryOrderMapperTest {
             null, // objectives
             null, // objectivesVersion
             null // meetingPoint
-            );
+            ,
+            null);
 
     // When
     Mission mission = mapper.missionDtoToMission(dto);

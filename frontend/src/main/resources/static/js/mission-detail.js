@@ -2479,15 +2479,37 @@ async function changeMissionOwner() {
 
         const cleanMissionId = String(currentMissionId).trim();
         const cleanUserId = String(userId).trim();
+        // The ownership counter is read LAZILY inside the payload thunk, at the moment the
+        // serialized section:owner chain sends the write — the same pattern as the owning-org-unit
+        // reassignment below — so a second change queued behind the first picks up the version the
+        // first one's onSuccess wrote back instead of self-409ing on the one read at click time.
+        const currentOwnershipVersion = function () {
+            const liveRow = document.getElementById('owner-row');
+            const attr = liveRow ? liveRow.getAttribute('data-ownership-version') : null;
+            return attr != null && attr !== '' ? parseInt(attr, 10) : 0;
+        };
 
-        const result = await window.krtMissionWrite({
+        await window.krtMissionWrite({
             method: 'PUT',
-            url: `/missions/${cleanMissionId}/owner/${cleanUserId}`,
+            url: `/missions/${cleanMissionId}/owner/ajax`,
+            payload: function () {
+                return { userId: cleanUserId, version: currentOwnershipVersion() };
+            },
             sectionKey: 'owner',
+            onSuccess: function (dto) {
+                // Write the bumped ownershipVersion straight back from the response before the chain
+                // releases the next queued write; the mgmt refetch below repaints it too, but later.
+                if (dto && dto.ownershipVersion != null) {
+                    const liveRow = document.getElementById('owner-row');
+                    if (liveRow) {
+                        liveRow.setAttribute('data-ownership-version', String(dto.ownershipVersion));
+                    }
+                }
+                // Re-render the management panel in place and broadcast it to peers (REQ-FE-010),
+                // whose re-rendered panel carries the new data-ownership-version as well.
+                window.krtRefreshMissionSection('mgmt');
+            },
         });
-        if (result.ok) {
-            window.krtRefreshMissionSection('mgmt');
-        }
     } catch (err) {
         showFrontendErrorToast(
             `${typeof MSG_ERROR_OWNER_CHANGE !== 'undefined' ? MSG_ERROR_OWNER_CHANGE : 'Fehler beim Ändern des Besitzers'} (Error: ${err.message})`,
@@ -2704,8 +2726,9 @@ async function updatePayoutPreference(selectElement) {
         selectElement.value = selectElement.getAttribute('data-original-value') || 'PAYOUT';
         return;
     }
-    const missionDto = result.body;
-    if (!missionDto) return;
+    // The answer is the participant row alone (the slim endpoint), not the whole Einsatz.
+    const updatedParticipant = result.body;
+    if (!updatedParticipant) return;
     selectElement.setAttribute('data-original-value', value);
     // The payout preference shows in the finance/payout table; signal peers to re-render it
     // (this handler patches its own view in place, REQ-FE-010).
@@ -2713,9 +2736,8 @@ async function updatePayoutPreference(selectElement) {
         window.krtNotifyMissionChanged('finance');
     }
     const participantId = selectElement.getAttribute('data-participant-id');
-    if (participantId && missionDto.participants) {
-        const updatedParticipant = missionDto.participants.find((p) => p.id === participantId);
-        if (updatedParticipant) {
+    if (participantId) {
+        if (updatedParticipant.id === participantId) {
             // Update the payout preference on the edit-button(s) so the next modal pre-fills
             // with the new value.
             document

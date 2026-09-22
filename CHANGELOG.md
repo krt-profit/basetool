@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Einsätze: Besitzerwechsel meldet jetzt einen Konflikt, wenn jemand anderes den Besitzer
+  inzwischen geändert hat.** Bisher gewann still der spätere von zwei gleichzeitigen Wechseln; jetzt
+  kommt der bekannte Konflikt-Dialog mit „Aktuelle Werte laden". Ein zweiter Wechsel auf derselben
+  Seite funktioniert ohne Neuladen.
+
 ### Added
 
 - **Server: automatische Sicherheitsupdates.** Der Produktionshost spielt Security-Advisories jetzt
@@ -14,6 +21,11 @@
   Deploy-Timer eine Stunde lang nichts prüft.
 
 ### Changed
+
+- **Einsätze: die Weboberfläche nutzt keine der 17 als veraltet markierten Einsatz-Schnittstellen
+  mehr** (Sunset 2026-10-20). Auszahlungsart, Ein-/Auschecken, Teilnehmer, Einheiten und Crew laufen
+  über die schlanken Nachfolger; ein Test verhindert künftig jeden Aufruf einer veralteten
+  Schnittstelle aus dem Frontend.
 
 - **Build: Release-Tags und Release-PRs legt jetzt die GitHub-App „basetool-release“ an.** Seit die
   Tag-Regel nur noch sie und den Maintainer zulässt, scheiterte das persönliche Token beim Anlegen

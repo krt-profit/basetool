@@ -326,6 +326,7 @@ class MissionPeerRedactorTest {
         7L,
         List.of(),
         8L,
-        "Meeting Point A");
+        "Meeting Point A",
+        null);
   }
 }

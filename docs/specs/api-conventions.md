@@ -18,6 +18,15 @@ endpoints carry `@ApiDeprecation(sunset = "YYYY-MM-DD", replacement = "/api/v2/.
 `DeprecationInterceptor` emits `Deprecation` / `Sunset` / `Link` headers and
 `OpenApiDeprecationConfig` reflects it in the spec.
 
+**The web frontend never calls a deprecated operation** (since 2026-09-22, BE-SIMP-02). The headers
+are read only by a human, so a deprecation the in-repo client kept using used to surface on its
+sunset day as a broken page — the frontend was still calling twelve of the seventeen deprecated
+mission endpoints weeks before theirs. `DeprecatedBackendEndpointCallGuardTest` (frontend) reads
+every `deprecated: true` operation out of the committed `openapi.json` and fails the build when a
+`backendApiClient.<verb>("/api/…")` call in the frontend's main sources matches one, verb included.
+A new deprecation is guarded as soon as the document is regenerated; move the caller to the named
+replacement in the same change.
+
 **Carve-out — internal-only endpoints:** a `/api/v1` endpoint consumed solely by the in-repo
 frontend may change its response *shape* in place (no `/api/v2` bump) when frontend and
 backend deploy atomically and `DtoOpenApiContractTest` guards the frontend mirror against

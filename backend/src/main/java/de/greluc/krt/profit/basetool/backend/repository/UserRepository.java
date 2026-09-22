@@ -371,15 +371,6 @@ public interface UserRepository extends JpaRepository<User, UUID> {
       @Param("usernames") Collection<String> usernames);
 
   /**
-   * Derived Spring-Data query - returns entities matching {@code
-   * UsernameIgnoreCaseOrDisplayNameIgnoreCase}. Eagerly fetches the configured relations via
-   * {@code @EntityGraph}.
-   */
-  @EntityGraph(attributePaths = {"roles"})
-  Optional<User> findByUsernameIgnoreCaseOrDisplayNameIgnoreCase(
-      String username, String displayName);
-
-  /**
    * Returns every entity matching the derived {@code
    * findAllByUsernameIgnoreCaseOrDisplayNameIgnoreCase} criteria. Eagerly fetches the configured
    * relations via {@code @EntityGraph}.

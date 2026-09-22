@@ -754,7 +754,8 @@ public class MissionPageController {
             0L,
             java.util.List.of(),
             0L,
-            null));
+            null,
+            0L));
     // Create page: always a full-page render, so prefill the "join as me" participant form.
     addFormsToModel(model, principal, true);
     addOperationsToModel(model);

@@ -52,6 +52,13 @@ import java.util.UUID;
  * same mission surface a 409 instead of silently overwriting; the assigned org unit itself is
  * carried by {@link #owningSquadron}.
  *
+ * <p>{@code ownershipVersion} is the optimistic-lock counter of the owner change (PUT {@code
+ * /api/v1/missions/{id}/owner}): the {@code version} of the mission's {@code MissionOwnership}
+ * companion row, {@code 0} while the owner has never been changed. The frontend echoes it on the
+ * next owner change, so two managers handing the same mission to different people surface a 409
+ * instead of the later one silently winning. It moves only with the owner, so an owner change never
+ * invalidates a concurrent edit of any other section.
+ *
  * <p><strong>Slimmed detail payload (#1138).</strong> The formerly-embedded {@code subMissions} (a
  * <em>recursively</em> mapped {@code Set<MissionDto>}), {@code inventoryEntries} and {@code
  * refineryOrders} were removed: {@code subMissions} was rendered nowhere, and the two economy lists
@@ -95,4 +102,5 @@ public record MissionDto(
     Long stepsVersion,
     List<MissionObjectiveDto> objectives,
     Long objectivesVersion,
-    String meetingPoint) {}
+    String meetingPoint,
+    Long ownershipVersion) {}
