@@ -97,6 +97,14 @@ filter: `WebClient.exchange()` runs on a Reactor-Netty worker thread and a plain
 not copied there. The accessors that exist cover the active-OrgUnit pin and the correlation id.
 Forgetting one is silent — the holder is simply empty on the worker thread.
 
+**This is a frontend rule only.** The backend and the ingest call HTTP through blocking
+`RestClient`s on the JDK HTTP client (ADR-0204): no WebFlux, no Reactor Netty, and the call runs on
+the thread that holds the MDC. Each module builds its clients in one `config.RestClientConfig`,
+wires the observation registry by hand (neither ships Boot's `spring-boot-restclient`), pins
+HTTP/1.1 and caps the response body with a `ResponseSizeLimitInterceptor`; a new outbound call in
+either module goes through those clients rather than a fresh `RestClient.builder()`, or it is
+neither observed nor bounded.
+
 ## 8.8 Audit
 
 Nine audited areas (Bank, Lager, Aufträge, Raffinerie, Mein Inventar, Missionen, Operationen,

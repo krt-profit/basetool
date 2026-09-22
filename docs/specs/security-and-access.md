@@ -714,9 +714,13 @@ shared bind-mounted `keystore.p12` — so neither edge that reaches it is cleart
 - **backend &rarr; Keycloak (admin/user-sync):** `KeycloakService` calls `https://keycloak:18443`
   directly over the isolated `net-backend-keycloak` network, pinning the self-signed cert via the
   `keycloak-trust` Spring SSL bundle (mirrors the frontend/ingest `backend-trust` approach, audit
-  finding M-13). Unlike those reactive WebClients, the synchronous JDK `HttpClient` keeps **hostname
-  verification ON** (it cannot be disabled reliably per-client), so the cert's SAN MUST include
-  `dns:keycloak`.
+  finding M-13). Unlike the relay clients that pin `backend-trust` without a hostname check, the
+  admin client keeps **hostname verification ON**, so the cert's SAN MUST include `dns:keycloak`.
+  *(Corrected 2026-09-22, ADR-0204: this used to say the JDK `HttpClient` cannot disable hostname
+  verification per client. Its API cannot, but a trust manager can — JSSE does endpoint
+  identification inside an `X509ExtendedTrustManager` — and that is how the ingest relay, now on the
+  same JDK client, keeps its no-hostname-check `backend-trust` posture. The Keycloak admin client
+  does not use it: verifying the name here is the intent, not a limitation.)*
 
 The management/health interface (port 9000) is exempt: it stays HTTP via
 `--http-management-scheme=http` because the Quarkus image ships no TLS-capable CLI client for the

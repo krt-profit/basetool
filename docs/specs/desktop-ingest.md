@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
-> **Owner area:** INGEST · **Related ADRs:** [ADR-0018](../adr/0018-desktop-ingest-gateway-device-grant.md), [ADR-0110](../adr/0110-ingest-handoff-consume-off-navigational-get.md), [ADR-0129](../adr/0129-ingest-gateway-is-a-trusted-subsystem-not-a-token-relay.md) · **Related:** epic [#639](https://github.com/krt-profit/basetool/issues/639), runbook [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md), [`refinery-screenshot-import.md`](refinery-screenshot-import.md) (`REQ-REFINERY-018`), [`security-and-access.md`](security-and-access.md), [`api-conventions.md`](api-conventions.md), [ADR-0007](../adr/0007-client-side-vlm-screenshot-extraction.md), [ADR-0008](../adr/0008-refinery-extract-json-contract.md)
+> **Owner area:** INGEST · **Related ADRs:** [ADR-0018](../adr/0018-desktop-ingest-gateway-device-grant.md), [ADR-0110](../adr/0110-ingest-handoff-consume-off-navigational-get.md), [ADR-0129](../adr/0129-ingest-gateway-is-a-trusted-subsystem-not-a-token-relay.md), [ADR-0204](../adr/0204-backend-and-ingest-call-http-through-restclient-without-webflux.md) · **Related:** epic [#639](https://github.com/krt-profit/basetool/issues/639), runbook [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md), [`refinery-screenshot-import.md`](refinery-screenshot-import.md) (`REQ-REFINERY-018`), [`security-and-access.md`](security-and-access.md), [`api-conventions.md`](api-conventions.md), [ADR-0007](../adr/0007-client-side-vlm-screenshot-extraction.md), [ADR-0008](../adr/0008-refinery-extract-json-contract.md)
 
 # Desktop one-click ingest (send-to-basetool)
 
@@ -151,6 +151,19 @@ network only.
   `https://localhost:11272/actuator/health/readiness` on the management port, skipping cert
   verification. The connector scheme and the edge's upstream scheme must stay aligned — a mismatch
   makes the proxy return a bare 400.
+- [x] The relay and the gateway's token grant are blocking `RestClient` calls on the JDK HTTP client
+  (`RestClientConfig`, ADR-0204, 2026-09-22) — the module carries no WebFlux, no Reactor Netty and
+  no `resilience4j-reactor`. Relay: 5 s connect, 15 s read, response body capped at
+  `app.ingest.max-payload-bytes`, HTTP/1.1, the `backend` circuit breaker applied with
+  `executeSupplier` and ignoring `RestClientResponseException`. Token grant: 5 s connect, read bounded
+  by the smaller of 10 s and `app.ingest.service-account.timeout-millis`. TLS trust is unchanged:
+  outside `dev`/`test` the `backend-trust` bundle is the relay's only anchor **without** a hostname
+  check (the service-alias certificate has no matching SAN), no bundle means the JVM trust store
+  **with** it, and the token client trusts the JVM anchors plus `keycloak-trust` and always checks the
+  hostname. A backend answer whose body cannot be read — a torn connection, a body past the cap — is a
+  `502 BACKEND_RELAY_FAILED` like a refused connection, not a `500`. Idle pooled connections are
+  closed after the JDK's 30 s keep-alive, at most half of Tomcat's 60 s, so a connection the backend
+  already dropped is never reused (ING-PERF-01).
 
 **Enforced by:** `ArchitectureTest` (no JPA / no relational persistence; every controller +
 `@PostMapping` is `@PreAuthorize`-annotated), `IngestControllerTest` (exactly the two endpoints,
@@ -158,7 +171,11 @@ forward-only relay, backend 4xx relayed verbatim, 502 on backend-unreachable), `
 (the dispatcher routes exactly the two `/v1` endpoints), `FilterOrderTest` (the registered filter order),
 `GlobalExceptionHandlerTest` (backend 401/403 → 502 + token invalidation), `ServiceAccountTokenProviderTest`
 (atomic cache under concurrency, `invalidate()`, failure backoff), `BackendImportClientTest`
-(the backend is called as the gateway, naming the caller; a refused token is replaced on the next relay) · **Code:** `IngestController`, `IngestService`, `BackendImportClient`,
+(the backend is called as the gateway, naming the caller; a refused token is replaced on the next relay),
+`RestClientConfigTest` (the TLS trust matrix against a real HTTPS server with a misnamed certificate,
+the token-grant timeout, the body cap, HTTP/1.1), `RelayIdleConnectionBoundTest` (the client's idle
+bound against Tomcat's keep-alive, read off the classpath) · **Code:** `IngestController`, `IngestService`, `BackendImportClient`,
+`RestClientConfig`, `ResponseSizeLimitInterceptor`, `BackendCallLoggingInterceptor`,
 `IngestApplication`, `application.yml` (`server.port: 11262`, `server.ssl.enabled: true`) · **Issues:** #642
 
 ### REQ-INGEST-002 — Authentication & authorization
