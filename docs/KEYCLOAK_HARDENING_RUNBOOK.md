@@ -23,7 +23,8 @@ breaks if it is wrong.
 
 ## Status
 
-Nine of the twelve are applied; three are open, plus a thirteenth finding and the clean-up. The
+Nine of the twelve are applied; three are open, plus a thirteenth finding (decided 2026-09-22,
+not yet applied to production) and the clean-up. The
 evidence is the sanitized realm export regenerated from production on **2026-09-09**
 ([`docs/keycloak/realm-config.reference.json`](keycloak/realm-config.reference.json), commit
 `72b9b1b2b`, which recorded "steps 1 and 3–10 applied, 11 not, 2 and 12 open"), and for step 4 a
@@ -38,13 +39,13 @@ value (§ 0.5) before acting on an "open" row.**
 | 4     | Events on, 30 d                               | **Done** — verified 2026-09-16 | both event switches on, `eventsExpiration` and the `adminEventsExpiration` attribute `2592000`, details off                      |
 | 5     | Clear service-account redirect/origin lists   | **Done**                       | `backend-service`, `basetool-ingest-gateway`: `redirectUris: []`, `webOrigins: []`                                               |
 | 6     | `basetool-frontend` PKCE `S256`               | **Done**                       | `pkce.code.challenge.method: S256`                                                                                               |
-| 7     | Drop `http://backend:11261`                   | **Done**                       | gone from both lists; `http://frontend:18081` remains (see the step)                                                             |
+| 7     | Drop `http://backend:11261`                   | **Done**                       | gone from both lists; `http://frontend:18081` remains — **retired 2026-09-22** by owner decision, removed on the provisioner's next production apply |
 | 8     | Extractor `fullScopeAllowed: false`           | **Done**                       | `basetool-sc-extractor`: `fullScopeAllowed: false`                                                                               |
 | 9     | Audience scopes off defaults and `grafana`    | **Done**                       | neither scope in `defaultDefaultClientScopes`; `grafana` carries neither; `basetool-ingest-gateway` keeps both                   |
 | 10    | `offline_access` off `default-roles-iri`      | **Done**                       | composites: `uma_authorization`, `KRT Member`, `account` `view-profile`/`manage-account`                                         |
 | 12    | Decide the session windows                    | **Open**                       | still 30 d / 180 d, with and without remember-me                                                                                 |
 | 11    | OTP for `Admin`, browser **and** Discord      | **Open** — not started         | `browserFlow: "browser"` (the built-in flow); the `discord` IdP has no `postBrokerLoginFlowAlias`                                 |
-| 13th  | Extractor's unused authorization-code flow    | **Open** — owner's choice      | `standardFlowEnabled: true`, loopback redirect wildcards, no PKCE (see step 6)                                                   |
+| 13th  | Extractor's unused authorization-code flow    | **Decided 2026-09-22 — off**; pending production apply | `standardFlowEnabled: true`, loopback redirect wildcards, no PKCE (see step 6); the provisioner's target is flow off, no redirect URI |
 | After | Delete `basetool-provisioner`, re-export      | **Open**                       | the client is in the export (taken mid-procedure); it stays until step 11 is done                                                |
 
 **Another realm does not need these steps replayed for the client-side half.** Since 2026-09-22
@@ -54,9 +55,16 @@ service-account lists, the frontend's PKCE `S256` and redirect list, the extract
 rest of the Basetool's clients
 ([`INGEST_KEYCLOAK_SETUP.md` → *New or out-of-date realm*](INGEST_KEYCLOAK_SETUP.md#new-or-out-of-date-realm-run-the-provisioner)).
 The realm-wide steps (1–4, 10–12) are **not** in it, and neither is 9a: it reports an audience scope
-that is a realm default instead of removing it. It also reproduces the open thirteenth finding
-as production has it, marked `PROD-AS-IS`; closing that finding is a production decision first and
-then a one-line change in the script.
+that is a realm default instead of removing it.
+
+**The thirteenth finding is decided (owner, 2026-09-22): the extractor's code flow goes.** So do two
+other entries the provisioner first reproduced as `PROD-AS-IS` — both ingest scopes on
+`basetool-android`, and step 7's leftover `http://frontend:18081` pair (ADR-0202 amendment 1).
+The
+script's target shape no longer has any of them, and it removes them wherever it finds them, so
+**applying it to production closes all three**: a dry run there lists exactly those removals
+(plus the DPoP policy's detach and re-attach around the app's scopes). Until that apply runs,
+production still carries them.
 
 ---
 
@@ -647,6 +655,12 @@ about clearing the redirect lists they never use). PKCE has nothing to protect t
 >
 > Not folded into the twelve because it is not one of them: decision D11 took a named list on
 > 2026-09-05 and this was not on it. It is written here because this is where the question arises.
+>
+> **Decided 2026-09-22: option 1, and the redirect URIs go with it** (owner; ADR-0202 amendment 1).
+> Re-read on `basetool-sc-extractor` `main` (`c6de57ff4`) that day: `DeviceGrantClient` sends only
+> the `device_code` and `refresh_token` grants. The change is applied by
+> `scripts/provision-keycloak-realm.py` — its target is `standardFlowEnabled: false` with no
+> redirect URI — not by hand; production carries the flow until the owner applies it there.
 
 ---
 
@@ -662,9 +676,11 @@ resolves in a browser's network.
 **Valid redirect URIs** and `http://backend:11261` from **Web origins** → *Save*.
 
 Leave the production entries (`https://<the real host>/*`, `…/login/oauth2/code/keycloak`) alone.
-The reference also shows a duplicated production entry and `http://frontend:18081/*`; the duplicate
-is cosmetic and the compose-internal frontend origin is used by the local stack, not by production —
-decide those on the live list, not on this sentence.
+The reference also showed a duplicated production entry and `http://frontend:18081/*`; the duplicate
+is cosmetic. **The compose-internal `http://frontend:18081` pair was retired on 2026-09-22** (owner
+decision, ADR-0202 amendment 1): the frontend serves HTTPS only on 18081 and builds its redirect URI
+from the forwarded public origin, so no real login can present it. The provisioner removes it on
+its next production apply; the e2e realm keeps its own entries.
 
 **Verify:** `… get clients/$id -r iri --fields redirectUris,webOrigins` — read the whole list and
 confirm the production login URI is still there.
