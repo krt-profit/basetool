@@ -20,9 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.support;
 
 import java.util.List;
-import lombok.Getter;
-import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
@@ -37,7 +36,7 @@ import org.springframework.validation.annotation.Validated;
  * describe a member who is deliberately smaller than the real one. Until the 2026-09-02 reversal
  * the omitted role was {@code Admin}, which is the form of this that actually cost an administrator
  * their row; {@code Guest}, {@code Logistician} and {@code Mission Manager} are omitted still, so
- * the rule is unchanged and so is this class. Persisting that description would let the client a
+ * the rule is unchanged and so is this record. Persisting that description would let the client a
  * member happened to use last decide what the database says they are.
  *
  * <p>Matched on the token's {@code azp} — a claim inside a Keycloak-signed token, not something a
@@ -49,19 +48,14 @@ import org.springframework.validation.annotation.Validated;
  * unsafe end is empty: a deployment that forgot to list the mobile client would silently resume
  * overwriting stored roles from partial tokens, which is the defect this exists to close. The
  * default therefore names the client that is known to be partial, and an override is only needed by
- * a deployment that renames its realm clients.
+ * a deployment that renames its realm clients. An immutable record (BE-MOD-04).
+ *
+ * @param clientIds the {@code azp} values whose role claim is not authoritative. Defaults are
+ *     supplied by {@code application.yml}; an empty list disables the guard entirely.
  */
-@Getter
-@Setter
 @Validated
 @ConfigurationProperties(prefix = "app.security.partial-role-scope")
-public class PartialRoleScopeProperties {
-
-  /**
-   * The {@code azp} values whose role claim is not authoritative. Defaults are supplied by {@code
-   * application.yml}; an empty list disables the guard entirely.
-   */
-  private List<String> clientIds = List.of();
+public record PartialRoleScopeProperties(@DefaultValue List<String> clientIds) {
 
   /**
    * Whether {@code azp} names a client whose realm-role claim must not be persisted.

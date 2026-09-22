@@ -186,7 +186,7 @@ public class SubjectRateLimitingFilter extends OncePerRequestFilter {
    */
   @Override
   protected boolean shouldNotFilter(@NotNull HttpServletRequest request) {
-    if (!properties.isEnabled() || !properties.getSubject().isEnabled()) {
+    if (!properties.enabled() || !properties.subject().enabled()) {
       return true;
     }
     String uri = request.getRequestURI();
@@ -219,7 +219,7 @@ public class SubjectRateLimitingFilter extends OncePerRequestFilter {
    * @return {@code true} when the export budget applies to this path.
    */
   private boolean spendsFromExportBudget(@NotNull PathContainer path) {
-    return properties.getSubject().getExport().isEnabled() && isExportPath(path);
+    return properties.subject().export().enabled() && isExportPath(path);
   }
 
   /**
@@ -259,8 +259,8 @@ public class SubjectRateLimitingFilter extends OncePerRequestFilter {
             response,
             exportBuckets.get(subject.get(), key -> newExportBucket()),
             MetricNames.BUCKET_SUBJECT_EXPORT,
-            properties.getSubject().getExport().getCapacity(),
-            properties.getSubject().getExport().getRefillPeriod())) {
+            properties.subject().export().capacity(),
+            properties.subject().export().refillPeriod())) {
       return;
     }
     if (spendsFromWriteBudget(request.getMethod(), path)
@@ -269,8 +269,8 @@ public class SubjectRateLimitingFilter extends OncePerRequestFilter {
             response,
             buckets.get(subject.get(), key -> newBucket()),
             MetricNames.BUCKET_SUBJECT,
-            properties.getSubject().getCapacity(),
-            properties.getSubject().getRefillPeriod())) {
+            properties.subject().capacity(),
+            properties.subject().refillPeriod())) {
       return;
     }
     chain.doFilter(request, response);
@@ -335,12 +335,12 @@ public class SubjectRateLimitingFilter extends OncePerRequestFilter {
    * @return a fresh full bucket.
    */
   private Bucket newBucket() {
-    RateLimitProperties.Subject budget = properties.getSubject();
+    RateLimitProperties.Subject budget = properties.subject();
     return Bucket.builder()
         .addLimit(
             Bandwidth.builder()
-                .capacity(budget.getCapacity())
-                .refillGreedy(budget.getRefillTokens(), budget.getRefillPeriod())
+                .capacity(budget.capacity())
+                .refillGreedy(budget.refillTokens(), budget.refillPeriod())
                 .build())
         .build();
   }
@@ -351,12 +351,12 @@ public class SubjectRateLimitingFilter extends OncePerRequestFilter {
    * @return a fresh full export bucket.
    */
   private Bucket newExportBucket() {
-    RateLimitProperties.Export budget = properties.getSubject().getExport();
+    RateLimitProperties.Export budget = properties.subject().export();
     return Bucket.builder()
         .addLimit(
             Bandwidth.builder()
-                .capacity(budget.getCapacity())
-                .refillGreedy(budget.getRefillTokens(), budget.getRefillPeriod())
+                .capacity(budget.capacity())
+                .refillGreedy(budget.refillTokens(), budget.refillPeriod())
                 .build())
         .build();
   }

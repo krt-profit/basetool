@@ -52,6 +52,7 @@ import de.greluc.krt.profit.basetool.backend.support.PartialRoleScopeProperties;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -105,6 +106,9 @@ class UserReconciliationServiceTest {
   private UserRegistrationService userRegistrationService;
   private UserReconciliationService userReconciliationService;
 
+  /** The partial-scope allowlist a test may extend; the record reads it by reference. */
+  private final List<String> partialScopeClientIds = new ArrayList<>();
+
   /**
    * A real instance rather than a mock: it holds a list and answers one pure predicate, so stubbing
    * it would only restate the production logic under test. Left empty by default so every
@@ -112,7 +116,7 @@ class UserReconciliationServiceTest {
    * populate it explicitly.
    */
   private final PartialRoleScopeProperties partialRoleScopeProperties =
-      new PartialRoleScopeProperties();
+      new PartialRoleScopeProperties(partialScopeClientIds);
 
   private static final UUID USER_ID = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
 
@@ -721,7 +725,7 @@ class UserReconciliationServiceTest {
     /** Lists the mobile client, which every case in this class assumes is configured as partial. */
     @BeforeEach
     void listTheMobileClient() {
-      partialRoleScopeProperties.setClientIds(List.of(MOBILE_CLIENT));
+      partialScopeClientIds.add(MOBILE_CLIENT);
     }
 
     /**

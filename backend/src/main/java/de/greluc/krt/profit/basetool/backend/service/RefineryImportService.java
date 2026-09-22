@@ -393,7 +393,7 @@ public class RefineryImportService {
             Comparator.comparing(
                 RefiningMethod::getName, Comparator.nullsLast(String::compareToIgnoreCase)),
             1,
-            properties.getMethodFuzzyAcceptThreshold());
+            properties.methodFuzzyAcceptThreshold());
     return ranked.isEmpty() ? Optional.empty() : Optional.of(ranked.getFirst().candidate());
   }
 
@@ -609,8 +609,8 @@ public class RefineryImportService {
             c -> MaterialNameCanonicalizer.fuzzyKey(c.getName()),
             Comparator.comparing(
                 Material::getName, Comparator.nullsLast(String::compareToIgnoreCase)),
-            properties.getSuggestionLimit(),
-            properties.getSuggestionFloor());
+            properties.suggestionLimit(),
+            properties.suggestionFloor());
     List<ImportSuggestionDto> suggestions =
         ranked.stream()
             .map(
@@ -618,7 +618,7 @@ public class RefineryImportService {
                     new ImportSuggestionDto(
                         s.candidate().getId(), s.candidate().getName(), s.score()))
             .toList();
-    if (!ranked.isEmpty() && ranked.getFirst().score() >= properties.getFuzzyAcceptThreshold()) {
+    if (!ranked.isEmpty() && ranked.getFirst().score() >= properties.fuzzyAcceptThreshold()) {
       return MaterialMatch.fuzzy(
           ranked.getFirst().candidate(), ranked.getFirst().score(), suggestions);
     }

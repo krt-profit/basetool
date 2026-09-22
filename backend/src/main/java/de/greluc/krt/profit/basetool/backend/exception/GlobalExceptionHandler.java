@@ -139,7 +139,7 @@ public class GlobalExceptionHandler {
   private final MeterRegistry meterRegistry;
 
   private URI type(String suffix) {
-    return URI.create(problemProperties.getBaseUri() + suffix);
+    return URI.create(problemProperties.baseUri() + suffix);
   }
 
   /**

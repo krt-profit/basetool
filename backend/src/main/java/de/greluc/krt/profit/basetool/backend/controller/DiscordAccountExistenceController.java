@@ -94,7 +94,7 @@ public class DiscordAccountExistenceController {
   public ResponseEntity<DiscordAccountExistenceResponse> checkAccountExistence(
       @RequestHeader(value = SECRET_HEADER, required = false) @Nullable String providedSecret,
       @RequestBody DiscordAccountExistenceRequest request) {
-    String configuredSecret = properties.getSharedSecret();
+    String configuredSecret = properties.sharedSecret();
     if (configuredSecret == null || configuredSecret.isBlank()) {
       // Feature not configured on this deployment → endpoint disabled. The SPI fails open.
       log.debug("Discord account-existence precheck called but no shared secret is configured.");

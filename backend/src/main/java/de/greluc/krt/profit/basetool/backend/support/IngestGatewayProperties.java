@@ -20,9 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.support;
 
 import java.util.List;
-import lombok.Getter;
-import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
@@ -34,13 +33,15 @@ import org.springframework.validation.annotation.Validated;
  *
  * <p><strong>Empty by default, and empty means nobody.</strong> A deployment that has not created
  * the gateway's confidential client refuses every on-behalf-of header rather than trusting one, so
- * the dangerous direction requires a deliberate act of configuration.
+ * the dangerous direction requires a deliberate act of configuration. An immutable record
+ * (BE-MOD-04).
+ *
+ * @param clientIds the {@code azp} values allowed to act for another member; empty disables the
+ *     mechanism
  */
-@Getter
-@Setter
 @Validated
 @ConfigurationProperties(prefix = "app.security.ingest-gateway")
-public class IngestGatewayProperties {
+public record IngestGatewayProperties(@DefaultValue List<String> clientIds) {
 
   /**
    * Keycloak's naming convention for the user row backing a client's service account.
@@ -53,9 +54,6 @@ public class IngestGatewayProperties {
    * hole, and the alternative is a Keycloak round trip on every metrics tick.
    */
   public static final String SERVICE_ACCOUNT_PREFIX = "service-account-";
-
-  /** The {@code azp} values allowed to act for another member. Empty disables the mechanism. */
-  private List<String> clientIds = List.of();
 
   /**
    * Whether {@code azp} names a configured ingest gateway.

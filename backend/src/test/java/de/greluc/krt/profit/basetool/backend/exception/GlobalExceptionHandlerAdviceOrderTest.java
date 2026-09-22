@@ -109,8 +109,7 @@ class GlobalExceptionHandlerAdviceOrderTest {
    * @return a ready handler instance
    */
   private static GlobalExceptionHandler newHandler() {
-    AppProblemProperties props = new AppProblemProperties();
-    props.setBaseUri("https://profit-base.online/problems/");
+    AppProblemProperties props = new AppProblemProperties("https://profit-base.online/problems/");
     ResourceBundleMessageSource messageSource = new ResourceBundleMessageSource();
     messageSource.setBasename("messages");
     messageSource.setDefaultEncoding("UTF-8");

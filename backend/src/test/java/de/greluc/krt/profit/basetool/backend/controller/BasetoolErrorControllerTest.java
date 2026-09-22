@@ -28,6 +28,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
 import jakarta.servlet.RequestDispatcher;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,7 +58,8 @@ class BasetoolErrorControllerTest {
         .thenAnswer(invocation -> invocation.getArgument(2));
     controller =
         new BasetoolErrorController(
-            new ProblemResponseFactory(new AppProblemProperties()), messageSource);
+            new ProblemResponseFactory(BoundProperties.defaults(AppProblemProperties.class)),
+            messageSource);
   }
 
   private static MockHttpServletRequest errorDispatch(Integer statusCode, String originalUri) {

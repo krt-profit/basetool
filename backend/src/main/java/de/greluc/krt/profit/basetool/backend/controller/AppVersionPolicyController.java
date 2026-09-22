@@ -88,8 +88,8 @@ public class AppVersionPolicyController {
   public ResponseEntity<AppVersionPolicyDto> versionPolicy() {
     return ResponseEntity.ok(
         new AppVersionPolicyDto(
-            properties.getMinimumVersionCode(),
-            properties.getLatestVersionCode(),
-            properties.getReleasesUrl()));
+            properties.minimumVersionCode(),
+            properties.latestVersionCode(),
+            properties.releasesUrl()));
   }
 }

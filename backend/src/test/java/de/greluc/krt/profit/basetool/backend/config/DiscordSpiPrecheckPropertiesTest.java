@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
@@ -52,25 +53,33 @@ class DiscordSpiPrecheckPropertiesTest {
 
   @Test
   void blankSecret_isValid_becauseItDisablesTheEndpoint() {
-    DiscordSpiPrecheckProperties props = new DiscordSpiPrecheckProperties();
-    props.setSharedSecret("");
+    DiscordSpiPrecheckProperties props = new DiscordSpiPrecheckProperties("");
 
     assertThat(validator.validate(props)).isEmpty();
   }
 
   @Test
   void shortSecret_isRejected() {
-    DiscordSpiPrecheckProperties props = new DiscordSpiPrecheckProperties();
-    props.setSharedSecret("too-short-secret"); // 16 chars, below the 32-char minimum
+    // 16 chars, below the 32-char minimum
+    DiscordSpiPrecheckProperties props = new DiscordSpiPrecheckProperties("too-short-secret");
 
     assertThat(validator.validate(props)).isNotEmpty();
   }
 
   @Test
   void secretOfAtLeastThirtyTwoChars_isValid() {
-    DiscordSpiPrecheckProperties props = new DiscordSpiPrecheckProperties();
-    props.setSharedSecret("x".repeat(32));
+    DiscordSpiPrecheckProperties props = new DiscordSpiPrecheckProperties("x".repeat(32));
 
     assertThat(validator.validate(props)).isEmpty();
+  }
+
+  @Test
+  void theSecretIsUnsetByDefaultAndNeverPrinted() {
+    DiscordSpiPrecheckProperties unset =
+        BoundProperties.defaults(DiscordSpiPrecheckProperties.class);
+    DiscordSpiPrecheckProperties set = new DiscordSpiPrecheckProperties("x".repeat(32));
+
+    assertThat(unset.sharedSecret()).isEmpty();
+    assertThat(set.toString()).doesNotContain("x".repeat(32)).contains("<redacted>");
   }
 }

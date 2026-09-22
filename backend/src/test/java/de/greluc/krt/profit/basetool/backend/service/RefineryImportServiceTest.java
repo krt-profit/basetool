@@ -54,6 +54,7 @@ import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipReposit
 import de.greluc.krt.profit.basetool.backend.repository.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver;
 import java.time.Instant;
 import java.util.List;
@@ -151,7 +152,7 @@ class RefineryImportServiceTest {
             userRepository,
             aliasService,
             new BlueprintFuzzyMatcher(),
-            new RefineryImportProperties(),
+            BoundProperties.defaults(RefineryImportProperties.class),
             new MaterialMapperImpl(new MaterialCategoryMapperImpl()),
             Mappers.getMapper(LocationMapper.class),
             Mappers.getMapper(RefiningMethodMapper.class),

@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -33,9 +34,8 @@ class MonitoringScrapePropertiesTest {
   @Test
   void shouldBeConfiguredWhenBothValuesArePresent() {
     // Given
-    MonitoringScrapeProperties properties = new MonitoringScrapeProperties();
-    properties.setUsername("metrics-scraper");
-    properties.setPassword("test-scrape-password");
+    MonitoringScrapeProperties properties =
+        new MonitoringScrapeProperties("metrics-scraper", "test-scrape-password");
 
     // When / Then
     assertThat(properties.isConfigured()).isTrue();
@@ -44,7 +44,8 @@ class MonitoringScrapePropertiesTest {
   @Test
   void shouldNotBeConfiguredByDefault() {
     // Given
-    MonitoringScrapeProperties properties = new MonitoringScrapeProperties();
+    MonitoringScrapeProperties properties =
+        BoundProperties.defaults(MonitoringScrapeProperties.class);
 
     // When / Then: unset env vars bind to empty strings — the fail-closed default.
     assertThat(properties.isConfigured()).isFalse();
@@ -53,9 +54,8 @@ class MonitoringScrapePropertiesTest {
   @Test
   void shouldNotBeConfiguredWithBlankUsername() {
     // Given
-    MonitoringScrapeProperties properties = new MonitoringScrapeProperties();
-    properties.setUsername("   ");
-    properties.setPassword("test-scrape-password");
+    MonitoringScrapeProperties properties =
+        new MonitoringScrapeProperties("   ", "test-scrape-password");
 
     // When / Then
     assertThat(properties.isConfigured()).isFalse();
@@ -64,9 +64,7 @@ class MonitoringScrapePropertiesTest {
   @Test
   void shouldNotBeConfiguredWithBlankPassword() {
     // Given
-    MonitoringScrapeProperties properties = new MonitoringScrapeProperties();
-    properties.setUsername("metrics-scraper");
-    properties.setPassword("");
+    MonitoringScrapeProperties properties = new MonitoringScrapeProperties("metrics-scraper", "");
 
     // When / Then
     assertThat(properties.isConfigured()).isFalse();
@@ -75,11 +73,19 @@ class MonitoringScrapePropertiesTest {
   @Test
   void shouldNotBeConfiguredWithNullValues() {
     // Given
-    MonitoringScrapeProperties properties = new MonitoringScrapeProperties();
-    properties.setUsername(null);
-    properties.setPassword(null);
+    MonitoringScrapeProperties properties = new MonitoringScrapeProperties(null, null);
 
     // When / Then
     assertThat(properties.isConfigured()).isFalse();
+  }
+
+  @Test
+  void thePasswordIsNeverPrinted() {
+    MonitoringScrapeProperties properties =
+        new MonitoringScrapeProperties("metrics-scraper", "test-scrape-password");
+
+    assertThat(properties.toString())
+        .contains("metrics-scraper")
+        .doesNotContain("test-scrape-password");
   }
 }

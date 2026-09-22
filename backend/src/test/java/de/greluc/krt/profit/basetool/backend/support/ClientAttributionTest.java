@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.support;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,13 +41,18 @@ class ClientAttributionTest {
 
   private ApiClientMetricsProperties clientProperties;
   private IngestGatewayProperties gatewayProperties;
+
+  /** The gateway allowlist a test may extend; the properties record reads it by reference. */
+  private List<String> gatewayClientIds;
+
   private ClientAttribution attribution;
 
   @BeforeEach
   void setUp() {
-    clientProperties = new ApiClientMetricsProperties();
-    clientProperties.setKnownClientIds(List.of("basetool-frontend", "basetool-android"));
-    gatewayProperties = new IngestGatewayProperties();
+    clientProperties =
+        new ApiClientMetricsProperties(List.of("basetool-frontend", "basetool-android"));
+    gatewayClientIds = new ArrayList<>();
+    gatewayProperties = new IngestGatewayProperties(gatewayClientIds);
     attribution = new ClientAttribution(clientProperties, gatewayProperties);
   }
 
@@ -59,7 +65,7 @@ class ClientAttributionTest {
   void label_keepsAConfiguredGatewayVerbatimWithoutListingItTwice() {
     // The gateway list is the deployment's other statement of "a machine client I know". Requiring
     // it in the metric allowlist as well is the drift that would make a gateway read as `other`.
-    gatewayProperties.setClientIds(List.of("basetool-ingest"));
+    gatewayClientIds.add("basetool-ingest");
 
     assertEquals("basetool-ingest", attribution.label("basetool-ingest"));
   }

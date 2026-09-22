@@ -86,8 +86,7 @@ class GlobalExceptionHandlerTest {
 
   @BeforeEach
   void setUp() {
-    AppProblemProperties props = new AppProblemProperties();
-    props.setBaseUri("https://profit-base.online/problems/");
+    AppProblemProperties props = new AppProblemProperties("https://profit-base.online/problems/");
     // Use the real messages bundle so the test catches missing or wrong i18n keys.
     // Locale is forced to English to keep these assertions stable regardless of the
     // JVM default locale on the developer / CI machine.

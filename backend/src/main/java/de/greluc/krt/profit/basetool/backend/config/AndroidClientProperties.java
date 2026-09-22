@@ -22,9 +22,8 @@ package de.greluc.krt.profit.basetool.backend.config;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
@@ -41,39 +40,24 @@ import org.springframework.validation.annotation.Validated;
  * lock every member out of the app, which is what any non-zero default would do the first time this
  * code reaches an environment whose operator has not thought about it yet. Locking members out is
  * the expensive direction of a wrong guess; serving an old build for one more day is the cheap one.
+ *
+ * <p>An immutable record bound by {@code @ConfigurationPropertiesScan} (BE-MOD-04).
+ *
+ * @param minimumVersionCode the oldest {@code versionCode} the server still serves. A build below
+ *     it is refused by the app itself, which shows the non-dismissible „Update erforderlich" screen
+ *     (design chapter 14). Zero means "no floor" and is the default, for the reason given above.
+ * @param latestVersionCode the newest {@code versionCode} published, or {@code 0} when unknown.
+ *     This is <em>not</em> what the gate keys on — it exists so the app can tell "you must update"
+ *     from "an update exists", and only the first of those is allowed to block anyone. Keeping the
+ *     two numbers apart is what stops a routine release from reading as a forced one.
+ * @param releasesUrl where the member gets the new build. Distribution is GitHub Releases plus
+ *     Obtainium (plan Q1), not a store, so the design's Play-Store CTA does not apply and this is
+ *     the recorded deviation: the button opens the release page.
  */
-@Data
 @Validated
-@Configuration
 @ConfigurationProperties(prefix = "app.android")
-public class AndroidClientProperties {
-
-  /**
-   * The oldest {@code versionCode} the server still serves. A build below it is refused by the app
-   * itself, which shows the non-dismissible „Update erforderlich" screen (design chapter 14).
-   *
-   * <p>Zero means "no floor" and is the default, for the reason given on the class.
-   */
-  @NotNull
-  @Min(0)
-  private Integer minimumVersionCode = 0;
-
-  /**
-   * The newest {@code versionCode} published, or {@code 0} when unknown.
-   *
-   * <p>This is <em>not</em> what the gate keys on — it exists so the app can tell "you must update"
-   * from "an update exists", and only the first of those is allowed to block anyone. Keeping the
-   * two numbers apart is what stops a routine release from reading as a forced one.
-   */
-  @NotNull
-  @Min(0)
-  private Integer latestVersionCode = 0;
-
-  /**
-   * Where the member gets the new build. Distribution is GitHub Releases plus Obtainium (plan Q1),
-   * not a store, so the design's Play-Store CTA does not apply and this is the recorded deviation:
-   * the button opens the release page.
-   */
-  @NotBlank
-  private String releasesUrl = "https://github.com/krt-profit/basetool-android/releases/latest";
-}
+public record AndroidClientProperties(
+    @DefaultValue("0") @NotNull @Min(0) Integer minimumVersionCode,
+    @DefaultValue("0") @NotNull @Min(0) Integer latestVersionCode,
+    @DefaultValue("https://github.com/krt-profit/basetool-android/releases/latest") @NotBlank
+        String releasesUrl) {}
