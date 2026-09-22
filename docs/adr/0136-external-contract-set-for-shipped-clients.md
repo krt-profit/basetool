@@ -8,7 +8,7 @@
 - **Related:** [ADR-0135](0135-public-api-vhost-not-a-gateway.md) ·
   [ADR-0003](0003-inventory-append-only-group-on-read.md) (the carve-out this narrows) ·
   specs `REQ-API-001`, `REQ-API-007`, `REQ-API-009`, `REQ-SEC-027` ·
-  [`ANDROID_API_EXPOSURE_PLAN.md`](../ANDROID_API_EXPOSURE_PLAN.md) item B3 ·
+  [`ANDROID_API_EXPOSURE_PLAN.md`](../archive/ANDROID_API_EXPOSURE_PLAN.md) item B3 ·
   `ExternalContractTest`
 
 ## Context

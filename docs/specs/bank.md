@@ -25,7 +25,7 @@ the mission/operation profit flows** — it is a standalone ledger.
 
 Work is tracked in epic [#556](https://github.com/krt-profit/basetool/issues/556); the
 phase-by-phase implementation plan (including per-phase deployment steps) lives in
-[`docs/BANK_PLAN.md`](../BANK_PLAN.md).
+[`docs/archive/BANK_PLAN.md`](../archive/BANK_PLAN.md).
 
 ## Requirements
 

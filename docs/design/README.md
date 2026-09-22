@@ -16,7 +16,7 @@ This folder holds the **offline-capable design prototype** for the SC Extractor 
 - Written UI/UX contract: [`../DESIGN_SC_EXTRACTOR.md`](../DESIGN_SC_EXTRACTOR.md)
 - Online Claude Design prototype / handoff bundle:
   <https://api.anthropic.com/v1/design/h/mM6v29vZctN6kiBsF62_eA>
-- Implementation plan: [`../REFINERY_SCREENSHOT_IMPORT_PLAN.md`](../REFINERY_SCREENSHOT_IMPORT_PLAN.md)
+- Implementation plan: [`../REFINERY_SCREENSHOT_IMPORT_PLAN.md`](../archive/REFINERY_SCREENSHOT_IMPORT_PLAN.md)
 
 Pixels: the prototype wins; `DESIGN_SC_EXTRACTOR.md` is the written contract. Where they
 disagree, reconcile against the prototype and update the doc.

@@ -24,7 +24,7 @@
 # `on(...)` clause that would have to be written differently for each shape.
 #
 # REQ-OBS-011 (metric naming), REQ-OBS-014 (container signals), ADR-0163, ADR-0189.
-# The per-alert mapping table lives in docs/PODMAN_MIGRATION_PLAN.md -> "The seven alerts, one by
+# The per-alert mapping table lives in docs/archive/PODMAN_MIGRATION_PLAN.md -> "The seven alerts, one by
 # one"; docs/specs/observability.md registers the names.
 # =================================================================================================
 groups:

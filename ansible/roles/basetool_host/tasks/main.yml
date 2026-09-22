@@ -6,7 +6,7 @@
 # containers.conf. It never ships unit files, never pulls an image, and must never be run against a
 # host that is serving traffic -- REQ-OPS-001's pull-only delivery is untouched by it.
 #
-# The reasoning behind every step is in docs/PODMAN_HOST_BOOTSTRAP.md. This file is the what; that
+# The reasoning behind every step is in docs/archive/PODMAN_HOST_BOOTSTRAP.md. This file is the what; that
 # document is the why, and it is not duplicated here on purpose.
 
 - name: Preflight -- the host is what this role assumes

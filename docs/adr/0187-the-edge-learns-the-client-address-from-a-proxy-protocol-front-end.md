@@ -7,7 +7,7 @@
   [ADR-0112](0112-edge-real-client-ip-restore-native-ipv6.md) ·
   [ADR-0135](0135-public-api-vhost-not-a-gateway.md) ·
   specs `REQ-SEC-023`, `REQ-OBS-005`, `REQ-OPS-004` ·
-  [`PODMAN_MIGRATION_PLAN.md`](../PODMAN_MIGRATION_PLAN.md) §13
+  [`PODMAN_MIGRATION_PLAN.md`](../archive/PODMAN_MIGRATION_PLAN.md) §13
 
 ## Context
 

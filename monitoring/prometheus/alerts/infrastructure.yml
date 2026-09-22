@@ -97,7 +97,7 @@ groups:
       # `podman_container_started_seconds`. This alert therefore goes SILENT at the Podman
       # cutover rather than wrong, and the intent is covered meanwhile by SystemdUnitFailed
       # plus the unit-level restart counters -- Quadlet containers ARE systemd units, which is
-      # a signal this migration gains. See the mapping table in docs/PODMAN_MIGRATION_PLAN.md.
+      # a signal this migration gains. See the mapping table in docs/archive/PODMAN_MIGRATION_PLAN.md.
       - alert: ContainerRestartLoop
         expr: changes(container_start_time_seconds{name=~".+"}[15m]) > 3
         for: 5m

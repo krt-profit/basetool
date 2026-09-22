@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Profit Basetool - container metrics read straight from cgroup v2.
 
-Phase 4 of ``docs/PODMAN_MIGRATION_PLAN.md``. Under rootless Podman there is no cAdvisor: its
+Phase 4 of ``docs/archive/PODMAN_MIGRATION_PLAN.md``. Under rootless Podman there is no cAdvisor: its
 rootless-Podman issue upstream is closed as not planned, and `prometheus-podman-exporter` publishes
 a strict subset of what the alert rules read. Three signals have no exporter equivalent at all -
 OOM kills, CPU throttling, and the pids ceiling.

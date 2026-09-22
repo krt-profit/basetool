@@ -1,6 +1,6 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-16.
 > **Owner area:** INV / ORDERS · **Related ADRs:** ADR-0101 (builds on ADR-0098/0099); design
-> context in [`docs/DESIGN_ITEM_INVENTORY.md`](../DESIGN_ITEM_INVENTORY.md).
+> context in [`docs/archive/DESIGN_ITEM_INVENTORY.md`](../archive/DESIGN_ITEM_INVENTORY.md).
 
 # Inventory — game-item stock rows (Items im Lager)
 
@@ -142,5 +142,5 @@ order-detail item-stock panel shipped as REQ-ORDERS-028 and delivery-consumes-ea
 
 ## Open questions
 
-None — owner decisions of 2026-07-16 are recorded in `docs/DESIGN_ITEM_INVENTORY.md`
+None — owner decisions of 2026-07-16 are recorded in `docs/archive/DESIGN_ITEM_INVENTORY.md`
 §10/§11.

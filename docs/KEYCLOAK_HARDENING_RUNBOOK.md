@@ -1,6 +1,6 @@
 > **Doc type:** Operator runbook — **the owner runs every step; nothing here is automated and
 > nothing here ships with the image.** Written 2026-09-06 as WP-K2 of
-> [`MEMBERS_ONLY_PLAN.md`](MEMBERS_ONLY_PLAN.md); the owner took all twelve items on 2026-09-05
+> [`MEMBERS_ONLY_PLAN.md`](archive/MEMBERS_ONLY_PLAN.md); the owner took all twelve items on 2026-09-05
 > (decision D11), the two originally marked optional included. Rewritten 2026-09-08 from a decision
 > list into an executable procedure, against the Keycloak **26.7** sources the deployment pins.
 > **Requirement:** [REQ-SEC-052, REQ-SEC-053](specs/security-and-access.md) ·

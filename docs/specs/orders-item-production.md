@@ -395,7 +395,7 @@ visible after a booked production with auto-earmark) · **Code:** `JobOrderItemS
 `items` dispatch), `orders-detail.html` (`itemsSection` item expand rows), `orders-detail.js`
 (`ORDER_SECTIONS['item-stock']` aliased to the items container), `LiveSyncTopicClass.ORDER`,
 `inventory-my.js` / `inventory-admin.js` (`broadcastOrdersChanged`) · **Issues:** — · **Design:**
-[`DESIGN_ITEM_INVENTORY.md`](../DESIGN_ITEM_INVENTORY.md) §10 PR 4 / §11.2
+[`DESIGN_ITEM_INVENTORY.md`](../archive/DESIGN_ITEM_INVENTORY.md) §10 PR 4 / §11.2
 
 ### REQ-ORDERS-029 — Requesting-side viewers see redacted inventory owner/location
 
@@ -513,7 +513,7 @@ drawn-down stock, mirroring the production-booking success path. All keys pre-ex
 live-sync mirror points; no seam-map change.
 
 **Rationale / no ADR.** This is a behaviour refinement of an already-decided feature (owner decision
-2026-07-16, [`DESIGN_ITEM_INVENTORY.md`](../DESIGN_ITEM_INVENTORY.md) §10 Phase 6 / §11.1), building on
+2026-07-16, [`DESIGN_ITEM_INVENTORY.md`](../archive/DESIGN_ITEM_INVENTORY.md) §10 Phase 6 / §11.1), building on
 the item-stock model (ADR-0101) and production booking (ADR-0099); it introduces no new architectural
 choice, so the rationale is captured in this requirement rather than in a separate ADR.
 
@@ -546,7 +546,7 @@ after a UI handover) · **Code:** `JobOrderItemHandoverService.createItemHandove
 `InventoryAllocations.reduceJobOrder`, `MaterialExchangeOfferRepository.clampItemQuantityToStock`,
 `AuditEventType.INVENTORY_HANDED_OVER`, `orders-detail.js`
 (item-handover success `items` + `inventory`/`stock` broadcast) · **Issues:** — · **Design:**
-[`DESIGN_ITEM_INVENTORY.md`](../DESIGN_ITEM_INVENTORY.md) §10 Phase 6 / §11.1
+[`DESIGN_ITEM_INVENTORY.md`](../archive/DESIGN_ITEM_INVENTORY.md) §10 Phase 6 / §11.1
 
 ### REQ-ORDERS-031 — Itemsammelübersicht (item collection page)
 
@@ -603,7 +603,7 @@ move re-fetches the page's `collectionResults` fragment in place.
 persists) · **Code:** `ItemCollectionPageController`, `item-collection.html`, `item-collection.js`
 (`ITEM_COLLECTION_SECTIONS`), `orders-detail.html` (Item-Übergaben toolbar link),
 `InventoryCheckoutService.bookOutTransfer` / `applyTransferInherit` · **Issues:** — · **Design:**
-[`DESIGN_ITEM_INVENTORY.md`](../DESIGN_ITEM_INVENTORY.md)
+[`DESIGN_ITEM_INVENTORY.md`](../archive/DESIGN_ITEM_INVENTORY.md)
 
 ### REQ-ORDERS-032 — An item-order edit re-derives its lines in place and never discards booked production
 

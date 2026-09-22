@@ -2382,7 +2382,7 @@ therefore alerts on:
   new. Three cAdvisor panels have no cgroup equivalent and stay on the old names until
   `prometheus-podman-exporter` lands with them (`container_memory_mapped_file`,
   `container_start_time_seconds`, `container_network_*`); the per-alert mapping is
-  `docs/PODMAN_MIGRATION_PLAN.md` → *"The seven alerts, one by one"*.
+  `docs/archive/PODMAN_MIGRATION_PLAN.md` → *"The seven alerts, one by one"*.
   `ContainerCgroupCollectorStale` and `ContainerCgroupCollectorFoundNothing` (both warning) watch
   the collector itself, because a collector that stops writing — or writes a **fresh** file
   matching zero cgroups — takes the four alerts above down with it silently, which is the failure
@@ -2816,7 +2816,7 @@ blackbox modules they need shipped live and inert. Rationale is REQ-OBS-014's: a
 a host that does not exist pages `BlackboxProbeFailed` and `DnsResolutionFailed` from the minute it
 merges, and a permanently-firing channel is one an operator stops reading. The enable procedure,
 including what to verify first and which alert scopes must be widened in the same edit, is
-[`MONITORING_ROLLOUT_RUNBOOK.md`, Appendix C](../MONITORING_ROLLOUT_RUNBOOK.md). Enabling is
+[`MONITORING_ROLLOUT_RUNBOOK.md`, Appendix C](../archive/MONITORING_ROLLOUT_RUNBOOK.md). Enabling is
 all-or-nothing per surface: a partially enabled probe set reads as "monitored".
 
 The liveness probe deliberately targets an **allow-listed path that answers 401**

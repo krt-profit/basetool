@@ -1,6 +1,10 @@
+> **Archived 2026-09-22.** Doc type: Historical analysis — frozen, kept as a record and no longer updated. A decision input, frozen at 2026-09-10.
+>
+> **Current truth:** [ADR-0161](../adr/0161-rest-json-over-http-stays-the-wire-format.md), [`api-conventions.md`](../specs/api-conventions.md). Index of the archive: [`README.md`](README.md).
+
 > **Doc type:** Historical analysis — a decision input, frozen at its date. The decision it produced
-> is [ADR-0161](adr/0161-rest-json-over-http-stays-the-wire-format.md); the living rules stay in
-> [`docs/specs/api-conventions.md`](specs/api-conventions.md).
+> is [ADR-0161](../adr/0161-rest-json-over-http-stays-the-wire-format.md); the living rules stay in
+> [`docs/specs/api-conventions.md`](../specs/api-conventions.md).
 > **Date:** 2026-09-10 · **Owner area:** API · BE · FE · SEC · OBS
 >
 > **Amended the same day, once.** §8.1–§8.5 were implemented, and each now ends in an **Outcome**
@@ -38,7 +42,7 @@ Static analysis of the three repositories in the workspace (`basetool`, `basetoo
 | `backend/`, `frontend/`, `ingest/`, `keycloak-spi`                           | 240 k lines of production Java in 1 714 files (+ 902 test-source files); seams, filters, DTO shape |
 | `docs/specs/` (42 specs), `docs/adr/` (162 ADRs)                             | the binding contracts a protocol change would have to keep                                         |
 | `monitoring/`                                                                | alert rules, dashboards, probe jobs — the observability substrate                                  |
-| [ADR-0085](adr/0085-scale-user-sync-and-stack-capacity-for-5000-accounts.md) | the only **measured** capacity data in the repository                                              |
+| [ADR-0085](../adr/0085-scale-user-sync-and-stack-capacity-for-5000-accounts.md) | the only **measured** capacity data in the repository                                              |
 | `basetool-android` `core/network`, `core/contract`                           | the second client's transport and its code-generation seam                                         |
 | `basetool-sc-extractor` `net/`, `auth/`                                      | the third client's transport and its DPoP binding                                                  |
 
@@ -83,7 +87,7 @@ Two structural facts follow immediately, and they do most of the work in this ev
 
 - **Seam 4 is the only one where a protocol change is even cheap to *deploy*.** It is internal, both
   ends ship from one repository, and `DtoOpenApiContractTest` already guards the mirror. Seams 5 and 6
-  face clients that cannot be redeployed with the server — [ADR-0136](adr/0136-external-contract-set-for-shipped-clients.md)
+  face clients that cannot be redeployed with the server — [ADR-0136](../adr/0136-external-contract-set-for-shipped-clients.md)
   exists precisely because of that — and seams 1–3 face browsers, which cannot speak gRPC at all.
 - **Seam 4 is also the seam where the network is least likely to be the problem.** Every container
   runs on **one 16 GB Hetzner host** on one Docker network. The frontend→backend round trip is a
@@ -188,7 +192,7 @@ Four properties of this domain collide with protobuf, and each is a correctness 
 inconvenience:
 
 1. **There is no decimal type in protobuf.** 105 files use `BigDecimal`, including every bank request
-   DTO — and the bank is a **double-entry, append-only ledger** ([ADR-0010](adr/0010-bank-double-entry-append-only-ledger.md)).
+   DTO — and the bank is a **double-entry, append-only ledger** ([ADR-0010](../adr/0010-bank-double-entry-append-only-ledger.md)).
    The options are `string` (lossless, but every constraint moves into hand-written code) or a scaled
    `int64` (fast, and a silent rounding bug the first time someone picks the wrong scale). Neither is
    an improvement on `BigDecimal` + `@DecimalMin` + `@WholeNumber`. A money format that can round is
@@ -225,11 +229,11 @@ Browsers cannot speak gRPC. gRPC-Web needs a translating proxy and still has no 
 Connect RPC is friendlier but is still an RPC-over-HTTP shape for a surface that is currently
 **hypermedia**: server-rendered Thymeleaf plus HTML-fragment swaps (`krtFetch.swap`, 83 sites).
 
-Adopting C would mean deleting the frontend's whole architecture — [ADR-0012](adr/0012-frontend-krtfetch-json-mutations-csrf-retry.md)
-(krtFetch), [ADR-0013](adr/0013-frontend-bfcache-history-restore-reload.md) (bfcache), [ADR-0069](adr/0069-inline-js-page-module-extraction.md)
-(page modules), [ADR-0093](adr/0093-eliminate-inline-style-attributes-csp-style-src-attr-none.md) (CSP
-`style-src-attr: none`), [ADR-0125](adr/0125-typed-javascript-via-checkjs-not-typescript.md) /
-[ADR-0130](adr/0130-own-openapi-dts-emitter-and-typescript-7.md) (typed JS via `checkJs`) — and
+Adopting C would mean deleting the frontend's whole architecture — [ADR-0012](../adr/0012-frontend-krtfetch-json-mutations-csrf-retry.md)
+(krtFetch), [ADR-0013](../adr/0013-frontend-bfcache-history-restore-reload.md) (bfcache), [ADR-0069](../adr/0069-inline-js-page-module-extraction.md)
+(page modules), [ADR-0093](../adr/0093-eliminate-inline-style-attributes-csp-style-src-attr-none.md) (CSP
+`style-src-attr: none`), [ADR-0125](../adr/0125-typed-javascript-via-checkjs-not-typescript.md) /
+[ADR-0130](../adr/0130-own-openapi-dts-emitter-and-typescript-7.md) (typed JS via `checkJs`) — and
 rebuilding it as a SPA, together with the entire REQ-FE-001…010 live-update contract, 110 templates,
 43 k lines of JS and 94 E2E tests.
 
@@ -259,7 +263,7 @@ And the case against, which is stronger:
 - **Two protocols would coexist for the whole migration.** 533 endpoint mappings cannot move
   atomically. During the transition every one of the 14 backend servlet filters needs a working
   `ServerInterceptor` twin, and the interesting bugs live exactly in the difference between them —
-  which is [ADR-0135](adr/0135-public-api-vhost-not-a-gateway.md)'s own reason for refusing a gateway,
+  which is [ADR-0135](../adr/0135-public-api-vhost-not-a-gateway.md)'s own reason for refusing a gateway,
   applied to a protocol instead of a hop.
 - **The performance premise does not hold.** Same host, same Docker network, already gzip-compressed,
   already caching with single-flight, no measured latency objective being missed, host at 3.2 % average
@@ -273,7 +277,7 @@ at all (§8.2).**
 
 This is the one seam where protobuf's *evolution* model is genuinely attractive. Field numbers plus
 `optional` are a better answer to "a released APK sits on a phone for weeks" than
-`ExternalContractTest`'s `containsAll` check, which [ADR-0136](adr/0136-external-contract-set-for-shipped-clients.md)
+`ExternalContractTest`'s `containsAll` check, which [ADR-0136](../adr/0136-external-contract-set-for-shipped-clients.md)
 itself admits *"does not compare types, nullability or enum values"*. A protobuf schema would catch
 exactly the class of break that ADR names as its own open gap.
 
@@ -298,7 +302,7 @@ Two endpoints. Everything valuable about this seam is in its **filters**: `Paylo
 `RateLimitingFilter`, `IdentityProviderUnavailableFilter`, `BotProtectionFilter`,
 `ClientIdentityFilter`, `SecurityProblemResponseHandler` and the DPoP converter
 (`PublicUriDpopAuthenticationConverter`) implementing sender-constrained tokens per RFC 9449
-([ADR-0131](adr/0131-mobile-auth-refresh-only-dpop-binding.md), REQ-INGEST-012). DPoP proofs bind to
+([ADR-0131](../adr/0131-mobile-auth-refresh-only-dpop-binding.md), REQ-INGEST-012). DPoP proofs bind to
 the **HTTP method and URI** (`htm`/`htu` claims) — the binding is defined *in terms of HTTP*.
 
 Re-expressing that stack in gRPC interceptors would mean re-deriving a working security control, for
@@ -345,7 +349,7 @@ the list that makes the answer a no rather than a "maybe later".
    `GlobalExceptionHandler` is pinned at `HIGHEST_PRECEDENCE` and guarded by
    `GlobalExceptionHandlerAdviceOrderTest` because losing this contract *"degrades every 400 to a
    generic 'some fields are invalid' toast with nothing in the server log either"*
-   ([ADR-0132](adr/0132-global-exception-handler-outranks-springs-problem-details-advice.md)). gRPC has
+   ([ADR-0132](../adr/0132-global-exception-handler-outranks-springs-problem-details-advice.md)). gRPC has
    17 status codes and no problem-detail standard. Every one of the eight sanctioned problem producers
    — including the ones that run *before* the DispatcherServlet — would be re-implemented over trailer
    metadata. **Regression: certain, in error fidelity and in `fieldErrors`-driven inline form errors.**
@@ -354,7 +358,7 @@ the list that makes the answer a no rather than a "maybe later".
    vhost makes proxies, corporate middleboxes and browser disk caches plausible, and the header is the
    only thing that tells them no"*. gRPC has no `Cache-Control`. **Regression: a security control is
    deleted, not replaced.**
-3. **The edge allow-list becomes hand-written nginx.** [ADR-0135](adr/0135-public-api-vhost-not-a-gateway.md)
+3. **The edge allow-list becomes hand-written nginx.** [ADR-0135](../adr/0135-public-api-vhost-not-a-gateway.md)
    rests on a default-deny path allow-list at nginx-proxy-manager, and already flags that this list
    *"lives in the NPM admin database, which is not version-controlled and cannot be reviewed in a PR"*.
    gRPC needs `grpc_pass` location blocks; NPM's UI exposes no gRPC mode, so they would go into that
@@ -382,7 +386,7 @@ the list that makes the answer a no rather than a "maybe later".
 9. **DPoP's `htm`/`htu` binding is defined over HTTP.** Seam 6. **Regression: a working
    sender-constraint would have to be re-derived.**
 10. **A shipped client could break in the field.** The Android APK and the extractor MSI cannot be
-    redeployed with the server; [ADR-0136](adr/0136-external-contract-set-for-shipped-clients.md) exists
+    redeployed with the server; [ADR-0136](../adr/0136-external-contract-set-for-shipped-clients.md) exists
     for that reason. Its own text says the min-version gate *"does not exist yet"* — **that sentence is
     dated**: `REQ-API-010` closed it on 2026-08-24 (`GET /api/v1/app/version-policy`; the app's
     `UpdateGate` refuses to run below the floor), and `docs/specs/api-conventions.md` records the
@@ -732,7 +736,7 @@ first costs nothing — but how much CPU and heap it returns is still unknown.
 
 ### 8.4 Take protobuf's *evolution discipline* without protobuf  ·  *closes an admitted gap*
 
-[ADR-0136](adr/0136-external-contract-set-for-shipped-clients.md) already names its own weakness:
+[ADR-0136](../adr/0136-external-contract-set-for-shipped-clients.md) already names its own weakness:
 `ExternalContractTest` *"does not compare types, nullability or enum values. A field that turns from
 string to object, or an enum that loses a constant, passes it and still breaks an old build"* — and it
 names the answer: *"a schema diff of the contract subset against the previous release tag"*.
@@ -884,7 +888,7 @@ way back while it is pending.
   if payload bytes ever become the measured constraint.
 - **GraphQL for the read paths** — it would address over-fetching (the 14 page-walked catalogues) but
   adds a second authorization surface next to `OwnerScopeService`'s scope triple, per-`sub` isolation and
-  guest field redaction. [ADR-0135](adr/0135-public-api-vhost-not-a-gateway.md) already rejected a second
+  guest field redaction. [ADR-0135](../adr/0135-public-api-vhost-not-a-gateway.md) already rejected a second
   copy of authorization rules — *"a second copy of an authorisation rule is a divergence waiting to
   happen"* — and that reasoning transfers unchanged. Server-side filtering (ADR-0100, ADR-0105) is the
   cheaper answer to over-fetching and is already the project's direction.

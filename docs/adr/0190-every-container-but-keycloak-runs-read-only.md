@@ -8,7 +8,7 @@
   [ADR-0055](0055-keycloak-spi-jar-as-promotable-oci-artifact.md) ·
   [ADR-0162](0162-edge-is-native-nginx-with-a-separate-acme-client.md) ·
   specs `REQ-OPS-014` ·
-  [`PODMAN_MIGRATION_PLAN.md`](../PODMAN_MIGRATION_PLAN.md) §21
+  [`PODMAN_MIGRATION_PLAN.md`](../archive/PODMAN_MIGRATION_PLAN.md) §21
 
 > [!important] Corrected the same day it was written — the file name keeps the original spelling
 > The first version of this ADR was titled *"Every container **but Keycloak**"* and recorded

@@ -1,10 +1,14 @@
+> **Archived 2026-09-22.** Doc type: Historical plan — frozen, kept as a record and no longer updated. Phases 0–6 are done and production was cut over on 2026-09-22. Decommissioning the old host is a separate owner decision, tracked in [`deployment.md`](../deployment.md) and [arc42 §11](../arc42/11-risks-and-technical-debt.md), not here. Scripts and alert rules still cite the phase numbers below.
+>
+> **Current truth:** [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md), [ADR-0187](../adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md)–[ADR-0190](../adr/0190-every-container-but-keycloak-runs-read-only.md), [ADR-0196](../adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md), [`deployment-delivery.md`](../specs/deployment-delivery.md), [`deployment.md`](../deployment.md). Index of the archive: [`README.md`](README.md).
+
 # Rootless Podman on CentOS Stream 10 — Migration Plan
 
 > **Doc type:** Implementation plan — **living** until shipped, then freeze and point at the living
-> truth (planned: [ADR-0163](adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md),
-> the reworked delivery section of [`docs/deployment.md`](deployment.md), and the `REQ-OPS-*` /
-> `REQ-OBS-014` amendments in [`docs/specs/deployment-delivery.md`](specs/deployment-delivery.md) and
-> [`docs/specs/observability.md`](specs/observability.md)).
+> truth (planned: [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md),
+> the reworked delivery section of [`docs/deployment.md`](../deployment.md), and the `REQ-OPS-*` /
+> `REQ-OBS-014` amendments in [`docs/specs/deployment-delivery.md`](../specs/deployment-delivery.md) and
+> [`docs/specs/observability.md`](../specs/observability.md)).
 > **Status:** **Phase 0 is done** and the platform is **decided** (2026-09-16): path A on
 > **CentOS Stream 10**, on a second Hetzner CPX42. Phases 1-6 are ready to start. **No host has
 > been touched.** What the decision changes is in §9.
@@ -12,7 +16,7 @@
 > vendor documentation, without needing a host. It **rejected Debian 13**, which is what the
 > ruling in §9 responds to. Read §3.1 for the finding, §8 for how path A was examined, §9 for
 > what was decided.
-> **Decision record:** [ADR-0163](adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md)
+> **Decision record:** [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md)
 > — **Accepted 2026-09-16** with choice 1 amended from Debian 13 to CentOS Stream 10. The file
 > name keeps the old spelling so no link breaks.
 > **Last updated:** 2026-09-16 (§3 answered; §4 re-verified; §6-§8 added; §9 records the ruling).
@@ -1216,7 +1220,7 @@ has only ever been tested against one host.**
 
 ## 12. The host bootstrap is an Ansible role — ruled 2026-09-16
 
-[ADR-0188](adr/0188-the-host-bootstrap-is-an-ansible-role.md). @greluc's decision, and it follows
+[ADR-0188](../adr/0188-the-host-bootstrap-is-an-ansible-role.md). @greluc's decision, and it follows
 from §11 rather than from a preference for the tool: **the testing host is built first and
 production is built from the same procedure afterwards.** A prose checklist executed twice by a
 human is not the same procedure twice. It is two procedures that resemble each other, and the
@@ -1255,8 +1259,8 @@ loopback-bound admin interfaces. @greluc confirmed on 2026-09-16 that it exists 
 
 So the prose was false and the acceptance criteria were right: the requirement governs the
 **delivery mechanism, not human access**. Corrected the same day in
-[`docs/specs/deployment-delivery.md`](specs/deployment-delivery.md),
-[`docs/deployment.md`](deployment.md) and [ADR-0049](adr/0049-config-as-promotable-oci-artifact.md).
+[`docs/specs/deployment-delivery.md`](../specs/deployment-delivery.md),
+[`docs/deployment.md`](../deployment.md) and [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md).
 Ansible at bootstrap therefore adds no inbound path that did not already exist.
 
 It is written down because an objection resting on a sentence that turns out to be wrong is worth
@@ -1480,7 +1484,7 @@ C also settles two things at once. §3.2 has been open since the beginning and s
 under C it disappears, because a host service may bind privileged ports anyway. An option that
 closes a standing question alongside its own is worth more than the list suggests.
 
-> [!important] Decided 2026-09-16 by @greluc: **C**, recorded as [ADR-0187](adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md)
+> [!important] Decided 2026-09-16 by @greluc: **C**, recorded as [ADR-0187](../adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md)
 > B stays the written-down fallback if C proves unworkable in Phase 2.
 >
 > Both of the questions that were open when the recommendation was made have since been answered.
@@ -1667,7 +1671,7 @@ images and configuration. The accident was worth more than a tidy run would have
 
 ## 14. The platform moves to Rocky Linux 10 — ruled 2026-09-16
 
-[ADR-0187](adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md) removed
+[ADR-0187](../adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md) removed
 the only reason this migration was on a development stream. ADR-0163's choice 1 went from Debian 13
 to CentOS Stream 10 because **only Podman 6 had `rootless_port_forwarder="pasta"`**, and only that
 preserved the client's source address for a bridge-networked edge. The PROXY-protocol front end does
@@ -1810,7 +1814,7 @@ was then run inside a single invocation.
 
 ## 16. The Ansible role, run for real — 2026-09-16
 
-[ADR-0188](adr/0188-the-host-bootstrap-is-an-ansible-role.md) exists because a prose checklist
+[ADR-0188](../adr/0188-the-host-bootstrap-is-an-ansible-role.md) exists because a prose checklist
 executed twice is two procedures that resemble each other. The role that replaced it had itself
 never been executed — only linted — and running it against Rocky 10.2 found **nine defects**, one of
 which would have stopped it at the first task.
@@ -2244,7 +2248,7 @@ wrong, root fixes it, and `--user` merely fails. The trade is a container that c
 against one with no root phase to escape from.
 
 **Ruled by @greluc on 2026-09-16: take `--user`.** Recorded as
-[ADR-0189](adr/0189-stateful-containers-run-as-their-own-uid.md), and built the same day:
+[ADR-0189](../adr/0189-stateful-containers-run-as-their-own-uid.md), and built the same day:
 
 - `scripts/generate-quadlet.py` grows a `RUN_AS` table beside `FRONT_END` and emits `User=`,
   `Group=`, `ReadOnly=true` and `DropCapability=ALL` **as one set**, with no way to express half of
@@ -2337,7 +2341,7 @@ the tmpfs list; the second proves it was not needed.
 ¹ with one environment variable, ² with one tmpfs; both below.
 
 **All eighteen units** now carry `ReadOnly=true`. The decision is
-[ADR-0190](adr/0190-every-container-but-keycloak-runs-read-only.md).
+[ADR-0190](../adr/0190-every-container-but-keycloak-runs-read-only.md).
 
 ### Keycloak took two passes, and the first was a wrong conclusion from a real failure
 

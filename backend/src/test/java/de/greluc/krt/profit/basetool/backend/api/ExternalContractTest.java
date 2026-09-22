@@ -157,8 +157,11 @@ class ExternalContractTest {
    * <p>Recorded from the generated document rather than hand-written, so the baseline is what the
    * server actually serves and not what someone believed it served.
    */
-  /** The operator procedure whose nginx block decides what the internet can reach. */
-  private static final String RUNBOOK = "docs/API_VHOST_ROLLOUT_RUNBOOK.md";
+  /**
+   * The nginx include that decides what the internet can reach through the API vhost — the source of
+   * truth since 2026-09-12 (ADR-0162), applied by the deploy reconcile.
+   */
+  private static final String ALLOW_LIST = "docker/edge/include/api-allowlist.conf";
 
   /** {@code if ($uri = "/api/v1/…") { set $krt_api_allowed 1; }} */
   private static final Pattern EXACT_RULE = Pattern.compile("\\$uri\\s*=\\s*\"([^\"]+)\"");
@@ -1491,7 +1494,7 @@ class ExternalContractTest {
               // request for
               // OPEN + IN_PROGRESS, split on the device.
               .addressedBy(Set.of("status:array", "page:integer", "size:integer")),
-          // The squadron-wide list, admitted at the edge on 2026-09-08 (runbook phase U). Same
+          // The squadron-wide list, admitted at the edge on 2026-09-08 (API vhost runbook phase U). Same
           // envelope and same row as `/my-orders` -- the app switches between them without a
           // second mapping -- plus `owner`, which is the whole reason it reads this one: a card
           // that does not name its owner is useless the moment foreign runs are on screen.
@@ -2032,7 +2035,7 @@ class ExternalContractTest {
           // REQ-APP-BANK-017, design ch. 12 artboard 10, shipped 2026-08-30 -- and refused by the
           // edge ever since, on a stem whose `/settings` GET is admitted. So the section drew its
           // current values correctly and every write answered 404. `approval-limit` appeared
-          // NOWHERE in the runbook: not admitted, and not among the deliberate exclusions either.
+          // NOWHERE in the API vhost runbook: not admitted, and not among the deliberate exclusions either.
           //
           // All four leaves answer the account's whole settings object, which is why their frozen
           // response set is the same one `/settings` carries above -- the section redraws from the
@@ -2118,7 +2121,7 @@ class ExternalContractTest {
           //
           // Both paths were already admitted; only the read-only guard refused the verb. The
           // carve-out that opens them is METHOD-SCOPED, because the backend serves DELETE on both
-          // and the app sends neither -- see the runbook's phase R.
+          // and the app sends neither -- see phase R of docs/archive/API_VHOST_ROLLOUT_RUNBOOK.md.
           //
           // The order edit answers the whole order and the app folds it back through the SAME
           // mapper as the detail read, so its frozen set is that one. `materials` is the only
@@ -3531,7 +3534,7 @@ class ExternalContractTest {
    * Every frozen operation is actually reachable from the internet.
    *
    * <p>Freezing an operation's shape and admitting its path are the same decision seen from two
-   * sides — the vhost runbook says so itself — and they are kept in two files that nothing compared
+   * sides — the allow-list says so itself — and they are kept in two files that nothing compared
    * until now. The asymmetry is not hypothetical: an audit on 2026-09-03 found <b>75 paths the
    * Android app calls that no allow-list rule admits</b>, every one of them refused at the edge
    * with a 404 the app renders as „Konnte nicht gespeichert werden.". None of those 75 was in this
@@ -3542,17 +3545,17 @@ class ExternalContractTest {
    * when this test was written, and this pins it — the next `ContractOperation` added without its
    * allow-list line fails the build instead of shipping a promise nobody can call.
    *
-   * <p>The allow-list is parsed out of the runbook rather than mirrored into a fixture on purpose:
-   * a copy is a third thing to keep in sync, and the runbook is the artefact an operator applies.
+   * <p>The allow-list is parsed out of the nginx include rather than mirrored into a fixture on
+   * purpose: a copy is a third thing to keep in sync, and the include is the file the edge serves.
    *
-   * @throws IOException if the runbook cannot be read
+   * @throws IOException if the allow-list cannot be read
    */
   @Test
   @DisplayName("every frozen operation is admitted by the API vhost allow-list")
   void theFrozenSetIsReachableThroughTheEdge() throws IOException {
     List<Predicate<String>> rules = allowListRules();
     assertThat(rules)
-        .as("no allow-list rules were parsed from %s — has its format changed?", RUNBOOK)
+        .as("no allow-list rules were parsed from %s — has its format changed?", ALLOW_LIST)
         .hasSizeGreaterThan(50);
 
     List<String> unreachable =
@@ -3569,26 +3572,26 @@ class ExternalContractTest {
                 + "them, so the edge answers 404 and the promise cannot be called. Add the rule in "
                 + "the same change that freezes the operation — and if one of these merely uses a "
                 + "path placeholder this test does not know how to fill, extend PLACEHOLDERS",
-            RUNBOOK)
+            ALLOW_LIST)
         .isEmpty();
   }
 
   /**
    * The allow-list, as predicates over a concrete URI.
    *
-   * <p>Two rule shapes appear in the runbook and both are honoured: {@code $uri = "…"} is an exact
+   * <p>Two rule shapes appear in the allow-list and both are honoured: {@code $uri = "…"} is an exact
    * comparison, {@code $uri ~ "…"} a regular expression. Anything else on a {@code krt_api_allowed
    * 1} line is ignored rather than guessed at.
    *
    * @return one predicate per parsed rule
-   * @throws IOException if the runbook cannot be read
+   * @throws IOException if the allow-list cannot be read
    */
   private static List<Predicate<String>> allowListRules() throws IOException {
-    Path runbook = findRepoRoot().resolve(RUNBOOK);
-    assertThat(Files.exists(runbook)).as("%s must exist", runbook).isTrue();
+    Path allowList = findRepoRoot().resolve(ALLOW_LIST);
+    assertThat(Files.exists(allowList)).as("%s must exist", allowList).isTrue();
 
     List<Predicate<String>> rules = new java.util.ArrayList<>();
-    for (String line : Files.readAllLines(runbook)) {
+    for (String line : Files.readAllLines(allowList)) {
       if (!line.contains("krt_api_allowed 1")) {
         continue;
       }
@@ -3629,7 +3632,7 @@ class ExternalContractTest {
   /**
    * Walks up from the working directory to the repository root.
    *
-   * <p>Located by {@code settings.gradle.kts} so the runbook resolves whichever module directory
+   * <p>Located by {@code settings.gradle.kts} so the allow-list resolves whichever module directory
    * the test task runs in.
    *
    * @return the repository root

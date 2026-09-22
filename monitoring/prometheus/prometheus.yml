@@ -3,7 +3,7 @@
 #
 # Contains ZERO secrets. The scrape basic-auth password and the admin-API web.config
 # basic-auth hash live in host-side files under /var/iri/monitoring/secrets/ (mounted
-# read-only, provisioned by docs/MONITORING_ROLLOUT_RUNBOOK.md); the exported public CA
+# read-only, provisioned by docs/archive/MONITORING_ROLLOUT_RUNBOOK.md); the exported public CA
 # for the apps' self-signed HTTPS lives under /var/iri/monitoring/certs/. Retention
 # (180d + 40GB cap) and the admin API are set via command-line flags in
 # docker-compose.monitoring.yml, not here.
@@ -210,7 +210,7 @@ scrape_configs:
       - targets:
           - https://ingest.profit-base.online
           # The API vhost of the mobile exposure (ADR-0135), un-staged as phase F of
-          # docs/API_VHOST_ROLLOUT_RUNBOOK.md. Phase E — the vhost answering 401 from OUTSIDE —
+          # docs/archive/API_VHOST_ROLLOUT_RUNBOOK.md. Phase E — the vhost answering 401 from OUTSIDE —
           # must be green before this reaches production, or it pages from the first scrape.
           # The probed path is deliberately an ALLOW-LISTED one that answers 401: the vhost is a
           # default-deny allow-list and 404s its own root, so probing `/` would assert nothing
@@ -536,7 +536,7 @@ scrape_configs:
         replacement: blackbox-exporter:9115
 
   # --- API vhost of the mobile-client exposure (ADR-0135, Track C) -------------------------------
-  # Un-staged as phase F of docs/API_VHOST_ROLLOUT_RUNBOOK.md. They shipped staged (commented)
+  # Un-staged as phase F of docs/archive/API_VHOST_ROLLOUT_RUNBOOK.md. They shipped staged (commented)
   # with the surface itself, so the cut-over is an un-comment rather than a config change written
   # under time pressure — the staging discipline REQ-OBS-014 applies to the
   # JvmNativeThreadExhaustion Loki rule. Phase E must be green before this reaches production: an

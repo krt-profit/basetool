@@ -6,7 +6,7 @@
 - **Related:** [ADR-0163](0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md) ·
   [ADR-0188](0188-the-host-bootstrap-is-an-ansible-role.md) ·
   specs `REQ-OPS-014` ·
-  [`PODMAN_MIGRATION_PLAN.md`](../PODMAN_MIGRATION_PLAN.md) §20
+  [`PODMAN_MIGRATION_PLAN.md`](../archive/PODMAN_MIGRATION_PLAN.md) §20
 
 ## Context
 

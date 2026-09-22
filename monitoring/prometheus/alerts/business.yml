@@ -1303,7 +1303,7 @@ groups:
           description: "A token whose azp names no known client drove /api/** for 10 minutes. Either a first-party client was added to the realm without being added to app.monitoring.api-clients.known-client-ids, or something nobody approved is using the API. Identify it from the Keycloak client sessions and the api vhost access log; the label is deliberately bounded to 'other' and will never name it."
 
       # STAGED (REQ-OBS-014) — do NOT uncomment before the verification in
-      # docs/MONITORING_ROLLOUT_RUNBOOK.md, Appendix C.
+      # docs/archive/MONITORING_ROLLOUT_RUNBOOK.md, Appendix C.
       #
       # client_id="none" means an authenticated caller whose token carries no azp claim at all.
       # Unlike "other" that is not a foreign client but a Keycloak mapper regression, and it blinds

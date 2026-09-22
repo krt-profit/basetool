@@ -1,3 +1,7 @@
+> **Archived 2026-09-22.** Doc type: Historical plan — frozen, kept as a record and no longer updated. The Materialbörse epic has shipped.
+>
+> **Current truth:** [`materialboerse.md`](../specs/materialboerse.md), [ADR-0082](../adr/0082-materialboerse-offer-model.md), [ADR-0086](../adr/0086-materialboerse-partial-offer-amount.md), [ADR-0087](../adr/0087-materialboerse-item-offers.md), [ADR-0108](../adr/0108-materialboerse-stock-backed-item-offers.md), [ADR-0116](../adr/0116-materialboerse-request-model.md). Index of the archive: [`README.md`](README.md).
+
 > **Doc type:** Living plan — kept in sync with `main` while the Materialbörse epic is in flight;
 > freeze and point at `docs/specs/materialboerse.md` once it ships. Last reviewed: 2026-07-07.
 > **Owner area:** MARKET · **Related:** design proposal `.claude/skills/das-kartell-design/proposals/materialboerse-final.html` + `…/materialboerse-final.js`, ADR-0082 (to be written), REQ-MARKET-001…

@@ -2248,7 +2248,7 @@ networks:
   # Subnet continues the pinned 172.28.0.0/16 block (.13); .12 (net-redis-backend) was the last one
   # taken. `app.rate-limit.trusted-proxies` already covers the whole /16 and needs no change. The
   # new gateway 172.28.13.1 must be in the Keycloak /admin allow-list before this lands, or the
-  # SSH-tunnel admin route can break — see docs/API_VHOST_ROLLOUT_RUNBOOK.md, phase A.
+  # SSH-tunnel admin route can break — see docs/archive/API_VHOST_ROLLOUT_RUNBOOK.md, phase A.
   #
   # NOTE: adding a top-level network edits the block deploy.sh diffs (`network_block()`), so the
   # apply is a CLEAN-SLATE recreate of the whole stack — a brief full-stack outage, once. That is

@@ -8,7 +8,7 @@
   [ADR-0135](0135-public-api-vhost-not-a-gateway.md) ·
   [ADR-0139](0139-shared-committed-tls-material-for-the-test-stack.md) ·
   specs `REQ-SEC-023`, `REQ-SEC-031`, `REQ-SEC-032`, `REQ-SEC-033`, `REQ-OBS-012`,
-  `REQ-OPS-014` · [`API_VHOST_ROLLOUT_RUNBOOK.md`](../API_VHOST_ROLLOUT_RUNBOOK.md)
+  `REQ-OPS-014` · [`API_VHOST_ROLLOUT_RUNBOOK.md`](../archive/API_VHOST_ROLLOUT_RUNBOOK.md)
 
 ## Context
 
@@ -155,7 +155,7 @@ change makes it cheaper rather than more expensive: an edge already running as u
 capabilities, a read-only filesystem and no egress is the container that gains least from rootless.
 
 **Merging and promoting is not enough**, and the steps are in
-[`EDGE_CUTOVER_RUNBOOK.md`](../EDGE_CUTOVER_RUNBOOK.md). Two reasons: the network changes cannot be
+[`EDGE_CUTOVER_RUNBOOK.md`](../archive/EDGE_CUTOVER_RUNBOOK.md). Two reasons: the network changes cannot be
 applied in place, so the stack is recreated; and nginx refuses to start without a certificate while
 `acme` cannot obtain one before something serves the HTTP-01 challenge. That circle is broken by
 seeding the certificates Let's Encrypt already issued for NPM — valid, and no network needed.

@@ -68,6 +68,10 @@ COMPOSE_FILE="docker-compose.monitoring.yml"
 #       superseded by a new ADR; it is never silently edited. Same footing as the changelog, hence
 #       the same exclusion.
 #
+#   docs/archive/
+#       The archive of implemented plans and executed one-time runbooks. Every file in it is a frozen
+#       record of how something was done at the time; its tags name what was deployed then.
+#
 #   docker-compose*.yml
 #       The compose files are the AUTHORITY the expected tags are parsed out of. Scanning them would
 #       compare each tag against itself — always green, pure noise — and the moment a second compose
@@ -79,7 +83,7 @@ COMPOSE_FILE="docker-compose.monitoring.yml"
 # list here, so a future exemption needs no edit to this script:
 #
 #   "Doc type: ... Historical ..."  the repository's existing front-matter convention for a frozen
-#       document (see docs/BANK_PLAN.md and docs/REFINERY_SCREENSHOT_IMPORT_PLAN.md, both frozen
+#       document (see docs/archive/BANK_PLAN.md and docs/archive/REFINERY_SCREENSHOT_IMPORT_PLAN.md, both frozen
 #       after implementation). A future incident or post-mortem write-up is covered the moment it
 #       carries that header. The repository tracks no incident/post-mortem directory today, which is
 #       why none is listed above; add its prefix here if one is ever introduced.
@@ -89,7 +93,7 @@ COMPOSE_FILE="docker-compose.monitoring.yml"
 #       header quotes a stale tag as an illustration, and its test suite, whose fixtures pin wrong
 #       tags on purpose — "repairing" those would make the suite pass vacuously, which is the one
 #       outcome a regression suite must never have.
-EXCLUDED_PATHS_REGEX='^(CHANGELOG\.md$|CHANGELOG-ARCHIVE\.md$|docs/adr/|docker-compose[^/]*\.yml$)'
+EXCLUDED_PATHS_REGEX='^(CHANGELOG\.md$|CHANGELOG-ARCHIVE\.md$|docs/adr/|docs/archive/|docker-compose[^/]*\.yml$)'
 
 # How far into a file the two exemption markers are looked for. Deliberately small, and NOT widened
 # when the second marker was added: docs/specs/INDEX.md quotes the "Doc type:" header deep in its

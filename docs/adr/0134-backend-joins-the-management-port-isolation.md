@@ -6,7 +6,7 @@
   not superseded) · [ADR-0072](0072-monitoring-stack-prometheus-grafana.md) ·
   [ADR-0049](0049-config-as-promotable-oci-artifact.md) · spec `REQ-OBS-005`, `REQ-OBS-008`,
   `REQ-OBS-012`, `REQ-OBS-016`, `REQ-SEC-014` ·
-  [`ANDROID_API_EXPOSURE_PLAN.md`](../ANDROID_API_EXPOSURE_PLAN.md) item A2 ·
+  [`ANDROID_API_EXPOSURE_PLAN.md`](../archive/ANDROID_API_EXPOSURE_PLAN.md) item A2 ·
   `ManagementPortSecurityConfig`, `ManagementPortIsolationTest` (backend)
 
 ## Context

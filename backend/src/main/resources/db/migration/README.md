@@ -12,7 +12,7 @@ something broke once.
 
 ## Migration timeline — feature releases
 
-- **V80–V93** — Multi-Squadron-Umbau (see [`MULTI_SQUADRON_PLAN.md`](../../../../../../../../MULTI_SQUADRON_PLAN.md)).
+- **V80–V93** — Multi-Squadron-Umbau (see [`MULTI_SQUADRON_PLAN.md`](../../../../../../docs/archive/MULTI_SQUADRON_PLAN.md)).
   Introduced `owning_squadron_id` on every staffel-scoped aggregate; tightened
   the NOT NULL constraint in V89; dropped the legacy `job_order.squadron`
   VARCHAR in V90.
@@ -24,7 +24,7 @@ something broke once.
   - **V95** — `backfill_material_quantity_type`.
   - **V96** — `add_mission_participant_user_unique_index` (DB-backstop against
     duplicate Einsatz-Anmeldungen).
-- **V97–V105** — Spezialkommando-Erweiterung (see `SPEZIALKOMMANDO_PLAN.md`).
+- **V97–V105** — Spezialkommando-Erweiterung (see [`SPEZIALKOMMANDO_PLAN.md`](../../../../../../docs/archive/SPEZIALKOMMANDO_PLAN.md)).
   Introduces the `org_unit` parent table with a `kind` discriminator so SKs
   can coexist with Staffel as a second tenant kind. The releases land in
   stages:
@@ -194,7 +194,7 @@ migrations are where things go subtly wrong.
 * **Backfill in SQL inside the migration file.** Use `UPDATE ... WHERE ...`
   statements between the `ALTER TABLE ADD COLUMN` and the
   `ALTER TABLE ALTER COLUMN ... SET NOT NULL`. See
-  [`V72__add_role_code.sql`](V72__add_role_code.sql) — it shows the canonical
+  [`V73__add_role_code.sql`](V73__add_role_code.sql) — it shows the canonical
   add-column → seed-known-rows → derive-the-rest → tighten-NOT-NULL sequence.
 * **Don't backfill from Java.** A `DataInitializer`-style backfill happens
   *after* Spring's `EntityManagerFactory` validates the schema; if the column

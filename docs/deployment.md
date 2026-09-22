@@ -391,7 +391,7 @@ does not mention the mount at all:
 | `/var/iri/secrets/keystore.p12`   | caught by the pre-flight (`require_file`), so this one fails cleanly |
 
 Create the first two before the first deploy — `users.acl` per
-[`MONITORING_ROLLOUT_RUNBOOK.md` §4.2](MONITORING_ROLLOUT_RUNBOOK.md) (**with** its `default`
+[`MONITORING_ROLLOUT_RUNBOOK.md` §4.2](archive/MONITORING_ROLLOUT_RUNBOOK.md) (**with** its `default`
 line), the realm export per §5.3 above. If a run already created directories, remove them
 before retrying:
 

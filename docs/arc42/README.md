@@ -1,7 +1,7 @@
 # Architecture documentation (arc42)
 
 **Doc type:** living spec · **Baseline:** the system **as it stands after the Podman cutover**
-(`docs/PODMAN_CUTOVER_RUNBOOK.md`) · **Last reviewed:** 2026-09-21
+(`docs/archive/PODMAN_CUTOVER_RUNBOOK.md`) · **Last reviewed:** 2026-09-21
 
 This folder documents the architecture of the **Profit Basetool** along the
 [arc42](https://arc42.org) template. It is the map, not the territory: where a subject already has

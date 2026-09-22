@@ -87,7 +87,7 @@ import org.springframework.web.util.pattern.PathPatternParser;
  * does get an ETag — and it was deliberately not taken here, because that ETag is inert only for as
  * long as no client sends {@code If-None-Match}. That is a property of today's clients, not of the
  * response, and removing it would quietly foreclose the mobile read cache in {@code
- * docs/WIRE_PROTOCOL_EVALUATION.md} §8.3.
+ * docs/archive/WIRE_PROTOCOL_EVALUATION.md} §8.3.
  *
  * <p>The list is not copied here. Both filters read {@link NoStoreApiScopes}, so a family added to
  * one is added to the other — ADR-0135's argument about a second copy of a rule, applied to a rule

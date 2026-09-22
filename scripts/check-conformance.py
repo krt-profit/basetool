@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Profit Basetool - external conformance suite.
 
-Phase 0 of ``docs/PODMAN_MIGRATION_PLAN.md``: the regression net the container-runtime
+Phase 0 of ``docs/archive/PODMAN_MIGRATION_PLAN.md``: the regression net the container-runtime
 migration is gated on. It asserts invariants against a **running host** rather than against
 configuration files, because the whole class of defect this project keeps hitting is a config
 that is correct on disk and not in force in the process.

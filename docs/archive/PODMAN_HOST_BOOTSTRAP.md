@@ -1,11 +1,15 @@
+> **Archived 2026-09-22.** Doc type: Historical plan — frozen, kept as a record and no longer updated. Superseded by the Ansible role `ansible/roles/basetool_host/` ([ADR-0188](../adr/0188-the-host-bootstrap-is-an-ansible-role.md)), which is the procedure now. Kept because the role's defaults, tasks and templates cite it for the *why* behind each step.
+>
+> **Current truth:** [`ansible/README.md`](../../ansible/README.md), [`deployment.md`](../deployment.md). Index of the archive: [`README.md`](README.md).
+
 # Host bootstrap — CentOS Stream 10, rootless Podman
 
 > **Doc type:** Implementation plan — **living**, and **not yet validated on a host**. It is the
 > Phase 2 deliverable of [`PODMAN_MIGRATION_PLAN.md`](PODMAN_MIGRATION_PLAN.md) §11, written before
 > the VM exists so that building it is a matter of following a procedure rather than improvising
 > one. Every line marked *measured* was; everything else is derived from the Docker bootstrap in
-> [`deployment.md`](deployment.md) and has to survive first contact.
-> **Decision record:** [ADR-0163](adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md),
+> [`deployment.md`](../deployment.md) and has to survive first contact.
+> **Decision record:** [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md),
 > Accepted 2026-09-16 with choice 1 amended to CentOS Stream 10.
 > **Status:** draft. The testing host is built from this **first**; production is built from the
 > corrected version afterwards. That order is the point — see §11 of the plan.
@@ -25,7 +29,7 @@
 
 ## 0. What this replaces, and what it does not
 
-[`deployment.md` → *Initial server bootstrap*](deployment.md) is the current procedure: Ubuntu
+[`deployment.md` → *Initial server bootstrap*](../deployment.md) is the current procedure: Ubuntu
 24.04, `apt`, a root Docker daemon, and a `deploy` user whose only privilege is membership in the
 `docker` group. That document stays authoritative until the migration lands; **this one does not
 edit it.**
@@ -263,7 +267,7 @@ forwarder, not nginx, which already listens on 8080/8443 inside the container as
 
 ## 6. `containers.conf` — the setting the migration turned on, and then did not
 
-> [!important] Superseded 2026-09-16 by [ADR-0187](adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md)
+> [!important] Superseded 2026-09-16 by [ADR-0187](../adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md)
 > Everything below describes `rootless_port_forwarder="pasta"`, which was the mechanism for
 > keeping real client addresses until it was measured to **deliver no IPv6 at all** (plan §13).
 > The deployment now gets the client address from a host-level PROXY-protocol front end, and
@@ -276,7 +280,7 @@ forwarder, not nginx, which already listens on 8080/8443 inside the container as
 >
 > **`containers.conf` is no longer empty — 2026-09-22.** It carries `pasta_options` with a v4 and a
 > v6 `--map-guest-addr`, which is what lets a container reach this host over IPv6 at all
-> ([ADR-0196](adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md)
+> ([ADR-0196](../adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md)
 > Amendment 1). `rootless_port_forwarder` is still deliberately unset; a different setting arrived,
 > that one did not.
 

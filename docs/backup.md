@@ -166,7 +166,7 @@ systemctl list-timers 'iri-*'                    # confirm next fire times
 > the NPM step below is obsolete since ADR-0162 retired Nginx Proxy Manager. The Podman
 > equivalents — `podman exec`, `systemctl --user start`, and the edge certificate volumes in
 > place of `npm.tar.gz` — are in
-> [`PODMAN_CUTOVER_RUNBOOK.md` §1.4](PODMAN_CUTOVER_RUNBOOK.md). This section stays correct for
+> [`PODMAN_CUTOVER_RUNBOOK.md` §1.4](archive/PODMAN_CUTOVER_RUNBOOK.md). This section stays correct for
 > the Docker host until it is retired.
 
 Assumes a **bootstrapped host** (OS, Docker, the `deploy` user, the systemd units and the GHCR pull

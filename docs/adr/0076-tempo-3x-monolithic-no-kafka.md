@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-07-06
 - **Deciders:** @greluc
-- **Related:** issue [#1036](https://github.com/krt-profit/basetool/issues/1036) (verified migration plan of record) · extends ADR-0072 (monitoring stack) · spec `REQ-OBS-009` (distributed tracing) / `REQ-OBS-013` (telemetry-sink failures) ([`observability.md`](../specs/observability.md)) · runbook [`docs/MONITORING_ROLLOUT_RUNBOOK.md`](../MONITORING_ROLLOUT_RUNBOOK.md)
+- **Related:** issue [#1036](https://github.com/krt-profit/basetool/issues/1036) (verified migration plan of record) · extends ADR-0072 (monitoring stack) · spec `REQ-OBS-009` (distributed tracing) / `REQ-OBS-013` (telemetry-sink failures) ([`observability.md`](../specs/observability.md)) · runbook [`docs/archive/MONITORING_ROLLOUT_RUNBOOK.md`](../archive/MONITORING_ROLLOUT_RUNBOOK.md)
 
 ## Context
 

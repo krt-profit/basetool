@@ -6,7 +6,7 @@
 - **Related:** ADR-0082 (offer model) · ADR-0086 (partial offers, clamp-on-read + ratchet) ·
   **partially supersedes ADR-0087** (the "item offer quantity is a free-stated, non-live claim"
   decision) · ADR-0101 (game items as catalog-discriminated Lager stock rows) · spec REQ-MARKET-014
-  (`docs/specs/materialboerse.md`), amends REQ-MARKET-012/013 · design `docs/DESIGN_ITEM_INVENTORY.md`
+  (`docs/specs/materialboerse.md`), amends REQ-MARKET-012/013 · design `docs/archive/DESIGN_ITEM_INVENTORY.md`
   §8 · REQ-AUDIT-001 · REQ-FE-010
 
 ## Context

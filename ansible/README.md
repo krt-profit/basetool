@@ -14,7 +14,7 @@ The Basetool host bootstrap, as an Ansible role. [ADR-0188](../docs/adr/0188-the
 
 ## Why this exists at all
 
-[`PODMAN_MIGRATION_PLAN.md` §11](../docs/PODMAN_MIGRATION_PLAN.md) rules that the **testing host is
+[`PODMAN_MIGRATION_PLAN.md` §11](../docs/archive/PODMAN_MIGRATION_PLAN.md) rules that the **testing host is
 built first and production is built from the same procedure afterwards**. A prose checklist executed
 twice by a human is not the same procedure twice — it is two procedures that resemble each other,
 and the resemblance is precisely what the sequence was supposed to guarantee. This role makes
@@ -23,7 +23,7 @@ Phases 1–4 consist of.
 
 ## The document this implements
 
-[`docs/PODMAN_HOST_BOOTSTRAP.md`](../docs/PODMAN_HOST_BOOTSTRAP.md) carries the **why** and is not
+[`docs/archive/PODMAN_HOST_BOOTSTRAP.md`](../docs/archive/PODMAN_HOST_BOOTSTRAP.md) carries the **why** and is not
 duplicated here: why redis needs uid 999 and cannot chown its own data directory, why the Keycloak
 provider directory must exist or the deploy fails at the very last step after every container is
 already healthy, why SELinux will bite the certificate handover first. A playbook is a poor place
@@ -69,7 +69,7 @@ machine is created. `/tmp` is the exception — `tmp.mount` gives it as a tmpfs 
 and takes effect at the next boot with `noexec`, so it is switched on deliberately and measured.
 
 Firewalls: the production host runs **both** the provider's and `firewalld`, on purpose. See
-[`PODMAN_HOST_BOOTSTRAP.md` §10](../docs/PODMAN_HOST_BOOTSTRAP.md) for what each allows and why the
+[`PODMAN_HOST_BOOTSTRAP.md` §10](../docs/archive/PODMAN_HOST_BOOTSTRAP.md) for what each allows and why the
 doubling is not redundancy.
 
 ## Running it

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Fail when the edge probe expects a refusal on a path the vhost allow-list admits.
 
-The nightly probe and the allow-list runbook describe the same surface from two
-sides, and nothing compared them. Five times an admission was written into
-``docs/API_VHOST_ROLLOUT_RUNBOOK.md`` while the probe kept its old refusal row,
+The nightly probe and the vhost allow-list describe the same surface from two
+sides, and nothing compared them. Five times an admission was written into the
+allow-list (then a block in the API vhost runbook, since 2026-09-12
+``docker/edge/include/api-allowlist.conf``) while the probe kept its old refusal row,
 and every time production was the first to say so -- as a red cron run that reads
 like edge drift when it is really a stale table:
 
@@ -43,7 +44,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 PROBE = REPO / ".github" / "workflows" / "edge-deny-probe.yml"
-RUNBOOK = REPO / "docs" / "API_VHOST_ROLLOUT_RUNBOOK.md"
+ALLOW_LIST = REPO / "docker" / "edge" / "include" / "api-allowlist.conf"
 
 # The probe's stand-in for "an id that cannot exist".
 NIL = "00000000-0000-4000-8000-00000000cafe"
@@ -78,18 +79,18 @@ def probe_rows() -> list[tuple[str, str, int]]:
 
 
 def admitting_rules() -> tuple[list[str], list[re.Pattern[str]]]:
-    """Read the allow-list's admitting rules out of the runbook's config block.
+    """Read the allow-list's admitting rules out of the edge's nginx include.
 
     Only rules that set ``$krt_api_allowed 1`` count: the block also carries
     read-only-family and rate-limit rules that admit nothing.
 
     :return: the literal paths, and the compiled regexes, that admit a request.
-    :raises OSError: if the runbook cannot be read.
+    :raises OSError: if the allow-list cannot be read.
     :raises re.error: if a rule's regex is not valid Python ``re`` syntax, which
         means this checker can no longer model the block and must be fixed rather
         than trusted.
     """
-    text = RUNBOOK.read_text(encoding="utf-8")
+    text = ALLOW_LIST.read_text(encoding="utf-8")
     literals = LITERAL_RULE.findall(text)
     regexes = [re.compile(r) for r in REGEX_RULE.findall(text)]
     return literals, regexes
@@ -104,7 +105,7 @@ def main() -> None:
     if not literals and not regexes:
         print(
             "error: no `set $krt_api_allowed 1` rule found in "
-            f"{RUNBOOK.relative_to(REPO)} — this checker can no longer read the block, "
+            f"{ALLOW_LIST.relative_to(REPO)} — this checker can no longer read the block, "
             "which makes it vacuous rather than green"
         )
         raise SystemExit(1)
@@ -135,7 +136,7 @@ def main() -> None:
         print(
             "\n404 is the vhost's own refusal. An admitted path reaches the backend and answers "
             "401/403/405 instead, so each row above is a contradiction between the probe and the "
-            "runbook. Admitting a path DELETES its refusal row; it does not only add an admitted "
+            "allow-list. Admitting a path DELETES its refusal row; it does not only add an admitted "
             "one."
         )
         raise SystemExit(1)

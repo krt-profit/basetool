@@ -5,7 +5,7 @@
 # (config.alloy). "fake" is the single-tenant id when auth_enabled is false.
 #
 # NOTE: the exact NPM access-log and host auth.log line formats are verified ONCE on
-# the test stack during rollout (docs/MONITORING_ROLLOUT_RUNBOOK.md) and the line filters below
+# the test stack during rollout (docs/archive/MONITORING_ROLLOUT_RUNBOOK.md) and the line filters below
 # adjusted there if needed — they are the documented first-cut patterns.
 groups:
   - name: log-alerts-critical

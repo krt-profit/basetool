@@ -49,7 +49,7 @@ floor also grows every time a probe target is added, silently, in a file nobody 
 input. And the alert's own remediation text told the operator to split by `reason` into three values,
 none of which ever occurs.
 
-This was half-foreseen and never followed up. [`MEMBERS_ONLY_PLAN.md`](../MEMBERS_ONLY_PLAN.md) §
+This was half-foreseen and never followed up. [`MEMBERS_ONLY_PLAN.md`](../archive/MEMBERS_ONLY_PLAN.md) §
 *Risks* predicted that closing the anonymous surface would push scanners from `200` to `401` and
 that "`BackendAuthFailureSpike` may fire during the first days. Measure, then retune (WP-E)." The
 measurement is this ADR, eight days late, and it found a larger cause than the one predicted: not

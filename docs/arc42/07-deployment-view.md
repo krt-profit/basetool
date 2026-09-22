@@ -1,8 +1,8 @@
 # 7. Deployment view
 
 > **This section describes the system after the Podman cutover.** The Docker-era shape is recorded
-> in [`PODMAN_MIGRATION_PLAN.md`](../PODMAN_MIGRATION_PLAN.md) and
-> [`PODMAN_CUTOVER_RUNBOOK.md`](../PODMAN_CUTOVER_RUNBOOK.md).
+> in [`PODMAN_MIGRATION_PLAN.md`](../archive/PODMAN_MIGRATION_PLAN.md) and
+> [`PODMAN_CUTOVER_RUNBOOK.md`](../archive/PODMAN_CUTOVER_RUNBOOK.md).
 
 ## 7.1 One host, three privilege levels
 

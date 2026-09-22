@@ -8,7 +8,7 @@
   [ADR-0090](0090-isolate-app-actuator-on-internal-management-port.md) ·
   [ADR-0072](0072-monitoring-stack-prometheus-grafana.md) · specs `REQ-SEC-011`, `REQ-SEC-030`,
   `REQ-SEC-031`, `REQ-SEC-032`, `REQ-SEC-033`, `REQ-OBS-012`, `REQ-OBS-018` ·
-  [`ANDROID_API_EXPOSURE_PLAN.md`](../ANDROID_API_EXPOSURE_PLAN.md) items B1, C, D3
+  [`ANDROID_API_EXPOSURE_PLAN.md`](../archive/ANDROID_API_EXPOSURE_PLAN.md) items B1, C, D3
 
 ## Context
 

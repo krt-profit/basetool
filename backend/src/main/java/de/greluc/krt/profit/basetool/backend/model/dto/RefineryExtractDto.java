@@ -29,7 +29,7 @@ import java.util.List;
 /**
  * Envelope of the frozen {@code RefineryExtract} JSON contract (v1) produced by the desktop
  * extractor and consumed by {@code POST /api/v1/refinery-orders/import-extract} — see {@code
- * docs/REFINERY_SCREENSHOT_IMPORT_PLAN.md} §5 (epic #439, Phase 1 #434). The provenance fields
+ * docs/archive/REFINERY_SCREENSHOT_IMPORT_PLAN.md} §5 (epic #439, Phase 1 #434). The provenance fields
  * ({@code tool}, {@code toolVersion}, {@code model}, {@code generatedAt}, {@code clientLanguage})
  * are echoed for display only and never influence matching.
  *

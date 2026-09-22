@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # =============================================================================
-# The container-runtime seam (ADR-0163, Phase 3 of docs/PODMAN_MIGRATION_PLAN.md).
+# The container-runtime seam (ADR-0163, Phase 3 of docs/archive/PODMAN_MIGRATION_PLAN.md).
 #
 # `deploy.sh`, `backup.sh` and `restore-drill.sh` were written against Docker
 # Compose. The Podman migration does not swap a binary underneath them — it

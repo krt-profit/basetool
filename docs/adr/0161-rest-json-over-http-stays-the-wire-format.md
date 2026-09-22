@@ -3,7 +3,7 @@
 - **Status:** Proposed
 - **Date:** 2026-09-10
 - **Deciders:** @greluc (pending)
-- **Related:** [`WIRE_PROTOCOL_EVALUATION.md`](../WIRE_PROTOCOL_EVALUATION.md) (the full analysis) ·
+- **Related:** [`WIRE_PROTOCOL_EVALUATION.md`](../archive/WIRE_PROTOCOL_EVALUATION.md) (the full analysis) ·
   specs `REQ-API-001`, `REQ-API-003`, `REQ-API-004`, `REQ-API-007`, `REQ-API-009`, `REQ-SEC-011`,
   `REQ-SEC-031`, `REQ-OBS-005…012`, `REQ-INGEST-012` ·
   [ADR-0012](0012-frontend-krtfetch-json-mutations-csrf-retry.md) ·
@@ -121,7 +121,7 @@ preserve every contract above. In priority order, each as its own change with it
 The list above is kept in the voice it was written in, because the reasoning is what makes each item
 reviewable. It is no longer a plan: items 1–5 were implemented in the same pull request, and what
 that proved is recorded in each section's **Outcome** paragraph in
-[`docs/WIRE_PROTOCOL_EVALUATION.md`](../WIRE_PROTOCOL_EVALUATION.md).
+[`docs/archive/WIRE_PROTOCOL_EVALUATION.md`](../archive/WIRE_PROTOCOL_EVALUATION.md).
 
 **Runtime behaviour changed.** Two settings are new, both defaulting to the new behaviour and both
 reversible without a redeploy:
@@ -184,7 +184,7 @@ of reading it). Originally written as: the mirror stays hand-maintained until it
 four contract tests over a 1.87 MB spec keep carrying the load a schema compiler would have carried.
 
 **The evaluation is written down so it need not be re-litigated from scratch.**
-[`WIRE_PROTOCOL_EVALUATION.md`](../WIRE_PROTOCOL_EVALUATION.md) records the seam inventory, the measured
+[`WIRE_PROTOCOL_EVALUATION.md`](../archive/WIRE_PROTOCOL_EVALUATION.md) records the seam inventory, the measured
 evidence, the eight candidates, the per-seam verdicts and — importantly — the five triggers that would
 flip this answer: a real service split across a network, a third or fourth non-browser client, profiling
 that shows serialization dominating *after* items 1 and 3, a high-frequency non-browser streaming need,

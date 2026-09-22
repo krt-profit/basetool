@@ -5,7 +5,7 @@
 - **Related:** spec `REQ-SEC-030` ([`security-and-access.md`](../specs/security-and-access.md)) ·
   `REQ-SEC-012` (refresh-token rotation is off realm-wide) ·
   [ADR-0129](0129-ingest-gateway-is-a-trusted-subsystem-not-a-token-relay.md) (the opposite case) ·
-  [`ANDROID_API_EXPOSURE_PLAN.md`](../ANDROID_API_EXPOSURE_PLAN.md) section 7 · script
+  [`ANDROID_API_EXPOSURE_PLAN.md`](../archive/ANDROID_API_EXPOSURE_PLAN.md) section 7 · script
   `scripts/provision-keycloak-mobile-client.py`
 
 ## Context

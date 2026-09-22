@@ -299,23 +299,23 @@ tasks.named<Test>("test") {
     .withPropertyName("crossModuleParitySources")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 
-  // Same defect, one directory further out. `ExternalContractTest` parses the API vhost runbook at
-  // runtime (`findRepoRoot().resolve("docs/API_VHOST_ROLLOUT_RUNBOOK.md")`) to assert that every
-  // frozen REQ-API-009 operation is admitted by the nginx allow-list. That file is not a source,
-  // not
-  // a resource and not on any classpath, so an edit that touches ONLY the runbook left this task
-  // UP-TO-DATE: the run printed BUILD SUCCESSFUL in seconds and the guard never executed.
+  // Same defect, one directory further out. `ExternalContractTest` parses the API vhost allow-list
+  // at runtime (`findRepoRoot().resolve("docker/edge/include/api-allowlist.conf")`) to assert that
+  // every frozen REQ-API-009 operation is admitted by it. That file is not a source, not a resource
+  // and not on any classpath, so an edit that touches ONLY the allow-list left this task
+  // UP-TO-DATE: the run printed BUILD SUCCESSFUL in seconds and the guard never executed. (Until
+  // 2026-09-22 the test read the allow-list's copy inside the API vhost rollout runbook, now
+  // archived; the include has been the source of truth since 2026-09-12.)
   //
   // That is the worst shape a false green can take here, because the assertion it silences is the
-  // one connecting the allow-list to the frozen contract set — a rule deleted from the runbook
-  // would
-  // pass locally and only fail on a fresh CI checkout, which has no cached output to trust.
+  // one connecting the allow-list to the frozen contract set — a rule deleted from the allow-list
+  // would pass locally and only fail on a fresh CI checkout, which has no cached output to trust.
   //
   // The document itself needs no declaration: the test reads `/api/openapi.json` off the CLASSPATH,
   // so `processResources` already tracks it.
   inputs
-    .file(rootProject.file("docs/API_VHOST_ROLLOUT_RUNBOOK.md"))
-    .withPropertyName("apiVhostRunbook")
+    .file(rootProject.file("docker/edge/include/api-allowlist.conf"))
+    .withPropertyName("apiVhostAllowList")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 
   // The same defect a third time, and here it was never theoretical. `crossModuleParitySources`

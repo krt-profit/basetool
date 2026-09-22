@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Profit Basetool - generate Quadlet units from the Compose files, and detect drift between them.
 
-Phase 2 of ``docs/PODMAN_MIGRATION_PLAN.md``. Twenty-two services, nineteen networks and three
+Phase 2 of ``docs/archive/PODMAN_MIGRATION_PLAN.md``. Twenty-two services, nineteen networks and three
 volumes become roughly forty unit files. Transcribing that by hand is how a digest pin or a network
 membership goes quietly wrong, and nothing would notice: a unit that starts is not a unit that is
 right.

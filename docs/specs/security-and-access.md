@@ -1585,7 +1585,7 @@ nor the provisioning service account.
 `scripts/verify-dpop-binding.py` (behaviour) · **Code:**
 `scripts/provision-keycloak-mobile-client.py` · **Decision:**
 [ADR-0131](../adr/0131-mobile-auth-refresh-only-dpop-binding.md) · **Measurements:**
-[`ANDROID_API_EXPOSURE_PLAN.md`](../ANDROID_API_EXPOSURE_PLAN.md) section 7
+[`ANDROID_API_EXPOSURE_PLAN.md`](../archive/ANDROID_API_EXPOSURE_PLAN.md) section 7
 
 ### REQ-SEC-031 — Sensitive GET families MUST be uncacheable, not merely revalidatable
 
@@ -1962,7 +1962,7 @@ load-bearing:
 
 - `POST /api/v1/refining-methods` was the one allow-listed path carrying a bare `hasRole('ADMIN')`
   write. `refining-methods` is therefore added to the read-only family in
-  [`API_VHOST_ROLLOUT_RUNBOOK.md`](../API_VHOST_ROLLOUT_RUNBOOK.md). Nothing loses a capability: the
+  [`API_VHOST_ROLLOUT_RUNBOOK.md`](../archive/API_VHOST_ROLLOUT_RUNBOOK.md). Nothing loses a capability: the
   app only reads it (the refinery form's method picker) and the web admin does not traverse this
   vhost at all. **The runbook is the version-controlled copy of host state — this change is not live
   until the vhost config is applied on the host.**
@@ -2343,7 +2343,7 @@ caller, never sees an exception the MVC advice has already handled. Both are clo
 internet; only the number differs, and it differs *because* authorization lives at the method seam
 in this project rather than in the matcher list. `ApiVhostAnonymousSurfaceTest` pins both, since
 the statuses are what an operator verifies the vhost against
-([`API_VHOST_ROLLOUT_RUNBOOK.md`](../API_VHOST_ROLLOUT_RUNBOOK.md) § D.3a).
+([`API_VHOST_ROLLOUT_RUNBOOK.md`](../archive/API_VHOST_ROLLOUT_RUNBOOK.md) § D.3a).
 
 **The missions and operations families are additionally read-only on this vhost.**
 `/api/v1/missions/<uuid>` and `/api/v1/operations/<uuid>` answer `PUT` and `DELETE` as well as

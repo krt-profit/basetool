@@ -17,7 +17,7 @@
 #
 # WHAT THE ORDER OF OPERATIONS IS FOR
 # -----------------------------------
-# Experiment E1 (2026-08-17, docs/ANDROID_API_EXPOSURE_PLAN.md section 7) established that while
+# Experiment E1 (2026-08-17, docs/archive/ANDROID_API_EXPOSURE_PLAN.md section 7) established that while
 # the DPoP policy is attached to a client, Keycloak refuses **every** admin update to that client
 # with `invalid_client_metadata: DPoP token is disabled` — down to a description change. So the
 # order below is load-bearing, not stylistic:
