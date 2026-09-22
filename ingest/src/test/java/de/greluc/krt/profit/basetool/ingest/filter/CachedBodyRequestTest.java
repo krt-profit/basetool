@@ -23,6 +23,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.greluc.krt.profit.basetool.ingest.config.IngestProperties;
+import de.greluc.krt.profit.basetool.ingest.support.TestLoggingProperties;
+import de.greluc.krt.profit.basetool.ingest.support.TestProperties;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.ServletInputStream;
 import jakarta.servlet.ServletRequest;
@@ -48,11 +50,13 @@ class CachedBodyRequestTest {
 
   /** Runs the size filter over a chunked request and hands back the wrapper it created. */
   private static ServletRequest wrappedChunkedRequest() throws Exception {
-    IngestProperties properties = new IngestProperties();
-    properties.setMaxPayloadBytes(1024);
+    IngestProperties properties = TestProperties.ingest("max-payload-bytes", "1024");
     PayloadSizeLimitFilter filter =
         new PayloadSizeLimitFilter(
-            properties, JsonMapper.builder().build(), new SimpleMeterRegistry());
+            properties,
+            JsonMapper.builder().build(),
+            new SimpleMeterRegistry(),
+            TestLoggingProperties.defaults());
 
     MockHttpServletRequest request =
         new MockHttpServletRequest("POST", "/v1/refinery-extract") {
@@ -85,6 +89,23 @@ class CachedBodyRequestTest {
     ServletInputStream in = wrappedChunkedRequest().getInputStream();
 
     assertThat(new String(in.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo(BODY);
+  }
+
+  /**
+   * The bulk {@code read(byte[], int, int)} is served in one call rather than byte by byte through
+   * the inherited loop (ING-SIMP-01): a buffer larger than the body is filled completely by the
+   * first call, honouring the offset, and the next call reports the end of the stream.
+   */
+  @Test
+  void servesABulkReadInOneCallAndHonoursTheOffset() throws Exception {
+    ServletInputStream in = wrappedChunkedRequest().getInputStream();
+    byte[] buffer = new byte[BODY.length() + 8];
+
+    int read = in.read(buffer, 4, BODY.length() + 4);
+
+    assertThat(read).isEqualTo(BODY.length());
+    assertThat(new String(buffer, 4, read, StandardCharsets.UTF_8)).isEqualTo(BODY);
+    assertThat(in.read(buffer, 0, buffer.length)).isEqualTo(-1);
   }
 
   @Test

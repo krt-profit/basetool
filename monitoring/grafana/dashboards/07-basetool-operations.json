@@ -3393,6 +3393,80 @@
           }
         }
       ]
+    },
+    {
+      "id": 64,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 216
+      },
+      "type": "stat",
+      "title": "Ingest client gates enforcing",
+      "description": "Which of the ingest gateway's four client gates actually refuse callers (REQ-INGEST-011): 1 = enforcing, 0 = unconfigured or only counting under audit-only. basetool_ingest_gate_enforcing{gate}. azp/scope/tool read 0 while the allowlist runs in audit-only, which is a legitimate rollout stage; audience at 0 means any valid realm token passes the decoder and backs the IngestAudienceGateOff alert. Every gate is switched on by the environment alone, so this panel is the only place the production posture is visible without reading the host.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "off",
+                  "index": 0
+                },
+                "1": {
+                  "text": "enforcing",
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "value_and_name",
+        "colorMode": "background"
+      },
+      "targets": [
+        {
+          "expr": "max by (gate) (basetool_ingest_gate_enforcing{application=\"basetool-ingest\"})",
+          "refId": "A",
+          "legendFormat": "{{gate}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
     }
   ]
 }

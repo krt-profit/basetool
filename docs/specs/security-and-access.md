@@ -19,7 +19,7 @@ read/write is isolated to the calling user unless the caller is privileged.
 > linking of a registration). The mission finance-entry scope below shared `REQ-SEC-019` with the
 > Discord-link indicator until 2026-09-22, when it was renumbered to **REQ-SEC-065** on the owner's
 > decision (see the renumbering table in [`INDEX.md`](INDEX.md)). **REQ-SEC-054** was never
-> allocated. The next free id is **REQ-SEC-066** — re-check `origin/main` and open PRs before
+> allocated. The next free id is **REQ-SEC-067** — re-check `origin/main` and open PRs before
 > claiming it. Requirements are grouped by subject, not strictly by number.
 
 ### REQ-SEC-001 — OIDC topology
@@ -4450,6 +4450,45 @@ this requirement first.
 `frontend/…/config/CspNonceFilter`, the `headers(...)` blocks of the backend and ingest
 `SecurityConfig`, `docker/edge/conf.d/00-maps.conf` · **ADR:**
 [ADR-0093](../adr/0093-eliminate-inline-style-attributes-csp-style-src-attr-none.md)
+
+### REQ-SEC-066 — The Keycloak login form works with password managers, and "remember me" is opt-in
+
+The credential form of the `krt-theme` login theme (`keycloak-theme/krt-theme/login/login.ftl`) MUST
+keep the contract of the Keycloak base template it overrides:
+
+- **Autocomplete tokens.** The username field carries `autocomplete="username"` and the password
+  field `autocomplete="current-password"`. Both used to carry `autocomplete="off"`, which stops a
+  password manager from filling and saving the credential and so pushes members towards short,
+  memorable, reused passwords — the opposite of what the form is for. (The update-password form
+  already used `new-password`, and the OTP form `one-time-code`.)
+- **A known username is shown read-only.** When Keycloak already knows who is signing in
+  (`usernameHidden` — a re-authentication or an identity-first step), the name is rendered
+  `readonly` and the password field takes the focus, as the base theme does. Keycloak 26.7 no
+  longer sets the older `usernameEditDisabled` flag (verified against `FreeMarkerLoginFormsProvider`
+  on 2026-09-22), so `usernameHidden` is the one to honour.
+- **The selected credential travels.** The hidden `credentialId` input the base template carries
+  (`auth.selectedCredential`) is present, so a flow that offers a choice of credentials does not lose
+  the member's pick on this page.
+- **"Angemeldet bleiben" is not pre-ticked** (owner decision 2026-09-22). It is checked only when the
+  member ticked it on a previous attempt of the same login (`login.rememberMe`), exactly as the base
+  theme does. A pre-ticked box made the long remember-me session (30 days idle, 180 days max in the
+  realm) the default for every login, including one on a shared or borrowed machine.
+- **No inline event handler.** The three krt-theme forms carry no `onsubmit` attribute; the
+  double-submit guard it held is not worth inline script on the page that handles a password.
+
+**Acceptance**
+
+- [x] `login.ftl`: `autocomplete="username"` / `"current-password"`, the hidden `credentialId`
+  input, `readonly` username under `usernameHidden`, and `rememberMe` checked only via
+  `login.rememberMe`.
+- [x] No krt-theme login template carries an inline `onsubmit` handler.
+- [ ] A real login in a browser with a password manager offers to save and later fills the
+  credential. _(manual; no theme test harness exists.)_
+
+**Enforced by:** review of the templates (the theme has no automated test harness; the Keycloak base
+template is the reference) · **Code:** `keycloak-theme/krt-theme/login/login.ftl`,
+`login-otp.ftl`, `login-update-password.ftl` · **Related:** THEME-SEC-01 / THEME-SIMP-01 of the
+2026-09 improvement audit
 
 ## Out of scope
 

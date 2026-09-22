@@ -439,7 +439,15 @@ IRI_INGEST_EXPECTED_AUDIENCES=basetool-ingest
 ```
 
 > **Do not point the gateway at `basetool-backend`.** That is the backend's audience and every
-> frontend token carries it — the check would pass for tokens this interface must refuse.
+> frontend token carries it — the check would pass for tokens this interface must refuse. Since
+> 2026-09-22 the repo-lint job `ingest-audience` (`scripts/check-ingest-audience.py`) fails a PR
+> that pairs the gateway's audience with that value in any config, env template or runbook.
+>
+> **Reading the result without the host** (2026-09-22): the gauge
+> `basetool_ingest_gate_enforcing{gate="audience"}` is `1` once this variable holds a value and `0`
+> while it is empty; `IngestAudienceGateOff` fires while it is `0`, and the gateway's startup log
+> prints the whole posture on its `Client gates` line (booleans and counts only). The same gauge
+> reports `azp` / `scope` / `tool`, which read `0` while `AUDIT_ONLY` is on.
 >
 > ### ⚠️ `AUDIT_ONLY` does NOT cover this variable — set it LAST
 >

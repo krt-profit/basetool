@@ -2,6 +2,31 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Anmeldeseite: Passwortmanager funktionieren, „Angemeldet bleiben" ist nicht mehr
+  vorausgewählt.** Benutzername und Passwort werden jetzt von Passwortmanagern ausgefüllt und
+  gespeichert. Wer angemeldet bleiben will, setzt den Haken selbst (REQ-SEC-066).
+
+- **Ingest-Gateway: eigene, großzügigere Grenze pro IP-Adresse.** Mehrere Mitglieder hinter einem
+  gemeinsamen Anschluss (CGNAT, Büro) teilen sich nicht mehr 30 Sendungen pro Minute: pro IP gelten
+  jetzt 120, pro Mitglied weiter 30. Neu: `IRI_INGEST_RATE_LIMIT_IP_CAPACITY` /
+  `IRI_INGEST_RATE_LIMIT_IP_REFILL_TOKENS`.
+
+- **Betrieb: Das Ingest-Gateway meldet, welche Client-Sperren wirklich greifen.** Neue Metrik
+  `basetool_ingest_gate_enforcing{gate}`, eine Zeile im Startlog, ein Dashboard-Panel und der Alarm
+  `IngestAudienceGateOff`, solange die Audience-Prüfung aus ist.
+
+### Fixed
+
+- **Extractor: Serverfehler wurden als „bitte anmelden" gemeldet.** Lehnte das Backend die eigene
+  Kennung des Ingest-Gateways ab, sah das Mitglied einen Anmeldefehler. Jetzt kommt ein 502 mit
+  Hinweis auf ein Serverproblem, und das Gateway holt beim nächsten Senden ein frisches Token.
+
+- **Ingest-Konfiguration nannte die falsche Audience.** Der Kommentar in `application.yml` empfahl
+  noch `basetool-backend`, was Browser-Sitzungstokens durchließe; richtig ist `basetool-ingest`. Ein
+  neuer Repo-Lint-Check verhindert, dass der Wert wieder auftaucht.
+
 ## [v1.10.0](https://github.com/krt-profit/basetool/releases/tag/v1.10.0) - 2026-09-22
 
 ### Added

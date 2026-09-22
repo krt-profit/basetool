@@ -1,0 +1,90 @@
+# promtool unit test for IngestAudienceGateOff (ING-SEC-03, REQ-INGEST-011).
+#
+# Pins the three things the rule has to get right:
+#   - it fires when the gateway reports its audience gate at 0 for longer than the `for:` window,
+#   - it stays silent once the audience is configured (1), and
+#   - it is blind to the OTHER gates: an allowlist left in audit-only reports azp/scope/tool at 0,
+#     which is a legitimate rollout stage, and must not be read as the audience being off.
+# It also pins that an absent gauge (a restart, or a gateway not yet on this build) is silence, not
+# an alert: absence is TargetDown's question, not this rule's.
+#
+# Run locally (no promtool on the host — use an ephemeral container, see monitoring/README.md):
+#   docker run --rm --entrypoint sh -v "$PWD/monitoring/prometheus:/work" -w /work \
+#     prom/prometheus:v3.14.0 -c 'promtool test rules tests/ingest_audience_gate_off_test.yml'
+
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: fires - the gateway runs without its audience check
+    interval: 1m
+    input_series:
+      - series: 'basetool_ingest_gate_enforcing{gate="audience", application="basetool-ingest", job="basetool-ingest"}'
+        values: "0x60"
+    alert_rule_test:
+      - eval_time: 45m
+        alertname: IngestAudienceGateOff
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              application: basetool-ingest
+            exp_annotations:
+              summary: "Ingest gateway runs without its JWT audience check"
+              description: "basetool_ingest_gate_enforcing{gate=\"audience\"} is 0: the ingest gateway accepts any valid realm token at the decoder, including frontend session tokens. Set IRI_INGEST_EXPECTED_AUDIENCES=basetool-ingest (never the backend's audience) once a live extractor token carries aud=basetool-ingest, after the client-identity gate has left audit-only — docs/INGEST_KEYCLOAK_SETUP.md step 7a — then re-render env.d and restart ingest."
+
+  - name: pending, not firing - inside the for window
+    interval: 1m
+    input_series:
+      - series: 'basetool_ingest_gate_enforcing{gate="audience", application="basetool-ingest", job="basetool-ingest"}'
+        values: "0x60"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: IngestAudienceGateOff
+        exp_alerts: []
+
+  - name: silent - the audience is configured, the client gates still in audit-only
+    interval: 1m
+    input_series:
+      - series: 'basetool_ingest_gate_enforcing{gate="audience", application="basetool-ingest", job="basetool-ingest"}'
+        values: "1x60"
+      - series: 'basetool_ingest_gate_enforcing{gate="azp", application="basetool-ingest", job="basetool-ingest"}'
+        values: "0x60"
+      - series: 'basetool_ingest_gate_enforcing{gate="scope", application="basetool-ingest", job="basetool-ingest"}'
+        values: "0x60"
+      - series: 'basetool_ingest_gate_enforcing{gate="tool", application="basetool-ingest", job="basetool-ingest"}'
+        values: "0x60"
+    alert_rule_test:
+      - eval_time: 45m
+        alertname: IngestAudienceGateOff
+        exp_alerts: []
+
+  - name: silent - the gauge is absent (restart, or a gateway without it)
+    interval: 1m
+    input_series:
+      - series: 'up{job="basetool-ingest"}'
+        values: "1x60"
+    alert_rule_test:
+      - eval_time: 45m
+        alertname: IngestAudienceGateOff
+        exp_alerts: []
+
+  - name: resolves - the operator sets the audience
+    interval: 1m
+    input_series:
+      - series: 'basetool_ingest_gate_enforcing{gate="audience", application="basetool-ingest", job="basetool-ingest"}'
+        values: "0x40 1x20"
+    alert_rule_test:
+      - eval_time: 35m
+        alertname: IngestAudienceGateOff
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              application: basetool-ingest
+            exp_annotations:
+              summary: "Ingest gateway runs without its JWT audience check"
+              description: "basetool_ingest_gate_enforcing{gate=\"audience\"} is 0: the ingest gateway accepts any valid realm token at the decoder, including frontend session tokens. Set IRI_INGEST_EXPECTED_AUDIENCES=basetool-ingest (never the backend's audience) once a live extractor token carries aud=basetool-ingest, after the client-identity gate has left audit-only — docs/INGEST_KEYCLOAK_SETUP.md step 7a — then re-render env.d and restart ingest."
+      - eval_time: 50m
+        alertname: IngestAudienceGateOff
+        exp_alerts: []

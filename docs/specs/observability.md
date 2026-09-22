@@ -1943,7 +1943,9 @@ the same `basetool_bot_blocked_total{rule}` series, distinguished by the `applic
 
 **Ingest.** `basetool_ingest_handoff_total{kind}` (accepted+staged handoffs per `HandoffKind`),
 `basetool_ingest_handoff_errors_total{reason}` (relay failures: `backend_reject` /
-`backend_unavailable` / `staging_unavailable` / `internal`; pre-relay rejections are not counted
+`backend_unavailable` / `backend_auth` — the backend refused the gateway's **own** identity with a
+`401`/`403`, answered `502` and the cached token invalidated (2026-09-22) — / `staging_unavailable` /
+`internal`; pre-relay rejections are not counted
 here — `staging_unavailable` is kept apart from `internal` because at that point the backend relay
 already **succeeded** and only Redis is at fault, a different operator action, which is why it also
 has its own `IngestStagingUnavailable` alert — REQ-INGEST-003), and
@@ -1971,7 +1973,9 @@ the access log by path, so a second producer appearing alongside the extractor u
 The `client_id` value is bounded **by construction**: it is the matched allowlist entry or the literal
 `other`, never the raw `azp`, because deriving a label from a token claim is the shape of an
 unbounded-cardinality bug (REQ-OBS-011). The reject counter's `reason` (`unknown_client` /
-`missing_azp` / `missing_scope` / `bad_provenance` / `dpop_required`) is kept as a label because it
+`missing_azp` / `missing_scope` / `bad_provenance` / `non_jwt_principal` — an authenticated principal
+that is not a JWT, refused fail-closed since 2026-09-22; corrected the same day: the `dpop_required`
+this list used to name was never implemented, REQ-INGEST-011) is kept as a label because it
 splits into two operationally **opposite** causes: `unknown_client` / `bad_provenance` mean a foreign
 tool is calling the restricted interface, while `missing_azp` / `missing_scope` mean a Keycloak mapper
 or scope assignment regressed and the legitimate extractor is being locked out. It is also bumped
@@ -1979,6 +1983,16 @@ while `app.ingest.client-identity.audit-only` is set — counting what the gate 
 precisely how the operator measures the blast radius before enforcing — and it backs the
 `IngestUnknownClient` alert, deliberately not baseline-tuned away: reaching that counter required a
 valid realm token, so it cannot be produced by an anonymous scanner and a single occurrence is signal.
+`basetool_ingest_gate_enforcing{gate}` (gauge, 2026-09-22, ING-SEC-03) reports the configured
+posture of the four client gates — `gate` is one of the four literals `azp` / `scope` / `tool` /
+`audience`, never a configured value; `1` while that gate refuses callers, `0` while it is
+unconfigured or (for the first three) only counting under `audit-only`. Registered once at startup
+with constant values, exactly like `basetool_tracing_enabled`, because every input is bound at
+startup. It backs `IngestAudienceGateOff` (the audience at `0` for 30 minutes; the monitoring plane
+scrapes production only, so no environment matcher is needed) and the "Ingest client gates
+enforcing" panel. `basetool_ingest_service_account_token_total{outcome}` gained `backoff` beside
+`minted` / `cached` / `failed`: an upload refused without a Keycloak call because a grant failed
+within the last 5 s, so `failed` keeps counting real grant attempts.
 `basetool_ingest_payload_rejected_total` (untagged, `PayloadSizeLimitFilter`) counts each
 oversized-body 413 the INGEST-DOS-1 guard refuses — previously silent (no log, no metric) unlike the
 sibling bot / rate-limit filters — and backs `IngestPayloadRejectedSpike` (logging audit). Its

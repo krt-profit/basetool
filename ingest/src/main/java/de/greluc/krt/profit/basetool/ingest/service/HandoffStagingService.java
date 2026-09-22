@@ -25,7 +25,6 @@ import de.greluc.krt.profit.basetool.ingest.model.dto.StagedHandoff;
 import de.greluc.krt.profit.basetool.ingest.web.BadRequestException;
 import java.security.SecureRandom;
 import java.util.Base64;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -34,14 +33,19 @@ import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Stages and consumes the short-lived, single-use browser handoffs in Redis (REQ-INGEST-003). A
- * staged entry is keyed by {@code (sub, handoffId)}, expires after {@link
- * IngestProperties#getHandoffTtl()}, and is deleted on the first successful read — so a stolen or
- * replayed id is useless, and the entry is scoped to the user who created it.
+ * Stages the short-lived, single-use browser handoffs in Redis (REQ-INGEST-003). A staged entry is
+ * keyed by {@code (sub, handoffId)}, expires after {@link IngestProperties#handoffTtl()}, and is
+ * deleted on the first successful read — so a stolen or replayed id is useless, and the entry is
+ * scoped to the user who created it.
  *
  * <p>Key schema (shared with the frontend, which performs the consuming read after login): {@code
  * ingest:handoff:&lt;sub&gt;:&lt;handoffId&gt;} → a {@link StagedHandoff} JSON document. No
  * screenshots and no raw image bytes are ever staged — only the already-matched draft.
+ *
+ * <p>The gateway only ever writes. The single-use consume is the frontend's ({@code
+ * IngestHandoffService}); a gateway-side {@code consume} existed only for this module's tests and
+ * now lives there, reading the literal key schema the frontend reads, so a drift on either side
+ * fails a test.
  */
 @Slf4j
 @Service
@@ -86,17 +90,17 @@ public class HandoffStagingService {
     // frontend's Spring Session store and runs `--maxmemory-policy noeviction` - where reaching the
     // ceiling refuses writes rather than evicting, so the symptom is that nobody can log in.
     long stagedBytes = value.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
-    if (stagedBytes > ingestProperties.getMaxHandoffBytes()) {
+    if (stagedBytes > ingestProperties.maxHandoffBytes()) {
       log.warn(
           "Refused to stage an oversized {} handoff (sub=u-{}, bytes={}, max={})",
           kind,
           mask(sub),
           stagedBytes,
-          ingestProperties.getMaxHandoffBytes());
+          ingestProperties.maxHandoffBytes());
       throw new BadRequestException("The import draft is too large to hand off.");
     }
 
-    redisTemplate.opsForValue().set(key(sub, handoffId), value, ingestProperties.getHandoffTtl());
+    redisTemplate.opsForValue().set(key(sub, handoffId), value, ingestProperties.handoffTtl());
     trimSubjectIndex(sub, handoffId);
     // Diagnostic correlator (REQ-OBS-004): log a NON-reversible hash of the subject and of the
     // handoff id — never the raw subject (pseudonymous PII), the raw id (a bearer-grade secret that
@@ -115,26 +119,8 @@ public class HandoffStagingService {
         mask(sub),
         mask(handoffId),
         draftJson.length(),
-        ingestProperties.getHandoffTtl());
+        ingestProperties.handoffTtl());
     return handoffId;
-  }
-
-  /**
-   * Atomically reads and deletes the staged handoff for {@code (sub, handoffId)} — the single-use
-   * consume. Returns empty when the id is unknown, expired, already consumed, or staged under a
-   * different subject; no distinction is exposed so a probe cannot tell "wrong owner" from "never
-   * existed".
-   *
-   * @param sub the caller's subject
-   * @param handoffId the handoff id from the {@code ?handoff=} parameter
-   * @return the staged handoff, or empty if there is nothing to hand off
-   */
-  public @NotNull Optional<StagedHandoff> consume(@NotNull String sub, @NotNull String handoffId) {
-    String value = redisTemplate.opsForValue().getAndDelete(key(sub, handoffId));
-    if (value == null) {
-      return Optional.empty();
-    }
-    return Optional.of(objectMapper.readValue(value, StagedHandoff.class));
   }
 
   /**
@@ -157,10 +143,11 @@ public class HandoffStagingService {
   private void trimSubjectIndex(@NotNull String sub, @NotNull String handoffId) {
     String indexKey = INDEX_PREFIX + sub;
     try {
-      redisTemplate.opsForList().rightPush(indexKey, handoffId);
-      redisTemplate.expire(indexKey, ingestProperties.getHandoffTtl());
-      Long size = redisTemplate.opsForList().size(indexKey);
-      long excess = size == null ? 0L : size - ingestProperties.getMaxHandoffsPerSubject();
+      // RPUSH answers the list's length after the push, so it is the size already — a separate
+      // LLEN was one more Redis round trip per stage for a number we had in hand.
+      Long size = redisTemplate.opsForList().rightPush(indexKey, handoffId);
+      redisTemplate.expire(indexKey, ingestProperties.handoffTtl());
+      long excess = size == null ? 0L : size - ingestProperties.maxHandoffsPerSubject();
       for (long i = 0; i < excess; i++) {
         String evicted = redisTemplate.opsForList().leftPop(indexKey);
         if (evicted == null) {
@@ -173,7 +160,7 @@ public class HandoffStagingService {
             "Evicted {} handoff(s) over the per-subject cap (sub=u-{}, cap={})",
             excess,
             mask(sub),
-            ingestProperties.getMaxHandoffsPerSubject());
+            ingestProperties.maxHandoffsPerSubject());
       }
     } catch (RuntimeException redisProblem) {
       log.warn(

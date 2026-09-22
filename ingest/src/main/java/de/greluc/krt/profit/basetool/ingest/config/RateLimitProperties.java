@@ -22,36 +22,46 @@ package de.greluc.krt.profit.basetool.ingest.config;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import java.time.Duration;
-import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Rate-limit budget for the ingest endpoints (prefix {@code app.rate-limit}). The new ingress must
- * not become a way to hammer the backend's import endpoints, so each caller gets a small token
- * bucket refilled on a fixed interval (REQ-INGEST-005). This single budget is applied on two keys:
- * per authenticated JWT subject ({@link
- * de.greluc.krt.profit.basetool.ingest.ratelimit.SubjectRateLimiter}, the enforceable control) and
- * per source IP ({@link de.greluc.krt.profit.basetool.ingest.filter.RateLimitingFilter}, a coarse
- * pre-auth front line). Modelled on the backend's bucket4j limiter but scoped to this module's two
- * endpoints.
+ * Rate-limit budgets for the ingest endpoints (prefix {@code app.rate-limit}). The new ingress must
+ * not become a way to hammer the backend's import endpoints, so each caller gets a token bucket
+ * refilled on a fixed interval (REQ-INGEST-005). Two keys, two budgets:
+ *
+ * <ul>
+ *   <li><b>Per authenticated JWT subject</b> ({@link
+ *       de.greluc.krt.profit.basetool.ingest.ratelimit.SubjectRateLimiter}) — the enforceable
+ *       control, sized by {@code capacity} / {@code refillTokens}.
+ *   <li><b>Per source IP</b> ({@link
+ *       de.greluc.krt.profit.basetool.ingest.filter.RateLimitingFilter}) — a coarse pre-auth front
+ *       line, sized by its own, looser {@code ipCapacity} / {@code ipRefillTokens}. It used to
+ *       share the subject budget, which made one CGNAT household or one office NAT share 30
+ *       requests a minute between every member behind it — the IP limiter throttled legitimate
+ *       members before the subject limiter, the one that actually identifies them, ever got a say.
+ * </ul>
+ *
+ * <p>Both buckets refill over the same {@code refillPeriod}; the factory is {@link
+ * de.greluc.krt.profit.basetool.ingest.ratelimit.RateLimitBuckets#newBucket(int, int, Duration)}.
+ *
+ * @param enabled master switch; set {@code false} (e.g. in the e2e stack) to disable throttling
+ *     entirely
+ * @param capacity per-subject bucket size: the maximum burst of ingest calls one member may make
+ * @param refillTokens tokens added back to the per-subject bucket every {@code refillPeriod}
+ * @param refillPeriod refill cadence shared by both buckets
+ * @param ipCapacity per-IP bucket size. Deliberately looser than {@code capacity} because several
+ *     members can share one public address; overridable via {@code APP_RATE_LIMIT_IP_CAPACITY}
+ * @param ipRefillTokens tokens added back to the per-IP bucket every {@code refillPeriod};
+ *     overridable via {@code APP_RATE_LIMIT_IP_REFILL_TOKENS}
  */
-@Data
 @Validated
 @ConfigurationProperties(prefix = "app.rate-limit")
-public class RateLimitProperties {
-
-  /** Master switch; set {@code false} (e.g. in the e2e stack) to disable throttling entirely. */
-  private boolean enabled = true;
-
-  /** Bucket size: the maximum burst of ingest calls a single caller (subject / IP) may make. */
-  @Min(1)
-  private int capacity = 30;
-
-  /** Tokens added back to the bucket every {@link #refillPeriod}. */
-  @Min(1)
-  private int refillTokens = 30;
-
-  /** Refill cadence for {@link #refillTokens}. */
-  @NotNull private Duration refillPeriod = Duration.ofMinutes(1);
-}
+public record RateLimitProperties(
+    @DefaultValue("true") boolean enabled,
+    @Min(1) @DefaultValue("30") int capacity,
+    @Min(1) @DefaultValue("30") int refillTokens,
+    @NotNull @DefaultValue("PT1M") Duration refillPeriod,
+    @Min(1) @DefaultValue("120") int ipCapacity,
+    @Min(1) @DefaultValue("120") int ipRefillTokens) {}

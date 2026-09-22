@@ -82,8 +82,8 @@ class IngestServiceTest {
     when(backendImportClient.forwardRefineryExtract(any(), any(), any()))
         .thenReturn("{\"draft\":true}");
     when(handoffStagingService.stage(any(), any(), any())).thenReturn("handoff-1");
-    when(ingestProperties.getRefineryPath()).thenReturn("/refinery/import");
-    when(ingestProperties.getFrontendBaseUrl()).thenReturn("https://frontend.test");
+    when(ingestProperties.refineryPath()).thenReturn("/refinery/import");
+    when(ingestProperties.frontendBaseUrl()).thenReturn("https://frontend.test");
 
     service.ingestRefinery("sub-1", null, mock(RefineryExtractDto.class));
 
@@ -97,8 +97,8 @@ class IngestServiceTest {
     when(backendImportClient.forwardRefineryExtract(any(), any(), any()))
         .thenReturn("{\"draft\":true}");
     when(handoffStagingService.stage(any(), any(), any())).thenReturn("handoff-1");
-    when(ingestProperties.getRefineryPath()).thenReturn("/refinery/import");
-    when(ingestProperties.getFrontendBaseUrl()).thenReturn("https://frontend.test");
+    when(ingestProperties.refineryPath()).thenReturn("/refinery/import");
+    when(ingestProperties.frontendBaseUrl()).thenReturn("https://frontend.test");
 
     List<ILoggingEvent> events =
         LogCapture.capture(
@@ -120,8 +120,8 @@ class IngestServiceTest {
     when(backendImportClient.forwardRefineryExtract(any(), any(), any()))
         .thenReturn("{\"draft\":true}");
     when(handoffStagingService.stage(any(), any(), any())).thenReturn("handoff-1");
-    when(ingestProperties.getRefineryPath()).thenReturn("/refinery/import");
-    when(ingestProperties.getFrontendBaseUrl()).thenReturn("https://frontend.test");
+    when(ingestProperties.refineryPath()).thenReturn("/refinery/import");
+    when(ingestProperties.frontendBaseUrl()).thenReturn("https://frontend.test");
     RefineryExtractDto forged =
         new RefineryExtractDto(
             1, "evil\nERROR fabricated", "1.0", null, null, null, List.of(order()));
@@ -138,8 +138,8 @@ class IngestServiceTest {
     when(backendImportClient.forwardBlueprintPreview(any(), any(), any()))
         .thenReturn("{\"preview\":true}");
     when(handoffStagingService.stage(any(), any(), any())).thenReturn("handoff-2");
-    when(ingestProperties.getBlueprintPath()).thenReturn("/blueprint/import");
-    when(ingestProperties.getFrontendBaseUrl()).thenReturn("https://frontend.test");
+    when(ingestProperties.blueprintPath()).thenReturn("/blueprint/import");
+    when(ingestProperties.frontendBaseUrl()).thenReturn("https://frontend.test");
 
     List<ILoggingEvent> events =
         LogCapture.capture(
@@ -185,8 +185,8 @@ class IngestServiceTest {
     when(backendImportClient.forwardBlueprintPreview(any(), any(), any()))
         .thenReturn("{\"preview\":true}");
     when(handoffStagingService.stage(any(), any(), any())).thenReturn("handoff-2");
-    when(ingestProperties.getBlueprintPath()).thenReturn("/blueprint/import");
-    when(ingestProperties.getFrontendBaseUrl()).thenReturn("https://frontend.test");
+    when(ingestProperties.blueprintPath()).thenReturn("/blueprint/import");
+    when(ingestProperties.frontendBaseUrl()).thenReturn("https://frontend.test");
 
     service.ingestBlueprint("sub-1", null, new byte[] {1, 2, 3}, BLUEPRINT_PROVENANCE);
 

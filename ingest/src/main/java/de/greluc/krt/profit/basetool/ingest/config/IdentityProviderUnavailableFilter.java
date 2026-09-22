@@ -72,8 +72,14 @@ public class IdentityProviderUnavailableFilter extends OncePerRequestFilter {
   /** Bounded depth for the cause-chain walk — guards against a self-referential cause cycle. */
   private static final int MAX_CAUSE_DEPTH = 12;
 
+  /** Serializes the 503 problem body. */
   private final ObjectMapper objectMapper;
+
+  /** Counts the 503 on {@code basetool_http_error_total}. */
   private final MeterRegistry meterRegistry;
+
+  /** Supplies the MDC key the problem body's {@code correlationId} is read from. */
+  private final LoggingProperties loggingProperties;
 
   @Override
   protected void doFilterInternal(
@@ -150,6 +156,7 @@ public class IdentityProviderUnavailableFilter extends OncePerRequestFilter {
     ProblemResponseWriter.write(
         response,
         objectMapper,
+        loggingProperties,
         HttpStatus.SERVICE_UNAVAILABLE,
         "Service unavailable",
         MetricNames.CODE_SERVICE_UNAVAILABLE,

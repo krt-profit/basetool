@@ -68,7 +68,7 @@ public class ProvenanceGuard {
    * @throws ClientNotAllowedException when the tool is not approved and enforcement is active
    */
   public void requireApprovedTool(@NotNull Provenance provenance) {
-    if (clientIdentityProperties.getAllowedTools().isEmpty()) {
+    if (clientIdentityProperties.allowedTools().isEmpty()) {
       return;
     }
     String tool = provenance.tool();
@@ -81,7 +81,7 @@ public class ProvenanceGuard {
             MetricNames.TAG_REASON,
             MetricNames.REASON_BAD_PROVENANCE)
         .increment();
-    if (clientIdentityProperties.isAuditOnly()) {
+    if (clientIdentityProperties.auditOnly()) {
       log.warn(
           "Ingest payload provenance would be rejected (audit-only): tool={}, toolVersion={}",
           LogSafe.text(tool, MAX_LOGGED_PROVENANCE),
@@ -120,7 +120,7 @@ public class ProvenanceGuard {
    * @return {@code true} when an allowlist entry matches ignoring case
    */
   private boolean isAllowed(@NotNull String tool) {
-    for (String allowed : clientIdentityProperties.getAllowedTools()) {
+    for (String allowed : clientIdentityProperties.allowedTools()) {
       if (allowed.toLowerCase(Locale.ROOT).equals(tool.toLowerCase(Locale.ROOT))) {
         return true;
       }

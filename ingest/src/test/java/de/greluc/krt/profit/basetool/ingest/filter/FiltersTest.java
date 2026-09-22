@@ -27,8 +27,9 @@ import de.greluc.krt.profit.basetool.ingest.config.IngestProperties;
 import de.greluc.krt.profit.basetool.ingest.config.RateLimitProperties;
 import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.ingest.support.LogCapture;
+import de.greluc.krt.profit.basetool.ingest.support.TestLoggingProperties;
+import de.greluc.krt.profit.basetool.ingest.support.TestProperties;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -94,10 +95,10 @@ class FiltersTest {
 
   @Test
   void sizeFilterRejectsOversizedPayloadWith413() throws Exception {
-    IngestProperties properties = new IngestProperties();
-    properties.setMaxPayloadBytes(10);
+    IngestProperties properties = TestProperties.ingest("max-payload-bytes", "10");
     PayloadSizeLimitFilter filter =
-        new PayloadSizeLimitFilter(properties, objectMapper, meterRegistry);
+        new PayloadSizeLimitFilter(
+            properties, objectMapper, meterRegistry, TestLoggingProperties.defaults());
     MockHttpServletResponse response = new MockHttpServletResponse();
     MockFilterChain chain = new MockFilterChain();
 
@@ -113,10 +114,10 @@ class FiltersTest {
 
   @Test
   void sizeFilterPassesPayloadWithinLimit() throws Exception {
-    IngestProperties properties = new IngestProperties();
-    properties.setMaxPayloadBytes(1024);
+    IngestProperties properties = TestProperties.ingest("max-payload-bytes", "1024");
     PayloadSizeLimitFilter filter =
-        new PayloadSizeLimitFilter(properties, objectMapper, meterRegistry);
+        new PayloadSizeLimitFilter(
+            properties, objectMapper, meterRegistry, TestLoggingProperties.defaults());
     MockHttpServletResponse response = new MockHttpServletResponse();
     MockFilterChain chain = new MockFilterChain();
 
@@ -128,10 +129,10 @@ class FiltersTest {
   @Test
   void sizeFilterRejectsOversizedChunkedPayloadWith413() throws Exception {
     // INGEST-DOS-1: a chunked body (no Content-Length) over the cap must still be rejected.
-    IngestProperties properties = new IngestProperties();
-    properties.setMaxPayloadBytes(10);
+    IngestProperties properties = TestProperties.ingest("max-payload-bytes", "10");
     PayloadSizeLimitFilter filter =
-        new PayloadSizeLimitFilter(properties, objectMapper, meterRegistry);
+        new PayloadSizeLimitFilter(
+            properties, objectMapper, meterRegistry, TestLoggingProperties.defaults());
     MockHttpServletResponse response = new MockHttpServletResponse();
     MockFilterChain chain = new MockFilterChain();
 
@@ -144,10 +145,10 @@ class FiltersTest {
 
   @Test
   void sizeFilterPassesChunkedPayloadWithinLimitAndReplaysBody() throws Exception {
-    IngestProperties properties = new IngestProperties();
-    properties.setMaxPayloadBytes(1024);
+    IngestProperties properties = TestProperties.ingest("max-payload-bytes", "1024");
     PayloadSizeLimitFilter filter =
-        new PayloadSizeLimitFilter(properties, objectMapper, meterRegistry);
+        new PayloadSizeLimitFilter(
+            properties, objectMapper, meterRegistry, TestLoggingProperties.defaults());
     MockHttpServletResponse response = new MockHttpServletResponse();
     MockFilterChain chain = new MockFilterChain();
 
@@ -160,10 +161,10 @@ class FiltersTest {
 
   @Test
   void sizeFilterLogsBothSizesSoATooLowCapIsDistinguishableFromAHostileBody() throws Exception {
-    IngestProperties properties = new IngestProperties();
-    properties.setMaxPayloadBytes(10);
+    IngestProperties properties = TestProperties.ingest("max-payload-bytes", "10");
     PayloadSizeLimitFilter filter =
-        new PayloadSizeLimitFilter(properties, objectMapper, meterRegistry);
+        new PayloadSizeLimitFilter(
+            properties, objectMapper, meterRegistry, TestLoggingProperties.defaults());
 
     List<ILoggingEvent> events =
         LogCapture.capture(
@@ -184,10 +185,10 @@ class FiltersTest {
   void sizeFilterReportsAChunkedRejectAsDeclaredMinusOne() throws Exception {
     // The stream is abandoned the moment the cap is crossed, so -1 is the honest value — and it is
     // itself the diagnostic: the body arrived without a Content-Length.
-    IngestProperties properties = new IngestProperties();
-    properties.setMaxPayloadBytes(10);
+    IngestProperties properties = TestProperties.ingest("max-payload-bytes", "10");
     PayloadSizeLimitFilter filter =
-        new PayloadSizeLimitFilter(properties, objectMapper, meterRegistry);
+        new PayloadSizeLimitFilter(
+            properties, objectMapper, meterRegistry, TestLoggingProperties.defaults());
 
     List<ILoggingEvent> events =
         LogCapture.capture(
@@ -207,13 +208,11 @@ class FiltersTest {
   void rateLimitFilterLogsThePerIpRejectAtDebugWithoutTheClientAddress() throws Exception {
     // DEBUG, not WARN: an attacker decides how often the pre-auth limiter fires, so a higher level
     // would be a log-flood vector. The client IP stays out — app logs are PII-free (REQ-OBS-004).
-    RateLimitProperties properties = new RateLimitProperties();
-    properties.setEnabled(true);
-    properties.setCapacity(1);
-    properties.setRefillTokens(1);
-    properties.setRefillPeriod(Duration.ofMinutes(1));
+    RateLimitProperties properties =
+        TestProperties.rateLimit("ip-capacity", "1", "ip-refill-tokens", "1");
     RateLimitingFilter filter =
-        new RateLimitingFilter(properties, objectMapper, new SimpleMeterRegistry());
+        new RateLimitingFilter(
+            properties, objectMapper, new SimpleMeterRegistry(), TestLoggingProperties.defaults());
     filter.doFilter(
         ingestRequestWithBody(10), new MockHttpServletResponse(), new MockFilterChain());
 
@@ -237,13 +236,12 @@ class FiltersTest {
 
   @Test
   void rateLimitFilterAllowsFirstThenBlocksWith429() throws Exception {
-    RateLimitProperties properties = new RateLimitProperties();
-    properties.setEnabled(true);
-    properties.setCapacity(1);
-    properties.setRefillTokens(1);
-    properties.setRefillPeriod(Duration.ofMinutes(1));
+    RateLimitProperties properties =
+        TestProperties.rateLimit("ip-capacity", "1", "ip-refill-tokens", "1");
     SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
-    RateLimitingFilter filter = new RateLimitingFilter(properties, objectMapper, meterRegistry);
+    RateLimitingFilter filter =
+        new RateLimitingFilter(
+            properties, objectMapper, meterRegistry, TestLoggingProperties.defaults());
 
     MockFilterChain firstChain = new MockFilterChain();
     filter.doFilter(ingestRequestWithBody(10), new MockHttpServletResponse(), firstChain);
@@ -277,10 +275,10 @@ class FiltersTest {
    */
   @Test
   void sizeFilterRejectsAnOversizedPayloadOnAPercentEncodedIngestPath() throws Exception {
-    IngestProperties properties = new IngestProperties();
-    properties.setMaxPayloadBytes(10);
+    IngestProperties properties = TestProperties.ingest("max-payload-bytes", "10");
     PayloadSizeLimitFilter filter =
-        new PayloadSizeLimitFilter(properties, objectMapper, meterRegistry);
+        new PayloadSizeLimitFilter(
+            properties, objectMapper, meterRegistry, TestLoggingProperties.defaults());
     MockHttpServletResponse response = new MockHttpServletResponse();
     MockFilterChain chain = new MockFilterChain();
 
@@ -297,13 +295,11 @@ class FiltersTest {
    */
   @Test
   void rateLimitFilterCountsAPercentEncodedIngestPathAgainstTheSameBudget() throws Exception {
-    RateLimitProperties properties = new RateLimitProperties();
-    properties.setEnabled(true);
-    properties.setCapacity(1);
-    properties.setRefillTokens(1);
-    properties.setRefillPeriod(Duration.ofMinutes(1));
+    RateLimitProperties properties =
+        TestProperties.rateLimit("ip-capacity", "1", "ip-refill-tokens", "1");
     RateLimitingFilter filter =
-        new RateLimitingFilter(properties, objectMapper, new SimpleMeterRegistry());
+        new RateLimitingFilter(
+            properties, objectMapper, new SimpleMeterRegistry(), TestLoggingProperties.defaults());
 
     filter.doFilter(
         ingestRequestWithBody(10), new MockHttpServletResponse(), new MockFilterChain());

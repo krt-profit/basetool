@@ -47,15 +47,17 @@ import org.keycloak.util.JsonSerialization;
  * cannot delay it beyond the bounded request timeout; the caller treats an empty result as "no
  * nickname captured".
  *
- * <p>Two views of the same guild-member object are exposed. {@link #readNickname} returns only the
- * explicit per-guild {@code nick} — used by the first-broker-login collision precheck, kept
- * conservative so a common global display name never triggers a false match (and never denies a
- * login the admin would rather resolve manually). {@link #readGuildDisplayName} returns the name
- * the guild actually shows for the member — the per-guild {@code nick} if set, otherwise the
- * account's global display name ({@code user.global_name}) — used for the admin approval-queue
- * label, so a member who never set a server nick is still shown a recognisable name instead of a
- * blank em-dash (REQ-DATA-018; the reported case of a member whose server name is the global
- * display name, with no per-guild nick set).
+ * <p>Two views of the same guild-member object are exposed. {@link #extractNick(String)} returns
+ * only the explicit per-guild {@code nick} — used by the first-broker-login collision precheck,
+ * kept conservative so a common global display name never triggers a false match (and never denies
+ * a login the admin would rather resolve manually). It is a pure parse of the member object the
+ * membership gate already read, so the precheck makes no Discord call of its own (KC-PERF-01; a
+ * {@code readNickname} that fetched the same object a second time was removed on 2026-09-22).
+ * {@link #readGuildDisplayName} returns the name the guild actually shows for the member — the
+ * per-guild {@code nick} if set, otherwise the account's global display name ({@code
+ * user.global_name}) — used for the admin approval-queue label, so a member who never set a server
+ * nick is still shown a recognisable name instead of a blank em-dash (REQ-DATA-018; the reported
+ * case of a member whose server name is the global display name, with no per-guild nick set).
  *
  * <p>This class never logs the token, the response body, or any captured name.
  */
@@ -75,23 +77,6 @@ public class DiscordGuildNicknameReader {
 
   /** Per-request timeout; exceeding it yields an empty result (fail open). */
   private final @NotNull Duration requestTimeout;
-
-  /**
-   * Reads the user's explicit per-guild server nickname ({@code nick}) in the given guild,
-   * best-effort. Conservative view for the collision precheck: it never falls back to the global
-   * display name, so a common {@code global_name} cannot trigger a false account match.
-   *
-   * @param apiBaseUrl Discord API base URL, e.g. {@code https://discord.com/api/v10}
-   * @param guildId the guild (server) id whose nickname is wanted
-   * @param accessToken the user's brokered Discord access token (scope {@code guilds.members.read})
-   * @return the trimmed, length-bounded per-guild nickname, or {@link Optional#empty()} when absent
-   *     or on any error
-   */
-  public @NotNull Optional<String> readNickname(
-      @NotNull String apiBaseUrl, @NotNull String guildId, @NotNull String accessToken) {
-    return fetchMemberBody(apiBaseUrl, guildId, accessToken)
-        .flatMap(DiscordGuildNicknameReader::extractNick);
-  }
 
   /**
    * Reads the name the guild <em>displays</em> for the user, best-effort: the per-guild {@code

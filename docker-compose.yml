@@ -1161,6 +1161,10 @@ x-ingest: &ingest-template
     # but opening the pre-filled page is a separate manual click afterwards, so a shorter window
     # expired before pickup for slower users ("Import-Link abgelaufen"). Tune via .env if needed.
     APP_INGEST_HANDOFF_TTL: ${IRI_INGEST_HANDOFF_TTL:-PT30M}
+    # Per-IP ingest budget (REQ-INGEST-005), looser than the per-member 30/min on purpose: members
+    # behind one CGNAT / office NAT share a single public address. Requests per minute.
+    APP_RATE_LIMIT_IP_CAPACITY: ${IRI_INGEST_RATE_LIMIT_IP_CAPACITY:-120}
+    APP_RATE_LIMIT_IP_REFILL_TOKENS: ${IRI_INGEST_RATE_LIMIT_IP_REFILL_TOKENS:-120}
     REDIS_HOST: redis
     REDIS_PORT: 6379
     REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}

@@ -78,7 +78,7 @@ public class IngestService {
     String draftJson = backendImportClient.forwardRefineryExtract(sub, acceptLanguage, extract);
     String handoffId = handoffStagingService.stage(sub, HandoffKind.REFINERY, draftJson);
     countHandoff(HandoffKind.REFINERY);
-    return response(handoffId, HandoffKind.REFINERY, ingestProperties.getRefineryPath());
+    return response(handoffId, HandoffKind.REFINERY, ingestProperties.refineryPath());
   }
 
   /**
@@ -152,7 +152,7 @@ public class IngestService {
         backendImportClient.forwardBlueprintPreview(sub, acceptLanguage, blueprintJson);
     String handoffId = handoffStagingService.stage(sub, HandoffKind.BLUEPRINT, draftJson);
     countHandoff(HandoffKind.BLUEPRINT);
-    return response(handoffId, HandoffKind.BLUEPRINT, ingestProperties.getBlueprintPath());
+    return response(handoffId, HandoffKind.BLUEPRINT, ingestProperties.blueprintPath());
   }
 
   /**
@@ -178,7 +178,7 @@ public class IngestService {
    */
   private @NotNull IngestResponseDto response(
       @NotNull String handoffId, @NotNull HandoffKind kind, @NotNull String path) {
-    String url = ingestProperties.getFrontendBaseUrl() + path + "?handoff=" + handoffId;
+    String url = ingestProperties.frontendBaseUrl() + path + "?handoff=" + handoffId;
     return new IngestResponseDto(handoffId, kind, url);
   }
 }

@@ -25,6 +25,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.ingest.support.LogCapture;
+import de.greluc.krt.profit.basetool.ingest.support.TestLoggingProperties;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -51,7 +52,8 @@ class SecurityProblemResponseHandlerTest {
   private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
 
   private final SecurityProblemResponseHandler handler =
-      new SecurityProblemResponseHandler(JsonMapper.builder().build(), meterRegistry);
+      new SecurityProblemResponseHandler(
+          JsonMapper.builder().build(), meterRegistry, TestLoggingProperties.defaults());
 
   @AfterEach
   void clearMdc() {

@@ -137,6 +137,12 @@ brokered user access token (scope `guilds.members.read`). It **fails closed**: a
 timeout, network error, malformed body, or `429` after the retry budget — denies the login, distinct
 from a clean `404` (not in guild). Tokens, payloads and Discord ids are **never logged**.
 
+**One guild-member read per first login** (KC-PERF-01, 2026-09-22). The gate reads the member
+object once (`DiscordMembershipChecker.lookup`) and takes both the role decision and the server
+nickname the REQ-SEC-022 precheck needs from that one answer; it used to read the same endpoint a
+second time for the nickname. All Discord calls of the provider JAR share one `HttpClient`
+(`DiscordHttp.CLIENT`) instead of three.
+
 **Acceptance**
 
 - [x] In-guild **and** holds `KRT-Mitglied` (HTTP 200, `roles[]` ∋ role id) ⇒ login allowed.
@@ -152,7 +158,10 @@ from a clean `404` (not in guild). Tokens, payloads and Discord ids are **never 
   form, the extractor's device-grant verification page, and any direct login — not only the app
   sidebar. Requires the `discord` IdP's "Hide on login page" = OFF.
 
-**Enforced by:** `DiscordMembershipCheckerTest` (keycloak-spi) proves the decision matrix · `MessageBundleConsistencyTest` (frontend) pins the `nav.login.discord` key across the default/de/en bundles · _(planned T1.4: login-gate e2e + log PII grep)_ · **Code:** `DiscordGuildRoleGateAuthenticator(+Factory)`, `DiscordMembershipChecker`, `fragments/sidebar.html`, `fragments/icons.html` (`krt-icon-discord`) · **Issues:** #723, #725
+- [x] The gate makes exactly one Discord call per first login; the precheck's nickname comes from
+  that call's member object (`DiscordGuildRoleGateAuthenticatorTest`).
+
+**Enforced by:** `DiscordMembershipCheckerTest` (keycloak-spi) proves the decision matrix · `DiscordGuildRoleGateAuthenticatorTest` (exactly one Discord call per first login) · `MessageBundleConsistencyTest` (frontend) pins the `nav.login.discord` key across the default/de/en bundles · _(planned T1.4: login-gate e2e + log PII grep)_ · **Code:** `DiscordGuildRoleGateAuthenticator(+Factory)`, `DiscordMembershipChecker`, `fragments/sidebar.html`, `fragments/icons.html` (`krt-icon-discord`) · **Issues:** #723, #725
 
 ### REQ-SEC-022 — Deny a colliding Discord first-login & redirect to account linking (fail-open)
 
@@ -550,7 +559,9 @@ it must **never** block or delay the login, in deliberate contrast to the fail-c
 (grants nothing), **admin-only** (carried solely in the approval-queue `PendingRegistrationDto`,
 never in any shared `UserDto`), and **never logged** (it is a name — REQ-OBS). The
 first-broker-login collision precheck's nickname candidate deliberately stays **nick-only**
-(`readNickname`), so broadening the display never widens that anti-duplicate name match.
+(`DiscordGuildNicknameReader.extractNick`, parsed from the member object the membership gate already
+read — no second Discord call), so broadening the display never widens that anti-duplicate name
+match.
 
 **Acceptance**
 
@@ -558,7 +569,7 @@ first-broker-login collision precheck's nickname candidate deliberately stays **
   boots clean against the migration.
 - [x] The Keycloak SPI reads the guild display name best-effort and **fails open** — `nick` if set,
   else `user.global_name`; a Discord error/timeout or neither name present yields no value and never
-  breaks the login. The precheck's `readNickname` view stays nick-only
+  breaks the login. The precheck's `extractNick` view stays nick-only
   (`DiscordGuildNicknameReaderTest`).
 - [x] `UserReconciliationService.syncUser(Jwt)` persists a non-blank `discord_guild_nickname` claim
   (trimmed, length-bounded) and leaves the field `null` when the claim is absent
