@@ -164,6 +164,14 @@ a delegated leader; `LOGISTICIAN` / `MISSION_MANAGER` are deliberately **not** a
 capability-only holder with no appointment reach (empty view) cannot open the surface. The per-unit
 appointment authority remains the delegated verdict above, re-checked on every backend write.
 
+The page's **Spezialkommandos** section lists every SK the caller may either appoint the lead of
+(`canAppointLead`, the Bereichsleiter rung above) **or** manage the members of (`canManageRoster` =
+`SpecialCommandSecurityService.canManageMembers` — admin, or the SK's own `SK_LEAD`, REQ-ORG-005).
+The lead toggle renders only with `canAppointLead`; `canManageRoster` renders a „Mitglieder verwalten"
+link to the SK member page `/organisation/special-commands/{id}`. So an SK lead sees their own SK
+here without being able to touch its lead seat. (Since 2026-09-22; before that an SK was listed only
+for a caller who could appoint its lead, and an SK lead had no web path to their own member list.)
+
 **Acceptance**
 
 - [x] Each tier can appoint exactly the rung below it, within its own scope; a foreign-unit or

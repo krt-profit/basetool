@@ -2449,7 +2449,7 @@ async function changeMissionOwner() {
         showFrontendErrorToast(
             typeof MSG_ERROR_USER_REQUIRED !== 'undefined'
                 ? MSG_ERROR_USER_REQUIRED
-                : 'Bitte wählen Sie einen Benutzer aus',
+                : 'Bitte wähle einen Benutzer aus',
         );
         return;
     }
@@ -2647,7 +2647,7 @@ async function addMissionManager() {
         showFrontendErrorToast(
             typeof MSG_ERROR_USER_REQUIRED !== 'undefined'
                 ? MSG_ERROR_USER_REQUIRED
-                : 'Bitte wählen Sie einen Benutzer aus',
+                : 'Bitte wähle einen Benutzer aus',
         );
         return;
     }

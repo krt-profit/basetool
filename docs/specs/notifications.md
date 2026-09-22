@@ -1,6 +1,6 @@
 # Notifications & alerting
 
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-17.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
 > **Owner area:** NOTIF · **Related ADRs:** [ADR-0014](../adr/0014-notification-system-architecture.md),
 > [ADR-0015](../adr/0015-notification-data-driven-rule-engine.md),
 > [ADR-0016](../adr/0016-notification-transport-polling-sse.md) · **Epic:**
@@ -138,12 +138,17 @@ Recipients are decided by admin-managed `notification_rule` rows, each owning a 
 `RESPONSIBLE` / `REQUESTING`), `ACCOUNT_GRANT` (the bank employees holding a
 `bank_account_grant` on the **bank account** the event carries — see `NotificationEvent.contextAccountId()`),
 and `EVENT_RECIPIENT` (the single user the event is **directed at** — see
-`NotificationEvent.contextRecipientSub()`, e.g. the officer/lead notified when their booking request is
-decided). The last two were added for the bank booking-request use case (ADR-0022/REQ-NOTIF-011) and read
-no selector columns — the account / recipient comes from the event.
+`NotificationEvent.contextRecipientUserId()`, e.g. the officer/lead notified when their booking request is
+decided), and `ACCOUNT_RESPONSIBLE` (the responsible holder(s) of the bank account the event carries,
+REQ-BANK-034, V194). The last three were added for the bank booking-request use case
+(ADR-0022/REQ-NOTIF-011) and read no selector columns — the account / recipient comes from the event.
 A rule's `exclude_actor` flag drops the triggering user. The selector `kind` is an open enum so a
 future `GROUP` selector slots in without reworking the engine. Rules are created, edited, enabled /
-disabled and deleted at runtime via an admin-only API.
+disabled and deleted at runtime via an admin-only API — **every** rule, including the seeded ones:
+all six selector kinds are accepted on create and update. The three event-derived kinds are stored
+with every selector column `null`, whatever the request carried. (Until 2026-09-22 the service
+refused those three as "seed-only", so no seeded bank, Materialbörse or account-deletion rule could be
+saved from the editor — not even to disable it.)
 
 **Acceptance**
 
@@ -151,11 +156,16 @@ disabled and deleted at runtime via an admin-only API.
 - [x] Admin CRUD at `/api/v1/notification-rules` is gated on `hasRole('ADMIN')`.
 - [x] The engine unions a rule's selectors, applies `exclude_actor`, and de-duplicates
   recipients.
+- [x] All six selector kinds are admin-manageable; a seeded rule round-trips through the editor
+  unchanged.
 
 Admins manage rules through a dedicated admin page (list + create/edit form with a dynamic
-selector editor) that relays to the rule API.
+selector editor) that relays to the rule API. The page offers **every** event type, notification
+type and selector kind, each under a localized label (`admin.notificationRules.*`) rather than its
+enum code; an event-derived selector kind shows a hint instead of further fields. A save or delete
+re-swaps the rule table in place (REQ-FE-001) instead of reloading the page.
 
-**Enforced by:** `RuleEvaluationServiceTest`, `NotificationRuleEngineIntegrationTest` ·
+**Enforced by:** `RuleEvaluationServiceTest`, `NotificationRuleEngineIntegrationTest`, `NotificationRuleServiceTest` ·
 **Code:** `model/NotificationRule`, `model/NotificationRuleSelector`,
 `service/RuleEvaluationService`, `service/NotificationRuleService`,
 `controller/NotificationRuleController`, `db/migration/V156__create_notification_rule.sql`,
@@ -381,7 +391,7 @@ account comes from the event, mirroring how `ORG_RELATIVE_ROLE` reads the org un
 
 **UC3 — on decision (→ the requester).** A `BANK_BOOKING_REQUEST_CONFIRMED` /
 `BANK_BOOKING_REQUEST_REJECTED` event carries the **directed recipient**
-(`NotificationEvent.contextRecipientSub()` = the requesting officer/lead) and is mapped by seeded
+(`NotificationEvent.contextRecipientUserId()` = the requesting officer/lead) and is mapped by seeded
 default rules (V161) to same-named notifications, each with a single `EVENT_RECIPIENT` selector that
 resolves to that recipient. The rejection reason is rendered in the text.
 
@@ -449,7 +459,7 @@ logged** (REQ-OBS).
 
 When a member registers interest in a Materialbörse offer, the offer owner (the Anbieter) is notified
 through the engine (#1187). A `MATERIAL_EXCHANGE_INTEREST_REGISTERED` event carries the **directed
-recipient** (`NotificationEvent.contextRecipientSub()` = the offer owner) and is mapped by a seeded
+recipient** (`NotificationEvent.contextRecipientUserId()` = the offer owner) and is mapped by a seeded
 default rule (V211) to a same-named notification with a single `EVENT_RECIPIENT` selector — the same
 directed-recipient mechanism as the bank decision notifications (REQ-NOTIF-011, UC3). The registering
 member is excluded (`exclude_actor = TRUE`; moot because a member can never register interest in their

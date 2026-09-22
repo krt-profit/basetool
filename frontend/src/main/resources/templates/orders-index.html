@@ -23,7 +23,7 @@
 <main>
     <div class="greeting hud-box flex-between">
         <h1 th:text="${requesterView} ? #{nav.orders.own} : #{nav.orders}">Aufträge</h1>
-        <a th:href="@{/orders/create(source='index')}" class="btn btn--cta">Neuer Auftrag</a>
+        <a th:href="@{/orders/create(source='index')}" class="btn btn--cta" th:text="#{orders.index.new}">Neuer Auftrag</a>
     </div>
 
     <div class="hud-box mt-2">

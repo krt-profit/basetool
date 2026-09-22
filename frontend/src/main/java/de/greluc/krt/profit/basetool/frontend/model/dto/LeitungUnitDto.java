@@ -32,7 +32,9 @@ import java.util.UUID;
  * @param shorthand the org unit shorthand.
  * @param kind the org-unit kind, driving which rank options + section the page renders.
  * @param canAppointLead whether the caller may set this unit's top seat.
- * @param canManageRoster whether the caller may manage this unit's subordinate roster.
+ * @param canManageRoster whether the caller may manage this unit's subordinate roster; on a
+ *     Spezialkommando it means the caller may manage its members, and the page links to {@code
+ *     /organisation/special-commands/{id}} for that.
  * @param members the unit's roster rows.
  * @param groups the unit's Kommandogruppen (Staffel only; empty otherwise).
  * @param grandAdmiralUserId the account id of this unit's Grand Admiral (REQ-ORG-021), or {@code

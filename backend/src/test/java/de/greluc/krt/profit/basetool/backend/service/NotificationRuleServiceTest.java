@@ -49,6 +49,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -61,10 +62,12 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
  * on {@code update} and the per-kind selector validation applied on {@code create}/{@code update}.
  *
  * <p>Pins that a stale client version raises a 409 (lost-update protection) while a matching or
- * absent persisted version proceeds to {@code saveAndFlush}, and that the admin-manageable selector
+ * absent persisted version proceeds to {@code saveAndFlush}, that the column-configured selector
  * kinds ({@code SPECIFIC_USER}, {@code ROLE}, {@code ORG_RELATIVE_ROLE}) reject missing required
- * fields while the three seed-only kinds ({@code ACCOUNT_GRANT}, {@code ACCOUNT_RESPONSIBLE},
- * {@code EVENT_RECIPIENT}) are refused before any row is written.
+ * fields before any row is written, and that the three event-derived kinds ({@code ACCOUNT_GRANT},
+ * {@code ACCOUNT_RESPONSIBLE}, {@code EVENT_RECIPIENT}) are accepted on create and update and
+ * stored with every selector column null even when the request carried stray values — so every
+ * seeded rule stays editable from the admin screen (REQ-NOTIF-007).
  */
 @ExtendWith(MockitoExtension.class)
 class NotificationRuleServiceTest {
@@ -200,22 +203,97 @@ class NotificationRuleServiceTest {
                 null,
                 null,
                 NotificationContextRole.RESPONSIBLE),
-            "ORG_RELATIVE_ROLE selector requires orgRelativeRole and contextRole"),
-        Arguments.of(
-            "seed-only ACCOUNT_GRANT",
-            new NotificationRuleSelectorWriteRequest(
-                SelectorKind.ACCOUNT_GRANT, null, null, null, null),
-            "Unsupported selector kind"),
-        Arguments.of(
-            "seed-only ACCOUNT_RESPONSIBLE",
-            new NotificationRuleSelectorWriteRequest(
-                SelectorKind.ACCOUNT_RESPONSIBLE, null, null, null, null),
-            "Unsupported selector kind"),
-        Arguments.of(
-            "seed-only EVENT_RECIPIENT",
-            new NotificationRuleSelectorWriteRequest(
-                SelectorKind.EVENT_RECIPIENT, null, null, null, null),
-            "Unsupported selector kind"));
+            "ORG_RELATIVE_ROLE selector requires orgRelativeRole and contextRole"));
+  }
+
+  /**
+   * A selector of an event-derived kind that carries a value in every column it does not read — the
+   * shape a hand-crafted or stale client payload could have.
+   *
+   * @param kind one of the event-derived kinds
+   * @return the selector with stray values in all four columns
+   */
+  private static NotificationRuleSelectorWriteRequest strayValuedSelector(SelectorKind kind) {
+    return new NotificationRuleSelectorWriteRequest(
+        kind,
+        UUID.randomUUID(),
+        "ADMIN",
+        OrgRelativeRole.OFFICER,
+        NotificationContextRole.RESPONSIBLE);
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @EnumSource(
+      value = SelectorKind.class,
+      names = {"ACCOUNT_GRANT", "EVENT_RECIPIENT", "ACCOUNT_RESPONSIBLE"})
+  void createAcceptsEventDerivedKindAndStoresNoColumns(SelectorKind kind) {
+    // REQ-NOTIF-007: these kinds used to be refused as "seed-only", so no seeded rule carrying one
+    // (every bank booking-request rule among them) could be saved from the editor at all.
+    NotificationRule saved = ruleWithVersion(UUID.randomUUID(), 0L);
+    when(notificationRuleRepository.saveAndFlush(any(NotificationRule.class))).thenReturn(saved);
+    NotificationRuleDto dto = dtoFor(saved);
+    when(notificationRuleMapper.toDto(saved)).thenReturn(dto);
+
+    NotificationRuleDto result =
+        notificationRuleService.create(writeRequest(null, strayValuedSelector(kind)));
+
+    assertThat(result).isSameAs(dto);
+    ArgumentCaptor<NotificationRule> persisted = ArgumentCaptor.forClass(NotificationRule.class);
+    verify(notificationRuleRepository).saveAndFlush(persisted.capture());
+    assertThat(persisted.getValue().getSelectors())
+        .singleElement()
+        .satisfies(selector -> assertStoredWithoutColumns(selector, kind));
+    // The stray roleCode must not be looked up either: the kind reads no role.
+    verify(roleRepository, never()).findByCodeIgnoreCase(any());
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @EnumSource(
+      value = SelectorKind.class,
+      names = {"ACCOUNT_GRANT", "EVENT_RECIPIENT", "ACCOUNT_RESPONSIBLE"})
+  void updateAcceptsEventDerivedKindAndStoresNoColumns(SelectorKind kind) {
+    UUID id = UUID.randomUUID();
+    NotificationRule persisted = ruleWithVersion(id, 3L);
+    persisted.addSelector(NotificationRuleSelector.builder().kind(kind).build());
+    when(notificationRuleRepository.findByIdWithSelectors(id)).thenReturn(Optional.of(persisted));
+    when(notificationRuleRepository.saveAndFlush(persisted)).thenReturn(persisted);
+    NotificationRuleDto dto = dtoFor(persisted);
+    when(notificationRuleMapper.toDto(persisted)).thenReturn(dto);
+
+    // Disabling a seeded rule is the edit the old "seed-only" refusal made impossible.
+    NotificationRuleWriteRequest disable =
+        new NotificationRuleWriteRequest(
+            NotificationEventType.BANK_BOOKING_REQUEST_CREATED,
+            NotificationType.BANK_BOOKING_REQUEST_CREATED,
+            null,
+            false,
+            true,
+            3L,
+            List.of(strayValuedSelector(kind)));
+
+    NotificationRuleDto result = notificationRuleService.update(id, disable);
+
+    assertThat(result).isSameAs(dto);
+    verify(notificationRuleRepository).saveAndFlush(persisted);
+    assertThat(persisted.isEnabled()).isFalse();
+    assertThat(persisted.getSelectors())
+        .singleElement()
+        .satisfies(selector -> assertStoredWithoutColumns(selector, kind));
+  }
+
+  /**
+   * Asserts a persisted selector kept its event-derived kind and none of the four columns.
+   *
+   * @param selector the persisted selector
+   * @param kind the kind it must carry
+   */
+  private static void assertStoredWithoutColumns(
+      NotificationRuleSelector selector, SelectorKind kind) {
+    assertThat(selector.getKind()).isEqualTo(kind);
+    assertThat(selector.getUserId()).isNull();
+    assertThat(selector.getRoleCode()).isNull();
+    assertThat(selector.getOrgRelativeRole()).isNull();
+    assertThat(selector.getContextRole()).isNull();
   }
 
   @ParameterizedTest(name = "{0}")

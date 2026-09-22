@@ -25,7 +25,7 @@ Ein Spezialkommando wird als eigene OrgUnit aufgesetzt und betrieben.
 ## Hauptablauf
 
 1. **Admin** legt unter `/admin/special-commands` ein SK an (anlegen / umbenennen / löschen — ADMIN-only).
-2. **Admin oder SK-Lead** fügt Mitglieder hinzu / entfernt sie / toggelt deren `is_logistician` / `is_mission_manager` (Gate `SpecialCommandSecurityService.canManageMembers`). Der `is_lead`-Toggle selbst bleibt ADMIN-only (kein Self-Escalation).
+2. **Admin oder SK-Lead** fügt Mitglieder hinzu / entfernt sie / toggelt deren `is_logistician` / `is_mission_manager` (Gate `SpecialCommandSecurityService.canManageMembers`) — auf der Seite `/organisation/special-commands/{id}`, die der SK-Lead über „Leitung" → „Mitglieder verwalten" erreicht (`/admin/special-commands/{id}` leitet dorthin um). Den Lead-Rang setzt nie der SK-Lead selbst (kein Self-Escalation), sondern ein Admin oder die Bereichsleitung des übergeordneten Bereichs.
 3. Ein SK-Mitglied nutzt das SK als aktiven Kontext (Pin) — analog zu einer Staffel-Mitgliedschaft.
 
 ## Erwartetes Ergebnis

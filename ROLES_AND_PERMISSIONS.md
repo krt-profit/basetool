@@ -626,18 +626,24 @@ service layer via the active Staffel context
 | Function (gate)                                                                                                                                                     | Member | Log. | MM | Officer | Admin |
 |:--------------------------------------------------------------------------------------------------------------------------------------------------------------------|:------:|:----:|:--:|:-------:|:-----:|
 | Read Staffel list / active OrgUnit list (`/org-units/active`)                                                                                                       |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Read SK list (`isAuthenticated()`; inactive ones **and** the detail view `GET /special-commands/{id}` admin only)                                                   |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Read SK list (`isAuthenticated()`; inactive ones admin only; the detail view `GET /special-commands/{id}` admin **or SK-Lead of this SK**, `canManageMembers`)     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Switch the active OrgUnit context (sidebar switcher)                                                                                                                |   ✅²   |  ✅²  | ✅² |   ✅²    |   ✅   |
 | Staffel lifecycle (create/rename/delete/activate, `promotion-enabled`, `profit-eligible`) (`hasRole('ADMIN')`)                                                      |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Set Staffel membership flags (`PATCH /squadrons/{id}/members/{uid}`, `hasRole('ADMIN')`)                                                                            |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | SK lifecycle (create/rename/delete/activate, `profit-eligible`) (`hasRole('ADMIN')`)                                                                                |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | **Read SK member list** & **manage members** (add/remove/flags) (`@specialCommandSecurityService.canManageMembers` — applies also to the plain `GET /{id}/members`) |   ❌    |  ❌   | ❌  |   ❌³    |   ✅   |
-| Set SK **lead flag** (`PATCH /special-commands/{id}/members/{uid}/lead`, `hasRole('ADMIN')`)                                                                        |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Set SK **lead** (`PATCH /special-commands/{id}/members/{uid}/lead`, `hasRole('ADMIN') or canAppointSkLead`)                                                         |   ❌    |  ❌   | ❌  |   ❌⁴    |   ✅   |
 
 ¹ Master-data read, every member. ² Non-admins switch between their
 memberships; admins additionally „Alle Staffeln" (all Staffeln). ³ SK member management
 is **admin or SK-Lead of this SK** — not tied
-to the global Officer role.
+to the global Officer role. The web page for it is **„Leitung" → „Mitglieder verwalten"**
+(`/organisation/special-commands/{id}`, frontend gate `ADMIN_OR_OFFICER`, the backend's per-SK
+verdict decides), not the admin area; `/admin/special-commands/{id}` only redirects there. An SK
+lead cannot change the lead seat on that page — the lead column renders for admins only.
+⁴ Besides the admin, the **Bereichsleiter of the SK's parent Bereich** sets the lead, on the
+„Leitung" page (`OrgRoleManagementSecurityService.canAppointSkLead`, REQ-ROLE-004) — never the SK
+lead itself. *(Corrected 2026-09-22: this row said `hasRole('ADMIN')` only.)*
 
 ### 3.10 Master data, announcements, system
 

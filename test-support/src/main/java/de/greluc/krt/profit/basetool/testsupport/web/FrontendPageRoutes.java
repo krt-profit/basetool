@@ -20,7 +20,9 @@
 package de.greluc.krt.profit.basetool.testsupport.web;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
@@ -342,4 +344,35 @@ public final class FrontendPageRoutes {
    */
   public static final @Unmodifiable Set<String> DETAIL_LIST_PAGES =
       Set.of("/missions", "/operations", "/orders", "/refinery-orders");
+
+  /**
+   * The list routes whose detail links leave the list's own path, mapped to the path prefix their
+   * detail view lives under.
+   *
+   * <p>The touch sweep reaches a detail view by following the first {@code <prefix>/<id>} link a
+   * list renders, and by default the prefix is the list's own path. That holds for every list but
+   * the ones named here. {@code /admin/special-commands} lists the SKs in the admin area, but each
+   * row links to the SK member page {@code /organisation/special-commands/{id}}, which moved out of
+   * {@code /admin/**} because an SK's own lead manages its members too and the admin area stays
+   * admin-only (REQ-ORG-005). Without this entry the sweep would look for {@code
+   * /admin/special-commands/<id>} links, find none, and the member page would silently stop being
+   * measured.
+   *
+   * <p>{@code PageRouteCatalogueTest} checks that every key is a page in {@link #PAGES} and that
+   * every value still owns a routed {@code /{id}} detail pattern, so a rename cannot turn an entry
+   * into a prefix that matches nothing.
+   */
+  public static final @Unmodifiable Map<String, String> DETAIL_PREFIX_OVERRIDES =
+      Map.of("/admin/special-commands", "/organisation/special-commands");
+
+  /**
+   * The path prefix under which a list page's detail links are expected.
+   *
+   * @param listPath the app-relative path of the list page
+   * @return the override from {@link #DETAIL_PREFIX_OVERRIDES} when the list links out of its own
+   *     path, otherwise {@code listPath} itself
+   */
+  public static @NotNull String detailPrefixOf(@NotNull String listPath) {
+    return DETAIL_PREFIX_OVERRIDES.getOrDefault(listPath, listPath);
+  }
 }

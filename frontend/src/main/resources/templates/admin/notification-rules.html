@@ -58,15 +58,11 @@
 
 <main>
     <span id="rule-i18n" hidden
-          th:attr="data-confirm-delete-title=#{admin.notificationRules.confirmDelete.title},data-confirm-delete-body=#{admin.notificationRules.confirmDelete.body},data-confirm-ok=#{notifications.confirm.ok},data-confirm-cancel=#{general.cancel},data-saved=#{admin.notificationRules.success.saved},data-deleted=#{admin.notificationRules.success.deleted},data-error=#{notification.error.title}"></span>
+          th:attr="data-confirm-delete-title=#{admin.notificationRules.confirmDelete.title},data-confirm-delete-body=#{admin.notificationRules.confirmDelete.body},data-confirm-ok=#{notifications.confirm.ok},data-confirm-cancel=#{general.cancel},data-saved=#{admin.notificationRules.success.saved},data-deleted=#{admin.notificationRules.success.deleted},data-error=#{notification.error.title},data-unknown-value=#{admin.notificationRules.selector.unknown}"></span>
 
     <div class="greeting hud-box">
         <h1 th:text="#{admin.notificationRules.title}">Benachrichtigungsregeln</h1>
         <p th:text="#{admin.notificationRules.subtitle}">Wer wird bei welchem Ereignis benachrichtigt.</p>
-    </div>
-
-    <div th:if="${error}" class="hud-box mt-2 krtm-border-color-var-color-danger-b169">
-        <p th:text="#{${error}}">Fehler beim Laden.</p>
     </div>
 
     <div class="hud-box mt-2">
@@ -75,8 +71,13 @@
              is wider than every device class this app supports — the page scrolled SIDEWAYS even at
              1280px, and on a phone it widened the layout viewport to 1329px and took the header and
              the notification bell out of view with it. Found the day /admin/notification-rules was
-             added to the touch-class sweep, having never been measured before. -->
-        <div class="table-responsive">
+             added to the touch-class sweep, having never been measured before.
+             #rules-host is the swap container: after a create, update or delete notification-rules.js
+             re-fetches the `rules` fragment (?fragment=rules) into it instead of reloading the page
+             (REQ-FE-001). The load-failure message lives inside the fragment, so a swap that finds
+             the backend down says so in place. -->
+        <div class="table-responsive" id="rules-host">
+        <th:block th:fragment="rules">
         <table id="rules-table">
             <thead>
             <tr>
@@ -89,9 +90,11 @@
             </tr>
             </thead>
             <tbody>
+            <!-- A code this page has no label for (a backend enum value newer than the bundles)
+                 shows as the raw code rather than as ??key??. -->
             <tr th:each="r : ${rules}" th:attr="data-rule-id=${r.id}">
-                <td th:text="${r.eventType}">JOB_ORDER_CREATED</td>
-                <td th:text="${r.notificationType}">JOB_ORDER_CREATED</td>
+                <td th:text="${#messages.msgOrNull('admin.notificationRules.eventType.' + r.eventType) ?: r.eventType}">Auftrag angelegt</td>
+                <td th:text="${#messages.msgOrNull('admin.notificationRules.notificationType.' + r.notificationType) ?: r.notificationType}">Auftrag angelegt</td>
                 <td th:text="${r.enabled} ? '✓' : '–'">✓</td>
                 <td th:text="${#lists.size(r.selectors)}">4</td>
                 <td th:text="${r.description}">…</td>
@@ -106,11 +109,15 @@
                     </button>
                 </td>
             </tr>
-            <tr th:if="${#lists.isEmpty(rules)}">
+            <tr th:if="${error}">
+                <td colspan="6" class="text-danger" th:text="#{${error}}">Fehler beim Laden.</td>
+            </tr>
+            <tr th:if="${error == null and #lists.isEmpty(rules)}">
                 <td colspan="6" th:text="#{admin.notificationRules.empty}">Noch keine Regeln.</td>
             </tr>
             </tbody>
         </table>
+        </th:block>
         </div>
     </div>
 
@@ -121,20 +128,19 @@
             <div class="form-grid">
                 <div class="form-group">
                     <label for="rule-eventType" th:text="#{admin.notificationRules.eventType}">Ereignis</label>
+                    <!-- Every option list on this page is rendered from the controller's code lists
+                         (backend enum declaration order); the value stays the enum code, the text is
+                         its localized label. -->
                     <select id="rule-eventType">
-                        <option value="JOB_ORDER_CREATED">JOB_ORDER_CREATED</option>
-                        <option value="BANK_BOOKING_REQUEST_CREATED">BANK_BOOKING_REQUEST_CREATED</option>
-                        <option value="BANK_BOOKING_REQUEST_CONFIRMED">BANK_BOOKING_REQUEST_CONFIRMED</option>
-                        <option value="BANK_BOOKING_REQUEST_REJECTED">BANK_BOOKING_REQUEST_REJECTED</option>
+                        <option th:each="code : ${eventTypes}" th:value="${code}"
+                                th:text="#{admin.notificationRules.eventType.__${code}__}">Auftrag angelegt</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label for="rule-notificationType" th:text="#{admin.notificationRules.notificationType}">Benachrichtigungstyp</label>
                     <select id="rule-notificationType">
-                        <option value="JOB_ORDER_CREATED">JOB_ORDER_CREATED</option>
-                        <option value="BANK_BOOKING_REQUEST_CREATED">BANK_BOOKING_REQUEST_CREATED</option>
-                        <option value="BANK_BOOKING_REQUEST_CONFIRMED">BANK_BOOKING_REQUEST_CONFIRMED</option>
-                        <option value="BANK_BOOKING_REQUEST_REJECTED">BANK_BOOKING_REQUEST_REJECTED</option>
+                        <option th:each="code : ${notificationTypes}" th:value="${code}"
+                                th:text="#{admin.notificationRules.notificationType.__${code}__}">Auftrag angelegt</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -170,39 +176,38 @@
         <div class="selector-row" data-selector-row>
             <div class="form-group">
                 <label th:text="#{admin.notificationRules.selector.kind}">Art</label>
+                <!-- A new row is set to ORG_RELATIVE_ROLE by notification-rules.js, not to the first
+                     option, so an empty row never starts out as a user picker with no user. -->
                 <select data-selector-kind>
-                    <option value="ORG_RELATIVE_ROLE">ORG_RELATIVE_ROLE</option>
-                    <option value="ROLE">ROLE</option>
-                    <option value="SPECIFIC_USER">SPECIFIC_USER</option>
-                    <option value="ACCOUNT_GRANT">ACCOUNT_GRANT</option>
-                    <option value="EVENT_RECIPIENT">EVENT_RECIPIENT</option>
+                    <option th:each="code : ${selectorKinds}" th:value="${code}"
+                            th:text="#{admin.notificationRules.selector.kind.__${code}__}">Bestimmter Nutzer</option>
                 </select>
             </div>
             <div class="form-group" data-field="orgRelativeRole">
                 <label th:text="#{admin.notificationRules.selector.orgRelativeRole}">Org-relative Rolle</label>
                 <select data-selector-orgRelativeRole>
-                    <option value="OFFICER">OFFICER</option>
-                    <option value="LEAD">LEAD</option>
-                    <option value="LOGISTICIAN">LOGISTICIAN</option>
-                    <option value="MISSION_MANAGER">MISSION_MANAGER</option>
+                    <option th:each="code : ${orgRelativeRoles}" th:value="${code}"
+                            th:text="#{admin.notificationRules.selector.orgRelativeRole.__${code}__}">Offizier</option>
                 </select>
             </div>
             <div class="form-group" data-field="contextRole">
                 <label th:text="#{admin.notificationRules.selector.contextRole}">Kontext-Einheit</label>
                 <select data-selector-contextRole>
-                    <option value="RESPONSIBLE">RESPONSIBLE</option>
-                    <option value="REQUESTING">REQUESTING</option>
+                    <option th:each="code : ${contextRoles}" th:value="${code}"
+                            th:text="#{admin.notificationRules.selector.contextRole.__${code}__}">Zuständige Einheit</option>
                 </select>
             </div>
             <div class="form-group" data-field="roleCode">
                 <label th:text="#{admin.notificationRules.selector.roleCode}">Rollencode</label>
                 <select data-selector-roleCode>
-                    <option value="ADMIN">ADMIN</option>
-                    <option value="OFFICER">OFFICER</option>
-                    <option value="KRT_MEMBER">KRT_MEMBER</option>
-                    <option value="BANK_EMPLOYEE">BANK_EMPLOYEE</option>
-                    <option value="BANK_MANAGEMENT">BANK_MANAGEMENT</option>
+                    <option th:each="code : ${roleCodes}" th:value="${code}"
+                            th:text="#{admin.notificationRules.selector.roleCode.__${code}__}">Admin</option>
                 </select>
+            </div>
+            <!-- The three event-derived kinds (ACCOUNT_GRANT, EVENT_RECIPIENT, ACCOUNT_RESPONSIBLE)
+                 have no further field: the account or the recipient comes from the event. -->
+            <div class="form-group" data-field="fromEvent">
+                <p class="form-hint" th:text="#{admin.notificationRules.selector.fromEvent}">Die Empfänger ergeben sich aus dem Ereignis.</p>
             </div>
             <div class="form-group" data-field="userId">
                 <label th:text="#{admin.notificationRules.selector.userId}">Benutzer</label>

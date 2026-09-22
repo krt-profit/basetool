@@ -2,7 +2,24 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Spezialkommandos: SK-Leiter verwalten die Mitglieder ihres SK jetzt selbst.** „Leitung" →
+  „Mitglieder verwalten" öffnet die Mitgliederseite des eigenen SK: hinzufügen, entfernen,
+  Logistiker/Einsatz-Manager setzen. Das Recht bestand im Backend schon, nur lag die einzige Seite
+  dafür im Admin-Bereich. Den Lead-Rang setzen weiterhin Admin und Bereichsleitung.
+
 ### Fixed
+
+- **Benachrichtigungsregeln: vorkonfigurierte Regeln lassen sich wieder bearbeiten.** Bank-,
+  Materialbörsen- und Kontolöschungs-Regeln scheiterten beim Speichern, selbst beim Deaktivieren,
+  und der Editor kannte nur 4 von 12 Ereignissen. Jetzt sind alle Ereignisse, Typen und
+  Empfänger-Arten (auch „Kontoverantwortliche") wählbar, mit Klartext statt Codes, und die Liste
+  aktualisiert sich ohne Neuladen.
+
+- **Texte: durchgängig „du", und keine fest verdrahteten Beschriftungen mehr.** Zwölf Hinweise und
+  Rückfragen siezten noch; „Nutzer zuordnen" und „Eigener Eintrag" beim Einbuchen sowie „Neuer
+  Auftrag" in der Auftragsliste waren nicht übersetzbar.
 
 - **Betrieb: Sicherung, Wiederherstellungsprobe und Aufräumen scheitern nicht mehr nach einem Neustart.**
   Ihre Nachhol-Läufe starteten Sekunden nach dem Hochfahren, bevor die Container-Laufzeit bereitstand,

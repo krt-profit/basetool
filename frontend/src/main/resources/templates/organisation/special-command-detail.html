@@ -67,7 +67,9 @@
 
 <main>
     <div class="greeting hud-box">
-        <a th:href="@{/admin/special-commands}" class="krtm-font-size-0-9rem-color-var-color-gray-2-58f9" th:text="#{admin.specialcommands.back_to_list}">&larr; zurück zur Übersicht</a>
+        <!-- Admins came from the SK overview; an SK lead came from the Leitung page. -->
+        <a th:href="@{${backUrl}}" class="krtm-font-size-0-9rem-color-var-color-gray-2-58f9"
+           th:text="${canToggleLead} ? #{admin.specialcommands.back_to_list} : #{admin.specialcommands.back_to_leitung}">&larr; zurück zur Übersicht</a>
         <h1 th:text="${specialCommand != null ? specialCommand.name() : ''}">Spezialkommando</h1>
         <p class="sk-meta">
             <span th:text="#{admin.specialcommands.column.shorthand}">Kürzel</span>:
@@ -99,7 +101,7 @@
                     <tr>
                         <th th:text="#{admin.specialcommands.members.column.name}">Name</th>
                         <th th:text="#{admin.specialcommands.members.column.roles}">Rollen</th>
-                        <th th:text="#{admin.specialcommands.members.column.lead}">Leiter</th>
+                        <th th:if="${canToggleLead}" th:text="#{admin.specialcommands.members.column.lead}">Leiter</th>
                         <th th:text="#{admin.specialcommands.column.actions}">Aktion</th>
                     </tr>
                 </thead>
@@ -110,7 +112,7 @@
                             <span th:if="${m.isLead()}" class="role-badge lead" th:text="#{admin.specialcommands.members.lead_badge}">Lead</span>
                         </td>
                         <td>
-                            <form th:action="@{/admin/special-commands/{id}/members/{userId}/flags(id=${specialCommand.id()},userId=${m.userId()})}"
+                            <form th:action="@{/organisation/special-commands/{id}/members/{userId}/flags(id=${specialCommand.id()},userId=${m.userId()})}"
                                   method="post" class="flags-form">
                                 <input type="hidden" name="version" th:value="${m.version()}">
                                 <!-- Spring _field markers: an unchecked checkbox sends nothing,
@@ -129,7 +131,10 @@
                                 <button type="submit" class="btn btn-ghost btn-icon krtm-font-size-0-8rem-padding-0-25rem-0-5rem-51c7" th:title="#{members.save}" th:aria-label="#{members.save}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg></button>
                             </form>
                         </td>
-                        <td>
+                        <!-- The lead seat is appointed from the tier above, never from within the SK:
+                             only an admin toggles it here (the Bereichsleiter does it on the Leitung
+                             page), so this column and its admin-area form render for admins only. -->
+                        <td th:if="${canToggleLead}">
                             <form th:action="@{/admin/special-commands/{id}/members/{userId}/lead(id=${specialCommand.id()},userId=${m.userId()})}"
                                   method="post" class="lead-toggle-form">
                                 <input type="hidden" name="version" th:value="${m.version()}">
@@ -141,10 +146,10 @@
                             </form>
                         </td>
                         <td>
-                            <form th:action="@{/admin/special-commands/{id}/members/{userId}/delete(id=${specialCommand.id()},userId=${m.userId()})}"
+                            <form th:action="@{/organisation/special-commands/{id}/members/{userId}/delete(id=${specialCommand.id()},userId=${m.userId()})}"
                                   method="post" class="krtm-margin-0-display-inline-3bbd">
                                 <button type="submit" class="btn btn-quiet-danger delete-btn btn-icon"
-                                        th:data-action="@{/admin/special-commands/{id}/members/{userId}/delete(id=${specialCommand.id()},userId=${m.userId()})}"
+                                        th:data-action="@{/organisation/special-commands/{id}/members/{userId}/delete(id=${specialCommand.id()},userId=${m.userId()})}"
                                         th:title="#{admin.specialcommands.members.remove}" th:aria-label="#{admin.specialcommands.members.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                             </form>
                         </td>
@@ -164,7 +169,7 @@
             <h2 th:text="#{admin.specialcommands.members.add}">Mitglied hinzufügen</h2>
             <button type="button" class="krt-modal-close close-add-member-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
         </div>
-        <form th:action="@{/admin/special-commands/{id}/members(id=${specialCommand.id()})}" method="post">
+        <form th:action="@{/organisation/special-commands/{id}/members(id=${specialCommand.id()})}" method="post">
             <div class="krt-modal-body">
                 <div class="form-group">
                     <label for="add-member-userid" th:text="#{admin.specialcommands.members.user_picker}">Nutzer</label>

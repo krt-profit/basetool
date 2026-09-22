@@ -1232,7 +1232,9 @@ class ArchitectureTest {
             "InventoryItemController",
             "RefineryOrderController",
             // R6.a — SPEZIALKOMMANDO_PLAN.md §8.1 extension.
-            // SpecialCommandController is fully ADMIN-gated (R5.a). Adding it to the whitelist
+            // SpecialCommandController's writes are all ADMIN-gated (R5.a); only the single-row
+            // read shares the canManageMembers gate, and reads sit outside this rule. Adding it
+            // to the whitelist
             // makes the audit's reach explicit and would catch a future maintainer who relaxes
             // any endpoint to a non-admin gate without wiring the owner-scope check.
             "SpecialCommandController",
