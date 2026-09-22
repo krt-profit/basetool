@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Betrieb: die Container erreichen den eigenen öffentlichen Namen wieder.** Auf einem
+  Rootless-Host kommt ein Container über die öffentliche Adresse gar nicht an die eigene Maschine
+  heran. Die Rolle konnte dafür bisher genau einen Namen umbiegen und tat es für die Produktion
+  überhaupt nicht — unter Docker funktionierte der Umweg noch. Es ist jetzt eine Liste, und Grafana
+  sowie die externen Sonden stehen mit darin; ohne sie schlugen die Keycloak-Anmeldung in Grafana
+  und jede externe Prüfung fehl. Rein betriebsseitig.
+
 ## [v1.9.1](https://github.com/krt-profit/basetool/releases/tag/v1.9.1) - 2026-09-22
 
 ### Fixed
