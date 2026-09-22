@@ -83,7 +83,7 @@
           }
         },
         {
-          "expr": "container_memory_mapped_file{name=~\".+\"}",
+          "expr": "basetool:container:memory_mapped_file_bytes",
           "legendFormat": "{{name}} mapped binary",
           "refId": "C",
           "datasource": {
@@ -150,7 +150,7 @@
       },
       "targets": [
         {
-          "expr": "changes(container_start_time_seconds{name=~\".+\"}[1h])",
+          "expr": "changes(basetool:container:start_time_seconds[1h])",
           "legendFormat": "{{name}}",
           "refId": "A",
           "datasource": {
@@ -269,7 +269,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (name) (rate(container_network_receive_bytes_total{name=~\".+\"}[5m]))",
+          "expr": "rate(basetool:container:network_receive_bytes_total[5m])",
           "legendFormat": "{{name}} RX",
           "refId": "A",
           "datasource": {
@@ -278,7 +278,7 @@
           }
         },
         {
-          "expr": "sum by (name) (rate(container_network_transmit_bytes_total{name=~\".+\"}[5m]))",
+          "expr": "rate(basetool:container:network_transmit_bytes_total[5m])",
           "legendFormat": "{{name}} TX",
           "refId": "B",
           "datasource": {

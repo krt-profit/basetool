@@ -51,7 +51,7 @@ working as rootless containers, and two had no reason to exist any more:
 | **node-exporter** | **host service** | Mounts `/run/systemd/private` for its systemd collector, which a rootless container cannot reach — and that collector is exactly the signal this migration gains. It also owns the textfile directory. |
 | **alloy** | **host service** | Reads `/var/log` and needs real supplementary groups (`adm`) for `root:adm` files such as `auth.log`. A rootless container's supplementary groups are *namespace* groups, not host groups. |
 | **podman-exporter** | **host service** (a *user* unit of the service user) | Has no compose counterpart at all. A system-level one would talk to the root podman and see nothing. |
-| **cadvisor** | **deleted** | Its rootless-Podman support is closed as not-planned upstream. Its series return from `prometheus-podman-exporter` plus `scripts/cgroup-container-metrics.py`. |
+| **cadvisor** | **deleted** | Its rootless-Podman support is closed as not-planned upstream. Its series return from `prometheus-podman-exporter` plus `scripts/cgroup-container-metrics.py` — but only where a `basetool:container:*` recording rule normalises the two families. Three did not exist until 2026-09-22 (network receive/transmit and the start time), and the panels that queried cAdvisor for them read **No data** about containers that were running and serving. The exporter labels by `id` alone, so those three join `podman_container_info` to recover the name every other rule is keyed on. |
 | **socket-proxy** | **deleted** | It existed only to hand cAdvisor and Alloy a read-only view of the Docker socket. There is no Docker socket. |
 
 Because those names belong to *host* services now, the Quadlet units carry
