@@ -145,6 +145,37 @@ Three steps translate; **two do not**, and the difference is the part worth know
 > (156 MB, measured), and `rt_rm_force` now passes `-v`. On Docker, the weekly prune had been
 > silently absorbing that leak for as long as it existed — which is why nobody had seen it.
 
+### 7.4b What the timers wait for after a boot, and what they deliberately do not
+
+The four units that reach the containers -- `iri-deploy`, `iri-backup`, `iri-restore-drill`,
+`iri-container-cleanup` -- run as the deploy account and reach the stack through the rootless
+service user. They used to be ordered on `docker.service`, which on this host does not exist: inert,
+and read as if it ordered them on their runtime, so nothing noticed that nothing did.
+
+The first reboot after the cutover showed what that costs. Three of the timers carry
+`Persistent=true`, so their catch-up runs fired eleven seconds after boot -- one second before
+`user@<uid>.service` came up. All three failed in runtime detection, `SystemdUnitFailed` paged
+critical, and each stayed failed until its next scheduled run: the next night, or the next week.
+The catch-up `Persistent=true` exists for was the run that was lost.
+
+Two waits now live in `scripts/lib/container-runtime.sh`, not in the units, because only the script
+knows the service user's uid and only the script can see the signal that matters:
+
+| wait | who | on what | bound |
+| --- | --- | --- | --- |
+| `rt_detect` | all four | the service user's runtime directory appearing, **only** when it is absent -- a runtime that exists and refuses is a real answer and is not waited on | 120 s |
+| `rt_wait_for_startup` | backup, drill, cleanup | the user manager's `is-system-running` leaving `starting` -- `running` or `degraded` | 600 s |
+
+The second exists because the first is not enough. `user@<uid>.service` reports ready as soon as
+the manager runs; measured on the same boot, that was 16:26:03, while the manager's own startup
+finished at 16:27:33. An `After=user@<uid>.service` would have fixed detection and then let the
+backup's quiesce stop the backend while it was still starting.
+
+**`iri-deploy` does not wait for startup, on purpose.** A stack stuck in `starting` because a unit
+will not come up may be exactly what the next release exists to fix, and a deployer that refused to
+act until startup finished could never deliver it. `container-runtime.test.sh` asserts both the
+three calls and the one absence.
+
 ## 7.5 Delivery
 
 ```

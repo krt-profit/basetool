@@ -85,6 +85,12 @@ COPY test-support/src/main/ test-support/src/main/
 # reading its output exists to avoid, and an image build that diverges from `./gradlew build` is
 # how a task stops being exercised anywhere.
 COPY backend/src/main/resources/api/openapi.json backend/src/main/resources/api/openapi.json
+# The hand-kept non-Maven half of the „Open-Source-Lizenzen“ page (REQ-UI-021, ADR-0197).
+# `generateOssLicenses` reads it into the jar's classpath report; without it the image build
+# fails on a missing task input. The other half — the Licensee reports of backend, ingest and
+# keycloak-spi — needs only their build scripts, which are already copied above: Licensee
+# resolves each module's runtimeClasspath and reads no source file.
+COPY frontend/oss-bundled-components.json frontend/oss-bundled-components.json
 # `${APP_VERSION:+...}` only expands when the build-arg was set and non-empty,
 # so a `docker build` without `--build-arg APP_VERSION=...` still works and the
 # Gradle fallback in `frontend/build.gradle.kts` kicks in.

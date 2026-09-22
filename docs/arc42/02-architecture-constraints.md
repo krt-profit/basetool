@@ -9,7 +9,7 @@ so a later reader does not mistake a constraint for a preference and "improve" i
 | --- | --- |
 | **One maintainer, one production deployment.** There is no ops team. The only other environment is a testing host that serves no users and is fed by its own `:testing` promotion channel (`REQ-OPS-022`). | Every operational action has to be a runbook, a script or the Ansible role, not tribal knowledge. Delivery is a timer pulling a signed bundle rather than a pipeline somebody drives. |
 | **Unofficial, non-commercial *Star Citizen* fan project.** Not affiliated with or endorsed by Cloud Imperium. | Game data may be used within the fan-content terms; the tool can never present itself as official. Asset provenance is tracked (`docs/images/fankit/`). |
-| **GPL-3.0-only**, with a DCO sign-off on every commit. | Third-party code has to be licence-compatible; SBOMs are produced per module (CycloneDX) and dependency CVEs gate the build. |
+| **GPL-3.0-only**, with a DCO sign-off on every commit. | Third-party code has to be licence-compatible, and that is gated: every shipped module runs Licensee against a GPL-3.0-compatible allow-list in `check`, and `/licenses` lists what ships (ADR-0197). SBOMs are produced per module (CycloneDX) and dependency CVEs gate the build. |
 | **GDPR: the maintainer is the controller** for real members' personal data. | Export and erasure are product features, not manual database work — including the free-text surfaces no foreign key points at. Retention is bounded and specified rather than open-ended. |
 | **German is the primary language of the users.** | German is the default locale, English the second. Every user-visible string comes from the message bundles; there is no hardcoded UI text anywhere. |
 

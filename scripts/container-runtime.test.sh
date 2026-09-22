@@ -135,7 +135,7 @@ say "== detecting the runtime, which is where this class of bug lives =="
 # Green for the wrong reason, in the file whose whole subject is detection.
 MINIMAL="${WORK}/coreutils"
 mkdir -p "$MINIMAL"
-for util in bash sh env id basename getent cut ls sudo; do
+for util in bash sh env id basename getent cut ls sudo sleep; do
   util_path="$(command -v "$util" 2>/dev/null)" || continue
   ln -sf "$util_path" "${MINIMAL}/${util}" 2>/dev/null     || cp "$util_path" "${MINIMAL}/${util}" 2>/dev/null || true
 done
@@ -258,6 +258,173 @@ if [[ "${got}" == "podman|podman|"*"/.config/containers/systemd" ]]; then
   ok "...while a lingering user IS the owner, and its own unit directory is used"
 else
   bad "expected the lingering user's own store, got '${got}'"
+fi
+
+say ""
+say "== the boot race: a lingering user whose runtime is not up YET =="
+# Measured on the production host 2026-09-22, the first reboot after the cutover: the backup,
+# cleanup and drill timers carry Persistent=true, their catch-up runs fired at 16:26:02, eleven
+# seconds after boot, and all three died in detection -- user@994.service became active at 16:26:03.
+# They lost by one second, stayed `failed` and paged SystemdUnitFailed critical.
+#
+# These cases run detection through the SUDO BRIDGE, which is the path production takes: the jobs
+# run as the deploy account, which does not linger, and reach the service user through sudo.
+BRIDGE="${WORK}/bridge"; mkdir -p "$BRIDGE"
+cp "${BIN}/podman" "$BRIDGE/"
+REAL_ID="$(command -v id)"
+ABS_BASH="$(command -v bash)"
+# `id -u svcuser` answers a fixed uid; every other form is the real id, because detection also
+# asks `id -un` for the CURRENT user and that answer has to be true.
+# shellcheck disable=SC2016  # "$1", "$2" and "$@" belong to the stub being written, not to this shell
+printf '#!%s\nif [ "$1" = "-u" ] && [ "$2" = "svcuser" ]; then echo 4242; exit 0; fi\nexec "%s" "$@"\n' \
+  "$ABS_BASH" "$REAL_ID" > "${BRIDGE}/id"
+# `sudo -n -u svcuser podman ps` succeeds only once the fixture's runtime directory exists -- the
+# same thing that decides it on a host. Any other sudo call succeeds.
+# shellcheck disable=SC2016  # "$*" and the variable belong to the stub being written, not to this shell
+printf '#!%s\ncase "$*" in *"podman ps"*) [ -d "${STUB_READY_DIR:-/nonexistent}" ] || exit 1 ;; esac\nexit 0\n' \
+  "$ABS_BASH" > "${BRIDGE}/sudo"
+chmod +x "${BRIDGE}/id" "${BRIDGE}/sudo"
+LINGER_SVC="${WORK}/linger-svc"; mkdir -p "$LINGER_SVC"; : > "${LINGER_SVC}/svcuser"
+RUNBASE="${WORK}/run-user"; mkdir -p "$RUNBASE"
+
+# Prints "<backend>|<cli>", or nothing when detection refused. $1 = RT_RUNTIME_WAIT.
+detect_bridge() {
+  # shellcheck disable=SC2030,SC2031,SC2034
+  # The subshell IS the isolation, as in detect_detail; the RT_* names are read by the library.
+  (
+    set +e
+    PATH="${BRIDGE}:${MINIMAL}"
+    unset RT_BACKEND RT_CLI RT_SYSTEMCTL RT_UNIT_DIR
+    RT_LINGER_DIR="${LINGER_SVC}"
+    RT_RUNTIME_BASE="${RUNBASE}"
+    RT_POLL_INTERVAL=1
+    RT_RUNTIME_WAIT="${1:-10}"
+    HOME="${WORK}/not-the-owner"
+    # shellcheck disable=SC1090
+    . "$LIB"
+    rt_detect 2>"${WORK}/detect.err"
+    printf '%s|%s' "${RT_BACKEND}" "${RT_CLI}"
+  )
+}
+
+rm -rf "${RUNBASE:?}/4242"
+export STUB_READY_DIR="${RUNBASE}/4242"
+( sleep 3; mkdir -p "${RUNBASE}/4242" ) &
+started=$SECONDS
+got="$(detect_bridge 15)"
+elapsed=$(( SECONDS - started ))
+wait
+if [[ "$got" == "podman|sudo -n -u svcuser podman" && $elapsed -ge 2 ]]; then
+  ok "a runtime that comes up late is waited for, and then found (${elapsed}s)"
+else
+  bad "the boot race is not waited out: got '${got}' after ${elapsed}s -- $(tr '\n' ' ' < "${WORK}/detect.err")"
+fi
+
+# The bound matters as much as the wait. A runtime that never appears must still end in the
+# refusal detection always gave -- later, and saying that it waited.
+rm -rf "${RUNBASE:?}/4242"
+started=$SECONDS
+got="$(detect_bridge 3)"
+elapsed=$(( SECONDS - started ))
+if [[ -z "$got" && $elapsed -ge 3 && $elapsed -lt 10 ]] && grep -q "after waiting" "${WORK}/detect.err"; then
+  ok "...and the wait is bounded: it refuses after ${elapsed}s and says it waited"
+else
+  bad "a runtime that never comes up was not refused within the bound: got '${got}' after ${elapsed}s"
+fi
+
+# The opposite case must NOT wait. A runtime directory that exists belongs to a manager that is up,
+# so a podman that refuses is a real answer -- waiting there would only make every genuine refusal
+# two minutes slower.
+mkdir -p "${RUNBASE}/4242"
+export STUB_READY_DIR="${WORK}/never-ready"
+started=$SECONDS
+got="$(detect_bridge 15)"
+elapsed=$(( SECONDS - started ))
+if [[ -z "$got" && $elapsed -lt 3 ]]; then
+  ok "a runtime that EXISTS but refuses is answered at once, not waited on (${elapsed}s)"
+else
+  bad "detection waited on a runtime that was already up: got '${got}' after ${elapsed}s"
+fi
+unset STUB_READY_DIR
+
+say ""
+say "== waiting for the service user's manager to FINISH starting =="
+# The second half of the same boot. user@994.service was active at 16:26:03 -- it reports ready as
+# soon as the manager runs -- and the manager logged "Startup finished in 1min 30.765s" at 16:27:33.
+# A job that only waited for the runtime would have quiesced the backend while it was still coming
+# up. rt_wait_for_startup waits on the manager's own state instead.
+STARTUP="${WORK}/startup"; mkdir -p "$STARTUP"
+# Answers the next state from STUB_STATES on every call; the last one repeats. "-" stands for a
+# manager that does not answer at all, which prints nothing.
+printf '#!%s\n' "$ABS_BASH" > "${STARTUP}/systemctl"
+cat >> "${STARTUP}/systemctl" <<'STUB'
+read -r -a states <<< "${STUB_STATES}"
+n="$(cat "${STUB_COUNTER}" 2>/dev/null || echo 0)"
+i=$(( n < ${#states[@]} ? n : ${#states[@]} - 1 ))
+echo $(( n + 1 )) > "${STUB_COUNTER}"
+state="${states[$i]}"
+[ "${state}" = "-" ] && exit 1
+printf '%s\n' "${state}"
+[ "${state}" = "running" ]
+STUB
+chmod +x "${STARTUP}/systemctl"
+
+# Prints "rc=<n> calls=<n>". $1 backend, $2 the states, $3 RT_STARTUP_WAIT.
+startup_case() {
+  # shellcheck disable=SC2030,SC2031,SC2034
+  (
+    set +e
+    export STUB_STATES="$2" STUB_COUNTER="${WORK}/startup.count"
+    rm -f "${STUB_COUNTER}"
+    export RT_BACKEND="$1" RT_CLI="" RT_SYSTEMCTL="${STARTUP}/systemctl --user" RT_UNIT_DIR="${WORK}/units"
+    RT_POLL_INTERVAL=1
+    RT_STARTUP_WAIT="${3:-10}"
+    # shellcheck disable=SC1090
+    . "$LIB"
+    rt_detect
+    ( rt_wait_for_startup ) 2>"${WORK}/startup.err"
+    rc=$?
+    printf 'rc=%s calls=%s' "$rc" "$(cat "${STUB_COUNTER}" 2>/dev/null || echo 0)"
+  )
+}
+expect_startup() { # label backend states wait want
+  local got; got="$(startup_case "$2" "$3" "$4")"
+  if [[ "$got" == "$5" ]]; then ok "$1"; else
+    bad "$1 -- wanted '$5', got '${got}' ($(tr '\n' ' ' < "${WORK}/startup.err"))"
+  fi
+}
+expect_startup "a manager that is running is not waited for"   podman "running"                  10 "rc=0 calls=1"
+expect_startup "degraded is finished too -- a failed healthcheck unit is routine" \
+                                                                podman "degraded"                 10 "rc=0 calls=1"
+expect_startup "a manager still starting is waited out"        podman "starting starting running" 10 "rc=0 calls=3"
+expect_startup "a manager not answering yet is waited out too" podman "- - degraded"             10 "rc=0 calls=3"
+expect_startup "shutting down is not a moment to start a job, and it says so at once" \
+                                                                podman "stopping"                 10 "rc=1 calls=1"
+expect_startup "docker has no user manager and nothing to wait for" \
+                                                                docker "starting"                 10 "rc=0 calls=0"
+got="$(startup_case podman "starting" 3)"
+if [[ "$got" == rc=1* ]] && grep -q "still 'starting' after 3s" "${WORK}/startup.err"; then
+  ok "a startup that never finishes is refused after the bound, naming the state it was stuck in"
+else
+  bad "a stuck startup was not refused within the bound: got '${got}' ($(tr '\n' ' ' < "${WORK}/startup.err"))"
+fi
+
+# The function is only half of it; the other half is WHO calls it. Nothing else exercises the three
+# maintenance scripts end to end, so a refactor that dropped one call would be invisible until the
+# next reboot paged again. And deploy.sh must NOT call it: a stack stuck in `starting` may be exactly
+# what the next release exists to fix, and a deployer that waits for startup could never deliver it.
+for job in backup restore-drill container-cleanup; do
+  if awk '/^rt_detect$/ { d = 1; next } d && /^rt_wait_for_startup$/ { found = 1 } END { exit !found }' \
+       "${HERE}/${job}.sh"; then
+    ok "${job}.sh waits for the manager's startup after detecting the runtime"
+  else
+    bad "${job}.sh no longer calls rt_wait_for_startup after rt_detect"
+  fi
+done
+if grep -q '^[[:space:]]*rt_wait_for_startup' "${HERE}/deploy.sh"; then
+  bad "deploy.sh waits for startup -- it must not; it may be the fix for a stuck one"
+else
+  ok "...and deploy.sh deliberately does not"
 fi
 
 say ""

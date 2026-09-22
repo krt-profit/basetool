@@ -494,6 +494,7 @@ class HomeControllerMvcTest {
         .as("what it DOES carry: the two login entry points and the legal pages")
         .contains("/oauth2/authorization/keycloak")
         .contains("/impressum")
-        .contains("/privacy");
+        .contains("/privacy")
+        .contains("/licenses");
   }
 }

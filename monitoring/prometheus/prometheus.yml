@@ -323,6 +323,7 @@ scrape_configs:
           - https://profit-base.online/impressum
           - https://profit-base.online/privacy
           - https://profit-base.online/terms
+          - https://profit-base.online/licenses
           - https://profit-base.online/robots.txt
           - https://profit-base.online/.well-known/assetlinks.json
           - https://profit-base.online/manifest.webmanifest?locale=de

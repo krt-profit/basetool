@@ -642,6 +642,15 @@ interface Window {
      * remote picker so the form can react without a second round trip.
      */
     krtBankAccountMeta?: Record<string, boolean>;
+    /** Server-rendered configuration for the admin default-blueprints page module. */
+    krtDefaultBlueprints?: {
+        /** Endpoint the product type-ahead queries. */
+        searchUrl?: string;
+        /** Page URL whose `fragment=rows` read re-renders the list after a write. */
+        listUrl?: string;
+        /** Localized labels for the type-ahead, the modal and the toasts. */
+        i18n?: KrtI18nDict;
+    };
     /** Server-rendered configuration for the blueprint overview page module. */
     krtBlueprintOverview?: {
         /** Localized labels for the owners panel. */

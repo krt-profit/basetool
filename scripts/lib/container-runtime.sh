@@ -50,6 +50,20 @@ RT_UNIT_DIR="${RT_UNIT_DIR:-}"
 # -- on a host it is always this path.
 RT_LINGER_DIR="${RT_LINGER_DIR:-/var/lib/systemd/linger}"
 
+# A lingering user's $XDG_RUNTIME_DIR lives under here. A variable for the same reason as
+# RT_LINGER_DIR: the self-test points it at a fixture. On a host it is always /run/user.
+RT_RUNTIME_BASE="${RT_RUNTIME_BASE:-/run/user}"
+
+# How long rt_detect waits for a lingering user's runtime to come up, and how long
+# rt_wait_for_startup waits for that user's manager to finish starting. Seconds. See both
+# functions for why they exist and why they are bounded.
+RT_RUNTIME_WAIT="${RT_RUNTIME_WAIT:-120}"
+RT_STARTUP_WAIT="${RT_STARTUP_WAIT:-600}"
+RT_POLL_INTERVAL="${RT_POLL_INTERVAL:-2}"
+
+# Seconds rt_detect actually spent waiting, so its refusal can say so. Not configuration.
+RT_RUNTIME_WAITED=0
+
 # Monitoring services that are HOST services under Podman rather than containers, so a reconcile has
 # to restart the system unit instead of asking the service user's systemd about a unit it has never
 # had.
@@ -187,9 +201,10 @@ rt_detect() {
       # detection fail with "you are not allowed to set the following environment
       # variables" on the one host whose sudo rule was written properly -- so the
       # wider grant would have been needed for the command that does not need it.
+      rt_wait_for_user_runtime "${u}" "${uid}"
       if sudo -n -u "${u}" podman ps --format '{{.Names}}' >/dev/null 2>&1; then
         RT_CLI="sudo -n -u ${u} podman"
-        RT_SYSTEMCTL="sudo -n -u ${u} XDG_RUNTIME_DIR=/run/user/${uid} systemctl --user"
+        RT_SYSTEMCTL="sudo -n -u ${u} XDG_RUNTIME_DIR=${RT_RUNTIME_BASE}/${uid} systemctl --user"
         # The SYSTEM manager, for RT_HOST_SERVICES. Running as root already has it; the deploy
         # account reaches it through one named sudoers entry per unit, and through nothing wider.
         RT_HOST_SYSTEMCTL="${RT_HOST_SYSTEMCTL:-sudo -n systemctl}"
@@ -221,10 +236,115 @@ rt_detect() {
         return 0
       fi
     done
+    if (( RT_RUNTIME_WAITED > 0 )); then
+      rt_die "podman is installed but no lingering user could be found that owns the containers (looked in ${RT_LINGER_DIR}, after waiting ${RT_RUNTIME_WAITED}s for a runtime directory under ${RT_RUNTIME_BASE} to appear)"
+    fi
     rt_die "podman is installed but no lingering user could be found that owns the containers (looked in ${RT_LINGER_DIR})"
   fi
 
   rt_die "this host has neither a working docker nor a podman"
+}
+
+# -----------------------------------------------------------------------------
+# rt_wait_for_user_runtime <user> <uid>
+#
+# Wait, bounded, for a lingering user's runtime to come up -- but ONLY when its
+# runtime directory does not exist yet. That is the one shape of "podman ps
+# failed" that is worth waiting for: the user has declared it runs services, and
+# its manager simply has not started yet. Every other failure is a real answer
+# and is returned at once, as before.
+#
+# WHY IT EXISTS. Measured on the production host 2026-09-22, the first reboot
+# after the cutover:
+#
+#   16:25:51  boot
+#   16:26:02  iri-backup, iri-container-cleanup and iri-restore-drill start --
+#             their timers carry Persistent=true, so each catch-up run fires
+#             at once -- and all three die here with "no lingering user could
+#             be found"
+#   16:26:03  user@994.service becomes active
+#
+# They lost the race by one second. A failed oneshot is not "one retry" -- it
+# puts the unit into `failed`, SystemdUnitFailed pages CRITICAL, and it stays
+# failed until the next scheduled run: the next night for the backup, the next
+# WEEK for the other two. And the run that was lost is exactly the catch-up
+# Persistent=true exists to provide.
+#
+# Only the directory is tested before sudo, because only the directory is
+# visible to the account this runs as: /run/user is 0755, the directory under
+# it is 0700 and owned by the service user, so the deploy account can stat it
+# and cannot look inside.
+#
+# Returns 0 whatever happens. The caller's own `podman ps` decides.
+# -----------------------------------------------------------------------------
+rt_wait_for_user_runtime() {
+  local u="$1" uid="$2" waited=0
+  [[ -d "${RT_RUNTIME_BASE}/${uid}" ]] && return 0
+  echo "container-runtime: ${u} lingers but ${RT_RUNTIME_BASE}/${uid} does not exist yet --" \
+       "waiting up to ${RT_RUNTIME_WAIT}s for its manager to start" >&2
+  while (( waited < RT_RUNTIME_WAIT )); do
+    sleep "${RT_POLL_INTERVAL}"
+    waited=$(( waited + RT_POLL_INTERVAL ))
+    RT_RUNTIME_WAITED=${waited}
+    if [[ -d "${RT_RUNTIME_BASE}/${uid}" ]] \
+       && sudo -n -u "${u}" podman ps --format '{{.Names}}' >/dev/null 2>&1; then
+      echo "container-runtime: ${u}'s runtime answered after ${waited}s" >&2
+      return 0
+    fi
+  done
+  return 0
+}
+
+# -----------------------------------------------------------------------------
+# rt_wait_for_startup
+#
+# Wait, bounded, until the rootless user's systemd manager has FINISHED
+# starting -- that is, until every container it brings up at boot is up, has
+# failed, or has timed out. For a job that stops, dumps or prunes, "the runtime
+# answers" is not enough: the manager answers within a second of boot and the
+# stack is not up for another minute and a half.
+#
+# Measured on the same boot: user@994.service was ACTIVE at 16:26:03 -- its
+# Type=notify-reload reports ready as soon as the manager runs -- while the
+# manager itself logged "Startup finished in 1min 30.765s" at 16:27:33. Ordering
+# the units after user@<uid>.service would therefore have fixed the detection and
+# then let backup.sh QUIESCE the backend, frontend and ingest while they were
+# still starting. That is why this is not a unit dependency: the signal that
+# matters is the manager's own state, not whether its unit is up.
+#
+# `running` and `degraded` both mean startup is over -- degraded is merely that
+# some unit failed, which podman's transient healthcheck units do routinely.
+# `initializing`, `starting` and no answer at all mean wait. Anything else --
+# `stopping` during a shutdown, `offline`, `maintenance` -- means this is not a
+# moment to start a maintenance job, and it refuses.
+#
+# NOT called by deploy.sh, on purpose. A stack stuck in `starting` because a
+# unit will not come up is exactly what a new release may be needed to fix, and
+# a deployer that refused to act until startup finished could never deliver it.
+#
+# Docker has no user manager and nothing to wait for; it returns at once.
+# -----------------------------------------------------------------------------
+rt_wait_for_startup() {
+  [[ "${RT_BACKEND}" == podman ]] || return 0
+  local waited=0 state
+  while :; do
+    # `|| true` because a manager that is not answering yet makes systemctl exit
+    # non-zero, and the callers run under `set -e`.
+    state="$(${RT_SYSTEMCTL} is-system-running 2>/dev/null)" || true
+    case "${state}" in
+      running|degraded)
+        (( waited > 0 )) && echo "container-runtime: the service user's manager is ${state} after ${waited}s" >&2
+        return 0 ;;
+      initializing|starting|"") ;;
+      *) rt_die "the service user's manager reports '${state}' -- refusing to start a maintenance job now" ;;
+    esac
+    if (( waited >= RT_STARTUP_WAIT )); then
+      rt_die "the service user's manager was still '${state:-not answering}' after ${RT_STARTUP_WAIT}s -- refusing to run against a stack that has not finished starting"
+    fi
+    (( waited == 0 )) && echo "container-runtime: the service user's manager is '${state:-not answering}' -- waiting up to ${RT_STARTUP_WAIT}s for its startup to finish" >&2
+    sleep "${RT_POLL_INTERVAL}"
+    waited=$(( waited + RT_POLL_INTERVAL ))
+  done
 }
 
 # -----------------------------------------------------------------------------

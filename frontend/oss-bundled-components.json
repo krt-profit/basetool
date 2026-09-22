@@ -1,0 +1,59 @@
+{
+  "_comment": "Third-party components the Basetool ships that are NOT Maven artifacts, so no Licensee report can see them (REQ-UI-021, ADR-0197). :frontend:generateOssLicenses merges this list into the Open-Source-Lizenzen page. Add an entry whenever a font, an image layer or any other non-Gradle third-party file starts shipping; the licence must be GPL-3.0-compatible or kept separate from the program (a font or a base-image layer is aggregated, not linked). OssBundledComponentsTest pins that every bundled font file is listed here and has its licence text beside it.",
+  "components": [
+    {
+      "name": "Lato",
+      "version": "1.104",
+      "title": "Typeface by Łukasz Dziedzic — web font, Keycloak login theme and PDF exports",
+      "url": "https://www.latofonts.com/",
+      "modules": [
+        "backend",
+        "frontend",
+        "keycloak-theme"
+      ],
+      "licenses": [
+        {
+          "spdxId": "OFL-1.1",
+          "name": "SIL Open Font License 1.1",
+          "url": "https://openfontlicense.org/open-font-license-official-text/"
+        }
+      ]
+    },
+    {
+      "name": "Eclipse Temurin JRE",
+      "version": "25 (eclipse-temurin:25-jre-alpine)",
+      "title": "Java runtime of the backend, frontend and ingest container images",
+      "url": "https://github.com/adoptium/temurin-build",
+      "modules": [
+        "backend",
+        "frontend",
+        "ingest"
+      ],
+      "licenses": [
+        {
+          "spdxId": "GPL-2.0-with-classpath-exception",
+          "name": "GNU General Public License v2.0 w/Classpath exception",
+          "url": "https://openjdk.org/legal/gplv2+ce.html"
+        }
+      ]
+    },
+    {
+      "name": "Alpine Linux",
+      "version": "base layer of eclipse-temurin:25-jre-alpine",
+      "title": "Operating-system layer of the backend, frontend and ingest container images; the licence of each package and its source are listed by Alpine",
+      "url": "https://gitlab.alpinelinux.org/alpine/aports",
+      "modules": [
+        "backend",
+        "frontend",
+        "ingest"
+      ],
+      "licenses": [
+        {
+          "spdxId": null,
+          "name": "Alpine Linux packages (per package, incl. GPL-2.0-only, MIT, Apache-2.0)",
+          "url": "https://pkgs.alpinelinux.org/packages"
+        }
+      ]
+    }
+  ]
+}

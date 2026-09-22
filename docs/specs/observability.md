@@ -2061,8 +2061,8 @@ monitoring plane therefore **asserts** that posture continuously from where a cl
   weaker. The navigation shape is load-bearing: the same paths answer `401` to a background call by
   design (REQ-SEC-012), so a probe without those headers would assert the wrong half of the
   contract.
-- **Public surface stays public** — the `blackbox-public-surface` job probes the eight frontend
-  paths REQ-SEC-052 keeps `permitAll` (`/`, `/impressum`, `/privacy`, `/terms`, `/robots.txt`,
+- **Public surface stays public** — the `blackbox-public-surface` job probes the nine frontend
+  paths REQ-SEC-052 keeps `permitAll` (`/`, `/impressum`, `/privacy`, `/terms`, `/licenses`, `/robots.txt`,
   `/.well-known/assetlinks.json`, `/manifest.webmanifest?locale=de`, `/app/link-help`) with
   `http_public_200_no_redirect` — exactly `200`, **redirects not followed**;
   `EdgePublicSurfaceNot200` (warning, 15 min) fires on drift. This is the inverse of the

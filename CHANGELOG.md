@@ -2,7 +2,23 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Neue Seite „Open-Source-Lizenzen“ in der Fußleiste, neben den Nutzungsbedingungen.** Sie
+  listet jede mitgelieferte Fremdkomponente mit Version und Lizenz, gruppiert nach Lizenz, und
+  wird bei jedem Build neu erzeugt. Öffentlich wie Impressum und Datenschutz.
+
 ### Changed
+
+- **Build: jedes ausgelieferte Modul prüft die Lizenzen seiner Abhängigkeiten gegen eine
+  GPL-3.0-kompatible Liste.** Eine unverträgliche Lizenz lässt den Build scheitern. Dabei fiel
+  AspectJ im Backend auf (EPL-2.0 ohne GPL-Zusatz); es wurde nicht genutzt und ist entfernt.
+  Zu jeder mitgelieferten Lato-Schrift liegt jetzt ihr Lizenztext (OFL).
+
+- **Admin: Standard-Blueprints aufnehmen und entfernen aktualisiert die Liste ohne Neuladen.** Die
+  Seite `/admin/default-blueprints` lud nach jeder Änderung komplett neu; jetzt wird nur die Liste
+  ersetzt (REQ-FE-001). Schlägt beim Aufnehmen ein Teil fehl, bleiben genau diese Einträge in der
+  Auswahl stehen und können erneut abgeschickt werden.
 
 - **Dokumentation: vollständig gegen den Code geprüft, umgesetzte Pläne archiviert.** Specs, ADRs,
   arc42, Betriebs- und Rollen-Dokumente beschreiben jetzt den Stand nach dem Podman-Umzug;
@@ -11,9 +27,21 @@
 
 ### Fixed
 
+- **Betrieb: Sicherung, Wiederherstellungsprobe und Aufräumen scheitern nicht mehr nach einem Neustart.**
+  Ihre Nachhol-Läufe starteten Sekunden nach dem Hochfahren, bevor die Container-Laufzeit bereitstand,
+  schlugen fehl und lösten einen kritischen Alarm aus — die nachzuholende Sicherung ging dabei verloren.
+  Sie warten jetzt, bis der Stack vollständig hochgefahren ist, bevor sie etwas anhalten oder aufräumen.
+  Rein betriebsseitig.
+
+- **Betrieb: die IPv6-Prüfung der Abnahme-Suite meldete Rot über die Bereitstellung, wenn der
+  Ausführende selbst kein IPv6 hat.** Der Zweig, der genau das unterscheiden sollte, war seit
+  jeher unerreichbar, weil die Fehlernummer unterwegs verloren ging. Sie bleibt jetzt erhalten,
+  und die Suite überspringt die Prüfung mit einer ehrlichen Begründung. Rein betriebsseitig.
+
 - **Betrieb: der monatliche Bankbericht liest die Zahlen wieder.** Das Abfrageskript rief auf dem
   neuen Server noch `docker exec` auf und wäre beim nächsten Lauf gescheitert; es nutzt jetzt
   Podman. Rein betriebsseitig.
+
 
 ## [v1.9.2](https://github.com/krt-profit/basetool/releases/tag/v1.9.2) - 2026-09-22
 

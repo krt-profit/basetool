@@ -116,6 +116,7 @@ write_drill_metrics() {
 # --- Pre-flight -------------------------------------------------------------
 [[ -f "${BACKUP_ENV}" ]] || fail "missing ${BACKUP_ENV}"
 rt_detect
+rt_wait_for_startup
 log "container runtime: ${RT_BACKEND}"
 command -v restic >/dev/null 2>&1 || fail "restic not found (dnf install restic / apt install restic; ansible role: 10-packages.yml)"
 command -v rclone >/dev/null 2>&1 || fail "rclone not found (dnf install rclone / apt install rclone; ansible role: 10-packages.yml)"

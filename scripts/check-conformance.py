@@ -523,7 +523,16 @@ def _connect(host: str, port: int, family: int, timeout: int) -> socket.socket:
             return sock
         except OSError as exc:  # try the next record rather than failing on the first
             last = exc
-    raise OSError(f"{host}:{port} unreachable: {last}")
+    # CARRY THE ERRNO. This used to raise OSError(f"..."), a single-argument OSError whose `errno`
+    # is None -- and check_ipv6_reachable decides whether a failure is the DEPLOYMENT'S or THIS
+    # MACHINE'S by reading exactly that attribute. The effect was that its skip path could never be
+    # taken: run from a v4-only network, the suite reported `ipv6-reachable FAIL ... [Errno 101]
+    # Network is unreachable` about four vhosts that were serving IPv6 correctly (measured
+    # 2026-09-22, from a WSL host with no global v6 address and no route to any). A red that means
+    # "the runner has no IPv6" and a red that means "the edge lost its AAAA" were indistinguishable,
+    # which is the exact failure the check's own docstring exists to prevent.
+    raise OSError(getattr(last, "errno", None),
+                  f"{host}:{port} unreachable: {last}") from last
 
 
 def _peer_certificate(host: str, family: int = 0, timeout: int = 20) -> dict:
@@ -810,6 +819,21 @@ def check_http_redirects(ctx: Context) -> str:
     return f"all {len(ctx.hosts)} vhosts redirect :80 to HTTPS"
 
 
+# DO NOT add an up-front "can this machine route IPv6?" probe here. One was written on
+# 2026-09-22 and removed the same hour: it connected a UDP socket to a documentation address
+# (2001:db8::1) and skipped the whole check on ENETUNREACH, which asks about GLOBAL routing -- while
+# the self-test's fixture serves on ::1, where global routing is absent and irrelevant. Every ipv6
+# scenario in the suite turned from pass/fail into skip, including the one that proves the check can
+# go red at all.
+#
+# It also passed locally and failed in CI, which is the part worth remembering: Windows lets that
+# UDP connect succeed and Linux does not, so the probe's verdict depended on the operating system
+# rather than on the network.
+#
+# The question is answered where it is actually asked -- by the real connection attempt, whose
+# errno _connect now preserves. That is the whole fix.
+
+
 def check_ipv6_reachable(ctx: Context) -> str:
     """Every vhost has an AAAA record and answers over IPv6.
 
@@ -822,6 +846,13 @@ def check_ipv6_reachable(ctx: Context) -> str:
     refused connection, is the target's problem** and fails. **No usable IPv6 route from this
     machine** is the runner's problem and skips - otherwise the suite would report a red about
     the deployment every time it ran from a v4-only network.
+
+    That separation was written from the start and did not work until 2026-09-22: ``_connect``
+    raised a single-argument ``OSError`` whose ``errno`` was ``None``, so the branch that reads the
+    errno could never be taken and the suite reported ``FAIL ... [Errno 101] Network is
+    unreachable`` about four vhosts that were serving IPv6 correctly. Preserving the errno is the
+    whole fix; see the comment above this function for the up-front probe that was tried instead and
+    why it must not come back.
 
     Args:
         ctx: the run context.
@@ -853,7 +884,11 @@ def check_ipv6_reachable(ctx: Context) -> str:
             if getattr(exc, "errno", None) in (
                     getattr(__import__("errno"), "ENETUNREACH", -1),
                     getattr(__import__("errno"), "EAFNOSUPPORT", -2)):
-                raise Skip(f"no usable IPv6 route from this machine ({exc})") from exc
+                # exc.strerror, not exc: the wrapped message already carries "[Errno 101]", and
+                # str(OSError(errno, msg)) prefixes it a second time.
+                raise Skip(f"no usable IPv6 route from this machine "
+                           f"({exc.strerror or exc}) - this says nothing about the "
+                           f"deployment") from exc
             unreachable.append(f"{host}: {exc}")
 
     problems = []

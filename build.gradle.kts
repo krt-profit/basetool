@@ -16,6 +16,10 @@ plugins {
   // (rather than an imperative `apply(...)` in the script body) keeps task
   // registration in the right phase under `--configure-on-demand`.
   alias(libs.plugins.spotless)
+  // `apply false`, like pitest above: puts `LicenseeExtension` / `LicenseeTask` on this script's
+  // classpath for the shared licence gate in `subprojects {}` below. Each shipped module applies
+  // the plugin itself.
+  alias(libs.plugins.licensee) apply false
 }
 
 allprojects {
@@ -155,6 +159,89 @@ configure<com.diffplug.gradle.spotless.SpotlessExtension> {
     endWithNewline()
   }
 }
+
+// ---------------------------------------------------------------------------
+// Third-party licence policy (REQ-UI-021, ADR-0197) — ONE decision, read in two places.
+//
+// The Basetool is GPL-3.0-only and its images are published to GHCR, which is distribution, so
+// every library that ships inside them must be one we may redistribute under GPL-3.0-only. The
+// Licensee plugin enforces that per shipped module (the `plugins.withId("app.cash.licensee")`
+// block below, wired into `check`); `:frontend:generateOssLicenses` turns the same reports into
+// the „Open-Source-Lizenzen“ page. Both read the two tables here, so the gate and the page cannot
+// disagree about what a licence is.
+//
+// `ossAllowedLicenses` — the SPDX identifiers that may ship. Only what is GPL-3.0-compatible AND
+// actually present, the same rule the Android app's allow-list follows. Deliberately ABSENT:
+// `EPL-2.0` on its own (no GPL Secondary License designated — AspectJ was exactly that, and was
+// excluded rather than allowed), `EPL-1.0`, `GPL-2.0-only` without an exception, `Apache-1.1`,
+// `CDDL-*`, `SSPL-1.0`, `BSD-4-Clause`. A POM that offers several licences needs only ONE of them
+// here: Maven reads a list of licences as a choice, and so does Licensee. That is how logback
+// (EPL-2.0 OR LGPL-2.1) and the Jakarta APIs (EPL-2.0 OR GPL-2.0 WITH Classpath-exception) pass
+// without EPL-2.0 being allowed.
+//   * `LGPL-2.1-only` — §3 lets the recipient apply the GPL (v2 or later) instead.
+//   * `MPL-2.0` — GPL is a designated Secondary License of MPL-2.0 (§3.3).
+//   * `GPL-2.0-with-classpath-exception` — the exception permits linking independent modules
+//     under any licence; the library itself stays GPL-2.0, and its source is its upstream repo.
+val ossAllowedLicenses =
+  listOf(
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "CC0-1.0",
+    "GPL-2.0-with-classpath-exception",
+    "LGPL-2.1-only",
+    "MIT",
+    "MIT-0",
+    "MPL-2.0",
+  )
+
+// `ossLicenseUrlAliases` — licence URLs a POM uses that Licensee cannot map to an SPDX identifier
+// by itself, each with the identifier its text actually is (read from the linked text or the
+// licence file inside the jar, 2026-09-22). The gate allows the URL when its identifier is on the
+// list above; the page files the component under that identifier instead of under whatever the POM
+// happened to call it. A URL whose identifier is NOT allowed (the EPL-2.0 spellings) is here only
+// so the page names it correctly for a component that also offers an allowed alternative.
+val ossLicenseUrlAliases =
+  mapOf(
+    // Eclipse Distribution License 1.0 is the BSD-3-Clause text (Eclipse says so; SPDX has no
+    // separate identifier for it). jakarta.activation/xml.bind, jaxb-*, istack, angus-*.
+    "http://www.eclipse.org/org/documents/edl-v10.php" to "BSD-3-Clause",
+    "http://www.eclipse.org/legal/epl-2.0" to "EPL-2.0",
+    "https://www.eclipse.org/org/documents/epl-2.0/EPL-2.0.txt" to "EPL-2.0",
+    "https://github.com/resilience4j/resilience4j/blob/master/LICENSE.txt" to "Apache-2.0",
+    "https://github.com/flyway/flyway/blob/main/README.txt" to "Apache-2.0",
+    "https://repository.jboss.org/licenses/apache-2.0.txt" to "Apache-2.0",
+    "http://www.apache.org/licenses/" to "Apache-2.0",
+    "https://opensource.org/license/mit" to "MIT",
+    // logstash-logback-encoder's second licence entry points at SLF4J's MIT page.
+    "http://www.slf4j.org/license.html" to "MIT",
+    "https://github.com/redis/lettuce/blob/main/LICENSE" to "MIT",
+    "https://github.com/redis/redis-authx-core/blob/master/LICENSE" to "MIT",
+    "https://www.antlr.org/license.html" to "BSD-3-Clause",
+    "https://asm.ow2.io/license.html" to "BSD-3-Clause",
+    "https://jdbc.postgresql.org/about/license.html" to "BSD-2-Clause",
+    "https://www.mozilla.org/en-US/MPL/2.0/" to "MPL-2.0",
+  )
+
+// Components whose POM names no usable licence at all, with the identifier their shipped licence
+// file states. Keyed WITHOUT the version so the page keeps the correction across bumps; the gate
+// (below) has to name the exact version, because Licensee allows by full coordinate only.
+//   * Spring Session 4.1.1 ships `<license><name>Broadcom Foundation License</name>` with no URL —
+//     a metadata slip: `META-INF/LICENSE.txt` inside both jars, and the upstream repository, are
+//     Apache-2.0. When a Spring Boot bump moves Spring Session, `:frontend:licensee` fails naming
+//     the new version; re-check the jar's LICENSE.txt and move the version below.
+val ossLicenseCoordinateOverrides =
+  mapOf(
+    "org.springframework.session:spring-session-core" to ("4.1.1" to "Apache-2.0"),
+    "org.springframework.session:spring-session-data-redis" to ("4.1.1" to "Apache-2.0"),
+  )
+
+extra["ossLicenseUrlAliases"] = ossLicenseUrlAliases
+
+extra["ossLicenseCoordinateOverrides"] =
+  ossLicenseCoordinateOverrides.mapValues { (_, versionAndId) ->
+    versionAndId.second
+  }
 
 // Shared Java conventions for the backend and frontend modules. Both subprojects
 // apply the Spring Boot plugin and need an identical Test/BootRun/JavaCompile
@@ -506,6 +593,48 @@ subprojects {
       gradle.startParameter.taskNames.any { it.substringAfterLast(':').startsWith("cyclonedx") }
     tasks.named("cyclonedxDirectBom").configure { enabled = sbomExplicitlyRequested }
     tasks.named("cyclonedxBom").configure { enabled = sbomExplicitlyRequested }
+  }
+
+  // The third-party licence gate (REQ-UI-021, ADR-0197), from the policy tables above. The plugin
+  // wires `licensee` into `check`, so a dependency under a licence that is not on the list fails
+  // the build of the module that would ship it. `unusedAction(IGNORE)`: the list is shared by four
+  // modules and keycloak-spi ships no runtime dependency at all, so "allowed but unused" is the
+  // normal state of most entries in most modules and says nothing.
+  //
+  // Each module also exports its report as `build/licensee-export/<module>.json` through the
+  // consumable `ossLicenseReportElements` configuration — the one way `:frontend` reads another
+  // module's report without reaching into its build directory.
+  plugins.withId("app.cash.licensee") {
+    configure<app.cash.licensee.LicenseeExtension> {
+      ossAllowedLicenses.forEach { allow(it) }
+      ossLicenseUrlAliases
+        .filterValues { it in ossAllowedLicenses }
+        .forEach { (url, spdxId) -> allowUrl(url) { because("the linked text is $spdxId") } }
+      ossLicenseCoordinateOverrides.forEach { (coordinate, versionAndId) ->
+        val (group, artifact) = coordinate.split(':')
+        allowDependency(group, artifact, versionAndId.first) {
+          because("POM names no usable licence; the jar's LICENSE.txt is ${versionAndId.second}")
+        }
+      }
+      unusedAction(app.cash.licensee.UnusedAction.IGNORE)
+    }
+
+    val licenseeReport = tasks.named<app.cash.licensee.LicenseeTask>("licensee")
+    val exportLicenseeReport =
+      tasks.register<Copy>("exportLicenseeReport") {
+        description = "Copies this module's Licensee report under the module's own name."
+        from(licenseeReport.flatMap { it.jsonOutput })
+        into(layout.buildDirectory.dir("licensee-export"))
+        rename { "${project.name}.json" }
+      }
+    configurations.consumable("ossLicenseReportElements") {
+      attributes { attribute(Usage.USAGE_ATTRIBUTE, objects.named("oss-license-report")) }
+      outgoing.artifact(
+        exportLicenseeReport.map { it.destinationDir.resolve("${project.name}.json") }
+      ) {
+        builtBy(exportLicenseeReport)
+      }
+    }
   }
 }
 

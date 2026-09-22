@@ -3,7 +3,7 @@
 ## 9.1 How decisions are recorded
 
 Every architecturally significant decision is an **ADR** in [`docs/adr/`](../adr/README.md), written
-before or with the change that implements it. There are **196** of them (ADR-0001 to ADR-0196,
+before or with the change that implements it. There are **197** of them (ADR-0001 to ADR-0197,
 as of 2026-09-22). They are numbered
 sequentially, carry a status, and are amended in place with a dated `## Amendment N` section rather
 than silently rewritten — a vault or a decision log that edits its own history teaches its readers
@@ -40,6 +40,7 @@ other decision in context.
 | **0189** | Stateful containers run as their own uid, not as root that steps down | Measured against the assumption: the capability set REQ-OPS-014 assumed was wrong in *both* directions, and reducing redis's capabilities would have **raised** its privilege. |
 | **0190** | Every container runs on a read-only root filesystem | Also measured against the assumption that the JVM and the databases write all over the filesystem. They do not — Keycloak included, after a second pass corrected the first version's exception. |
 | **0196** | A rootless host aliases its own public names to the container gateway | A container cannot reach the host through its public address, so the names it dials resolve to `host-gateway`; what that costs the external probes is §11.5a. |
+| **0197** | Shipped dependencies pass a GPL-compatible licence gate and are listed on a public page | The build refuses a library it may not redistribute under GPL-3.0-only — AspectJ was excluded for exactly that — and the footer's „Open-Source-Lizenzen“ page is generated from the same reports. |
 | **0192 / 0193** | Lombok and the JetBrains annotations everywhere; one logging facade, enforced | Style rules turned into compile errors and CI gates, so they stop depending on review attention. |
 
 ## 9.3 Where a decision is *not* an ADR

@@ -151,9 +151,22 @@ grant the new default to all existing users (REQ-INV-016).
 
 The admin UI is the ADMIN-gated page `/admin/default-blueprints` ("Standard-Blueprints" in the admin
 sidebar; `AdminDefaultBlueprintsPageController`): a blueprint-product type-ahead that stages picks
-into an add form, the current set, and a remove-confirm modal. Its add / remove are classic
-`POST → redirect` forms with flash toasts, **not** `krtFetch` in-place writes — a known gap against
-REQ-FE-001 (recorded 2026-09-22, no documented carve-out).
+into an add form, the current set, and a remove-confirm modal.
+
+The admin page (`/admin/default-blueprints`) performs both mutations **in place** (REQ-FE-001,
+ADR-0012): the add sends every staged product key in one `krtFetch.write` to the
+`X-Requested-With`-routed `POST /admin/default-blueprints/add` twin, which relays one backend add per
+key and answers `200` with `{added, skipped, failedKeys}` — a key that is already a default (the
+backend's 409) counts as skipped, any other failure is reported per key and the rest still go
+through. The page toasts the outcome, keeps only the failed keys staged for a retry, and re-renders
+the list from `GET /admin/default-blueprints?fragment=rows`. The remove goes through the confirm
+modal to the `POST /admin/default-blueprints/{id}/delete` twin (a backend failure is relayed as
+`problem+json`) and re-renders the same fragment. The type-ahead's „Bereits Standard" marking is read
+back from the swapped rows, so it cannot drift from the list on screen. The fragment read re-throws a
+backend failure rather than rendering an empty set, so a failed refresh toasts and leaves the list
+standing. The classic POST → redirect handlers remain as the fallback when `krtFetch` did not load.
+The page has no live-sync room: like most admin screens it is not a shared working surface, and a
+second admin sees another's change on the next refresh after their own write.
 
 **Acceptance criteria:**
 
@@ -163,6 +176,12 @@ REQ-FE-001 (recorded 2026-09-22, no documented carve-out).
   gains the owned row; adding the same product again returns 409.
 - [ ] Given a non-admin calls the default-blueprint admin endpoints, then the request is rejected
   with 403.
+- [ ] Given an admin adds or removes a default on `/admin/default-blueprints`, then the list updates
+  in place with no page reload, and a partially failed add leaves exactly the failed keys staged.
+
+**Enforced by:** `DefaultBlueprintServiceTest`, `AdminDefaultBlueprintControllerTest`,
+`AdminDefaultBlueprintsPageControllerMvcTest` (the XHR twins, the `rows` fragment, the redirect
+fallback), `DefaultBlueprintsE2eTest` (in-place remove, no-reload marker).
 
 **Code links:** [`DefaultBlueprintService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/DefaultBlueprintService.java),
 [`AdminDefaultBlueprintController`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/AdminDefaultBlueprintController.java),

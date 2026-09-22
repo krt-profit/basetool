@@ -160,12 +160,12 @@ whole-unit `itemQuantity` (`clampItemQuantityToStock`); both run at the book-out
 decrement sites in `InventoryCheckoutService`. The job-order handover sites decrement one row kind each
 and clamp only that kind: a **material** handover reduces material rows (`JobOrderHandoverService`,
 `clampOfferedAmountToStock`), an **item** delivery reduces game-item rows (`JobOrderItemHandoverService`,
-REQ-ORDERS-030, `clampItemQuantityToStock`); a **production booking** (Herstellung, REQ-ORDERS-025)
-consumes material rows and clamps them in `JobOrderItemProductionService`
-(`clampOfferedAmountToStock`). There is no general amount-edit path any more: the free
-`PUT /api/v1/inventory/{id}` amount edit was removed with the allocation rework (commit
-`d03a9238b`, 2026-07-14), so it no longer appears in this list (corrected 2026-09-22). This is the
-*persisting* counterpart to the display-time clamp-on-read
+REQ-ORDERS-030, `clampItemQuantityToStock`), and booking production against an item order consumes
+material rows and clamps their material offers (`JobOrderItemProductionService`, REQ-ORDERS-025,
+`clampOfferedAmountToStock`). There is no direct amount-edit path on a Lager row: the former
+`PUT /api/v1/inventory/{id}` and its `clampOffersToStock` seam were removed (d03a9238b, 2026-07-14;
+the unused seam itself on 2026-09-22). This is the *persisting* counterpart to the display-time
+clamp-on-read
 (REQ-MARKET-002/014, ADR-0086): the board already never *shows* more than is in stock, but without
 persisting the reduction the stored value would silently **recover** on a later stock increase.
 

@@ -145,12 +145,12 @@ class ArchitectureTest {
   }
 
   /**
-   * The six controllers that answer without a session, one public path each: the landing page, the
-   * three legal pages, the Android App Links descriptor the platform fetches with no session at all
-   * (REQ-SEC-038), and the web app manifest a browser reads on the landing page before anyone has
-   * signed in (REQ-UI-020, ADR-0164). They are exactly the frontend {@code permitAll} entries that
-   * are served by a controller rather than by the static-asset handlers, and REQ-SEC-052 enumerates
-   * them.
+   * The controllers that answer without a session, one public path each: the landing page, the four
+   * legal pages (the licence notice of REQ-UI-021 among them), the Android App Links descriptor the
+   * platform fetches with no session at all (REQ-SEC-038), and the web app manifest a browser reads
+   * on the landing page before anyone has signed in (REQ-UI-020, ADR-0164). They are exactly the
+   * frontend {@code permitAll} entries that are served by a controller rather than by the
+   * static-asset handlers, and REQ-SEC-052 enumerates them.
    *
    * <p>Both descriptors are on this list for the same reason rather than as an exception: a
    * {@code @PreAuthorize} on either would answer the platform with a redirect into OAuth, which is
@@ -210,6 +210,7 @@ class ArchitectureTest {
           "AssetLinksController",
           "HomeController",
           "ImpressumController",
+          "OssLicensesController",
           "PrivacyController",
           "TermsController",
           "WebAppManifestController");

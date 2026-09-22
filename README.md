@@ -154,6 +154,7 @@ ArchUnit rules in each module's `ArchitectureTest.java` (`backend`, `frontend`, 
 ./gradlew spotlessApply                                     # auto-format sources — run before every push
 ./gradlew :backend:cyclonedxBom :frontend:cyclonedxBom      # SBOM on demand into <module>/docs/
 ./gradlew :ingest:cyclonedxBom :keycloak-spi:cyclonedxBom   # the other two shipped modules (REQ-OPS-025)
+./gradlew :backend:licensee                                 # third-party licence gate (runs in check, ADR-0197)
 ```
 
 Checkstyle runs with `maxWarnings = 0` and Spotless is wired into `check` — any unformatted file or new Checkstyle warning fails CI. The frontend additionally runs strict asset gates in `check` that Spotless does not cover — Stylelint (`:frontend:lintCss`, `:frontend:lintCssInline`), ESLint (`:frontend:lintJs`, `:frontend:lintProbeJs`), HTMLHint (`:frontend:lintHtml`) and Prettier (`:frontend:prettierCheck`); run `spotlessApply` **and** those before pushing changes under `src/main/resources/static/**` or `templates/**`. The task list and the auto-fix recipe are in the [`lint-gate`](.claude/skills/lint-gate/SKILL.md) skill.
@@ -380,3 +381,5 @@ their respective owners. © 2025 Cloud Imperium Rights LLC and Cloud Imperium Ri
 ## License
 
 Profit Basetool is released under the [GNU General Public License v3.0](LICENSE.md).
+
+Every third-party library a shipped module carries must be GPL-3.0-compatible: each of `backend`, `frontend`, `ingest` and `keycloak-spi` runs [Licensee](https://github.com/cashapp/licensee) against its runtime classpath in `check`, with one allow-list in the root `build.gradle.kts` ([ADR-0197](docs/adr/0197-shipped-dependencies-pass-a-gpl-compatible-licence-gate-and-are-listed-on-a-public-page.md)). The running app lists every shipped component and its licence on the public page `/licenses` („Open-Source-Lizenzen“, linked in the footer), generated from the same reports on every build (REQ-UI-021). Non-Maven components — the Lato font, the image base layers — are kept in `frontend/oss-bundled-components.json`.
