@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Die Zertifikatserneuerung fehlte im Auslieferungspaket.** Die ACME-Schleife ist am 16.09. aus
+  der Compose-Datei in eine eigene Skriptdatei gewandert, ohne dass das Paket sie mitnimmt: auf
+  einem frisch aufgesetzten Host startet der Dienst dadurch gar nicht und erneuert keine
+  Zertifikate. Bestehende Hosts merkten davon nichts, weil ihr Container das alte Kommando noch in
+  sich trug. Paket und Auslieferung tragen die Datei jetzt beide, und ein Test prüft künftig jeden
+  Teilbaum statt nur den, der zuerst gefehlt hat.
+
 ## [v1.9.1](https://github.com/krt-profit/basetool/releases/tag/v1.9.1) - 2026-09-22
 
 ### Fixed
