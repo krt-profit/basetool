@@ -97,7 +97,8 @@ class MissionTimeTest {
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
 
-    missionService.addParticipant(mission.getId(), memberUser.getId());
+    missionService.addParticipant(
+        mission.getId(), memberUser.getId(), null, null, null, null, null);
   }
 
   @Test
@@ -142,6 +143,7 @@ class MissionTimeTest {
             0L, // stepsVersion
             Collections.emptyList(), // objectives
             0L, // objectivesVersion
+            null,
             null); // meetingPoint
 
     mockMvc
@@ -199,6 +201,7 @@ class MissionTimeTest {
             0L, // stepsVersion
             Collections.emptyList(), // objectives
             0L, // objectivesVersion
+            null,
             null); // meetingPoint
 
     mockMvc
@@ -239,7 +242,8 @@ class MissionTimeTest {
             put("/api/v1/missions/"
                     + mission.getId()
                     + "/participants/"
-                    + getParticipantId(memberUser))
+                    + getParticipantId(memberUser)
+                    + "/slim")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(memberUser.getId().toString()))
@@ -267,7 +271,8 @@ class MissionTimeTest {
             put("/api/v1/missions/"
                     + mission.getId()
                     + "/participants/"
-                    + getParticipantId(memberUser))
+                    + getParticipantId(memberUser)
+                    + "/slim")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(memberUser.getId().toString()))
@@ -331,6 +336,7 @@ class MissionTimeTest {
             0L, // stepsVersion
             Collections.emptyList(), // objectives
             0L, // objectivesVersion
+            null,
             null); // meetingPoint
 
     mockMvc

@@ -295,6 +295,32 @@ is rejected at commit. The two unconditional cross-section pokes with no client 
 in-memory `bumpSectionVersion`: the legacy full-replace and the activation auto-stamp of
 `actualStartTime`.
 
+**The owner is a locked section too (BE-SIMP-03, 2026-09-22).** Its counter is not a `Mission`
+column but the JPA `@Version` of the 1:1 `mission_ownership` companion row, which `PUT
+/api/v1/missions/{id}/owner` compares the client's `version` against (`MissionService.updateMissionOwner`).
+Until 2026-09-22 nothing could use it: `MissionDto` carried no ownership counter and the web page
+called the unversioned `PUT …/owner/{userId}`, so of two managers handing the same Einsatz to
+different people the later one silently won. Now:
+
+- `MissionDto.ownershipVersion` exposes the counter — a read-only `@Formula` on `Mission`
+  (`coalesce((select mo.version from mission_ownership mo where mo.mission_id = id), 0)`), `0` while
+  the owner was never changed. It moves only with the owner, so an owner change never 409s an edit
+  of another section and vice versa.
+- A mission with no companion row reads as `0`; the **first** change materialises the row with the
+  owner being replaced and then moves it, so the counter ends at `1`. Creating the row straight at
+  the new owner would leave it at `0`, and a second client still holding the `0` it read before the
+  change would pass the check — the lost update the counter exists for.
+- Both writes are flushed inside the change and the fresh counter is written back onto the managed
+  mission, so the response already carries the value the client echoes next. Two racers holding the
+  same correct echo: the second one's `UPDATE … WHERE version = ?` matches no row → 409. Two racing
+  *first* changes collide on the unique `uk_mission_ownership_mission` index → 409
+  (`DATA_INTEGRITY_VIOLATION`).
+- The web page pins the counter on `#owner-row` (`data-ownership-version`), reads it lazily at send
+  time, writes the response's value back before the serialized `section:owner` chain releases the
+  next write, and re-renders the `mgmt` section (peers receive the same section). The frontend proxy
+  `PUT /missions/{id}/owner/ajax` relays a 409 verbatim, `OPTIMISTIC_LOCK` code included, so the
+  shared conflict dialog opens.
+
 **Acceptance**
 
 - [ ] Two concurrent same-section writers (append step / reassign party lead) against the same start
@@ -305,12 +331,19 @@ in-memory `bumpSectionVersion`: the legacy full-replace and the activation auto-
 - [ ] A reorder that swaps ordinals commits without a unique violation; a duplicate `(mission_id,
   order_index)` is rejected once the deferred constraint is checked.
 - [ ] Two concurrent legacy full-replace `updateMission` saves: exactly one wins, the rest 409.
+- [x] An owner change with a stale `ownershipVersion` returns 409 and changes nothing; a matching
+  one moves the counter by one and answers with it; the first change of a never-transferred mission
+  ends at `1`, so an echo of the pre-change `0` is stale.
 
 **Enforced by:** `MissionSectionLockConcurrencyTest` (real-contention same-section one-winner +
 cross-section no-collision), `MissionSectionLockDbEnforcementTest` (conditional bump, row-version
 decoupling, deferred-constraint tolerance + backstop), `MissionUniqueIndexBackstopTest`,
 `ConcurrencyTest` (full-replace one-winner), and the extended `MissionServiceSectionPatchTest` /
-`MissionStepServiceTest` / `MissionObjectiveServiceTest`. **Code:** `Mission` (`@DynamicUpdate` +
+`MissionStepServiceTest` / `MissionObjectiveServiceTest`. The owner lock:
+`MissionOwnershipVersionIntegrationTest` (formula + counter movement against PostgreSQL),
+`MissionOwnerChangeControllerTest` (409 + `OPTIMISTIC_LOCK`, the counter in the answer, a missing
+version is a 400), `MissionServiceSectionPatchTest` (first-change materialisation), the frontend
+`MissionPageControllerMvcTest` (versioned body, 409 relay) and `MissionOwnerChangeE2eTest`. **Code:** `Mission` (`@DynamicUpdate` +
 per-scalar `@OptimisticLock(excluded = true)`), `MissionRepository.bump*VersionIfMatches` /
 `findByIdForFullReplace`, `MissionSectionVersions.enforceSectionVersion`, `MissionService` /
 `MissionTimelineService` / `MissionParticipantService`, migration `V208`. **Issues:** #1112, #1114,
@@ -577,6 +610,31 @@ bump, no re-fetch, id-only / kind-only audit) + `MissionServiceTest` /
 frontend `MissionForm` (`objectivesJson` / `stepsJson`), `CreateMissionRequest`,
 `MissionWriteController.createMission`, `mission-detail.html` (create editors + floating-save rule),
 `mission-detail.js` (create-form editor module).
+
+### REQ-MISSION-020 — Manager-only add-by-id for the app
+
+A mission manager adds a registered member to the roster by user id through
+`POST /api/v1/missions/{id}/participants/by-id/slim` (owner decision 2026-09-22, ADR-0170 amendment).
+It replaces the deprecated `POST …/participants` deleted the same day and exists for the Android
+app's "Teilnehmer hinzufügen" on the public API vhost.
+
+- **Gate:** `canManageMission(#id)` only — no self-enrolment branch (that is `…/join`).
+- **Body:** `AddParticipantByIdRequest{userId}`, required; no free-text name, org units, comment or
+  sign-up answers. The member's org units and payout default are stamped as on any registered add.
+- **Answer:** the participant list, peer-redacted below Logistician (REQ-SEC-007).
+- **Edge:** admitted on the API vhost and frozen in REQ-API-009; the add-anybody
+  `…/participants/add` and `…/participants/slim` stay off the edge.
+
+**Acceptance**
+
+- [x] A manager adds a member by id and gets the participant list; a non-manager — even naming
+  themselves — gets 403; a body without `userId` is a 400; anonymous is refused (401).
+
+**Enforced by:** `MissionControllerSlimEndpointsTest` (`addParticipantByIdSlim_*`),
+`ApiVhostAnonymousSurfaceTest`, `ExternalContractTest` (frozen + reachable through the edge),
+`check_probe_against_allowlist.py` / `edge-deny-probe.yml`. **Code:**
+`MissionController#addParticipantByIdSlim`, `AddParticipantByIdRequest`,
+`docker/edge/include/api-allowlist.conf`.
 
 ### REQ-MISSION-018 — Registration count on the mission list row
 

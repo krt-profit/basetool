@@ -167,7 +167,7 @@ class MissionUnitCrewTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/" + mission.getId() + "/units/" + unit.getId() + "/crew")
+            post("/api/v1/missions/" + mission.getId() + "/units/" + unit.getId() + "/crew/slim")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))

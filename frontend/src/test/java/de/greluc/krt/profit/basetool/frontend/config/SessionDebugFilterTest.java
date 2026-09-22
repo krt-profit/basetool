@@ -20,16 +20,25 @@
 package de.greluc.krt.profit.basetool.frontend.config;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import de.greluc.krt.profit.basetool.frontend.support.SessionIdFingerprint;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import java.io.IOException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 
@@ -207,5 +216,40 @@ class SessionDebugFilterTest {
 
     // Then
     verify(filterChain, times(1)).doFilter(request, response);
+  }
+
+  // -------------------------------------------------------------------------
+  // APPSEC-12: the raw session id never reaches a log line
+  // -------------------------------------------------------------------------
+
+  @Test
+  void logsASessionFingerprintAndNeverTheRawSessionId() throws ServletException, IOException {
+    Logger logger = (Logger) LoggerFactory.getLogger(SessionDebugFilter.class);
+    Level previous = logger.getLevel();
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+    logger.setLevel(Level.DEBUG);
+    try {
+      String rawId = "0b8d7f0e-2c1a-4e9b-8f3d-6a5c4b3a2918";
+      MockHttpServletRequest request = new MockHttpServletRequest("GET", "/dashboard");
+      request.setSession(new MockHttpSession(null, rawId));
+
+      filter.doFilter(request, new MockHttpServletResponse(), filterChain);
+
+      assertFalse(appender.list.isEmpty(), "the DEBUG filter must have logged");
+      for (ILoggingEvent event : appender.list) {
+        assertFalse(
+            event.getFormattedMessage().contains(rawId),
+            "raw session id leaked into: " + event.getFormattedMessage());
+      }
+      assertTrue(
+          appender.list.stream()
+              .anyMatch(e -> e.getFormattedMessage().contains(SessionIdFingerprint.of(rawId))),
+          "the fingerprint keeps the lines of one session correlatable");
+    } finally {
+      logger.detachAppender(appender);
+      logger.setLevel(previous);
+    }
   }
 }

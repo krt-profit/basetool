@@ -77,6 +77,10 @@ Two binding rules shape every UI change:
 - **Live update is binding** — every create/update/delete/toggle/reorder/filter/paginate updates
   the DOM in place via `krtFetch`, with no full-page reload on success, and on shared surfaces a
   peer's change propagates without a manual reload.
+- **Two browser-side safety rules are lint-enforced, not review-enforced** (2026-09-22): a `fetch`
+  write outside `krtFetch` fails `:frontend:lintJs` (REQ-FE-002), and so does an HTML sink that is
+  neither escaped through `escapeHtml` / `escapeAttr` nor a server fragment inserted through
+  `krtFetch.setTrustedHtml` (REQ-FE-022, `eslint-plugin-no-unsanitized`).
 
 Authority: [`ui-design-system.md`](../specs/ui-design-system.md),
 [`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md) (`REQ-FE-*`),

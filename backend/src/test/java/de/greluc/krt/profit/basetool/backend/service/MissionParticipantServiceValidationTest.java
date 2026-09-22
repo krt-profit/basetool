@@ -270,7 +270,9 @@ class MissionParticipantServiceValidationTest {
     // When / Then
     assertThrows(
         BusinessConflictException.class,
-        () -> missionParticipantService.addParticipant(missionId, userId));
+        () ->
+            missionParticipantService.addParticipant(
+                missionId, userId, null, null, null, null, null));
 
     verify(missionParticipantRepository, never()).save(any(MissionParticipant.class));
   }

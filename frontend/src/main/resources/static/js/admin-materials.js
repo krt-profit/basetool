@@ -24,9 +24,10 @@
  * On DOMContentLoaded wires the material-name filter autocomplete and the in-place category
  * management (delegated create + krtFetch.write, KRT-confirm + AJAX delete, live <option> and
  * placeholder-row maintenance across every category <select>). filterTable stays a global for the
- * shared filter-table common-handler; per-row updateMaterial PUTs a single field and refreshes the
- * row version; the create-material modal open/close/submit posts MaterialCreateAjaxRequest and
- * reloads on success.
+ * shared filter-table common-handler; per-row updateMaterial PUTs a single field through
+ * krtFetch.write and refreshes the row version; the create-material modal open/close/submit posts
+ * MaterialCreateAjaxRequest through krtFetch.write and, on success, re-renders the material table
+ * in place from a fresh GET of this page (REQ-FE-001: no reload on success).
  *
  * The CAT_MSG / CAT_CONFLICT dicts, the MSG_UPDATE_* and MSG_CREATE_* toast strings and the
  * krtAutocomplete helper are provided by (respectively) the inline Thymeleaf bootstrap block of
@@ -34,6 +35,24 @@
  */
 
 /* global CAT_MSG, CAT_CONFLICT, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_CREATE_SUCCESS, MSG_CREATE_ERROR, krtAutocomplete */
+
+// The filter autocomplete's data source. krtAutocomplete reads the array on every keystroke, so it
+// is refilled IN PLACE (never reassigned) after a create re-rendered the table — a new material is
+// then suggested without a reload.
+const materialNames = [];
+
+// Refills materialNames from the <datalist id="materialNames-data"> currently in the document.
+function readMaterialNames() {
+    const dataList = /** @type {HTMLDataListElement | null} */ (
+        document.getElementById('materialNames-data')
+    );
+    materialNames.length = 0;
+    if (dataList) {
+        Array.from(dataList.options).forEach(function (o) {
+            materialNames.push(o.value);
+        });
+    }
+}
 
 document.addEventListener('DOMContentLoaded', function () {
     // Material names come from the sibling <datalist id="materialNames-data">
@@ -43,12 +62,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // translation keys (notification.success.save / notification.error.save)
     // still rely on it — those are single primitives, which Thymeleaf's
     // inline parser handles correctly.
-    const dataList = document.getElementById('materialNames-data');
-    const materialNames = dataList
-        ? Array.from(dataList.options).map(function (o) {
-              return o.value;
-          })
-        : [];
+    readMaterialNames();
     const inpMaterials = document.getElementById('filterMaterials');
     if (inpMaterials) krtAutocomplete(inpMaterials, materialNames);
 
@@ -236,56 +250,47 @@ window.filterTable = filterTable;
 function updateMaterial(selectElement) {
     const tr = selectElement.closest('tr');
     const matId = tr.getAttribute('data-mat-id');
-    const version = tr.getAttribute('data-version');
     const updateType = selectElement.getAttribute('data-update-type');
+    if (!window.krtFetch) {
+        return;
+    }
 
     selectElement.disabled = true;
 
-    let requestBody = {
-        updateType: updateType,
-        version: parseInt(version),
-    };
-
-    if (updateType === 'QUANTITY_TYPE') {
-        requestBody.quantityType = selectElement.value;
-    } else if (updateType === 'CATEGORY') {
-        requestBody.categoryId = selectElement.value || null;
-    } else if (updateType === 'REFINED') {
-        requestBody.refinedMaterialId = selectElement.value || null;
-    } else if (updateType === 'MANUAL_RAW') {
-        requestBody.isManualRawMaterial = selectElement.checked;
-    } else if (updateType === 'JOB_ORDER') {
-        requestBody.isJobOrder = selectElement.checked;
-    } else if (updateType === 'VISIBILITY') {
-        requestBody.isVisible = selectElement.checked;
+    // Built at send time (payload thunk): writes on the same row are serialized, so a queued edit
+    // of a second control reads the version the first edit synced back instead of a stale one.
+    function buildRequestBody() {
+        const requestBody = {
+            updateType: updateType,
+            version: parseInt(tr.getAttribute('data-version'), 10),
+        };
+        if (updateType === 'QUANTITY_TYPE') {
+            requestBody.quantityType = selectElement.value;
+        } else if (updateType === 'CATEGORY') {
+            requestBody.categoryId = selectElement.value || null;
+        } else if (updateType === 'REFINED') {
+            requestBody.refinedMaterialId = selectElement.value || null;
+        } else if (updateType === 'MANUAL_RAW') {
+            requestBody.isManualRawMaterial = selectElement.checked;
+        } else if (updateType === 'JOB_ORDER') {
+            requestBody.isJobOrder = selectElement.checked;
+        } else if (updateType === 'VISIBILITY') {
+            requestBody.isVisible = selectElement.checked;
+        }
+        return requestBody;
     }
 
-    const headers = window.krtCsrf
-        ? window.krtCsrf.headers()
-        : { 'Content-Type': 'application/json', Accept: 'application/json' };
-
-    fetch(`/admin/materials/${matId}/ajax`, {
-        method: 'PUT',
-        headers: headers,
-        body: JSON.stringify(requestBody),
-    })
-        .then((response) => {
-            if (!response.ok) {
-                throw new Error('Update failed with status ' + response.status);
-            }
-            return response.json();
-        })
-        .then((updatedMaterial) => {
-            tr.setAttribute('data-version', updatedMaterial.version);
-            if (typeof window.showFrontendSuccessToast === 'function') {
-                window.showFrontendSuccessToast(MSG_UPDATE_SUCCESS);
-            }
-        })
-        .catch((error) => {
-            console.error('Error updating material:', error);
-            if (typeof window.showFrontendErrorToast === 'function') {
-                window.showFrontendErrorToast(MSG_UPDATE_ERROR);
-            }
+    window.krtFetch
+        .write({
+            method: 'PUT',
+            url: `/admin/materials/${encodeURIComponent(matId)}/ajax`,
+            payload: buildRequestBody,
+            serialize: 'admin-material:' + matId,
+            // Writes the fresh version onto the row (and any [data-version] inside it).
+            containerSelector: tr,
+            successMessage: MSG_UPDATE_SUCCESS,
+            errorMessage: MSG_UPDATE_ERROR,
+            conflict: CAT_CONFLICT,
         })
         .finally(() => {
             selectElement.disabled = false;
@@ -304,8 +309,8 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
 // ----------------------------------------------------------------------
 // Create-Material modal: open, close, submit. The form mirrors the
 // backend MaterialCreateAjaxRequest; the server stamps isManualEntry=true
-// so this dialog does not expose that flag. On success we reload to pick
-// up the new row plus its "Manuell" badge.
+// so this dialog does not expose that flag. On success the table is
+// re-rendered in place to pick up the new row plus its "Manuell" badge.
 // ----------------------------------------------------------------------
 function openCreateMaterialModal() {
     document.getElementById('cm-name').value = '';
@@ -353,39 +358,81 @@ function submitCreateMaterial(btn) {
         isVolatileTime: document.getElementById('cm-volatile-time').checked,
     };
 
-    const headers = window.krtCsrf
-        ? window.krtCsrf.headers()
-        : { 'Content-Type': 'application/json', Accept: 'application/json' };
-
-    if (btn) btn.disabled = true;
-    fetch('/admin/materials/ajax', {
+    if (!window.krtFetch) {
+        return;
+    }
+    window.krtFetch.write({
         method: 'POST',
-        headers: headers,
-        body: JSON.stringify(payload),
-    })
-        .then((response) => {
-            if (!response.ok) {
-                throw new Error('create failed with status ' + response.status);
-            }
-            return response.json();
-        })
-        .then(() => {
-            if (typeof window.showFrontendSuccessToast === 'function') {
-                window.showFrontendSuccessToast(MSG_CREATE_SUCCESS);
-            }
+        url: '/admin/materials/ajax',
+        payload: payload,
+        // Double-submit guard: the button stays disabled for the whole round-trip.
+        submitter: btn || null,
+        successMessage: MSG_CREATE_SUCCESS,
+        errorMessage: MSG_CREATE_ERROR,
+        conflict: CAT_CONFLICT,
+        onSuccess: function () {
             closeCreateMaterialModal();
-            setTimeout(function () {
-                window.location.reload();
-            }, 400);
-        })
-        .catch((error) => {
-            console.error('Error creating material:', error);
-            if (typeof window.showFrontendErrorToast === 'function') {
-                window.showFrontendErrorToast(MSG_CREATE_ERROR);
+            // Re-render the table in place so the new row (with its "Manuell" badge) appears
+            // without a page reload (REQ-FE-001).
+            return refreshMaterialsTable();
+        },
+    });
+}
+
+// Replaces the element matching selector in the live document with its counterpart from a freshly
+// fetched copy of this page. The node is imported (not re-serialized into innerHTML), so no markup
+// string ever reaches an HTML sink; scripts inside a DOMParser document never run.
+function replaceFromDocument(fresh, selector) {
+    const current = document.querySelector(selector);
+    const next = fresh.querySelector(selector);
+    if (current && next) {
+        current.replaceWith(document.importNode(next, true));
+    }
+}
+
+// Re-renders the material table (plus the two lists derived from the catalog: the filter
+// autocomplete datalist and the create modal's refined-material select) from a fresh GET of this
+// page. The page has no dedicated fragment endpoint, so the server-rendered page is parsed and the
+// affected nodes are swapped in place; the name filter currently typed is re-applied afterwards.
+// Resolves true when the table was replaced, false when the fetch bailed (the stale table stays).
+function refreshMaterialsTable() {
+    return fetch(window.location.pathname + window.location.search, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    })
+        .then(function (res) {
+            if (window.krtFetch && window.krtFetch.maybeReauthenticate(res)) {
+                return null;
             }
+            // A redirected / non-OK response is a login bounce or an error page, not this page.
+            return res.redirected || !res.ok ? null : res.text();
         })
-        .finally(() => {
-            if (btn) btn.disabled = false;
+        .then(function (html) {
+            if (html === null) {
+                return false;
+            }
+            const fresh = new DOMParser().parseFromString(html, 'text/html');
+            if (!fresh.querySelector('#materialsTable tbody')) {
+                return false;
+            }
+            replaceFromDocument(fresh, '#materialsTable tbody');
+            replaceFromDocument(fresh, '#materialNames-data');
+            replaceFromDocument(fresh, '#cm-refined');
+            readMaterialNames();
+            const filterInput = /** @type {HTMLInputElement | null} */ (
+                document.getElementById('filterMaterials')
+            );
+            if (filterInput && filterInput.value) {
+                filterTable('materialsTable', filterInput.value);
+            }
+            const table = document.getElementById('materialsTable');
+            document.dispatchEvent(
+                new CustomEvent('krt:swapped', { detail: { container: table } }),
+            );
+            return true;
+        })
+        .catch(function (error) {
+            console.warn('admin-materials: table refresh failed', error);
+            return false;
         });
 }
 

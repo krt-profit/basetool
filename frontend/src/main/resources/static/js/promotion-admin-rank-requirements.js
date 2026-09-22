@@ -24,7 +24,7 @@
  *
  * In-place CRUD for single-rank-step promotion requirements: create/edit modals with a topic->category
  * cascade built from AR_CATEGORIES_BY_TOPIC, single- and group-delete (sequential DELETEs), and a
- * client-side filter re-applied on krt:swapped. JSON writes go through the shared krtCsrf reader
+ * client-side filter re-applied on krt:swapped. JSON writes go through krtFetch.write
  * (retry-on-403, 409 -> toast + fragment-swap refresh, no reload). Wired via window.krtEvents on
  * DOMContentLoaded plus a native input listener for the readonly toRank sync.
  *
@@ -56,23 +56,6 @@ function openModal(id) {
     const el = document.getElementById(id);
     el.classList.add('krtm-modal-open');
     el.classList.remove('krtm-hidden');
-}
-
-// CSRF readers delegate to the shared krtCsrf module (epic #571); the meta-tag
-// fallback keeps the page working if krt-fetch.js failed to load.
-function getCsrfToken() {
-    return (
-        (window.krtCsrf && window.krtCsrf.token && window.krtCsrf.token()) ||
-        document.querySelector('meta[name="_csrf"]')?.content ||
-        ''
-    );
-}
-function getCsrfHeader() {
-    return (
-        (window.krtCsrf && window.krtCsrf.headerName && window.krtCsrf.headerName()) ||
-        document.querySelector('meta[name="_csrf_header"]')?.content ||
-        'X-CSRF-TOKEN'
-    );
 }
 
 // Re-renders the requirements list in place after a create / edit / delete so
@@ -134,58 +117,40 @@ function isValidSingleStep(fromVal, toVal) {
     return Number.isFinite(fromVal) && Number.isFinite(toVal) && fromVal - toVal === 1;
 }
 
-function arCsrfHeaders() {
-    if (window.krtCsrf && typeof window.krtCsrf.headers === 'function') {
-        return window.krtCsrf.headers();
-    }
-    const h = {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest',
-    };
-    h[getCsrfHeader()] = getCsrfToken();
-    return h;
-}
-
-// JSON write through the shared CSRF reader with a single retry on a bare 403
-// (stale token). On 409 it toasts and refreshes the list in place instead of
-// reloading the whole page.
+// JSON write through krtFetch.write (REQ-FE-002: CSRF, the bare-403 refresh-and-retry and the
+// re-auth redirect). Resolves to the response body ({} for a bodiless 2xx such as a 204), or to null
+// once the failure was surfaced: on 409 it toasts and refreshes the list in place instead of
+// reloading the whole page; any other failure toasts MSG_ERROR.
 function apiCall(url, method, body) {
-    function run() {
-        return fetch(url, {
-            method: method,
-            headers: arCsrfHeaders(),
-            body: body ? JSON.stringify(body) : undefined,
-        });
+    if (!window.krtFetch) {
+        toastError(MSG_ERROR);
+        return Promise.resolve(null);
     }
-    return run()
-        .then(function (r) {
-            if (
-                r.status === 403 &&
-                window.krtCsrf &&
-                typeof window.krtCsrf.refresh === 'function'
-            ) {
-                return window.krtCsrf.refresh().then(function (ok) {
-                    return ok ? run() : r;
-                });
-            }
-            return r;
-        })
-        .then(function (r) {
-            if (r.status === 409) {
-                toastError(MSG_CONFLICT);
-                arRefresh();
-                return null;
-            }
-            if (!r.ok) {
+    return window.krtFetch
+        .write({
+            method: method,
+            url: url,
+            payload: body || undefined,
+            toast: false,
+            onError: function (status) {
+                if (status === 409) {
+                    toastError(MSG_CONFLICT);
+                    arRefresh();
+                } else {
+                    toastError(MSG_ERROR);
+                }
+                return true;
+            },
+            onNetworkError: function () {
                 toastError(MSG_ERROR);
+                return true;
+            },
+        })
+        .then(function (result) {
+            if (!result.ok) {
                 return null;
             }
-            return r.status === 204 ? {} : r.json();
-        })
-        .catch(function () {
-            toastError(MSG_ERROR);
-            return null;
+            return result.body && typeof result.body === 'object' ? result.body : {};
         });
 }
 

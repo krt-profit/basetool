@@ -96,7 +96,9 @@ class MissionExpansionTest {
 
     // 4. Add Participant first — a unit's ship must belong to a registered participant, so the
     // ship owner has to be signed up before the ship can be assigned to the unit.
-    mission = missionService.addParticipant(mission.getId(), savedUser.getId());
+    mission =
+        missionService.addParticipant(
+            mission.getId(), savedUser.getId(), null, null, null, null, null);
     MissionParticipant participant =
         mission.getParticipants().stream()
             .filter(p -> p.getUser().getId().equals(savedUser.getId()))

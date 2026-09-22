@@ -2,7 +2,32 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Monitoring: Container-Limits werden wieder gelesen.** Der cgroup-Collector las seit der
+  Podman-Umstellung die Unit statt des Containers und sah deshalb kein Speicher-, pids- oder
+  CPU-Limit: Die Alarme `ContainerMemoryHigh`, `ContainerPidsHigh` und `ContainerCpuThrottledHigh`
+  konnten nicht auslösen, und drei Panels im Container-Dashboard blieben leer. Podmans
+  Healthcheck-Units erscheinen dort außerdem nicht mehr als Hex-Container.
+
+- **Einsätze: Besitzerwechsel meldet jetzt einen Konflikt, wenn jemand anderes den Besitzer
+  inzwischen geändert hat.** Bisher gewann still der spätere von zwei gleichzeitigen Wechseln; jetzt
+  kommt der bekannte Konflikt-Dialog mit „Aktuelle Werte laden". Ein zweiter Wechsel auf derselben
+  Seite funktioniert ohne Neuladen.
+
+### Removed
+
+- **API: die 17 veralteten Einsatz-Schnittstellen sind vorzeitig entfernt.** Angekündigt war der
+  Sunset 2026-10-20; per Entscheidung vom 22.09.2026 fielen sie schon mit diesem Release weg. Ersatz
+  sind die `/slim`-Endpunkte und der versionierte Besitzerwechsel. App-Versionen älter als der
+  07.09.2026 müssen aktualisiert werden.
+  
 ### Added
+
+- **App: Einsatzleitung kann wieder Mitglieder zu einem Einsatz hinzufügen.** Dafür gibt es einen
+  eigenen, nur für Verwalter freigegebenen Weg, der ein Mitglied ausschließlich per ID einträgt
+  (`POST …/participants/by-id/slim`); die allgemeinen Anmelde-Wege bleiben für die App gesperrt.
+  Die App braucht dafür ein Update.
 
 - **Server: automatische Sicherheitsupdates.** Der Produktionshost spielt Security-Advisories jetzt
   täglich um 07:00 selbst ein (dnf-automatic); die Container-Runtime ist ausgenommen, neu gestartet
@@ -23,6 +48,25 @@
 
 - **Datenbank: jeder Fremdschlüssel hat einen Index** (`V245`, 38 neue Indizes); ein neuer Test
   verhindert, dass wieder einer ohne ausgeliefert wird (REQ-DATA-017).
+
+- **Anmeldung: Das Sitzungs-Cookie heißt jetzt `__Host-SESSION`.** Der Browser nimmt es damit nur
+  über HTTPS und nur für genau diese Adresse an, keine andere Seite kann es setzen oder überschreiben.
+  **Mit diesem Update werden alle einmal abgemeldet** und melden sich neu an; die
+  Datenschutzerklärung nennt den neuen Namen.
+
+- **Überwachung: Vom Browser blockierte Inhalte werden gemeldet.** Verstößt eine Seite gegen die
+  Content-Security-Policy, meldet der Fehler-Beacon das jetzt als `csp_violation` (nur Direktive und
+  Ursprung), sichtbar im Dashboard und im Alarm `ClientErrorSpike`.
+
+- **Einsätze: die Weboberfläche nutzt keine der 17 als veraltet markierten Einsatz-Schnittstellen
+  mehr**. Auszahlungsart, Ein-/Auschecken, Teilnehmer, Einheiten und Crew laufen
+  über die schlanken Nachfolger; ein Test verhindert künftig jeden Aufruf einer veralteten
+  Schnittstelle aus dem Frontend.
+
+- **Build: Release-Tags und Release-PRs legt jetzt die GitHub-App „basetool-release“ an.** Seit die
+  Tag-Regel nur noch sie und den Maintainer zulässt, scheiterte das persönliche Token beim Anlegen
+  des Tags, und v1.10.0 musste von Hand getaggt werden. Beide Release-Workflows holen sich jetzt ein
+  kurzlebiges, pro Schritt beschränktes App-Token; das alte Token wird nicht mehr gelesen.
 
 - **Server-Härtung.** Datenbank- und Redis-Netze haben in Produktion keinen Internetzugang mehr,
   Keycloak bindet Theme und Provider nur lesend und `realm-export.json` gar nicht mehr ein, die
@@ -46,6 +90,35 @@
   `IngestAudienceGateOff`, solange die Audience-Prüfung aus ist.
 
 ### Fixed
+
+- **Einsätze und Operationen: Suche und Zeitraumfilter funktionieren mit Sonderzeichen.** Ein `&`,
+  `#` oder `+` im Suchbegriff veränderte bisher die Anfrage ans Backend, und der Datumsfilter der
+  Operationenliste griff nie. Beide Listen reichen die Filter jetzt unverändert weiter.
+
+- **Hangar-Import: Dateien über 8 MB werden sofort abgelehnt** – mit einer verständlichen Meldung
+  noch vor dem Hochladen, statt erst nach dem Upload mit einem Fehler.
+
+- **Fehlermeldungen: Downloads und Importe melden den echten Grund.** Lehnte das Backend einen
+  Kontoauszug, einen Export, einen Import oder eine Übergabe-PDF ab (z. B. keine Berechtigung,
+  nicht gefunden), kam bisher ein allgemeiner Serverfehler an; jetzt die passende Meldung.
+
+- **Organisationseinheit wechseln: Rücksprung nur noch innerhalb der Anwendung.** Nach dem Wechsel
+  führt die Weiterleitung nur noch auf eine Seite des Basetools, nie auf eine fremde Adresse.
+
+- **Protokolle enthalten keine Sitzungskennungen mehr**, nur noch einen nicht umkehrbaren
+  Fingerabdruck.
+
+- **Operationen: Die Markdown-Vorschau der Beschreibung funktioniert wieder.** Sie forderte die
+  falsche Antwortart an und blieb deshalb leer.
+
+- **Kein automatisches Neuladen mehr.** Ein neu angelegtes Material erscheint in der
+  Material-Verwaltung ohne Neuladen der Seite; bei einem Bearbeitungskonflikt (Lager-Zuordnung,
+  Lager-Notiz, Auftrags-Bearbeiter) wird nicht mehr nach zwei Sekunden neu geladen, sondern wie
+  überall nachgefragt.
+
+- **Sicherheit im Browser.** Alle Speichervorgänge laufen über denselben geschützten Weg
+  (CSRF-Wiederholung, Neuanmeldung, Doppelklick-Schutz), und jede eingefügte Anzeige wird
+  maskiert; der Lint-Lauf erzwingt beides jetzt.
 
 - **Betrieb: Container bekommen beim Stoppen wieder ihre Nachlaufzeit.** Podman beendete jeden
   Container nach 10 s hart — Anwendungen, Datenbanken, Loki und Tempo mitten im geordneten

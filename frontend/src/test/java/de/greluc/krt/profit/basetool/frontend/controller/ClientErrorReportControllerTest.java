@@ -85,6 +85,10 @@ class ClientErrorReportControllerTest {
   private static final Pattern BEACON_BODY_IS_THE_PAYLOAD =
       Pattern.compile("body: JSON\\.stringify\\(payload\\)");
 
+  /** Matches one {@code const KIND_… = '…';} declaration in the beacon and captures the value. */
+  private static final Pattern BEACON_KIND_DECLARATION =
+      Pattern.compile("const KIND_[A-Z_]+ = '([a-z_]+)';");
+
   /** Matches one {@code name:} property key inside the captured object literal. */
   private static final Pattern OBJECT_KEY = Pattern.compile("(\\w+)\\s*:");
 
@@ -242,6 +246,73 @@ class ClientErrorReportControllerTest {
     // location.search added to this literal would leave the browser unnoticed before the server
     // ever got the chance to drop it.
     assertThat(keys).containsExactlyInAnyOrder("kind", "message", "source", "line", "column");
+  }
+
+  @Test
+  void everyKindTheBeaconDeclaresIsOneTheServerAccepts() throws IOException {
+    // The reverse half of beaconModuleShipsExactlyTheServerSideKindAllowlist: a KIND_* the beacon
+    // sends but the server does not know is answered 400 and counted nowhere — the new signal would
+    // look exactly like "no errors of that kind". Both lists move together or this fails.
+    String beacon = readBeaconModule();
+    Matcher declaration = BEACON_KIND_DECLARATION.matcher(beacon);
+    List<String> beaconKinds = new ArrayList<>();
+    while (declaration.find()) {
+      beaconKinds.add(declaration.group(1));
+    }
+
+    assertThat(beaconKinds)
+        .containsExactlyInAnyOrderElementsOf(ClientErrorReportController.ALLOWED_KINDS);
+    assertThat(beaconKinds).contains(MetricNames.CLIENT_ERROR_CSP_VIOLATION);
+  }
+
+  @Test
+  void beaconListensForCspViolations() throws IOException {
+    // FE-SEC-04: the CSP is enforcing with no report-uri, so this listener is the only way a
+    // blocked inline script / style or a new third-party host ever reaches a server.
+    assertThat(readBeaconModule()).contains("addEventListener('securitypolicyviolation'");
+  }
+
+  @Test
+  void cspViolationReport_isCountedUnderItsOwnKind() {
+    ResponseEntity<Void> response =
+        controller.report(
+            new ClientErrorReport(
+                "script-src-elem",
+                "https://evil.example",
+                null,
+                null,
+                MetricNames.CLIENT_ERROR_CSP_VIOLATION));
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+    assertThat(counterFor(MetricNames.CLIENT_ERROR_CSP_VIOLATION)).isEqualTo(1.0d);
+  }
+
+  @Test
+  void cspViolationSource_isReducedToItsOriginServerSide() {
+    // A crafted beacon that skips the client-side reduction still cannot put a path, a query or
+    // user info into the log.
+    controller.report(
+        new ClientErrorReport(
+            "img-src",
+            "https://user:secret@evil.example:8443/track/member-42?token=abc#frag",
+            null,
+            null,
+            MetricNames.CLIENT_ERROR_CSP_VIOLATION));
+
+    String line = appender.list.getFirst().getFormattedMessage();
+    assertThat(line).contains("source=https://evil.example:8443,");
+    assertThat(line).doesNotContain("member-42").doesNotContain("token").doesNotContain("secret");
+  }
+
+  @Test
+  void originOnly_keepsTheBrowserKeywordsAndSchemes() {
+    assertThat(ClientErrorReportController.originOnly("inline")).isEqualTo("inline");
+    assertThat(ClientErrorReportController.originOnly("eval")).isEqualTo("eval");
+    assertThat(ClientErrorReportController.originOnly("data:image/png;base64,AAAA"))
+        .isEqualTo("data");
+    assertThat(ClientErrorReportController.originOnly("https://cdn.example/a.js?x=1"))
+        .isEqualTo("https://cdn.example");
+    assertThat(ClientErrorReportController.originOnly(null)).isNull();
   }
 
   private double counterFor(String kind) {

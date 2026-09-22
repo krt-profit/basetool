@@ -30,6 +30,9 @@
  *  - swap — server-rendered HTML fragment swaps for lists / filters /
  *    pagination, including delegated interception of in-container pagination
  *    anchors so paging stays in-place (fixes the known full-reload regression).
+ *  - setTrustedHtml / replaceWithTrustedHtml — the one sanctioned innerHTML sink for
+ *    server-rendered Thymeleaf fragment text (FE-SEC-05); swap uses it, and so does every page
+ *    that inserts a fragment it fetched itself. Markup built in script never goes through it.
  *  - sectionWrite — a factory for pages whose aggregate is saved and
  *    re-rendered as independent sections (#924, mission-detail): builds the
  *    page's { write, refresh, notify } trio around write/swap from a
@@ -255,10 +258,16 @@
      * assembly in one place so the two write paths cannot drift.
      *
      * @param json whether the body is JSON (adds Content-Type) rather than FormData (omits it)
+     * @param accept the Accept header value; defaults to application/json. Only a write whose
+     *     endpoint answers something else (e.g. a text/html markdown preview) passes one — Spring
+     *     answers 406 when the Accept header excludes every type a mapping produces
      * @return a plain headers object ready to hand to {@code fetch}
      */
-    function writeHeaders(json) {
-        const headers = { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+    function writeHeaders(json, accept) {
+        const headers = {
+            Accept: accept || 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+        };
         if (json) {
             headers['Content-Type'] = 'application/json';
         }
@@ -505,9 +514,21 @@
         );
     }
 
-    async function parseBody(response) {
+    /**
+     * Parses a write response: JSON / problem+json as an object, anything else as text. With
+     * `responseType === 'blob'` a 2xx body is returned as a Blob instead (a generated PDF, …); an
+     * error body is still parsed as above so the problem handling keeps working.
+     *
+     * @param {Response} response the fetch response
+     * @param {string} [responseType] 'blob' to read a successful body as a Blob
+     * @returns {Promise<any>} the parsed body, or null when it could not be read
+     */
+    async function parseBody(response, responseType) {
         const contentType = response.headers.get('Content-Type') || '';
         try {
+            if (responseType === 'blob' && response.ok) {
+                return await response.blob();
+            }
             if (
                 contentType.indexOf('application/json') >= 0 ||
                 contentType.indexOf('application/problem+json') >= 0
@@ -550,9 +571,14 @@
      *                         default network-error toast
      *  - submitter            optional submit button disabled for the in-flight request and
      *                         re-enabled when it settles (double-submit guard)
+     *  - accept               optional Accept header value (default application/json) for an
+     *                         endpoint that answers another type, e.g. a text/html preview; a
+     *                         non-JSON 2xx body reaches onSuccess as the response text
+     *  - responseType         optional 'blob': a 2xx body reaches onSuccess as a Blob (e.g. a
+     *                         generated PDF); error bodies are parsed as usual
      *
-     * Returns { ok, status, body }. On a bare 403 the CSRF token is refreshed from GET /csrf and the
-     * request retried exactly once before failing.
+     * Returns { ok, status, body } (plus `redirected` on a 2xx). On a bare 403 the CSRF token is
+     * refreshed from GET /csrf and the request retried exactly once before failing.
      */
     async function send(opts, buildInit, url) {
         // In-flight double-submit guard: opts.submitter was resolved + disabled SYNCHRONOUSLY by
@@ -602,7 +628,7 @@
                 return { ok: false, status: 0, body: null };
             }
 
-            const body = await parseBody(response);
+            const body = await parseBody(response, opts.responseType);
 
             // A 401 with X-Reauthenticate means the session lost its OAuth2 token: redirect the
             // window to re-login instead of toasting an error the user cannot act on.
@@ -655,7 +681,14 @@
                     /* a success callback must never break the UX */
                 }
             }
-            return { ok: true, status: response.status, body: body };
+            // `redirected` lets a caller that swaps an HTML body refuse a followed redirect (an
+            // error-handler bounce answers 200 with a whole document, not the expected fragment).
+            return {
+                ok: true,
+                status: response.status,
+                body: body,
+                redirected: !!response.redirected,
+            };
         } finally {
             if (submitter) {
                 submitter.disabled = false;
@@ -670,6 +703,10 @@
      *  - method               HTTP method (default PATCH)
      *  - url                  target URL, OR a `() => url` thunk resolved at send time
      *  - payload              JSON payload (omitted for GET/DELETE), OR a `() => payload` thunk
+     *  - bodyOnDelete         set true to send the payload with a DELETE as well — for the few
+     *                         endpoints whose DELETE mapping reads a @RequestBody (e.g. the inventory
+     *                         allocation removal, which echoes dimension, target and version). Off by
+     *                         default, so every existing DELETE keeps sending no body.
      *  - serialize            optional lock-scope key; writes sharing it run one at a time in order
      *                         (see runSerialized). Pair it with thunk url/payload so a queued write
      *                         re-reads its optimistic-lock version AFTER the preceding same-key write
@@ -691,9 +728,11 @@
             const url = typeof opts.url === 'function' ? opts.url() : opts.url;
             const payload = typeof opts.payload === 'function' ? opts.payload() : opts.payload;
             function buildInit() {
-                const headers = writeHeaders(true);
+                const headers = writeHeaders(true, opts.accept);
                 const init = { method: method, headers: headers };
-                if (payload !== undefined && method !== 'GET' && method !== 'DELETE') {
+                const sendsBody =
+                    method !== 'GET' && (method !== 'DELETE' || opts.bodyOnDelete === true);
+                if (payload !== undefined && sendsBody) {
                     init.body = JSON.stringify(payload);
                 }
                 return init;
@@ -751,7 +790,7 @@
             ).toUpperCase();
 
             function buildInit() {
-                const headers = writeHeaders(false);
+                const headers = writeHeaders(false, opts.accept);
                 const body =
                     opts.formData !== undefined
                         ? opts.formData
@@ -768,6 +807,47 @@
     }
 
     // ------------------------------------------------------------ fragment swap
+
+    /**
+     * Replaces the content of `el` with a server-rendered HTML fragment — the ONE sanctioned
+     * innerHTML sink for markup that did not pass through `escapeHtml` (FE-SEC-05).
+     *
+     * Only for the text of a same-origin response from one of our own Thymeleaf endpoints (a
+     * `?fragment=` render, a stack-entries or modal fragment): every value in it was escaped by the
+     * template engine on the server, so re-escaping it here would break it. Never pass it a string
+     * assembled in script from user or API data — build that with DOM APIs / textContent, or run
+     * each interpolated value through `escapeHtml` / `escapeAttr` and assign directly, where the
+     * lint rule can see the escaping.
+     *
+     * @param {Element | null | undefined} el the container whose content is replaced; no-op when
+     *     absent
+     * @param {string | null | undefined} html the fragment markup; null / undefined clears `el`
+     */
+    function setTrustedHtml(el, html) {
+        if (!el) {
+            return;
+        }
+        // eslint-disable-next-line no-unsanitized/property -- the documented trusted sink: same-origin Thymeleaf fragment markup, escaped server-side by the template engine.
+        el.innerHTML = html == null ? '' : String(html);
+    }
+
+    /**
+     * Replaces `el` itself (the outerHTML twin of {@link setTrustedHtml}) with a server-rendered
+     * fragment whose root is the element's own re-render — the same trust contract: only for the
+     * text of a same-origin Thymeleaf fragment response. The markup is parsed into an inert
+     * `<template>`, so, exactly as with an outerHTML assignment, no script inside it runs.
+     *
+     * @param {Element | null | undefined} el the element to replace; no-op when absent or detached
+     * @param {string | null | undefined} html the fragment markup; null / undefined removes `el`
+     */
+    function replaceWithTrustedHtml(el, html) {
+        if (!el || !el.parentNode) {
+            return;
+        }
+        const tpl = document.createElement('template');
+        setTrustedHtml(tpl, html);
+        el.replaceWith(tpl.content);
+    }
 
     /**
      * Ensures the fragment query parameter (default fragment=results) is present
@@ -943,7 +1023,7 @@
                     });
                     return false;
                 }
-                container.innerHTML = html;
+                setTrustedHtml(container, html);
                 bindSwapAnchorInterception(container, opts);
                 // Let page/global enhancers re-process the freshly swapped subtree
                 // (e.g. the .utc-time localiser in sidebar.html). A one-shot
@@ -1140,6 +1220,8 @@
         submitForm: submitForm,
         swap: swap,
         bindSwap: bindSwap,
+        setTrustedHtml: setTrustedHtml,
+        replaceWithTrustedHtml: replaceWithTrustedHtml,
         syncVersion: syncVersion,
         handleProblem: handleProblem,
         // Exposed so a page-local onError handler — which bypasses handleProblem entirely — can

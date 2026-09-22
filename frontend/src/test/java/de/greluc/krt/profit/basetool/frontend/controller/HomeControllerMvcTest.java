@@ -452,7 +452,7 @@ class HomeControllerMvcTest {
         .isNull();
     org.assertj.core.api.Assertions.assertThat(result.getResponse().getHeaders("Set-Cookie"))
         .as("nor set a session cookie")
-        .noneMatch(header -> header.startsWith("SESSION="));
+        .noneMatch(header -> header.startsWith("__Host-SESSION=") || header.startsWith("SESSION="));
     org.mockito.Mockito.verifyNoInteractions(backendApiClient);
   }
 

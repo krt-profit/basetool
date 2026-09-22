@@ -22,7 +22,10 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import okhttp3.mockwebserver.MockResponse;
@@ -31,6 +34,7 @@ import okhttp3.mockwebserver.RecordedRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.support.StaticMessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -56,6 +60,8 @@ import org.springframework.web.server.ResponseStatusException;
 @SuppressWarnings("removal")
 class HangarImportProxyControllerTest {
 
+  private static final String TOO_LARGE_MESSAGE = "The file is larger than 8 MB.";
+
   private MockWebServer server;
   private HangarImportProxyController controller;
 
@@ -64,7 +70,9 @@ class HangarImportProxyControllerTest {
     server = new MockWebServer();
     server.start();
     WebClient webClient = WebClient.builder().baseUrl(server.url("/").toString()).build();
-    controller = new HangarImportProxyController(webClient);
+    StaticMessageSource messages = new StaticMessageSource();
+    messages.addMessage("hangar.import.error.tooLarge", Locale.getDefault(), TOO_LARGE_MESSAGE);
+    controller = new HangarImportProxyController(webClient, messages);
   }
 
   @AfterEach
@@ -217,10 +225,16 @@ class HangarImportProxyControllerTest {
   }
 
   @Test
-  void importFleetview_onFileGetBytesIoException_wrapsAs500() {
-    // Given a MultipartFile whose getBytes() throws — simulating a torn upload.
+  void importFleetview_onFileReadIoException_wrapsAs500() {
+    // Given a MultipartFile whose content cannot be read — simulating a torn upload. The relay
+    // streams the part, so the failure surfaces from getInputStream(), not getBytes().
     MultipartFile broken =
         new MockMultipartFile("file", "x.json", "application/json", new byte[] {1, 2, 3}) {
+          @Override
+          public InputStream getInputStream() throws IOException {
+            throw new IOException("disk full");
+          }
+
           @Override
           public byte[] getBytes() throws IOException {
             throw new IOException("disk full");
@@ -249,5 +263,60 @@ class HangarImportProxyControllerTest {
         assertThrows(ResponseStatusException.class, () -> controller.importFleetview(file));
 
     assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, ex.getStatusCode());
+  }
+
+  @Test
+  void importShips_oneByteOverTheCap_isRefusedWith413BeforeAnyBackendRequest() throws Exception {
+    // An upload one byte above the cap must be refused without reading it and without a backend
+    // call (APPSEC-03): the relay was the cheaper DoS target of the two hops.
+    MultipartFile oversized =
+        new MockMultipartFile(
+            "file",
+            "huge.json",
+            "application/json",
+            new byte[(int) HangarImportProxyController.MAX_IMPORT_BYTES + 1]) {
+          @Override
+          public byte[] getBytes() {
+            throw new AssertionError("an oversized upload must not be read");
+          }
+
+          @Override
+          public InputStream getInputStream() {
+            throw new AssertionError("an oversized upload must not be read");
+          }
+        };
+
+    ResponseEntity<Map<?, ?>> result = controller.importShips(oversized);
+
+    assertEquals(HttpStatus.CONTENT_TOO_LARGE, result.getStatusCode());
+    Map<?, ?> body = result.getBody();
+    assertNotNull(body);
+    assertEquals("UPLOAD_TOO_LARGE", body.get("code"));
+    assertEquals(413, body.get("status"));
+    assertEquals(TOO_LARGE_MESSAGE, body.get("detail"), "hangar.js shows the detail field");
+    assertEquals(0, server.getRequestCount(), "no backend request may be made");
+  }
+
+  @Test
+  void importShips_exactlyAtTheCap_isStreamedToTheBackendWhole() throws Exception {
+    // The cap is inclusive: exactly 8 MiB is a legitimate upload and reaches the backend intact.
+    server.enqueue(
+        new MockResponse()
+            .setResponseCode(200)
+            .setHeader("Content-Type", "application/json")
+            .setBody("{\"importedCount\":0}"));
+    byte[] content = new byte[(int) HangarImportProxyController.MAX_IMPORT_BYTES];
+    Arrays.fill(content, (byte) 'x');
+    MultipartFile atCap = new MockMultipartFile("file", "big.json", "application/json", content);
+
+    ResponseEntity<Map<?, ?>> result = controller.importShips(atCap);
+
+    assertEquals(HttpStatus.OK, result.getStatusCode());
+    RecordedRequest req = server.takeRequest(5, TimeUnit.SECONDS);
+    assertNotNull(req);
+    assertEquals("/api/v1/hangar/import/ships", req.getPath());
+    assertTrue(
+        req.getBodySize() >= HangarImportProxyController.MAX_IMPORT_BYTES,
+        "the whole file must be forwarded, body was " + req.getBodySize() + " bytes");
   }
 }

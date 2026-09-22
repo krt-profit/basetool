@@ -70,10 +70,18 @@ server:
       # authenticated user's Redis session.
       timeout: 720h
       cookie:
+        # The `__Host-` prefix (FE-SEC-06) makes the browser refuse the cookie unless it is Secure,
+        # has Path=/ and carries NO Domain attribute — so no sibling subdomain and no plain-http
+        # response can ever set or overwrite the session cookie (cookie tossing / session
+        # fixation). All three conditions already held; the prefix makes the browser enforce them.
+        # Do not add `domain:` or a non-root `path:` here: the browser would then drop the cookie
+        # and every login would fail. Renaming the cookie from `SESSION` signed every member out
+        # once, at the deploy that shipped it (the old cookie names nothing the app reads any more).
+        name: __Host-SESSION
         secure: true
         http-only: true
         same-site: strict
-        # Persist the SESSION cookie for 30 days so the login survives a browser
+        # Persist the session cookie for 30 days so the login survives a browser
         # restart. Without max-age this is a session cookie that dies on browser
         # close, forcing a fresh login even though the Redis-backed session is
         # still valid.

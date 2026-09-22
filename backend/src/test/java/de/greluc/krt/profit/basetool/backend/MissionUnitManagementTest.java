@@ -107,7 +107,8 @@ class MissionUnitManagementTest {
                 null));
 
     // The ship owner must be a registered participant before the ship can be pinned to a unit.
-    missionService.addParticipant(mission.getId(), officerUser.getId());
+    missionService.addParticipant(
+        mission.getId(), officerUser.getId(), null, null, null, null, null);
 
     mission =
         missionService.addUnitToMission(
@@ -125,7 +126,7 @@ class MissionUnitManagementTest {
 
     mockMvc
         .perform(
-            put("/api/v1/missions/" + mission.getId() + "/units/" + unit.getId())
+            put("/api/v1/missions/" + mission.getId() + "/units/" + unit.getId() + "/slim")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
@@ -151,7 +152,7 @@ class MissionUnitManagementTest {
   void testDeleteUnit_Officer_Allowed() throws Exception {
     mockMvc
         .perform(
-            delete("/api/v1/missions/" + mission.getId() + "/units/" + unit.getId())
+            delete("/api/v1/missions/" + mission.getId() + "/units/" + unit.getId() + "/slim")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
@@ -161,7 +162,7 @@ class MissionUnitManagementTest {
                             new SimpleGrantedAuthority("MISSION_MANAGE"),
                             new SimpleGrantedAuthority("HANGAR_MANAGE"),
                             new SimpleGrantedAuthority("REFINERY_MANAGE"))))
-        .andExpect(status().isOk());
+        .andExpect(status().isNoContent());
 
     Mission updatedMission = missionRepository.findById(mission.getId()).orElseThrow();
     assertFalse(

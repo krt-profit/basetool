@@ -1263,8 +1263,21 @@ is a weaker CSRF model than the retained server-side synchronizer token + `SameS
 ADR-0088). Runaway regression is caught by `ActiveSessionsRunaway`
 ([`observability.md`](observability.md)).
 
+**The cookie is `__Host-SESSION` (FE-SEC-06, 2026-09-22).** The session cookie was called
+`SESSION`; it now carries the `__Host-` prefix (`server.servlet.session.cookie.name`). A browser
+accepts a `__Host-` cookie only when it is `Secure`, has `Path=/` and carries **no `Domain`** — so no
+sibling subdomain and no plain-http response can plant or overwrite the session cookie (cookie tossing
+into a session-fixation). All three conditions already held; the prefix makes the browser enforce
+them. It also makes them load-bearing: a `domain:`, a non-root `path:` or `secure: false` in any
+profile would not weaken the cookie quietly — the browser would drop it and every login would fail.
+The rename dropped every live session once, at the deploy that shipped it: the old `SESSION` cookie
+names nothing the app reads any more, so each member signed in again exactly once. The owner approved
+that trade.
+
 **Acceptance**
 
+- [ ] The session cookie is named `__Host-SESSION`, is `Secure`, has `Path=/` and no `Domain`, and
+  no profile file overrides any of the four.
 - [ ] A new session's default idle window is `app.session.anonymous-timeout` (the repository
   default), not the 30-day window.
 - [ ] A successful OAuth2 login promotes its session's idle window to
@@ -1272,7 +1285,10 @@ ADR-0088). Runaway regression is caught by `ActiveSessionsRunaway`
 - [ ] No throwaway session is created merely to bump the timeout when none exists at login success.
 - [ ] Members keep the 30-day "stay logged in" behaviour (cookie `max-age` + authenticated window).
 
-**Enforced by:** `RedisSessionConfigTest` (anonymous window is the repository default),
+**Enforced by:** `SessionCookiePrefixTest` (the `__Host-` name and its three conditions, in
+`application.yml` and in no profile override), `LoginSmokeE2eTest` (a real browser holds
+`__Host-SESSION` after the OIDC login), `RedisSessionConfigTest` (anonymous window is the repository
+default),
 `SessionLifetimeUpgradeSuccessHandlerTest` (login promotes to the authenticated window; no session
 minted when absent) · **Code:** `RedisSessionConfig#sessionRepositoryCustomizer`,
 `SessionLifetimeUpgradeSuccessHandler`, `SecurityConfig#oauth2LoginSuccessHandler` · **Monitoring:**
@@ -1671,9 +1687,11 @@ nor the provisioning service account.
 - [x] Verification fails loudly when `dpop.bound.access.tokens` is flipped on, when the marker role
   is missing, or when the policy is present but unscoped.
 
-**Enforced by:** `provision-keycloak-mobile-client.test.sh` (configuration) and
+**Enforced by:** `provision-keycloak-mobile-client.test.sh` and, for the whole realm,
+`provision-keycloak-realm.test.sh` section 4 (configuration and write order) and
 `scripts/verify-dpop-binding.py` (behaviour) · **Code:**
-`scripts/provision-keycloak-mobile-client.py` · **Decision:**
+`scripts/provision-keycloak-mobile-client.py`, which `scripts/provision-keycloak-realm.py` imports
+for the client, profile and policy (`REQ-OPS-033`) · **Decision:**
 [ADR-0131](../adr/0131-mobile-auth-refresh-only-dpop-binding.md) · **Measurements:**
 [`ANDROID_API_EXPOSURE_PLAN.md`](../archive/ANDROID_API_EXPOSURE_PLAN.md) section 7
 
@@ -2126,9 +2144,11 @@ not one that also silently changes what a post-incident review can reconstruct.
   unit; and the Lager under it reads **1403.4 SCU** (102.93 + 700 + 180 + 420.5), the org-wide
   total, against the 784.8 the same screen shows a member of one Staffel.
 
-**Enforced by:** `provision-keycloak-mobile-client.test.sh` section 7 · **Code:**
+**Enforced by:** `provision-keycloak-mobile-client.test.sh` section 7 and
+`provision-keycloak-realm.test.sh` sections 2 and 4 · **Code:**
 `scripts/provision-keycloak-mobile-client.py` (`MEMBER_REALM_ROLES`, `FORBIDDEN_REALM_ROLES`,
-`upsert_realm_role_scope`), `UserReconciliationService#syncUser`,
+`upsert_realm_role_scope`), `scripts/provision-keycloak-realm.py` (`_converge_role_scope`, which
+converges the same list in both directions), `UserReconciliationService#syncUser`,
 `CustomJwtGrantedAuthoritiesConverter`, `OrgUnitViewModel` (app) · **Decision:**
 [ADR-0131](../adr/0131-mobile-auth-refresh-only-dpop-binding.md), and the 2026-09-02 reversal above
 
@@ -3240,7 +3260,9 @@ narrowed against the allowlist the page itself renders, before it is relayed.
 | `userSub`, `actorUserId`, `userId`                      | `UUID`                                         | `AdminPersonalInventoryController`, `AdminPersonalBlueprintController`, `MemberEvaluationController`, `UserController` |
 | `eventType`, `clientId`, `source`, the board `sort` key | narrowed to the rendered option list           | the page's own `<select>`                                                                                              |
 | a Spring sort specification                             | `RelayParams.sortSpecOrNull`                   | REQ-API-005's backend field whitelist                                                                                  |
-| free text (`q`)                                         | a `WebClient` URI-template variable            | REQ-FE-016                                                                                                             |
+| free text (`q`, the list pages' `search`)               | a `WebClient` URI-template variable            | REQ-FE-016                                                                                                             |
+| the mission / operation list period (`start`, `end`)    | `Instant` + `@DateTimeFormat(iso = DATE_TIME)` | `MissionController#searchMissions`, `OperationController`                                                              |
+| the mission list `status`                               | narrowed to `PLANNED`/`ACTIVE`/`COMPLETED`/`CANCELLED` | the backend's mission status vocabulary                                                                          |
 | a star-system name (`starSystemNames`)                  | a `WebClient` URI-template variable            | REQ-UI-014's materials-matrix relay                                                                                    |
 
 Free text is the one relayed value that may legitimately contain arbitrary characters, so it is
@@ -3286,6 +3308,13 @@ proxy seam, it is a `400` from Spring's type conversion, handled by `GlobalExcep
   state; a catalogue name carrying `&` or `=` opens no second query parameter on the backend call.
 - [ ] The audit tab list has exactly one definition in the frontend, so the page and its
   export/purge proxy cannot disagree about which tabs exist.
+- [ ] The mission and operation list pages relay `search`, `start` and `end` as `WebClient`
+  URI-template variables, never concatenated into the URI: a search carrying `&`, `#`, `+`, `{…}` or
+  `%` reaches the backend as one decoded `query`, and a period reaches it decoded exactly once so it
+  parses as an `Instant`. (FE-SEC-01, 2026-09-22: the mission list concatenated all four filters —
+  `&` opened a second backend parameter, `#` cut the query, `{x}` threw — and the operation list
+  URL-encoded its dates into the template, so the WebClient encoded them twice and the operation
+  date filter never worked.)
 
 **Enforced by:** `RelayParamsTest` (the checks, hostile inputs included) · `RelayParamBindingMvcTest`
 (the four proxy seams answer 400 on a period carrying URI syntax; the admin page degrades without
@@ -3298,8 +3327,19 @@ allowlist, `MARKET` included) · `MaterialProxyControllerTest` (a star-system na
 `BankReportProxyController`, `OrgUnitBankProxyController`, `PromotionProxyController`,
 `AdminAuditLogPageController`, `AdminPersonalInventoryPageController`,
 `AdminPersonalBlueprintsPageController`, `AdminSyncReportsPageController`,
-`MaterialboersePageController` · **ADR:**
+`MaterialboersePageController`, `MissionPageController#listMissions`,
+`OperationPageController#listOperations` · **Enforced also by:** `ListSearchRelayParamsTest` (exact
+template + variables, and the query a `MockWebServer` backend actually receives) · **ADR:**
 [ADR-0158](../adr/0158-a-relayed-request-parameter-is-bound-to-the-backends-own-type.md)
+
+**The active-OrgUnit switcher redirects only on-site (FE-SEC-02, 2026-09-22).** `POST
+/me/active-org-unit` returns to the page it was posted from via the form's `_referer` field, which
+went into a `RedirectView` unchecked: a crafted form could send a signed-in member from the app to any
+site. `MeFrontendController.safeRedirectTarget` now honours `_referer` only as a path with exactly one
+leading `/` — no scheme, no `//host`, no `/\host` (browsers read that backslash as a slash), no
+control character — and falls back to `/` otherwise. `orgUnitId` is bound as a `UUID`, so a malformed
+one is a `400` instead of the `500` an unguarded `UUID.fromString` produced. **Enforced by:**
+`MeFrontendControllerTest`.
 
 ### REQ-SEC-052 — No anonymous surface beyond the landing page and the enumerated infrastructure paths
 
@@ -3339,7 +3379,8 @@ a method gate.
 >   to `/auth/admin` and kept the same bridge-gateway allow-list with its closing `deny all`, which
 >   the nightly external deny probe asserts from a GitHub runner — the only vantage point that can,
 >   since an internal probe shares the network position the rule tests.
-> - **Keycloak now receives this application's `SESSION` cookie**, because a cookie scoped to `/` is
+> - **Keycloak now receives this application's session cookie** (`SESSION`, renamed
+>   `__Host-SESSION` on 2026-09-22 — REQ-SEC-025), because a cookie scoped to `/` is
 >   sent to every path on the origin. Recorded rather than mitigated: Keycloak already holds every
 >   member's credentials and mints their tokens, so an identifier it ignores adds nothing to what a
 >   compromised Keycloak could already do, and filtering a `Cookie` header in nginx would put a
@@ -3431,7 +3472,7 @@ it is anonymous access in the brief's sense.
 - [x] Exactly two OpenAPI operations declare `security: []`, and no operation references a security
   scheme the document does not define.
 - [x] The landing page mints no session and makes no backend call: `getSession(false) == null`, no
-  `SESSION` cookie, `verifyNoInteractions(backendApiClient)`.
+  `__Host-SESSION` (formerly `SESSION`) cookie, `verifyNoInteractions(backendApiClient)`.
 - [x] A read endpoint without a method- or class-level `@PreAuthorize` fails the build, like a write.
 
 **Enforced by:** `AnonymousSurfaceSweepTest` (three passes over every mapping, plus `HEAD`) ·
