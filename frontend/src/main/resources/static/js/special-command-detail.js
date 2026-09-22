@@ -19,12 +19,16 @@
  */
 
 /*
- * Special-command-detail admin page module (/admin/special-commands/{id}), extracted verbatim
- * from the former inline script of admin/special-command-detail.html (ADR-0069, follow-up to #924).
+ * SK member page module (/organisation/special-commands/{id}, reachable by admins and by the SK's
+ * own lead), extracted from the former inline script of the detail template (ADR-0069, follow-up
+ * to #924). The page moved out of /admin/** so a non-admin SK lead can reach it; the old
+ * /admin/special-commands/{id} URL redirects here.
  *
  * In-place member roster management: the flags/lead/remove forms (document-delegated inside the
  * swappable roster) and the add-member modal all save via the krtFetch AJAX twins and re-swap the
- * #members-results fragment; the classic POST->redirect forms stay the no-JS fallback. The whole
+ * #members-results fragment; the classic POST->redirect forms stay the no-JS fallback. Every form
+ * posts to its own action attribute: the flags/remove/add forms to /organisation/special-commands,
+ * the admin-only lead-toggle form to /admin/special-commands (rendered for admins only). The whole
  * page logic is one IIFE.
  *
  * The Thymeleaf-interpolated toast + conflict strings (MEMBER_MSG, MEMBER_CONFLICT) stay inline in
@@ -44,7 +48,7 @@
             return;
         }
         window.krtFetch.swap({
-            url: '/admin/special-commands/' + encodeURIComponent(scId) + '?fragment=members',
+            url: '/organisation/special-commands/' + encodeURIComponent(scId) + '?fragment=members',
             container: '#members-results',
             fragmentValue: 'members',
             history: false,

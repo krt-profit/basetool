@@ -1601,7 +1601,7 @@
       "get" : {
         "tags" : [ "special-command-controller" ],
         "summary" : "Get a Spezialkommando by id",
-        "description" : "Returns the full DTO for the requested Spezialkommando. ADMIN-only.",
+        "description" : "Returns the full DTO for the requested Spezialkommando. Admin, or the SK lead of this Spezialkommando (the same gate as its member-management endpoints).",
         "operationId" : "getSpecialCommand",
         "parameters" : [ {
           "name" : "id",
@@ -1637,6 +1637,16 @@
               }
             }
           },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
           "404" : {
             "description" : "Not Found",
             "content" : {
@@ -1662,16 +1672,6 @@
           },
           "401" : {
             "description" : "Unauthorized",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "403" : {
-            "description" : "Forbidden",
             "content" : {
               "application/problem+json" : {
                 "schema" : {

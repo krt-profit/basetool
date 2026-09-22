@@ -38,10 +38,11 @@ import org.springframework.transaction.annotation.Transactional;
  * authorities with the membership row on the target SK.
  *
  * <p>The rule, recorded in {@code SPEZIALKOMMANDO_PLAN.md} §2 (D2): an admin may manage any SK's
- * member list; a non-admin caller may manage a specific SK's members iff they hold an {@code
- * is_lead = true} membership on that exact SK. The {@code is_lead} flag itself is ADMIN-only
- * (toggled via a dedicated endpoint with a hard {@code hasRole('ADMIN')} guard) so a Lead cannot
- * promote themselves or someone else to Lead.
+ * member list; a non-admin caller may manage a specific SK's members iff their membership on that
+ * exact SK carries {@code role = SK_LEAD}. The same verdict also gates the single-SK read {@code
+ * GET /api/v1/special-commands/{id}}, so the lead's member page can render its SK header. The lead
+ * seat itself is set through a dedicated endpoint gated to admin or the Bereichsleiter of the SK's
+ * parent Bereich, so a Lead cannot promote themselves or someone else to Lead.
  */
 @Service
 @RequiredArgsConstructor
@@ -61,9 +62,9 @@ public class SpecialCommandSecurityService {
    *       admin surface.
    *   <li>Anonymous / unauthenticated — always {@code false}; the endpoints under {@code
    *       /api/v1/special-commands/{id}/members/**} are not part of the public surface.
-   *   <li>Authenticated non-admin — {@code true} iff the caller has an {@code is_lead = true}
-   *       membership on the exact SK referenced by {@code specialCommandId}. A Lead may NOT manage
-   *       members of any other SK they are merely a regular member of.
+   *   <li>Authenticated non-admin — {@code true} iff the caller's membership on the exact SK
+   *       referenced by {@code specialCommandId} carries {@code role = SK_LEAD}. A Lead may NOT
+   *       manage members of any other SK they are merely a regular member of.
    * </ul>
    *
    * <p>A non-existent SK id is treated as denied (no special-case 404 surface from the

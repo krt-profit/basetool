@@ -672,7 +672,7 @@ service layer via the active Staffel context
 | Function (gate)                                                                                                                                                     | Member | Log. | MM | Officer | Admin |
 |:--------------------------------------------------------------------------------------------------------------------------------------------------------------------|:------:|:----:|:--:|:-------:|:-----:|
 | Read Staffel list / active OrgUnit list (`/org-units/active`)                                                                                                       |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Read SK list (`isAuthenticated()`; inactive ones **and** the detail view `GET /special-commands/{id}` admin only)                                                   |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Read SK list (`isAuthenticated()`; inactive ones admin only; the detail view `GET /special-commands/{id}` admin **or SK-Lead of this SK**, `canManageMembers`)     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Switch the active OrgUnit context (sidebar switcher)                                                                                                                |   ✅²   |  ✅²  | ✅² |   ✅²    |   ✅   |
 | Staffel lifecycle (create/rename/delete/activate, `promotion-enabled`, `profit-eligible`) (`hasRole('ADMIN')`)                                                      |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Set Staffel membership flags (`PATCH /squadrons/{id}/members/{uid}`, `hasRole('ADMIN')`)                                                                            |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
@@ -683,10 +683,15 @@ service layer via the active Staffel context
 | Read the org chart (`GET /api/v1/org-chart`, `/org-chart`)                                                                                                          |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Edit the org chart — free-text holders and structure only; account seats mirror the ranks (`/api/v1/org-chart/positions/**`, `hasRole('ADMIN')`, REQ-ROLE-006) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 
-² Non-admins switch between their memberships; admins additionally „Alle Staffeln" (all Staffeln).
-³ SK member management is **admin or SK-Lead of this SK** — not tied to the global Officer role.
-⁴ Not by role: the **Bereichsleiter of the SK's parent Bereich** may appoint and clear the lead
-(§3.9.1); nobody else below Admin.
+² Non-admins switch between their memberships; admins additionally „Alle Staffeln" (all Staffeln). ³ SK member management
+is **admin or SK-Lead of this SK** — not tied
+to the global Officer role. The web page for it is **„Leitung" → „Mitglieder verwalten"**
+(`/organisation/special-commands/{id}`, frontend gate `ADMIN_OR_OFFICER`, the backend's per-SK
+verdict decides), not the admin area; `/admin/special-commands/{id}` only redirects there. An SK
+lead cannot change the lead seat on that page — the lead column renders for admins only.
+⁴ Besides the admin, the **Bereichsleiter of the SK's parent Bereich** sets the lead, on the
+„Leitung" page (`OrgRoleManagementSecurityService.canAppointSkLead`, REQ-ROLE-004) — never the SK
+lead itself. *(Corrected 2026-09-22: this row said `hasRole('ADMIN')` only.)*
 
 #### 3.9.1 Leitung — the delegated appointment ladder (REQ-ROLE-004, ADR-0042)
 

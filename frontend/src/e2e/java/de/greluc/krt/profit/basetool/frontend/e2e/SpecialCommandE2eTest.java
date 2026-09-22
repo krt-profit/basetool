@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.e2e;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.microsoft.playwright.Browser;
@@ -44,6 +45,8 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * <ul>
  *   <li>Lifecycle (UI): the admin creates an SK via {@code /admin/special-commands} and it appears
  *       in the list.
+ *   <li>Member page (UI): the old {@code /admin/special-commands/{id}} URL redirects to the SK
+ *       member page at {@code /organisation/special-commands/{id}}.
  *   <li>Limitation (API): naming a non-profit-eligible SK as a job order's responsible OrgUnit
  *       returns 400.
  * </ul>
@@ -185,6 +188,38 @@ class SpecialCommandE2eTest {
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "special-command-delete");
+        throw failure;
+      }
+    }
+  }
+
+  /**
+   * The SK member page moved out of the admin area to {@code /organisation/special-commands/{id}}
+   * (an SK's own lead manages its members too, and {@code /admin/**} stays admin-only): the old
+   * {@code /admin/special-commands/{id}} URL redirects there, and the page renders the member
+   * roster box with its add-member action. Ephemeral-stack only: it needs the SK seeded in {@link
+   * #setUp}.
+   */
+  @Test
+  void oldAdminDetailUrlRedirectsToTheMemberPage() {
+    assumeTrue(STACK.managesStack(), "needs the ephemeral stack's seeded SK");
+    String baseUrl = STACK.baseUrl();
+    try (BrowserContext context =
+        browser.newContext(new Browser.NewContextOptions().setIgnoreHTTPSErrors(true))) {
+      Page page = context.newPage();
+      try {
+        E2eSupport.login(page, baseUrl, ADMIN_USER, ADMIN_PASSWORD);
+        E2eSupport.navigate(page, baseUrl + "/admin/special-commands/" + skApiId);
+        page.waitForLoadState();
+        String landed = page.url();
+        assertTrue(
+            landed.endsWith("/organisation/special-commands/" + skApiId),
+            "the old admin SK detail URL must redirect to the SK member page, landed on " + landed);
+        assertThat(page.locator("#members-box"))
+            .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
+        assertThat(page.locator("#add-member-btn")).isVisible();
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "special-command-member-page-redirect");
         throw failure;
       }
     }

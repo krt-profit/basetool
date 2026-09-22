@@ -524,8 +524,10 @@ class TouchClassLayoutE2eTest {
           // `smoke` precisely so it can run against a shared deployment. Taking the first detail
           // link the list actually renders keeps it read-only and measures whatever data is really
           // there. A list with no rows yields no link and is reported as uncovered rather than
-          // silently passing.
-          String detail = firstDetailLink(page, path);
+          // silently passing. The link is looked for under the list's own path, except where
+          // FrontendPageRoutes.DETAIL_PREFIX_OVERRIDES says the list links out of it (the admin SK
+          // list links to the SK member page under /organisation/special-commands).
+          String detail = firstDetailLink(page, FrontendPageRoutes.detailPrefixOf(path));
           if (detail != null) {
             findings.addAll(
                 measureSafely(page, baseUrl, detail, deviceLabel, width, height, measuredDetails));
@@ -710,14 +712,17 @@ class TouchClassLayoutE2eTest {
   }
 
   /**
-   * Finds the first detail link a list page renders under its own path.
+   * Finds the first detail link a list page renders under the given prefix — the list's own path,
+   * or the one {@link FrontendPageRoutes#detailPrefixOf} names for a list whose rows link out of
+   * it.
    *
    * <p>Matches {@code <listPath>/<id>} where the id looks like a UUID or a number — the two shapes
    * the frontend's detail routes use — and deliberately ignores the {@code /create}, {@code /new}
    * and {@code /search} siblings, which are pages in their own right and already in the sweep.
    *
    * @param page the page currently showing the list
-   * @param listPath the app-relative path of that list, used as the href prefix
+   * @param listPath the href prefix the detail links carry: the list's own app-relative path, or
+   *     its override from {@link FrontendPageRoutes#DETAIL_PREFIX_OVERRIDES}
    * @return the app-relative path of the first detail view, or {@code null} when the list is empty
    */
   private static String firstDetailLink(Page page, String listPath) {

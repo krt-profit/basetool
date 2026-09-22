@@ -35,7 +35,8 @@ import java.util.List;
  *     OL members); never {@code null}.
  * @param bereiche the Bereiche the caller may appoint into; never {@code null}.
  * @param squadrons the Staffeln the caller may appoint into; never {@code null}.
- * @param specialCommands the Spezialkommandos the caller may appoint a lead on; never {@code null}.
+ * @param specialCommands the Spezialkommandos the caller may appoint a lead on (admin, parent
+ *     Bereichsleiter) or manage the members of (admin, the SK's own lead); never {@code null}.
  */
 public record LeitungViewDto(
     boolean admin,

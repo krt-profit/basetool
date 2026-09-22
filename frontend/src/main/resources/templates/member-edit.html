@@ -217,7 +217,7 @@
 
     <!-- SPEZIALKOMMANDO_PLAN.md §7.4 — read-only Memberships-Übersicht. Each row links through to
          the corresponding management surface: Staffel rows to /admin/mission-data (squadron CRUD)
-         or /members/{id}/edit (this page) for flag-toggles; SK rows to /admin/special-commands/{id}
+         or /members/{id}/edit (this page) for flag-toggles; SK rows to /organisation/special-commands/{id}
          for the full roster UI. Full in-form delta-edit is a follow-up release. -->
     <div class="hud-box mt-2" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
         <h2 th:text="#{members.memberships.title}">Mitgliedschaften</h2>
@@ -237,7 +237,7 @@
                       th:if="${m.kind() != 'SPECIAL_COMMAND'}"
                       th:text="#{orgUnit.kind.squadron.short}">Staffel</span>
                 <a th:if="${m.kind() == 'SPECIAL_COMMAND'}"
-                   th:href="@{/admin/special-commands/{id}(id=${m.orgUnitId()})}"
+                   th:href="@{/organisation/special-commands/{id}(id=${m.orgUnitId()})}"
                    th:text="#{members.memberships.manage}"
                    class="btn-link">Verwalten</a>
             </li>

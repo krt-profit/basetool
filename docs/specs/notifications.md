@@ -183,7 +183,11 @@ org-unit-blind). The last three were added for the bank booking-request use case
 from the event.
 A rule's `exclude_actor` flag drops the triggering user. The selector `kind` is an open enum so a
 future `GROUP` selector slots in without reworking the engine. Rules are created, edited, enabled /
-disabled and deleted at runtime via an admin-only API.
+disabled and deleted at runtime via an admin-only API — **every** rule, including the seeded ones:
+all six selector kinds are accepted on create and update. The three event-derived kinds are stored
+with every selector column `null`, whatever the request carried. (Until 2026-09-22 the service
+refused those three as "seed-only", so no seeded bank, Materialbörse or account-deletion rule could be
+saved from the editor — not even to disable it.)
 
 **Acceptance**
 
@@ -191,11 +195,16 @@ disabled and deleted at runtime via an admin-only API.
 - [x] Admin CRUD at `/api/v1/notification-rules` is gated on `hasRole('ADMIN')`.
 - [x] The engine unions a rule's selectors, applies `exclude_actor`, and de-duplicates
   recipients.
+- [x] All six selector kinds are admin-manageable; a seeded rule round-trips through the editor
+  unchanged.
 
 Admins manage rules through a dedicated admin page (list + create/edit form with a dynamic
-selector editor) that relays to the rule API.
+selector editor) that relays to the rule API. The page offers **every** event type, notification
+type and selector kind, each under a localized label (`admin.notificationRules.*`) rather than its
+enum code; an event-derived selector kind shows a hint instead of further fields. A save or delete
+re-swaps the rule table in place (REQ-FE-001) instead of reloading the page.
 
-**Enforced by:** `RuleEvaluationServiceTest`, `NotificationRuleEngineIntegrationTest` ·
+**Enforced by:** `RuleEvaluationServiceTest`, `NotificationRuleEngineIntegrationTest`, `NotificationRuleServiceTest` ·
 **Code:** `model/NotificationRule`, `model/NotificationRuleSelector`,
 `service/RuleEvaluationService`, `service/NotificationRuleService`,
 `controller/NotificationRuleController`, `db/migration/V156__create_notification_rule.sql`,

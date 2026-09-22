@@ -108,7 +108,7 @@
                             <td th:text="${sc.shorthand}">Kürzel</td>
                             <td th:text="${sc.description}">Desc</td>
                             <td class="flex-gap-xs">
-                                <a th:href="@{/admin/special-commands/{id}(id=${sc.id})}" class="btn btn-ghost"
+                                <a th:href="@{/organisation/special-commands/{id}(id=${sc.id})}" class="btn btn-ghost"
                                    th:text="#{admin.specialcommands.members.manage}">Mitglieder verwalten</a>
                                 <button class="btn btn-ghost btn-icon edit-sc-btn"
                                         th:data-action="@{/admin/special-commands/{id}/update(id=${sc.id})}"

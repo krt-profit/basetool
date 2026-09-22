@@ -169,9 +169,17 @@ deactivated rows with a reactivate control. The list page's per-row trash button
 through a KRT modal (no native `confirm()`, per [`ui-design-system.md`](ui-design-system.md))
 before POSTing the deactivate. SK **member management** is open to ADMIN
 or a `role = SK_LEAD` member of that SK (`SpecialCommandSecurityService.canManageMembers`; epic #800
-replaced the legacy `is_lead` flag with the unified rank, V187). Appointing the lead is for an ADMIN
-or the Bereichsleiter of the SK's parent Bereich (`OrgRoleManagementSecurityService.canAppointSkLead`,
-REQ-ROLE-004) — never the lead themselves (no self-escalation). **Promotion-system maintenance** is
+replaced the legacy `is_lead` flag with the unified rank, V187) — the member list, add / remove, the
+Logistiker / Einsatzmanager flags, and the SK read `GET /api/v1/special-commands/{id}` that heads the
+page. Because it is not admin-only, the web page for it lives **outside** the admin area, at
+`/organisation/special-commands/{id}` (frontend `SpecialCommandMembersPageController`,
+`ADMIN_OR_OFFICER` + the backend's per-SK verdict); `/admin/special-commands/{id}` only redirects
+there. An SK lead reaches it from the „Leitung" page, which lists every SK the caller may manage
+members of (`LeitungUnitDto.canManageRoster`). Setting the **lead** is never open to the SK lead
+itself (no self-escalation): it is ADMIN or the Bereichsleiter of the SK's parent Bereich
+(`OrgRoleManagementSecurityService.canAppointSkLead`, REQ-ROLE-004). Until 2026-09-22 this sentence
+said the lead toggle was ADMIN-only, and the member page was admin-only in the frontend, so the SK
+lead's right existed in the API alone. **Promotion-system maintenance** is
 re-opened to OFFICER under an org-unit-scope gate (`canEditSquadron(topic.owningSquadron.id)`).
 Admins can toggle the promotion subsystem per Squadron
 (`PATCH /api/v1/squadrons/{id}/promotion-enabled`); `OwnerScopeService.isPromotionFeatureEnabledForCurrentScope()`

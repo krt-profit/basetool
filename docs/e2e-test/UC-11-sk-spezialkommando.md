@@ -33,13 +33,18 @@ Ein Spezialkommando wird als eigene OrgUnit aufgesetzt, deaktiviert und als bear
 3. In der Zeile des Wegwerf-SK den Papierkorb (`.delete-btn`) klicken → das KRT-Bestätigungsmodal `#sc-delete-modal` öffnet (kein natives `confirm()`); bestätigen (`#sc-delete-form`).
 4. Die Liste neu laden, anschließend mit `?includeInactive=true`.
 
+### SK-Mitgliederseite (UI)
+
+5. `/admin/special-commands/{id}` des geseedeten SK öffnen (nur ephemer).
+
 ### SK als bearbeitende Einheit (API)
 
-5. `POST /api/v1/orders` mit dem geseedeten SK als `responsibleOrgUnitId`.
+6. `POST /api/v1/orders` mit dem geseedeten SK als `responsibleOrgUnitId`.
 
 ## Erwartetes Ergebnis
 
 - Anlegen und Deaktivieren speichern **in place** (#582): der Reload-Marker `window.__krtNoReload` überlebt den Submit; das neu angelegte SK steht nach dem Neuladen in der Liste.
+- Die alte Admin-URL leitet auf die SK-Mitgliederseite `/organisation/special-commands/{id}` um; dort sind die Mitgliederbox (`#members-box`) und „Mitglied hinzufügen" (`#add-member-btn`) sichtbar.
 - Das deaktivierte SK fehlt in der Standardliste (nur aktive) und erscheint unter `includeInactive=true` wieder, markiert mit `.badge-inactive` — es wird weich gelöscht, nicht entfernt.
 - Der Auftrag mit dem SK als bearbeitender Einheit wird mit **HTTP 400** abgelehnt: nur profit-eligible Einheiten bearbeiten Aufträge (V128), und ein frisch angelegtes SK ist das standardmäßig nicht.
 
@@ -47,6 +52,7 @@ Ein Spezialkommando wird als eigene OrgUnit aufgesetzt, deaktiviert und als bear
 
 - **Die Grenze ist Profit-Eligibility, nicht die Art der OrgUnit.** Seit V102/V103 gibt es die Legacy-Spalte `owning_squadron_id` nicht mehr; ein SK kann besitzende Einheit von Inventar, Schiffen, Refinery Orders, Einsätzen und Operationen sein ([Rollen & Scope](rollen-und-scope.md)) und anfragende Einheit eines Auftrags. Nur als *bearbeitende* Einheit braucht es die Profit-Eligibility.
 - **Der Papierkorb war tot.** Vor dem Fix hatte der Button weder ein umschließendes Formular noch ein Skript — ein SK ließ sich über die Liste nie löschen. Der Deaktivierungs-Fall bewacht genau das.
-- **Nicht getestet:** die Mitgliederverwaltung durch den SK-Lead (`@specialCommandSecurityService.canManageMembers`, Lead-Toggle ADMIN-only) und der SK-Pin als aktiver Kontext. Die Regeln stehen in [Rollen & Scope](rollen-und-scope.md); das SK als besitzende Einheit von Inventar prüft [UC-14](UC-14-inventar-mandanten-scope.md).
+- **Wer was darf:** SK anlegen, umbenennen und löschen ist ADMIN-only. Mitglieder und deren Logistiker-/Einsatzmanager-Flags verwalten **Admin oder SK-Lead** (`SpecialCommandSecurityService.canManageMembers`) auf `/organisation/special-commands/{id}`, die der SK-Lead über „Leitung" → „Mitglieder verwalten" erreicht. Den Lead-Rang setzt nie der SK-Lead selbst, sondern ein Admin oder die Bereichsleitung des übergeordneten Bereichs.
+- **Nicht getestet:** die Mitgliederverwaltung durch einen SK-Lead selbst (getestet ist nur, dass der Admin auf der Seite landet) und der SK-Pin als aktiver Kontext. Die Regeln stehen in [Rollen & Scope](rollen-und-scope.md); das SK als besitzende Einheit von Inventar prüft [UC-14](UC-14-inventar-mandanten-scope.md).
 - **Keine Promotion für SK:** Das Beförderungssubsystem ist per DB-CHECK (`kind = 'SQUADRON' OR is_promotion_enabled = FALSE`), V101-Trigger und JPA-Guards für SK gesperrt.
-- **Lead-Scope ist eng:** `is_lead` gilt nur in *diesem einen* SK (kein cross-SK-Carry-over) und nur für die Mitgliederverwaltung — keine sonstigen erhöhten Rechte.
+- **Lead-Scope ist eng:** der Rang `SK_LEAD` gilt nur in *diesem einen* SK (kein cross-SK-Carry-over) und nur für die Mitgliederverwaltung — keine sonstigen erhöhten Rechte.

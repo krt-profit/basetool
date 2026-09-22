@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -26,9 +28,13 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.LeitungMemberDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.LeitungUnitDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LeitungViewDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitKind;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.List;
 import java.util.UUID;
@@ -51,6 +57,9 @@ import org.springframework.web.context.WebApplicationContext;
  * MISSION_MANAGER} capability roles — which have no appointment reach and only ever saw an empty
  * page — are now forbidden. The delegated per-unit authority still lives at the backend appointment
  * endpoints; this test only fixes the coarse frontend gate that used to admit them.
+ *
+ * <p>It also pins how the Spezialkommando section renders the two caps: the roster cap links to the
+ * SK member page, the lead cap shows the lead toggle, and neither leaks into the other.
  */
 @SpringBootTest
 class LeitungPageControllerMvcTest {
@@ -93,6 +102,62 @@ class LeitungPageControllerMvcTest {
     stubEmptyView();
 
     mockMvc.perform(get("/organisation/leitung")).andExpect(status().isOk());
+  }
+
+  /**
+   * Stubs a view holding exactly one Spezialkommando with one member and the given capability
+   * flags.
+   *
+   * @param skId the SK id.
+   * @param canAppointLead the lead-appointment cap (parent Bereichsleiter / admin).
+   * @param canManageRoster the roster cap (the SK's own lead / admin).
+   */
+  private void stubSpecialCommandView(UUID skId, boolean canAppointLead, boolean canManageRoster) {
+    LeitungUnitDto sk =
+        new LeitungUnitDto(
+            skId,
+            "Alpha SK",
+            "ASK",
+            OrgUnitKind.SPECIAL_COMMAND,
+            canAppointLead,
+            canManageRoster,
+            List.of(new LeitungMemberDto(UUID.randomUUID(), "Pilot", "MEMBER", null, 0L)),
+            List.of(),
+            null);
+    when(backendApiClient.get("/api/v1/leitung/view", LeitungViewDto.class))
+        .thenReturn(new LeitungViewDto(false, List.of(), List.of(), List.of(), List.of(sk)));
+  }
+
+  // An SK lead (roster cap only) gets the link to the SK member page and no lead toggle — the
+  // lead seat is appointed from the tier above, never from within the SK.
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void page_skLead_linksToMemberPageWithoutLeadToggle() throws Exception {
+    UUID skId = UUID.randomUUID();
+    stubSpecialCommandView(skId, false, true);
+
+    mockMvc
+        .perform(get("/organisation/leitung"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(containsString("href=\"/organisation/special-commands/" + skId + "\"")))
+        .andExpect(content().string(not(containsString("toggle-sk-lead"))));
+  }
+
+  // A Bereichsleiter who does not lead the SK (lead cap only) keeps the lead toggle and gets no
+  // member-page link.
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void page_bereichsleiter_keepsLeadToggleWithoutMemberPageLink() throws Exception {
+    UUID skId = UUID.randomUUID();
+    stubSpecialCommandView(skId, true, false);
+
+    mockMvc
+        .perform(get("/organisation/leitung"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("toggle-sk-lead")))
+        .andExpect(content().string(not(containsString("/organisation/special-commands/"))));
   }
 
   @Test

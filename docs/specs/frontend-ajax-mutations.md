@@ -440,6 +440,16 @@ wipe-reset and **sync-reports** purge keep their type-to-confirm / confirm hurdl
 outcome as a toast; **p4k-import** (already AJAX) had its bespoke CSRF reader retired onto `krtCsrf`.
 Every classic `POST`→redirect handler stays as the no-JS fallback.
 
+Two later changes on the same pages (2026-09-22). The SK **detail page** moved out of the admin
+area to `/organisation/special-commands/{id}` (`SpecialCommandMembersPageController`, ADR-0198),
+because an SK lead manages the roster there too; its member twins and the
+`organisation/special-command-detail :: membersResults` swap moved with it unchanged, and only the
+admin-only lead toggle still posts to `/admin/special-commands/{id}/members/{userId}/lead`. And
+**notification-rules** dropped its `location.reload()` after save / delete: it re-swaps its
+`admin/notification-rules :: rules` table fragment (`?fragment=rules`) instead (REQ-NOTIF-007).
+Neither page takes part in the live multi-user sync — no admin catalogue page does, except the org
+structure.
+
 **Enforced by:** lists/pagination e2e (#573) plus the mission-detail (#574), order-detail (#575),
 refinery-import (#591), asset-management (#578), bank (#579), promotion (#580), org/members/profile
 (#581) and admin-CRUD (#582) twin / fragment / endpoint MVC + e2e tests, plus

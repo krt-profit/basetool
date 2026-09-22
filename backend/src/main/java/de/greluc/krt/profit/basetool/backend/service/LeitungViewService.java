@@ -50,10 +50,12 @@ import org.springframework.transaction.annotation.Transactional;
  * this service is deliberately not a write authority.
  *
  * <p>The manageable set is computed entirely from the caller's own delegated reach via {@link
- * OrgRoleManagementSecurityService} (the same verdicts the write endpoints gate on) plus the admin
- * short-circuit from {@link AuthHelperService#isAdmin()}; a unit is only ever returned when the
- * caller can act on it, so a plain member receives four empty lists. The service therefore leaks no
- * cross-tenant data even though it is gated only by {@code isAuthenticated()} at the controller.
+ * OrgRoleManagementSecurityService} and, for a Spezialkommando's roster, {@link
+ * SpecialCommandSecurityService#canManageMembers} (the same verdicts the write endpoints gate on),
+ * plus the admin short-circuit from {@link AuthHelperService#isAdmin()}; a unit is only ever
+ * returned when the caller can act on it, so a plain member receives four empty lists. The service
+ * therefore leaks no cross-tenant data even though it is gated only by {@code isAuthenticated()} at
+ * the controller.
  *
  * <p>Class-level {@code @Transactional(readOnly = true)} so the lazy {@code user} association on
  * each roster row materialises while assembling the DTOs.
@@ -65,6 +67,7 @@ public class LeitungViewService {
 
   private final AuthHelperService authHelperService;
   private final OrgRoleManagementSecurityService roleSecurity;
+  private final SpecialCommandSecurityService specialCommandSecurity;
   private final OrgUnitRepository orgUnitRepository;
   private final OrgUnitMembershipRepository membershipRepository;
   private final KommandoGroupRepository kommandoGroupRepository;
@@ -72,8 +75,10 @@ public class LeitungViewService {
 
   /**
    * Builds the caller's delegated Leitung view: the OL(s), Bereiche, Staffeln and Spezialkommandos
-   * they may appoint into, each with its roster and capability flags. Returns empty tier lists for
-   * a caller with no appointment reach.
+   * they may appoint into or manage the roster of, each with its roster and capability flags. A
+   * Spezialkommando is listed when the caller may appoint its lead (admin, parent Bereichsleiter)
+   * or manage its members (admin, its own SK lead). Returns empty tier lists for a caller with no
+   * appointment or roster reach.
    *
    * @param authentication the current authentication, forwarded to the delegated verdicts; never
    *     {@code null} at the call site (the controller is {@code isAuthenticated()}-gated).
@@ -122,8 +127,12 @@ public class LeitungViewService {
       } else if (unit.getKind() == OrgUnitKind.SPECIAL_COMMAND) {
         boolean canAppointLead =
             admin || roleSecurity.canAppointSkLead(unit.getId(), authentication);
-        if (canAppointLead) {
-          specialCommands.add(unit(unit, canAppointLead, false));
+        // The SK lead manages their own SK's roster (member list + Logistiker/Einsatzmanager
+        // flags) — the same verdict the /api/v1/special-commands/{id}/members endpoints gate on.
+        boolean canManageRoster =
+            admin || specialCommandSecurity.canManageMembers(unit.getId(), authentication);
+        if (canAppointLead || canManageRoster) {
+          specialCommands.add(unit(unit, canAppointLead, canManageRoster));
         }
       }
     }
