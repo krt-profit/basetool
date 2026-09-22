@@ -1512,18 +1512,30 @@ scenario_check_only_noop_verifies() {
 #
 # This asserts the mirror, not the bundle: a directory that ships but is never
 # copied is the failure this scenario exists to catch.
+#
+# It happened a second time, and that is why every subtree under docker/ is now
+# asserted rather than only the one that failed first. docker/acme was added to
+# the bundle on 2026-09-16 when the ACME loop moved out of the compose file's
+# block scalar; neither the COPY allowlist nor the mirror list gained an entry.
+# A host that already had the acme container kept running the command baked into
+# it and showed nothing. The Podman cutover host, 2026-09-22, had no such
+# container and refused to start one:
+#   Error: statfs /var/iri/code/docker/acme: no such file or directory
+# — and renewed no certificates at all.
 # ---------------------------------------------------------------------------
 scenario_config_mirrors_edge() {
-  echo "Scenario: the promoted bundle's docker/edge is mirrored onto the host"
+  echo "Scenario: every docker/ subtree in the promoted bundle is mirrored onto the host"
   local tmp rc=0
   tmp="$(mktmp)"
   setup_host "${tmp}"
   local bundle="${tmp}/bundle"
-  mkdir -p "${bundle}/docker/edge/conf.d" "${bundle}/docker/edge/include"
+  mkdir -p "${bundle}/docker/edge/conf.d" "${bundle}/docker/edge/include"     "${bundle}/docker/acme" "${bundle}/docker/maintenance/static"
   echo "# dummy compose file" > "${bundle}/docker-compose.yml"
   echo "worker_processes auto;" > "${bundle}/docker/edge/nginx.conf"
   echo "# vhost" > "${bundle}/docker/edge/conf.d/10-frontend.conf"
   echo "# include" > "${bundle}/docker/edge/include/proxy.conf"
+  echo "#!/bin/sh" > "${bundle}/docker/acme/publish-loop.sh"
+  echo "<html></html>" > "${bundle}/docker/maintenance/static/index.html"
   write_marker "${MARKER}"
   mapfile -t fake < <(converged_env)
   run_deploy -- "${fake[@]}"     "FAKE_CONFIG_BUNDLE=${bundle}"     "FAKE_REMOTE_CONFIG=sha256:config-next" || rc=$?
@@ -1537,6 +1549,18 @@ scenario_config_mirrors_edge() {
     record 1 "the conf.d and include trees came with it"
   else
     record 0 "conf.d / include were not mirrored"
+  fi
+  # The unit mounts this directory and runs the script out of it; a bundle that
+  # ships it and a deployer that never copies it is a container that cannot start.
+  if [[ -f "${T_COMPOSE_DIR}/docker/acme/publish-loop.sh" ]]; then
+    record 1 "docker/acme/publish-loop.sh reached the host"
+  else
+    record 0 "docker/acme was not mirrored (the ACME loop has nothing to run)"
+  fi
+  if [[ -f "${T_COMPOSE_DIR}/docker/maintenance/static/index.html" ]]; then
+    record 1 "docker/maintenance came with it too"
+  else
+    record 0 "docker/maintenance was not mirrored"
   fi
 }
 

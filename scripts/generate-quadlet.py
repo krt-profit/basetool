@@ -1001,6 +1001,25 @@ def render_container(service: str, spec: dict[str, Any]) -> str:
 
     container.append(f"Image={_qualify(_image_defaults(spec['image'], service))}")
     container.append(f"ContainerName={service}")
+    # STATED, not left to podman's default, because the whole log pipeline depends on the answer
+    # and the default is not the same on every host.
+    #
+    # REQ-OBS-019 moved Alloy's container-stdout streams from the Docker API to the JOURNAL when
+    # Alloy became a host service: `loki.source.journal` is what ships `<svc>-stdout`, `mon-*`,
+    # `postgres-*`, `edge` and `ops-cleanup` to Loki. A container whose driver is `k8s-file` writes
+    # into podman's own storage instead and Alloy never sees it.
+    #
+    # That is not hypothetical. Measured on the production host 2026-09-22, hours after the
+    # cutover: every container resolved `k8s-file`, `journalctl CONTAINER_NAME=<any>` had never
+    # returned a line, and Loki held only the FILE-based streams -- the application JSON logs and
+    # the host's auth/audit logs. The edge's access log, which check-conformance.py calls "the only
+    # record of a refused request's origin", was reachable by SSH and nowhere else, and every alert
+    # that reads a container's stdout could not have fired. `log-streams` stayed green throughout,
+    # because it measures Loki's total ingest RATE and the file streams alone produce one.
+    #
+    # The testing host defaulted to `journald` and the production host to `k8s-file`, from the same
+    # release. A promotable artifact cannot depend on which one it lands on.
+    container.append("LogDriver=journald")
 
     run_as = RUN_AS.get(service)
     if run_as is not None:

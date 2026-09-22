@@ -99,3 +99,33 @@
   environment:
     XDG_RUNTIME_DIR: "/run/user/{{ basetool_host_service_uid }}"
   when: not ansible_check_mode
+
+# A RESTART, not a reload: journald re-reads its configuration and re-opens its storage only on
+# start, so `Storage=persistent` and a newly created /var/log/journal take effect at no other
+# moment. The cost is the in-memory journal of a host that is being provisioned, which is the
+# cheapest possible moment to pay it.
+- name: Reload systemd-journald
+  ansible.builtin.systemd_service:
+    name: systemd-journald.service
+    state: restarted
+  when: not ansible_check_mode
+  notify: Flush the runtime journal into persistent storage
+
+# AND A FLUSH, which is the step that actually moves it -- measured 2026-09-22, after four restarts
+# had changed nothing. A restarted journald opens the RUNTIME journal and says so:
+#
+#     Runtime Journal (/run/log/journal/<machine-id>) is 102.5M, max 306.9M
+#
+# It switches to /var/log/journal only when it receives the flush signal, which on an ordinary boot
+# comes from systemd-journal-flush.service once /var is mounted -- and never comes again. So with
+# Storage=persistent set and the directory created, by hand and with the right owner, group, mode
+# and SELinux label, the directory stayed EMPTY: no error, no warning, and `journalctl` kept
+# answering from RAM. Creating the machine-id subdirectory by hand did not help either, and
+# `systemd-tmpfiles --create` does not create it because its rule is `z` (adjust) and not `d`.
+#
+# One `journalctl --flush` moved 127 017 entries in 1.5 s and the System Journal appeared. Until
+# then Alloy's loki.source.journal tailed a path with nothing in it and shipped nothing, silently.
+- name: Flush the runtime journal into persistent storage
+  ansible.builtin.command: journalctl --flush
+  changed_when: true
+  when: not ansible_check_mode

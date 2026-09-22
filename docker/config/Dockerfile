@@ -48,6 +48,18 @@ COPY docker/maintenance /config/docker/maintenance
 # edge starts against an empty mount — the exact "it shipped and did nothing"
 # shape this bundle exists to prevent.
 COPY docker/edge /config/docker/edge
+# The ACME renewal loop, for the same reason and with a sharper edge. It lived inside the compose
+# file as a block scalar until 2026-09-16 and moved to docker/acme/publish-loop.sh then; the
+# allowlist was not extended with it, so from that commit on both the compose service and the
+# Quadlet unit have mounted a directory the bundle does not carry. On a host that already had the
+# container it kept running with the command baked into it and nothing showed. On a fresh one --
+# the Podman cutover host, 2026-09-22 -- it refused to start at all:
+#
+#     Error: statfs /var/iri/code/docker/acme: no such file or directory
+#
+# and with it went every certificate renewal on that host. deploy.sh mirrors each subtree by name,
+# so it needs the matching entry too; the comment above its edge mirror says so in as many words.
+COPY docker/acme /config/docker/acme
 COPY keycloak-theme /config/keycloak-theme
 COPY monitoring /config/monitoring
 # The Quadlet deployment: 18 .container units, 18 .network units, 3 .volume units, and the

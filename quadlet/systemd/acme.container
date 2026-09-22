@@ -5,6 +5,7 @@ StartLimitIntervalSec=0
 [Container]
 Image=docker.io/goacme/lego:v5.5.1@sha256:9c446e8ce05155f87475ce87392a5c55472a7ecd06e244752f762d2f4b162e8d
 ContainerName=acme
+LogDriver=journald
 ReadOnly=true
 DropCapability=ALL
 AddCapability=CHOWN

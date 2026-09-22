@@ -87,6 +87,20 @@
   ansible.builtin.set_fact:
     basetool_host_service_uid: "{{ ansible_facts.getent_passwd[basetool_host_service_user][1] }}"
 
+- name: Refuse an inventory still carrying the singular alias variable
+  # Renamed to a LIST on 2026-09-22, and the rename has to be loud. A string satisfies
+  # `| length > 0` just as a list does, and the template below would then iterate its CHARACTERS
+  # and write one AddHost line per letter -- a drop-in that parses, generates units that start,
+  # and resolves nothing. An inventory that was not migrated must stop the run instead.
+  ansible.builtin.assert:
+    that:
+      - basetool_host_public_name_alias is not defined
+    fail_msg: >-
+      basetool_host_public_name_alias is now basetool_host_public_name_aliases, a LIST of
+      "hostname:ip" entries -- one per name a container has to resolve locally. Replace it with
+      basetool_host_public_name_aliases: ["{{ basetool_host_public_name_alias | default('name:ip') }}"]
+    quiet: true
+
 - name: Write the public-name alias drop-in
   ansible.builtin.copy:
     dest: >-
@@ -100,12 +114,12 @@
       # Host configuration, not release configuration: the delivered unit carries the no-op default
       # because it is the same artifact on every host. See generate-quadlet.py's VALUE_VARS.
       #
-      # This value must match IRI_KEYCLOAK_HOST_ALIAS in {{ basetool_host_root_dir }}/code/.env;
+      # The FIRST entry must match IRI_KEYCLOAK_HOST_ALIAS in {{ basetool_host_root_dir }}/code/.env;
       # scripts/check-conformance.py fails the host when the two disagree.
       [Container]
-      AddHost={{ basetool_host_public_name_alias }}
+      AddHost={{ basetool_host_public_name_aliases | join('\nAddHost=') }}
   loop: "{{ basetool_host_public_name_alias_services }}"
-  when: basetool_host_public_name_alias | length > 0
+  when: basetool_host_public_name_aliases | length > 0
   notify: Reload the service user's units
 
 # Clearing the variable has to clear the alias. Without this the drop-in outlives the decision that
@@ -117,7 +131,7 @@
       /etc/containers/systemd/users/{{ basetool_host_service_uid }}/{{ item }}.container.d/10-host-alias.conf
     state: absent
   loop: "{{ basetool_host_public_name_alias_services }}"
-  when: basetool_host_public_name_alias | length == 0
+  when: basetool_host_public_name_aliases | length == 0
   notify: Reload the service user's units
 
 # The truststore drop-in, and it is a SECOND mount rather than a replacement of the first.
@@ -149,7 +163,11 @@
       # IRI_EXTRA_JAVA_OPTS in {{ basetool_host_root_dir }}/code/.env, which is rendered on the host.
       [Container]
       Volume={{ basetool_host_jvm_truststore_path }}:{{ basetool_host_jvm_truststore_dest }}:ro
-  loop: "{{ basetool_host_public_name_alias_services }}"
+  # The JVM services, NOT basetool_host_public_name_alias_services -- that list grew to five on
+  # 2026-09-22 when grafana and blackbox-exporter turned out to need the public-name alias too, and
+  # neither of them is a JVM. Sharing one list would have mounted a Java truststore into a Go
+  # process: inert, and a lie in the unit about what the container is.
+  loop: "{{ basetool_host_jvm_truststore_services }}"
   when: basetool_host_jvm_truststore_path | length > 0
   notify: Reload the service user's units
 
@@ -176,22 +194,28 @@
     path: >-
       /etc/containers/systemd/users/{{ basetool_host_service_uid }}/{{ item }}.container.d/20-jvm-truststore.conf
     state: absent
-  loop: "{{ basetool_host_public_name_alias_services }}"
+  loop: "{{ basetool_host_jvm_truststore_services }}"
   when: basetool_host_jvm_truststore_path | length == 0
   notify: Reload the service user's units
 
 - name: Say whether the containers will see the public name
   ansible.builtin.debug:
     msg: >-
-      {% if basetool_host_public_name_alias | length > 0 %}
+      {% if basetool_host_public_name_aliases | length > 0 %}
       {{ basetool_host_public_name_alias_services | join(', ') }} carry
-      AddHost={{ basetool_host_public_name_alias }} via a drop-in. It MUST match
+      {{ basetool_host_public_name_aliases | join(' and ') }} via a drop-in. The first MUST match
       IRI_KEYCLOAK_HOST_ALIAS in the host .env -- check-conformance.py fails on a silent
       disagreement.
       {% else %}
-      No public-name alias is configured, which is right for production: its public name resolves to
-      the host that serves it. A non-production host whose containers must reach their own public
-      name sets basetool_host_public_name_alias.
+      NO public-name alias is configured, and on a rootless host that is almost certainly wrong.
+      A container here cannot reach this machine through its own public address at all: the
+      container networks live in the service user's network namespace and outbound leaves through
+      pasta, which does not fold a connection to the host's own address back into the host.
+      Measured on production 2026-09-22 -- ports 22, 80 and 443 on the host's public IPv4 all
+      refused from inside a container, while the same ports on host-gateway answered.
+      This used to read "which is right for production: its public name resolves to the host that
+      serves it". That was true under Docker, whose hairpin worked, and it cost the cutover its
+      backend, its Grafana sign-in and every external probe.
       {% endif %}
       {% if basetool_host_jvm_truststore_path | length > 0 %}
       A JVM truststore is mounted at {{ basetool_host_jvm_truststore_dest }} from
