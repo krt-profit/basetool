@@ -21,10 +21,12 @@ package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.service.NotificationService;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
+import de.greluc.krt.profit.basetool.backend.web.CurrentUserId;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -51,8 +53,10 @@ import org.springframework.web.bind.annotation.RestController;
  * in the backend's {@code HttpSession}, but that was effectively a no-op: REST calls from the
  * frontend do not relay session cookies (only the OAuth2 bearer token), so each call created a
  * fresh backend session and the attribute was lost between requests. The mutators are gone; the
- * only remaining surface is {@code GET /active-org-unit} which reflects what the header for the
- * current request says, plus the per-principal {@code GET /capabilities} UI flags.
+ * only remaining surface is read-only: {@code GET /active-org-unit} which reflects what the header
+ * for the current request says, the per-principal {@code GET /capabilities} UI flags, the pinnable
+ * {@code GET /org-units}, and {@code GET /layout}, which answers the three together with the
+ * unread-notification count in one transaction.
  */
 @RestController
 @RequestMapping("/api/v1/me")
@@ -68,6 +72,9 @@ public class MeController {
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
 
   private final UserService userService;
+
+  /** Supplies the unread-notification count of the layout read. */
+  private final NotificationService notificationService;
 
   /**
    * Returns the org-unit context that the backend currently applies to staffel-scoped queries for
@@ -185,6 +192,49 @@ public class MeController {
   }
 
   /**
+   * Everything the page layout needs to know about the caller, in one call and one read-only
+   * transaction (BE-PERF-07): the effective org-unit context ({@link #getActiveOrgUnit()}), the
+   * pinnable org units ({@link #getPinnableOrgUnits(Jwt)}), the capability flags ({@link
+   * #getCapabilities()}) and the unread-notification count ({@code GET
+   * /api/v1/notifications/unread-count}).
+   *
+   * <p>The four answers are the same ones the individual endpoints give — this method calls the
+   * same resolvers — so a client may switch between them freely. What it saves is the fan-out: the
+   * web layout used to issue three or four backend calls before every page handler, each in its own
+   * transaction, re-resolving the caller's memberships each time; here they share one transaction
+   * and the request-scoped membership memos.
+   *
+   * <p>ADR-0151's fail-closed rule is unchanged and stays the client's: the endpoint either answers
+   * all four parts or fails as a whole, and a client that gets no answer treats every capability as
+   * {@code false}, exactly as it does when {@code /capabilities} fails.
+   *
+   * @param jwt the caller's JWT; never {@code null} thanks to the class-level {@code @PreAuthorize}
+   * @param callerId the caller's id as the notification endpoints resolve it
+   * @return the caller's layout context; never {@code null}
+   */
+  @NotNull
+  @GetMapping("/layout")
+  @Transactional(readOnly = true)
+  @Operation(
+      summary = "The caller's layout context in one read",
+      description =
+          "Active org unit, pinnable org units, capability flags and unread-notification count -"
+              + " the same answers as /me/active-org-unit, /me/org-units, /me/capabilities and"
+              + " /notifications/unread-count, in one read-only transaction.")
+  @ApiResponses(
+      value = {
+        @ApiResponse(responseCode = "200", description = "The caller's layout context"),
+        @ApiResponse(responseCode = "401", description = "Authentication required")
+      })
+  public LayoutResponse getLayout(@AuthenticationPrincipal Jwt jwt, @CurrentUserId UUID callerId) {
+    return new LayoutResponse(
+        getActiveOrgUnit().orgUnitId(),
+        getPinnableOrgUnits(jwt),
+        getCapabilities(),
+        notificationService.unreadCount(callerId));
+  }
+
+  /**
    * Response for {@code GET /api/v1/me/active-org-unit}: the resolved effective org-unit context
    * for the current request. {@code null} means the admin is viewing all OrgUnits (or the user has
    * no assigned home Staffel and no pinned context).
@@ -229,4 +279,22 @@ public class MeController {
       boolean isLogisticianOrAbove,
       boolean isMissionManagerOrAbove,
       boolean isAdmin) {}
+
+  /**
+   * Response for {@code GET /api/v1/me/layout}: the four layout answers in one payload.
+   *
+   * @param activeOrgUnitId the effective org-unit context, as {@link ActiveOrgUnitResponse} carries
+   *     it; {@code null} for admin "all org units" or no home Staffel.
+   * @param orgUnits the org units the caller may pin, as {@code GET /api/v1/me/org-units} returns
+   *     them; never {@code null}, possibly empty.
+   * @param capabilities the caller's capability flags, as {@code GET /api/v1/me/capabilities}
+   *     returns them; never {@code null}.
+   * @param unreadNotifications the caller's unread-notification count, as {@code GET
+   *     /api/v1/notifications/unread-count} returns it.
+   */
+  public record LayoutResponse(
+      @Nullable UUID activeOrgUnitId,
+      @NotNull List<OrgUnitMembershipOptionDto> orgUnits,
+      @NotNull CapabilitiesResponse capabilities,
+      long unreadNotifications) {}
 }

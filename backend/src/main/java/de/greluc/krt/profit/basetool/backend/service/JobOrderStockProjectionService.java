@@ -225,6 +225,7 @@ public class JobOrderStockProjectionService {
                 .toList());
     StockResolver stockResolver = stockIndex::stockFor;
     ClaimResolver claimResolver = order -> claimsByOrder.getOrDefault(order.getId(), List.of());
+    jobOrderMapper.primeAssignees(orders);
     return page.map(o -> mapToDtoWithStock(o, stockResolver, claimResolver));
   }
 

@@ -148,9 +148,14 @@ spring:
         # exist"). HangarIntegrationTest caught it.
         jdbc:
           batch_size: 50
+        # REQ-DATA-003: a paged query that fetch-joins a collection (an @EntityGraph or JOIN FETCH
+        # over a @OneToMany / @ManyToMany) cannot use SQL OFFSET/LIMIT, so Hibernate would load
+        # every matching row and page in memory (HHH90003004). Fail the query instead, so such a
+        # finder never ships; collections on a page batch-load under default_batch_fetch_size.
         query:
-          # A collection-valued IN parameter is padded to the next power of two, so the plan cache
-          # holds a handful of shapes per query instead of one per list length.
+          fail_on_pagination_over_collection_fetch: true
+          # BE-PERF-04: a collection-valued IN parameter is padded to the next power of two, so
+          # the plan cache holds a handful of shapes per query instead of one per list length.
           in_clause_parameter_padding: true
       # SEC-03: global statement-execution backstop. Every Hibernate-issued query (JPQL, derived,
       # @Query incl. native, @Modifying, pessimistic-lock waits) is bounded to this many

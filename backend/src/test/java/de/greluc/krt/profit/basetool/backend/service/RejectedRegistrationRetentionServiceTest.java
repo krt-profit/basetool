@@ -87,7 +87,7 @@ class RejectedRegistrationRetentionServiceTest {
   void purgesARejectedRegistrationPastTheWindow() {
     UUID id = UUID.randomUUID();
     when(userRepository.findRejectedDecidedBefore(CUTOFF)).thenReturn(List.of(id));
-    when(userRepository.findById(id))
+    when(userRepository.findPlainById(id))
         .thenReturn(Optional.of(rejected(id, CUTOFF.minus(1, ChronoUnit.DAYS))));
 
     assertThat(service.purgeRejectedOlderThan(CUTOFF)).isEqualTo(1);
@@ -104,7 +104,7 @@ class RejectedRegistrationRetentionServiceTest {
   void clearsTheCachedKeycloakFlagBeforeDelegating() {
     UUID id = UUID.randomUUID();
     when(userRepository.findRejectedDecidedBefore(CUTOFF)).thenReturn(List.of(id));
-    when(userRepository.findById(id))
+    when(userRepository.findPlainById(id))
         .thenReturn(Optional.of(rejected(id, CUTOFF.minus(1, ChronoUnit.DAYS))));
 
     service.purgeRejectedOlderThan(CUTOFF);
@@ -120,7 +120,7 @@ class RejectedRegistrationRetentionServiceTest {
   void deletesTheKeycloakUserOnlyAfterTheDatabaseHalf() {
     UUID id = UUID.randomUUID();
     when(userRepository.findRejectedDecidedBefore(CUTOFF)).thenReturn(List.of(id));
-    when(userRepository.findById(id))
+    when(userRepository.findPlainById(id))
         .thenReturn(Optional.of(rejected(id, CUTOFF.minus(1, ChronoUnit.DAYS))));
 
     service.purgeRejectedOlderThan(CUTOFF);
@@ -138,7 +138,7 @@ class RejectedRegistrationRetentionServiceTest {
     User reopened = rejected(id, null);
     reopened.setApprovalStatus(ApprovalStatus.PENDING);
     when(userRepository.findRejectedDecidedBefore(CUTOFF)).thenReturn(List.of(id));
-    when(userRepository.findById(id)).thenReturn(Optional.of(reopened));
+    when(userRepository.findPlainById(id)).thenReturn(Optional.of(reopened));
 
     assertThat(service.purgeRejectedOlderThan(CUTOFF)).isZero();
 
@@ -151,7 +151,7 @@ class RejectedRegistrationRetentionServiceTest {
   void skipsARejectionThatIsNoLongerPastTheCutoff() {
     UUID id = UUID.randomUUID();
     when(userRepository.findRejectedDecidedBefore(CUTOFF)).thenReturn(List.of(id));
-    when(userRepository.findById(id))
+    when(userRepository.findPlainById(id))
         .thenReturn(Optional.of(rejected(id, CUTOFF.plus(1, ChronoUnit.DAYS))));
 
     assertThat(service.purgeRejectedOlderThan(CUTOFF)).isZero();
@@ -165,9 +165,9 @@ class RejectedRegistrationRetentionServiceTest {
     UUID failing = UUID.randomUUID();
     UUID ok = UUID.randomUUID();
     when(userRepository.findRejectedDecidedBefore(CUTOFF)).thenReturn(List.of(failing, ok));
-    when(userRepository.findById(failing))
+    when(userRepository.findPlainById(failing))
         .thenReturn(Optional.of(rejected(failing, CUTOFF.minus(1, ChronoUnit.DAYS))));
-    when(userRepository.findById(ok))
+    when(userRepository.findPlainById(ok))
         .thenReturn(Optional.of(rejected(ok, CUTOFF.minus(1, ChronoUnit.DAYS))));
     Mockito.doThrow(new IllegalStateException("no admin to reassign to"))
         .when(userDeletionService)
@@ -188,7 +188,7 @@ class RejectedRegistrationRetentionServiceTest {
   void aFailingKeycloakDeleteStillCountsTheCommittedPurge() {
     UUID id = UUID.randomUUID();
     when(userRepository.findRejectedDecidedBefore(CUTOFF)).thenReturn(List.of(id));
-    when(userRepository.findById(id))
+    when(userRepository.findPlainById(id))
         .thenReturn(Optional.of(rejected(id, CUTOFF.minus(1, ChronoUnit.DAYS))));
     Mockito.doThrow(new IllegalStateException("keycloak down"))
         .when(keycloakService)

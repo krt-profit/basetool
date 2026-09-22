@@ -430,6 +430,23 @@ public class UserService {
   }
 
   /**
+   * Paged username/displayName substring search projected to slim {@link
+   * de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto}s, squadron-scoped exactly
+   * like {@link #searchByUsername(String, Pageable)} — the user pickers' source (BE-PERF-06). One
+   * statement for the page plus one for its count; no entity is hydrated.
+   *
+   * @param query free-text filter; blank matches every user in scope
+   * @param pageable page request
+   * @return matching user references in the caller's squadron context
+   */
+  public Page<de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto>
+      searchReferencesByUsername(@NotNull String query, @NotNull Pageable pageable) {
+    java.util.Set<UUID> scope = ownerScopeService.currentUserListScopeSquadronIds();
+    return userRepository.searchScopedReferences(
+        LikePatterns.escapeNullable(query), scope, pageable);
+  }
+
+  /**
    * Returns the user.
    *
    * @param id user primary key

@@ -39,9 +39,12 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <p>Browser-side JS calls land on {@code /users/search} (no {@code /api/} prefix because Spring
  * Security treats this path as authenticated-only-by-default); the controller forwards to the
- * backend {@code /api/v1/users/search} with the bearer token attached by {@link BackendApiClient}.
- * The page size is hardcoded at 1000 and sorted by username — autocomplete lists are short, so a
- * single page covers any realistic squadron.
+ * backend {@code /api/v1/users/search/references} with the bearer token attached by {@link
+ * BackendApiClient}. That backend endpoint projects each hit to a slim {@code UserReferenceDto}
+ * (id, username, display name, effective name, rank) in SQL, which is all the pickers read; the
+ * full-DTO {@code /api/v1/users/search} it replaced here hydrated every matching user with its
+ * roles and three membership lookups per keystroke (BE-PERF-06). The page size is 1000, sorted by
+ * username, as before the switch — see {@link #forwardSearch} for why it was not lowered.
  */
 @RestController
 @RequestMapping("/users")
@@ -88,16 +91,16 @@ public class UserProxyController {
   @GetMapping("/search")
   @PreAuthorize("isAuthenticated()")
   public List<Map<String, Object>> searchUsers(@RequestParam(required = false) String query) {
-    return forwardSearch("/api/v1/users/search", query);
+    return forwardSearch("/api/v1/users/search/references", query);
   }
 
   /**
    * Bank-audience twin of {@link #searchUsers}: forwards to the backend {@code
-   * /api/v1/users/search-bank}, which mirrors {@code /search} but widens the role gate to bank
-   * staff (ADR-0089, #1193). Backs the bank pickers' {@code remote-bank-users} combobox source
-   * (register holder, grant the Bank-Employee role, approval limits) so a bank employee/manager who
-   * holds no org role can still resolve candidates. The real authorization is enforced by the
-   * backend; this proxy only requires an authenticated session.
+   * /api/v1/users/search-bank/references}, which mirrors {@code /search} but widens the role gate
+   * to bank staff (ADR-0089, #1193). Backs the bank pickers' {@code remote-bank-users} combobox
+   * source (register holder, grant the Bank-Employee role, approval limits) so a bank
+   * employee/manager who holds no org role can still resolve candidates. The real authorization is
+   * enforced by the backend; this proxy only requires an authenticated session.
    *
    * @param query free-text query to forward to the backend, or {@code null}/blank to match all
    * @return matching user records (raw JSON maps), never {@code null}
@@ -106,7 +109,7 @@ public class UserProxyController {
   @PreAuthorize("isAuthenticated()")
   public List<Map<String, Object>> searchUsersForBank(
       @RequestParam(required = false) String query) {
-    return forwardSearch("/api/v1/users/search-bank", query);
+    return forwardSearch("/api/v1/users/search-bank/references", query);
   }
 
   /**
@@ -120,6 +123,13 @@ public class UserProxyController {
    * string binder) is normalised to the empty string, which the backend search treats as a
    * match-all filter, so opening the picker without typing returns the scoped roster instead of
    * failing.
+   *
+   * <p><b>Why the page size stays 1000.</b> The combobox renders {@code PickerSearch.RENDER_CAP}
+   * rows and would be served by {@code PickerSearch.PAGE_SIZE}, but the two free-text autocompletes
+   * on the mission page (participant and party lead, {@code mission-detail.js}) read the same proxy
+   * and render every row they receive with no overflow hint, so a smaller page would cap them
+   * silently — what REQ-FE-016 forbids. The slim projection already removes almost all of the cost;
+   * lowering the page size waits for those two autocompletes to announce an overflow.
    *
    * @param backendPath the backend search endpoint path to forward to
    * @param query the free-text query to forward, or {@code null}/blank to match all

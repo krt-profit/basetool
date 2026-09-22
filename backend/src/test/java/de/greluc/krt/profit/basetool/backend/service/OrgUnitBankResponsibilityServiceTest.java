@@ -178,8 +178,9 @@ class OrgUnitBankResponsibilityServiceTest {
     BankAccount cartelBank = typedAccount(accountId, "KB-0004", BankAccountType.CARTEL_BANK, null);
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(cartelBank));
     when(bereichRepository.findByDepartment(any())).thenReturn(List.of(profit));
-    when(orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(
-            profitBereichId, MembershipRole.BEREICHSLEITER))
+    // One batched statement for every Profit Bereich (REQ-DATA-003, BE-PERF-15).
+    when(orgUnitMembershipRepository.findUserIdsByOrgUnitIdsAndRole(
+            List.of(profitBereichId), MembershipRole.BEREICHSLEITER))
         .thenReturn(Set.of(bl));
 
     assertThat(service.resolveResponsibleHolderUserIds(accountId)).containsExactly(bl);

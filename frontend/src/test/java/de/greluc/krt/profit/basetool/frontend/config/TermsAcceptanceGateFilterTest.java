@@ -505,6 +505,47 @@ class TermsAcceptanceGateFilterTest {
   }
 
   /**
+   * An exempt path is decided by the path alone — no consent read, and so no token refresh that
+   * could fail.
+   *
+   * <p>Pins the early-exit guard that answers CodeQL alert #1126: the exemption is checked before,
+   * and independently of, the identity and consent questions. A member whose session can no longer
+   * refresh its token must still be able to read the imprint and the terms, exactly as before the
+   * guard was split out of the single boolean expression.
+   */
+  @Test
+  void anExemptPathPassesWithoutAskingTheBackendEvenWhenTheTokenIsGone() throws Exception {
+    when(backendApiClient.get(any(String.class), eq(TermsStatusDto.class)))
+        .thenThrow(new ReauthenticationRequiredException("token gone", null));
+
+    for (String path : new String[] {"/terms", "/impressum", "/terms/accept", "/css/styles.css"}) {
+      MockHttpServletResponse response = invoke(path);
+      assertThat(response.getRedirectedUrl()).as(path).isNull();
+      assertThat(response.getStatus()).as(path).isEqualTo(200);
+    }
+    verify(filterChain, times(4)).doFilter(any(), any());
+    verify(backendApiClient, never()).get(any(String.class), eq(TermsStatusDto.class));
+  }
+
+  /**
+   * The exemption guard does not widen under an encoded spelling: {@code /css%2f../missions} is a
+   * gated page, not a stylesheet, and still meets the consent redirect.
+   *
+   * <p>The path the guard reads is request-controlled, which is what CodeQL flagged; this is the
+   * property that makes that safe — the shared {@code PublicPaths} predicates decode per segment
+   * (REQ-SEC-029), so a crafted path cannot talk its way into the exempt set.
+   */
+  @Test
+  void anEncodedSpellingOfAGatedPathIsNotExempt() throws Exception {
+    stubStatus(false);
+
+    MockHttpServletResponse response = invoke("/css%2f../missions");
+
+    assertThat(response.getRedirectedUrl()).isEqualTo("/terms/accept");
+    verify(filterChain, never()).doFilter(any(), any());
+  }
+
+  /**
    * Runs the filter against the given path with a fresh session.
    *
    * @param path the request path

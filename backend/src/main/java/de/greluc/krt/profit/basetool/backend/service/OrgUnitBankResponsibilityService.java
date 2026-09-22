@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipReposit
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -147,13 +148,15 @@ public class OrgUnitBankResponsibilityService {
    */
   @NotNull
   private Set<UUID> resolveCartelBankResponsibleHolders() {
-    Set<UUID> holders = new LinkedHashSet<>();
-    for (Bereich bereich : bereichRepository.findByDepartment(Department.PROFIT)) {
-      holders.addAll(
-          orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(
-              bereich.getId(), MembershipRole.BEREICHSLEITER));
+    // One statement for every Profit Bereich at once rather than one per Bereich (REQ-DATA-003).
+    List<UUID> profitBereichIds =
+        bereichRepository.findByDepartment(Department.PROFIT).stream().map(Bereich::getId).toList();
+    if (profitBereichIds.isEmpty()) {
+      return Set.of();
     }
-    return holders;
+    return new LinkedHashSet<>(
+        orgUnitMembershipRepository.findUserIdsByOrgUnitIdsAndRole(
+            profitBereichIds, MembershipRole.BEREICHSLEITER));
   }
 
   /**

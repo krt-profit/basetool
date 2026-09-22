@@ -31,6 +31,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.service.NotificationService;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
@@ -59,6 +60,8 @@ class MeControllerTest {
   @Mock private OrgUnitMembershipQueryService orgUnitMembershipQueryService;
 
   @Mock private UserService userService;
+
+  @Mock private NotificationService notificationService;
 
   @InjectMocks private MeController controller;
 
@@ -229,5 +232,28 @@ class MeControllerTest {
 
     assertFalse(response.canViewBankStaff());
     assertFalse(response.canManageBank());
+  }
+
+  @Test
+  void getLayout_answersTheFourLayoutQuestionsFromTheSameResolvers() {
+    // BE-PERF-07: one call instead of /active-org-unit + /org-units + /capabilities +
+    // /notifications/unread-count. The answers must be the individual endpoints' answers, so a
+    // client can switch between the two shapes without a behaviour change.
+    UUID active = UUID.randomUUID();
+    UUID callerId = UUID.randomUUID();
+    List<OrgUnitMembershipOptionDto> catalogue = List.of();
+    when(ownerScopeService.currentOrgUnitId()).thenReturn(Optional.of(active));
+    when(authHelperService.isAdmin()).thenReturn(true);
+    when(orgUnitMembershipQueryService.listAllPinnableOptions()).thenReturn(catalogue);
+    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+    when(notificationService.unreadCount(callerId)).thenReturn(7L);
+
+    MeController.LayoutResponse layout = controller.getLayout(null, callerId);
+
+    assertEquals(active, layout.activeOrgUnitId());
+    assertSame(catalogue, layout.orgUnits());
+    assertTrue(layout.capabilities().isAdmin());
+    assertTrue(layout.capabilities().isLogisticianOrAbove());
+    assertEquals(7L, layout.unreadNotifications());
   }
 }
