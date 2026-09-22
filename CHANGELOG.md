@@ -4,6 +4,12 @@
 
 ### Fixed
 
+- **Betrieb: Sicherung, Wiederherstellungsprobe und Aufräumen scheitern nicht mehr nach einem Neustart.**
+  Ihre Nachhol-Läufe starteten Sekunden nach dem Hochfahren, bevor die Container-Laufzeit bereitstand,
+  schlugen fehl und lösten einen kritischen Alarm aus — die nachzuholende Sicherung ging dabei verloren.
+  Sie warten jetzt, bis der Stack vollständig hochgefahren ist, bevor sie etwas anhalten oder aufräumen.
+  Rein betriebsseitig.
+
 - **Betrieb: die IPv6-Prüfung der Abnahme-Suite meldete Rot über die Bereitstellung, wenn der
   Ausführende selbst kein IPv6 hat.** Der Zweig, der genau das unterscheiden sollte, war seit
   jeher unerreichbar, weil die Fehlernummer unterwegs verloren ging. Sie bleibt jetzt erhalten,

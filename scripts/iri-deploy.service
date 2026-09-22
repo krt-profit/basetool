@@ -32,20 +32,30 @@
 [Unit]
 Description=Profit Basetool — pull and apply latest GHCR images
 Documentation=https://github.com/krt-profit/basetool/blob/main/docs/deployment.md
-Wants=network-online.target docker.service
-After=network-online.target docker.service
-# NOT `Requires=docker.service`. That line made all four of these units refuse to start on a
-# rootless-Podman host -- "Failed to create iri-deploy.service/start: Unit docker.service not
-# found" -- which is where the migration would have discovered it, on the new production host,
-# with the timers already enabled.
+Wants=network-online.target
+After=network-online.target
+# NO dependency on the container runtime here, and the reason changed on 2026-09-22.
 #
-# Nothing replaces it, deliberately. The runtime is DETECTED by the script
-# (scripts/lib/container-runtime.sh), which refuses loudly when neither docker nor podman answers
-# -- a better failure than a unit that never ran, because it says which host is wrong and why. A
-# tick that fires while the runtime is still coming up costs one retry; the timer fires again.
+# These four units used to carry `Wants=`/`After=docker.service`, kept on the grounds that an
+# ordering on a unit that does not exist is inert. It was inert -- and it READ as if the unit were
+# ordered on its runtime, which is how nobody noticed that on a rootless-Podman host nothing orders
+# it on anything. The Docker host was retired at the 2026-09-22 cutover, so the line pointed at
+# nothing on every host that remains. (`Requires=docker.service` was removed earlier still, because
+# it made the units unstartable on Podman.)
 #
-# `Wants=`/`After=docker.service` are kept: an ordering or weak dependency on a unit that does not
-# exist is inert, and on the Docker host it still orders correctly.
+# The comment beside it also said "a tick that fires while the runtime is still coming up costs one
+# retry; the timer fires again". Measured on the first reboot after the cutover, that is wrong on
+# both counts. The timers carry `Persistent=true`, so a catch-up run fires seconds after boot; it
+# found no runtime and FAILED, SystemdUnitFailed paged critical, and the unit stayed failed until
+# its next scheduled run -- the next night for the backup, the next week for the drill and the
+# cleanup. The catch-up Persistent=true exists for was the run that was lost.
+#
+# What the job needs is the rootless service user's manager -- and not merely running, but FINISHED
+# starting, because backup.sh quiesces the writers and container-cleanup.sh prunes. Measured on the
+# same boot: user@994.service was active at 16:26:03, the stack at 16:27:33. So an
+# `After=user@<uid>.service` here would have fixed the detection and let the backup stop the
+# backend while it was still coming up. Only the script can wait on the right signal, and only the
+# script knows the uid -- scripts/lib/container-runtime.sh, rt_detect and rt_wait_for_startup.
 
 [Service]
 Type=oneshot

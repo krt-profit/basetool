@@ -191,6 +191,9 @@ write_backup_metrics() {
 [[ -f "${COMPOSE_DIR}/.env" ]] || fail "missing ${COMPOSE_DIR}/.env"
 [[ -f "${BACKUP_ENV}" ]] || fail "missing ${BACKUP_ENV} (restic repo + rclone config; see docs/backup.md)"
 rt_detect
+# Before the quiesce can stop anything: a catch-up run fires seconds after boot, and stopping the
+# writers while their units are still starting is a race with the stack's own startup.
+rt_wait_for_startup
 export RT_COMPOSE_FILE="${COMPOSE_DIR}/docker-compose.yml" RT_PROFILE="${PROFILE}"
 export RT_PROJECT_DIR="${COMPOSE_DIR}" RT_MONITORING_FILE="${MON_COMPOSE}"
 export RT_MONITORING_SERVICES="prometheus loki tempo grafana alertmanager blackbox-exporter postgres-exporter-backend postgres-exporter-keycloak redis-exporter"

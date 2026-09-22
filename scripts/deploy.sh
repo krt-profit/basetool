@@ -1035,6 +1035,8 @@ ENV_RENDERER="${IRI_ENV_RENDERER:-${IRI_SCRIPT_DIR}/render-env-d.py}"
 # fail fast on a host that has neither. `rt_detect` TRIES rather than infers —
 # an installed-but-dead docker does not win over a working podman.
 rt_detect
+# NOT rt_wait_for_startup, unlike backup, drill and cleanup: a stack stuck in `starting` because a
+# unit will not come up may be exactly what this release exists to fix. See the library.
 export RT_COMPOSE_FILE="${COMPOSE_DIR}/docker-compose.yml"
 export RT_PROJECT_DIR="${COMPOSE_DIR}"
 export RT_MONITORING_FILE="${COMPOSE_DIR}/docker-compose.monitoring.yml"

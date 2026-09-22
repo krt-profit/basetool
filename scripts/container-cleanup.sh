@@ -198,6 +198,8 @@ flock -n 200 || {
 
 # --- Precondition: a reachable container runtime -----------------------------
 rt_detect
+# Pruning while the stack is still coming up races the creation of the containers it would spare.
+rt_wait_for_startup
 log "runtime: ${RT_BACKEND} (${RT_CLI})"
 
 # RT_CLI can be a whole invocation -- `sudo -n -u <service user> podman` on a rootless host -- so it
