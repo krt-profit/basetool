@@ -249,9 +249,14 @@ migration version numbering*
 ([`flyway-migrations.yml`](.github/workflows/flyway-migrations.yml)).
 Further PR checks run alongside (some only when their paths are
 touched) and are expected to pass:
-[`repo-lint.yml`](.github/workflows/repo-lint.yml) (shellcheck,
-actionlint, zizmor, hadolint, ansible-lint, Quadlet drift, ADR registry,
-the cosign signer identity, monitoring and logging-facade gates),
+[`repo-lint.yml`](.github/workflows/repo-lint.yml) — four jobs by
+toolchain: *Linters* (shellcheck, actionlint, zizmor, hadolint),
+*Repository gates* (Quadlet drift, ADR numbering and registry, the cosign
+signer identity, image pins, dashboards, log masking, ansible-lint, …),
+*Self-tests* (the operational scripts' suites) and *Container checks*
+(Prometheus rules and config, Alertmanager, Alloy, Loki, the edge nginx,
+the Keycloak issuer). Every check is a step named `<check> / …` and runs
+even when an earlier one failed, so the job log lists every finding;
 [`gitleaks.yml`](.github/workflows/gitleaks.yml) (secret scan; on a PR
 it reads `.gitleaks.toml` from the **base** commit, so an allowlist
 change takes effect from the next PR on),
@@ -275,8 +280,9 @@ all four; a finding you accept goes into `.github/zizmor.yml` with its
 reason.
 
 The Playwright end-to-end suite ([`e2e.yml`](.github/workflows/e2e.yml))
-runs on a PR **only when it carries the `e2e` label** (and nightly on
-`main`). Maintainers apply the label to any PR that touches frontend
+runs on a PR **only when it carries the `e2e` label** (and once a day on
+`main`; GitHub starts scheduled runs hours after their cron time, so none
+of this repository's schedules is a clock time). Maintainers apply the label to any PR that touches frontend
 flows, auth / session, controllers or migrations; ask for it if your PR
 does.
 

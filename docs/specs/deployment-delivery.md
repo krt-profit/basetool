@@ -881,7 +881,7 @@ time; (3) `ContainerPidsHigh` as the runtime backstop for a task leak from any *
 
 **Enforced by:** `docker-compose.yml` (`x-backend` / `x-frontend` / `x-ingest` templates, `init:
 true`) · `docker-compose.monitoring.yml` (`x-mon-base` anchor, `init: true`) ·
-`.github/scripts/check_pid1_reaping.py` (wired into the `pid1-reaping` job of
+`.github/scripts/check_pid1_reaping.py` (wired into the `pid1-reaping` check of
 [`repo-lint.yml`](../../.github/workflows/repo-lint.yml), with a self-test that keeps it from
 passing vacuously) · verification recipe in the `x-backend` service comment
 
@@ -1497,10 +1497,12 @@ to the shared group and restores the defect exactly.
   second one beside it.
 - [ ] `concurrency.group` contains `jobs.e2e.if` verbatim, and CI fails when it stops doing so; the
   checker self-tests against a known-drifted workflow first, so it cannot pass vacuously.
+- [ ] The `build-stack` job, which builds the E2E images once per run for all matrix cells (since
+  2026-09-22), carries the same gate expression, so a run whose gate is false builds nothing.
 
-**Enforced by:** `.github/workflows/e2e.yml` (`concurrency.group`, `jobs.e2e.if`) ·
-`.github/scripts/check_e2e_gate_mirror.py` · `.github/workflows/repo-lint.yml`
-(`e2e-gate-mirror`) · **Decision:** [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md)
+**Enforced by:** `.github/workflows/e2e.yml` (`concurrency.group`, `jobs.e2e.if`,
+`jobs.build-stack.if`) · `.github/scripts/check_e2e_gate_mirror.py` ·
+`.github/workflows/repo-lint.yml` (`Repository gates` → `e2e-gate-mirror / …`) · **Decision:** [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md)
 
 ## Out of scope
 

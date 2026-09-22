@@ -1,55 +1,52 @@
 name: Repo Lint
 
-# Lints the repository's non-Java assets that the Gradle build does not cover:
-#   - shellcheck -> the server-side / helper shell scripts under scripts/
-#                   (deploy.sh runs on the production host; a quoting bug there
-#                   is a production incident, not a style nit).
-#   - actionlint -> the GitHub Actions workflows themselves, incl. shellcheck
-#                   over every embedded `run:` script (catches workflow-syntax
-#                   and shell bugs before they burn a CI run to discover them).
-#   - zizmor     -> the workflows' SECURITY, where actionlint covers their shape: persisted
-#                   credentials, template injection, over-broad permissions, cache poisoning.
-#   - hadolint   -> the three multi-stage production Dockerfiles.
-#   - cosign-identity -> every copy of the cosign signer-identity regexp is anchored and they
-#                   all agree (promote, promote-testing, the release reuse gate, deploy.sh).
-#   - probe-vs-allowlist -> the nightly edge probe and the vhost allow-list runbook
-#                   describe one surface from two sides; a refusal row for a path the
-#                   allow-list admits is a contradiction provable without production.
-#   - ingest-audience -> no ingest config, env template or runbook assigns the
-#                   backend's audience (basetool-backend) to the gateway, whose
-#                   value is basetool-ingest; the pairing would admit frontend
-#                   session tokens and still read as a passing audience check.
-#   - sbom-coverage -> every shipped Gradle module is wired for a CycloneDX
-#                   SBOM end to end: plugin, committed file, regenerated at
-#                   release time, attested and attached to the Release.
-#   - e2e-gate-mirror -> e2e.yml states one decision twice (the job gate and the
-#                   concurrency selector that has to predict it); a selector
-#                   looser than its gate silently stops the suite from running.
-#   - adr-numbering -> no two ADRs share a number, and a new one does not take
-#                   a number the base already holds. Parallel branches each
-#                   pick "the next free number" from their own checkout, so two
-#                   of them land on the same one; 0154 named two accepted
-#                   decisions on main for eleven days before anyone noticed.
-#   - adr-registry -> docs/adr/README.md still agrees with docs/adr/: every ADR
-#                   has an index row, every row links to a real decision, and
-#                   every row renders as three cells. adr-numbering reads
-#                   filenames, so nothing read the index at all -- 0192-0194 sat
-#                   unindexed, and three rows contained an unescaped "|" that
-#                   Markdown read as a cell separator, putting their status in
-#                   the wrong column.
-#   - alloy-log-masking -> the PII masks in monitoring/alloy/config.alloy. Alloy's
-#                   stage.replace overwrites EVERY capture group and expands no
-#                   back-references, so the natural way to write a mask destroys
-#                   the field name and writes the literal "${1}***${1}***" into
-#                   Loki. Eight of the fourteen stages were written that way from
-#                   the day they were added; it took reading a production log
-#                   export by hand on 2026-09-20 to notice.
+# Lints and gates the repository's non-Java assets that the Gradle build does not cover.
 #
-# Each linter runs from its pinned release binary, verified against a pinned
-# SHA-256 (shellcheck ships preinstalled on the runner; zizmor is hash-pinned
-# through pip), so no third-party action enters the supply chain and the tool
-# version is explicit + Dependabot-free (bump the version AND its digest
-# together). Every job is independent and blocks the PR on findings.
+# FOUR JOBS, BY TOOLCHAIN (since 2026-09-22, audit item CI-04). This workflow used to run one job
+# per check -- 25 of them, median 9 seconds of work each -- and every push queued all 25 against a
+# concurrency cap of about 20 runners shared with every other workflow. Measured on 2026-09-22: a
+# `main` push at 18:46 still had eleven repo-lint jobs QUEUED an hour later, holding runners the
+# required checks were waiting for. A runner spends longer booting and checking out than most of
+# these checks take to run, so the fix is fewer runners, not faster checks:
+#
+#   linters          the binary linters: shellcheck, actionlint, zizmor, hadolint
+#   repo-gates       python/bash assertions over the tree: ADRs, Quadlet drift, SBOM coverage,
+#                    dashboards, log masking, image pins, the cosign identity, ansible-lint, ...
+#   self-tests       the self-test suites of the operational scripts (conformance, the metric
+#                    collectors, the container-runtime seam, the env.d renderer)
+#   container-checks everything that validates a config in the image that runs it: Prometheus
+#                    rules and config, Alertmanager, Alloy, Loki, the edge nginx, the acme handover,
+#                    the Keycloak issuer across the compose stacks
+#
+# Each former job is now a group of named steps prefixed with its old id (`adr-numbering / ...`),
+# and every step carries `if: ${{ !cancelled() }}`: a failing check fails its job but does not
+# stop the checks after it, so one run still reports every finding -- which is what 25 independent
+# jobs gave for free. None of these jobs is a required status check today; the ones that should
+# become required are named in the PR that introduced this layout.
+#
+# What the individual checks are for is written next to each step. The ones whose purpose is not
+# obvious from their name:
+#   - probe-vs-allowlist -> the nightly edge probe and the vhost allow-list runbook describe one
+#                   surface from two sides; a refusal row for a path the allow-list admits is a
+#                   contradiction provable without production.
+#   - ingest-audience -> no ingest config, env template or runbook assigns the backend's audience
+#                   (basetool-backend) to the gateway, whose value is basetool-ingest.
+#   - sbom-coverage -> every shipped Gradle module is wired for a CycloneDX SBOM end to end.
+#   - e2e-gate-mirror -> e2e.yml states one decision twice (the job gate and the concurrency
+#                   selector that has to predict it); a looser selector silently stops the suite.
+#   - adr-numbering / adr-registry -> no two ADRs share a number, and docs/adr/README.md agrees
+#                   with docs/adr/ (0154 named two decisions for eleven days; 0192-0194 sat
+#                   unindexed).
+#   - alloy-log-masking -> Alloy's stage.replace overwrites EVERY capture group and expands no
+#                   back-references; eight of fourteen masks were written the destructive way.
+#   - cosign-identity -> every copy of the cosign signer-identity regexp is anchored and they all
+#                   agree (promote, promote-testing, the release reuse gate, deploy.sh).
+#
+# Each linter runs from its pinned release binary, verified against a pinned SHA-256 (shellcheck
+# ships preinstalled on the runner; zizmor is hash-pinned through pip), so no third-party action
+# enters the supply chain and the tool version is explicit and Dependabot-free (bump the version
+# AND its digest together). Container images are read from the compose files, digest included, so
+# a check validates with the exact image the host runs.
 
 on:
   push:
@@ -66,10 +63,19 @@ permissions:
   contents: read
 
 jobs:
-  shellcheck:
-    name: shellcheck
+  linters:
+    name: Linters
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
+    env:
+      ACTIONLINT_VERSION: 1.7.12
+      # SHA-256 of actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz, from the release's
+      # actionlint_<version>_checksums.txt. Bump BOTH together (audit item CI-SEC-12).
+      ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+      HADOLINT_VERSION: 2.14.0
+      # SHA-256 of hadolint-Linux-x86_64, from the release's hadolint-Linux-x86_64.sha256. Bump
+      # BOTH together (audit item CI-SEC-12).
+      HADOLINT_SHA256: 6bf226944684f56c84dd014e8b979d27425c0148f61b3bd99bcc6f39e9dc5a47
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -78,7 +84,8 @@ jobs:
 
       # shellcheck is preinstalled on ubuntu-latest. Lint every tracked *.sh
       # (not just scripts/) so a future script anywhere is covered automatically.
-      - name: Run shellcheck
+      - name: shellcheck / Run shellcheck
+        if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
           mapfile -t files < <(git ls-files '*.sh')
@@ -90,22 +97,8 @@ jobs:
           printf '  %s\n' "${files[@]}"
           shellcheck "${files[@]}"
 
-  actionlint:
-    name: actionlint
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    env:
-      ACTIONLINT_VERSION: 1.7.12
-      # SHA-256 of actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz, from the release's
-      # actionlint_<version>_checksums.txt. Bump BOTH together (audit item CI-SEC-12).
-      ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Install actionlint
+      - name: actionlint / Install actionlint
+        if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
           url="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
@@ -117,22 +110,14 @@ jobs:
 
       # actionlint shells out to the preinstalled shellcheck for every embedded
       # `run:` script, so workflow YAML and the bash inside it are both linted.
-      - name: Run actionlint
+      - name: actionlint / Run actionlint
+        if: ${{ !cancelled() }}
         run: actionlint -color
-
-  zizmor:
-    name: zizmor
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
 
       # Hash-pinned through pip rather than a checksummed tarball, because zizmor's release
       # publishes no checksums; the reasoning lives in .github/requirements/zizmor.txt.
-      - name: Install zizmor
+      - name: zizmor / Install zizmor
+        if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
           python3 -m pip install --disable-pip-version-check --quiet \
@@ -148,7 +133,8 @@ jobs:
       # GH_TOKEN switches zizmor out of offline mode, which enables the audits that ask GitHub about
       # the pinned actions -- `known-vulnerable-actions` and `impostor-commit` among them. It is this
       # job's read-only token; nothing is written.
-      - name: Run zizmor
+      - name: zizmor / Run zizmor
+        if: ${{ !cancelled() }}
         env:
           GH_TOKEN: ${{ github.token }}
         # `--config` explicitly: zizmor only discovers .github/zizmor.yml on its own when it is
@@ -158,44 +144,8 @@ jobs:
           zizmor --config .github/zizmor.yml --persona=regular --min-severity=medium
           --format=plain .github/workflows .github/actions
 
-  cosign-identity:
-    name: cosign-identity
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      # REQ-OPS-015 says the CI half and the host half of the signature gate "cannot diverge", and
-      # until 2026-09-22 that was a sentence: four hand-written copies of the signer-identity
-      # regexp, all unanchored, so a signature minted on `refs/heads/main-x` or `refs/tags/vfoo`
-      # verified everywhere (audit item CI-SEC-01). The checker asserts every copy is anchored, the
-      # copies are identical, and they accept and refuse the right subjects. The self-test runs
-      # first, so the gate cannot pass vacuously.
-      - name: Self-test the identity checker
-        run: bash scripts/check-cosign-identity.test.sh
-
-      - name: Check the cosign signer identity
-        run: python3 scripts/check-cosign-identity.py
-
-  hadolint:
-    name: hadolint
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    env:
-      HADOLINT_VERSION: 2.14.0
-      # SHA-256 of hadolint-Linux-x86_64, from the release's hadolint-Linux-x86_64.sha256. Bump
-      # BOTH together (audit item CI-SEC-12).
-      HADOLINT_SHA256: 6bf226944684f56c84dd014e8b979d27425c0148f61b3bd99bcc6f39e9dc5a47
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Install hadolint
+      - name: hadolint / Install hadolint
+        if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
           url="https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-Linux-x86_64"
@@ -211,18 +161,33 @@ jobs:
       # shortest runtime stage -- so it never produced a finding to be missed. It is
       # promoted and vulnerability-scanned exactly like the other two (REQ-OPS-024),
       # which is the list this should have matched all along.
-      - name: Run hadolint
+      - name: hadolint / Run hadolint
+        if: ${{ !cancelled() }}
         run: hadolint backend/Dockerfile frontend/Dockerfile ingest/Dockerfile
 
-  logging-facade:
-    name: logging-facade
+  repo-gates:
+    name: Repository gates
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # Full history: app-version asks whether a tag exists, and adr-numbering needs the
+          # merge-base against the base branch. A shallow clone degrades both to "nothing to
+          # check" rather than failing.
+          fetch-depth: 0
           persist-credentials: false
+
+      # Uses the runner's preinstalled python3; PyYAML ships with the ubuntu-latest image and the
+      # fallback keeps the job working if that ever stops being true (pinned, audit item CI-SEC-12).
+      - name: Ensure PyYAML
+        run: |
+          set -eu
+          if ! python3 -c "import yaml" >/dev/null 2>&1; then
+            pip3 install --disable-pip-version-check 'pyyaml==6.0.3'
+          fi
+          python3 -c "import yaml; print('PyYAML', yaml.__version__)"
 
       # `CLAUDE.md` says "@Slf4j - never instantiate loggers manually", and production code has
       # always honoured it, but nothing checked. `lombok.config` enforces the neighbouring half
@@ -235,32 +200,13 @@ jobs:
       # The self-test runs first so the check can never pass vacuously. Its load-bearing cases are
       # the false-positive guards: the 33 log-CAPTURE tests and the Playwright suite's deliberate
       # console output must stay green, or the gate would be red on a clean tree.
-      - name: Self-test the logging-facade checker
+      - name: logging-facade / Self-test the logging-facade checker
+        if: ${{ !cancelled() }}
         run: scripts/check-logging-facade.test.sh
 
-      - name: Check the logging facade
+      - name: logging-facade / Check the logging facade
+        if: ${{ !cancelled() }}
         run: scripts/check-logging-facade.sh
-
-  pid1-reaping:
-    name: pid1-reaping
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      # Uses the runner's preinstalled python3, like every other script in .github/scripts — no
-      # setup-python action, so there is no extra pinned SHA to maintain. PyYAML ships with the
-      # ubuntu-latest image; the fallback keeps the job working if that ever stops being true.
-      - name: Ensure PyYAML
-        run: |
-          set -eu
-          if ! python3 -c "import yaml" >/dev/null 2>&1; then
-            pip3 install --disable-pip-version-check 'pyyaml==6.0.3'
-          fi
-          python3 -c "import yaml; print('PyYAML', yaml.__version__)"
 
       # REQ-OPS-019. A wget-HTTPS healthcheck forks an `ssl_client` per probe; with no init as PID 1
       # it is never reaped and fills the service's `pids` cgroup cap until every fork is refused.
@@ -270,29 +216,13 @@ jobs:
       # distinguishes forking from non-forking probes AND still resolves the image-level HEALTHCHECK
       # out of the Dockerfiles (the dev-profile services have no compose healthcheck at all, so a
       # broken resolver would silently exempt them).
-      - name: Self-test the detector
+      - name: pid1-reaping / Self-test the detector
+        if: ${{ !cancelled() }}
         run: python3 .github/scripts/check_pid1_reaping.py --selftest
 
-      - name: Check PID-1 reaping invariant
+      - name: pid1-reaping / Check PID-1 reaping invariant
+        if: ${{ !cancelled() }}
         run: python3 .github/scripts/check_pid1_reaping.py
-
-  e2e-gate-mirror:
-    name: e2e-gate-mirror
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Ensure PyYAML
-        run: |
-          set -eu
-          if ! python3 -c "import yaml" >/dev/null 2>&1; then
-            pip3 install --disable-pip-version-check 'pyyaml==6.0.3'
-          fi
-          python3 -c "import yaml; print('PyYAML', yaml.__version__)"
 
       # REQ-OPS-027 / ADR-0169. `e2e.yml` decides "does this event run the Playwright suite?" in
       # two places, because GitHub evaluates the concurrency group when the run is CREATED and the
@@ -304,16 +234,353 @@ jobs:
       #
       # The self-test runs first so the gate can never pass vacuously -- a checker that stopped
       # resolving the workflow would otherwise report "no problems" forever.
-      - name: Self-test the gate-mirror checker
+      - name: e2e-gate-mirror / Self-test the gate-mirror checker
+        if: ${{ !cancelled() }}
         run: python3 .github/scripts/check_e2e_gate_mirror.py --selftest
 
-      - name: Check the e2e concurrency selector against its job gate
+      - name: e2e-gate-mirror / Check the e2e concurrency selector against its job gate
+        if: ${{ !cancelled() }}
         run: python3 .github/scripts/check_e2e_gate_mirror.py
 
-  conformance-selftest:
-    name: conformance-selftest
+      # Phase 2 of docs/archive/PODMAN_MIGRATION_PLAN.md. quadlet/ holds the unit files the migration
+      # replaces docker-compose.yml with, and for as long as BOTH exist the compose file is
+      # authoritative -- so the units are generated from it and this asserts they still match.
+      #
+      # Without the assertion the two drift silently: a digest bump, a new network membership or a
+      # changed memory limit would land in compose and not in the units, and nothing would notice
+      # until a host ran the stale one. A unit that starts is not a unit that is right.
+      - name: quadlet-drift / Check the Quadlet units against the compose files
+        if: ${{ !cancelled() }}
+        run: python3 scripts/generate-quadlet.py --check
+
+      # The drift check above compares the generator against ITS OWN OUTPUT, so a translation that
+      # is uniformly wrong is uniformly consistent and reports clean. Four defects reached the tree
+      # behind that green check (PR #1933 review, 2026-09-18): an exec-form healthcheck re-joined
+      # into an unquoted shell string, `Notify=healthy` with no start timeout, raw systemd `%`
+      # specifiers copied into `Exec=` -- measured LIVE, both databases were running with a
+      # corrupted log_line_prefix -- and a prefix-unsafe variable rewrite. None of them is visible
+      # by diffing the generator against itself; all four are properties of the translation, which
+      # is what this asserts.
+      - name: quadlet-drift / Self-test the Quadlet generator's translation
+        if: ${{ !cancelled() }}
+        run: bash scripts/generate-quadlet.test.sh
+
+      # Five times an admission was written into the runbook while the probe kept its old
+      # refusal row, and every time the nightly cron on main was the first to say so -- as a red
+      # run that reads like edge drift when it is really a stale table: bank/deposits (phase O),
+      # hangar/import/fleetview (phase X), the participant check-in (2026-09-08), and
+      # refinery-orders/all plus materials/{id} (2026-09-09). The existing probe-table conflict
+      # check catches one path given two codes in the SAME file; this catches one code in each of
+      # two files, which is the shape all five had. It needs no production access: 404 is the
+      # vhost's own refusal, so a 404 row on an admitted path is a contradiction between two
+      # files in this repository.
+      - name: probe-vs-allowlist / Check the edge probe against the vhost allow-list
+        if: ${{ !cancelled() }}
+        run: python3 .github/scripts/check_probe_against_allowlist.py
+
+      # frontend/Dockerfile runs `:frontend:build` with every lint task excluded BY NAME, because
+      # the image has no Node toolchain to run them with. So a task wired into `check` is silently
+      # added to the image build too. `lintCssInline` was, on 2026-09-13, and the failure mode is as
+      # indirect as it gets: the image build failed, the e2e stack's `up --wait` never saw a healthy
+      # service, and all 94 e2e classes reported `initializationError` with the real cause visible
+      # only inside compose-up.log in the uploaded artifact. Nothing in the build output said lint.
+      # The gateway's audience is basetool-ingest; every frontend session token carries
+      # basetool-backend, so a gateway configured with the backend's value admits the very tokens
+      # its client gate exists to refuse -- and the check still passes, so nothing notices. It went
+      # wrong twice (a runbook on 2026-08-18, the ingest application.yml comment until 2026-09-22).
+      - name: ingest-audience / Self-test the ingest audience checker
+        if: ${{ !cancelled() }}
+        run: python3 scripts/check-ingest-audience.py --selftest
+
+      - name: ingest-audience / Check no ingest config pairs expected-audiences with basetool-backend
+        if: ${{ !cancelled() }}
+        run: python3 scripts/check-ingest-audience.py
+
+      - name: frontend-image-lint-exclusions / Self-test the comparison
+        if: ${{ !cancelled() }}
+        run: python3 .github/scripts/check_frontend_image_lint_exclusions.py --selftest
+
+      - name: frontend-image-lint-exclusions / Check the frontend image excludes every Node-based task
+        if: ${{ !cancelled() }}
+        run: python3 .github/scripts/check_frontend_image_lint_exclusions.py
+
+      # The E2E matrix's `device:` axis and TouchClassLayoutE2eTest's DEVICE_CLASSES are verbatim
+      # copies of one another, and only ONE of the two drift directions is loud. A device the
+      # workflow names and the test does not fails the job with the sweep's own message; a class
+      # added to the test and forgotten in the workflow is measured by nobody, while the coverage
+      # assertion inside each runner is satisfied by the single class that runner was given. The
+      # touch-class work has already been through exactly this with `PAGES`, which was short by
+      # seventeen routes while its Javadoc and REQ-UI-009 both called it complete.
+      - name: e2e-device-matrix / Self-test the comparison
+        if: ${{ !cancelled() }}
+        run: python3 .github/scripts/check_e2e_device_matrix.py --selftest
+
+      - name: e2e-device-matrix / Check the E2E device matrix against DEVICE_CLASSES
+        if: ${{ !cancelled() }}
+        run: python3 .github/scripts/check_e2e_device_matrix.py
+
+      # The version string in the footer is the one kind of output that cannot be
+      # wrong loudly, and it WAS wrong: since ADR-0137 the tag run re-tags instead
+      # of rebuilding, so `git describe` is evaluated on `main` before the release
+      # tag exists and the release commit described itself as the PREVIOUS release
+      # plus nine commits. The resolver reads the version from the CHANGELOG in
+      # that one case; this asserts every branch of it, including that one.
+      - name: app-version / Self-test the version resolver
+        if: ${{ !cancelled() }}
+        run: python3 .github/scripts/app_version.py --selftest
+
+      # REQ-OPS-025. The published SBOM set is read as "these are the components of this release",
+      # so a module missing from it does not read as missing -- it reads as absent from the product.
+      # It had drifted both possible ways by v1.7.3, and neither drift failed anything: `ingest`
+      # had a committed BOM that no release workflow regenerated, so it aged from 2026-07-11 and
+      # shipped 126 stale component versions while never being attached to a Release at all; and
+      # `keycloak-spi`, whose provider JAR promote.yml pushes to the production Keycloak, had no
+      # SBOM whatsoever. Four lists in four files had to agree by hand, and did not. This asserts
+      # them against settings.gradle.kts instead, so a new module fails here until somebody decides
+      # whether it ships -- the decision both drifts skipped.
+      - name: sbom-coverage / Check SBOM coverage of every shipped module
+        if: ${{ !cancelled() }}
+        run: python3 .github/scripts/check_sbom_coverage.py
+
+      - name: adr-numbering / Fetch base branch tip
+        if: ${{ !cancelled() && (github.event_name == 'pull_request') }}
+        # Brings the base into origin/<base_ref> so the checker can resolve both
+        # the ref and the merge-base against it. Compared against the freshly
+        # fetched tip rather than the PR event's base.sha, so a number that
+        # landed on main after the PR opened is caught on the next re-run.
+        # Through the environment, not `${{ }}` in the script: a branch name is attacker-chosen
+        # text, and an expression is pasted into the shell before it runs (zizmor
+        # `template-injection`).
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: git fetch --no-tags origin "${BASE_REF}"
+
+      # The suite runs FIRST so the gate can never pass vacuously: it asserts
+      # that a duplicate, a number already held on the base, and an inherited
+      # duplicate all still fail, while a squash-merge-in-flight and an ADR
+      # filling a gap BELOW the base tip still pass. That last one is what
+      # separates this from the Flyway checker -- an open PR routinely holds a
+      # number main has already passed, and rejecting it would be churn.
+      - name: adr-numbering / Self-test the ADR numbering checker
+        if: ${{ !cancelled() }}
+        # chmod first, like the other script-backed gates: this repo is
+        # developed on Windows where core.filemode=false, so the executable bit
+        # is easy to lose on a re-add and the job would die with exit 126.
+        run: |
+          chmod +x scripts/check-adr-numbering.sh scripts/check-adr-numbering.test.sh
+          scripts/check-adr-numbering.test.sh
+
+      # On push-to-main ADR_BASE_REF is empty, so only the duplicate check runs
+      # -- which is the point: it is the one check that sees a duplicate that
+      # has already landed, and it makes main go red the same day rather than
+      # eleven days later. ADR-0171.
+      - name: adr-numbering / Check ADR numbering
+        if: ${{ !cancelled() }}
+        env:
+          ADR_BASE_REF: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
+        run: scripts/check-adr-numbering.sh
+
+      # The `adr-numbering` steps above read FILENAMES only, so until now nothing read
+      # docs/adr/README.md at all -- and both ways that bites have already happened.
+      #
+      # 0192, 0193 and 0194 reached main with no index row; the table jumped 0191 -> 0195 and
+      # stayed that way until 2026-09-22 (#1963). To the numbering gate an unindexed ADR is a
+      # perfectly well-numbered one.
+      #
+      # And 0123, 0137 and 0140 each carried an UNESCAPED `|` in their prose. GFM splits a row on
+      # every unescaped pipe before it parses inline syntax, so the backticks all three sat inside
+      # were no shelter -- and because GFM keeps the first three cells and DISCARDS the excess, the
+      # `Accepted` status was not merely shifted, it was dropped: the status column rendered a
+      # fragment of the prose instead, or blank for 0123, whose `||` produced an empty cell.
+      # It is invisible by eye -- the table is padded to a fixed width, so a broken row looks
+      # exactly like an intact one -- and 0137 escaped the pipe correctly in one place and not in
+      # the other, in the SAME row.
+      #
+      # The self-test runs first so the gate can never pass vacuously. Its load-bearing case is the
+      # false-positive guard: a legitimately ESCAPED `\|` must stay green, or the gate would be red
+      # on a clean tree from the day it merged.
+      - name: adr-registry / Self-test the ADR registry checker
+        if: ${{ !cancelled() }}
+        # chmod first, like the other script-backed gates: this repo is developed on Windows where
+        # core.filemode=false, so the executable bit is easy to lose on a re-add and the job would
+        # die with exit 126.
+        run: |
+          chmod +x scripts/check-adr-registry.sh scripts/check-adr-registry.test.sh
+          scripts/check-adr-registry.test.sh
+
+      - name: adr-registry / Check the ADR registry
+        if: ${{ !cancelled() }}
+        run: scripts/check-adr-registry.sh
+
+      # Dependabot bumps the image tags in docker-compose.monitoring.yml; nothing used to update the
+      # docs that quote them. That drifted unnoticed for months — on 2026-08-02 the monitoring
+      # runbook's version table was stale on 8 of 12 rows. The tables lost their hand-maintained
+      # Version column in the same change (a copy of the compose file cannot stay true, and it never
+      # described the RUNNING container anyway), but the runbooks still pin tags inside COPY-PASTEABLE
+      # commands — `docker run ... grafana/alloy:<tag> fmt /cfg/config.alloy`. Those must stay pinned
+      # to be reproducible, and a stale one is the sharper hazard: the command still succeeds, just
+      # against a binary that is not deployed, so the wrong answer is silent. This gate keeps them
+      # honest. `--fix` rewrites every drifted pin in one go. Since 2026-08-16 the scan covers every
+      # tracked text file rather than only Markdown: the same command sits in the header of each
+      # promtool test under monitoring/prometheus/tests/, where nothing gated it, and nine of the ten
+      # files there had drifted across three Prometheus versions.
+      #
+      # The self-test runs first (audit item CI-11): scripts/check-monitoring-image-pins.test.sh
+      # existed with 39 cases -- the ADR exemption, the single-file `grep -H` trap, the --fix
+      # escaping -- and nothing ran it, so the gate could have been reduced to `exit 0` without a
+      # red run anywhere.
+      - name: monitoring-image-pins / Self-test the image-pin checker
+        if: ${{ !cancelled() }}
+        run: bash scripts/check-monitoring-image-pins.test.sh
+
+      - name: monitoring-image-pins / Check documented monitoring image pins
+        if: ${{ !cancelled() }}
+        # chmod first, mirroring the migration-numbering gate: this repo is developed on Windows
+        # where `core.filemode=false`, so a local `chmod +x` is not recorded and the executable bit
+        # is easy to lose on a re-add. Without this the job dies with exit 126 before running a
+        # single check -- which is how it failed the first time.
+        run: |
+          chmod +x scripts/check-monitoring-image-pins.sh
+          scripts/check-monitoring-image-pins.sh
+
+      # The 13 provisioned dashboards had NO validation of any kind until 2026-08-29 (#1708) — not a
+      # Gradle test, not a CI job, not a lint script. Every way they can be wrong is silent: invalid
+      # JSON makes Grafana skip the dashboard with only a line in its own startup log, a duplicate
+      # uid makes provisioning last-writer-wins so one dashboard replaces another, and an
+      # unprovisioned datasource uid renders "Datasource not found" on every panel — which reads as
+      # "no data" to anyone not looking closely. This is the dashboard half of what #1707 found in
+      # the alert rules: a monitoring surface nothing checks drifts silently, and its silence is
+      # indistinguishable from health.
+      #
+      # The suite runs FIRST so the gate can never pass vacuously: it asserts each failure mode is
+      # still detected, including a panel nested in a collapsed row, before the repository's own
+      # dashboards are checked.
+      - name: grafana-dashboards / Self-test the dashboard checker
+        if: ${{ !cancelled() }}
+        run: |
+          chmod +x scripts/check-grafana-dashboards.py scripts/check-grafana-dashboards.test.sh
+          scripts/check-grafana-dashboards.test.sh
+
+      - name: grafana-dashboards / Check provisioned Grafana dashboards
+        if: ${{ !cancelled() }}
+        run: python3 scripts/check-grafana-dashboards.py
+
+      # REQ-OBS-007. Alloy's `stage.replace` does not substitute the match and expands no
+      # back-references: it walks EVERY capture group and overwrites each one with the literal
+      # `replace` value. So the natural way to write a mask -- keep the field name in group 1 so it
+      # survives, `(username=)(\S+)` with replace = "${1}***" -- destroys the field name AND prints
+      # the template text, and the line reaches Loki as `${1}***${1}***` with nothing left to say
+      # which field was scrubbed.
+      #
+      # Eight of the fourteen stages were written that way, and had been since the day each was
+      # added. Nothing failed: the config is valid, `alloy fmt` is happy, the shipper is healthy,
+      # the stream is not silent, and the secret really is gone -- the only symptom is the
+      # REPLACEMENT text, which no alert and no dashboard reads. It was found on 2026-09-20 by
+      # exporting production logs and reading them by hand. The same patterns had a second defect
+      # that leaked rather than over-masked (`\S+` stops at the first space, and Keycloak quotes its
+      # field values, so a login attempt under a full name reached Loki with the surname intact).
+      # Both are fixed; this is what stops them coming back.
+      #
+      # The self-test runs FIRST so the gate can never pass vacuously, exactly as the
+      # grafana-dashboards job above does. It asserts BOTH failure modes are still detected
+      # independently -- a stage can destroy a field name with a purely literal replacement, and a
+      # stage can emit "${1}" with only one group -- because checking for either alone would have
+      # looked sufficient against the real patterns, which had both.
+      - name: alloy-log-masking / Self-test the masking checker
+        if: ${{ !cancelled() }}
+        # chmod first, like every other script-backed gate here: this repo is developed on Windows
+        # where core.filemode=false, so the executable bit is easy to lose on a re-add and the job
+        # would die with exit 126 before running a single check.
+        run: |
+          chmod +x scripts/check-alloy-log-masking.py scripts/check-alloy-log-masking.test.sh
+          scripts/check-alloy-log-masking.test.sh
+
+      - name: alloy-log-masking / Check the Alloy log-masking stages
+        if: ${{ !cancelled() }}
+        run: python3 scripts/check-alloy-log-masking.py
+
+      # REQ-OPS-015 says the CI half and the host half of the signature gate "cannot diverge", and
+      # until 2026-09-22 that was a sentence: four hand-written copies of the signer-identity
+      # regexp, all unanchored, so a signature minted on `refs/heads/main-x` or `refs/tags/vfoo`
+      # verified everywhere (audit item CI-SEC-01). The checker asserts every copy is anchored, the
+      # copies are identical, and they accept and refuse the right subjects. The self-test runs
+      # first, so the gate cannot pass vacuously.
+      - name: cosign-identity / Self-test the identity checker
+        if: ${{ !cancelled() }}
+        run: bash scripts/check-cosign-identity.test.sh
+
+      - name: cosign-identity / Check the cosign signer identity
+        if: ${{ !cancelled() }}
+        run: python3 scripts/check-cosign-identity.py
+
+      # ADR-0188. `ansible/` provisions hosts; it never deploys, and REQ-OPS-001's pull-only
+      # delivery is untouched by it. The role is the reason "production is built from the same
+      # procedure as testing" can be asserted rather than hoped for, so it is worth having CI
+      # notice when it stops parsing -- it cannot be exercised against a real host here, and an
+      # unrunnable role is discovered at the worst possible moment otherwise.
+      # The galaxy fetch is retried; the pip install is not. Only one of them talks to a service
+      # that has been observed dropping the connection mid-request:
+      #
+      #   [ERROR]: Unknown error when attempting to call Galaxy at
+      #   'https://galaxy.ansible.com/api/v3/collections/ansible/posix/':
+      #   <urlopen error [Errno 104] Connection reset by peer>
+      #
+      # (2026-09-20, PR #1933). The job died in this step, so ansible-lint never ran and the gate
+      # reported a lint failure for a network hiccup. That is the worst shape a gate can have: it
+      # sends whoever reads it looking for a finding that does not exist, and after a few of those
+      # a red ansible-lint stops meaning anything — the same reasoning the .gitattributes and
+      # dead-alert notes elsewhere in this repository turn on.
+      #
+      # Three attempts with a widening pause, matching release-images.yml's cosign retry. A genuine
+      # failure — a collection that does not exist, a version that cannot be satisfied — fails all
+      # three and still stops the build; only the transient is absorbed.
+      # ansible-core and ansible-lint are pinned by version (audit item CI-SEC-12): unpinned, every
+      # run linted with whatever PyPI served that minute, so a new ansible-lint rule could turn the
+      # gate red on a diff that touched nothing under ansible/, and nothing recorded which version
+      # had passed. Bump them together, by hand, and re-run the job.
+      - name: ansible-lint / Install ansible-core, ansible-lint and the pinned collections
+        if: ${{ !cancelled() }}
+        env:
+          ANSIBLE_CORE_VERSION: 2.21.4
+          ANSIBLE_LINT_VERSION: 26.9.0
+        run: |
+          set -euo pipefail
+          pip install --disable-pip-version-check --quiet \
+            "ansible-core==${ANSIBLE_CORE_VERSION}" "ansible-lint==${ANSIBLE_LINT_VERSION}"
+          ansible --version | head -n 1
+          ansible-lint --version
+          attempts=3
+          delay=10
+          for i in $(seq 1 "${attempts}"); do
+            if ansible-galaxy collection install -r ansible/requirements.yml -p ansible/collections; then
+              exit 0
+            fi
+            if [ "${i}" -lt "${attempts}" ]; then
+              echo "::warning::ansible-galaxy attempt ${i}/${attempts} failed; retrying in ${delay}s"
+              sleep "${delay}"
+              delay=$(( delay * 2 ))
+            fi
+          done
+          echo "::error title=ansible-galaxy::collection install failed ${attempts} times" >&2
+          exit 1
+
+      # `-i localhost,` rather than the committed example: an inventory file named
+      # *.example is not recognised by extension, so ansible falls back to scanning and
+      # buries a real error in parser warnings.
+      - name: ansible-lint / Syntax-check the playbook
+        if: ${{ !cancelled() }}
+        working-directory: ansible
+        run: ansible-playbook -i localhost, --syntax-check site.yml
+
+      - name: ansible-lint / Lint the role
+        if: ${{ !cancelled() }}
+        working-directory: ansible
+        run: ansible-lint
+
+  self-tests:
+    name: Self-tests
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -331,18 +598,9 @@ jobs:
       # carry the right message, and fails if any check has no demonstrated red scenario -- so
       # adding a check and forgetting to break it blocks the PR instead of quietly weakening the
       # net. Needs only python3, openssl and loopback; no host, no daemon, no secrets.
-      - name: Self-test the conformance suite
+      - name: conformance-selftest / Self-test the conformance suite
+        if: ${{ !cancelled() }}
         run: bash scripts/check-conformance.test.sh
-
-  cgroup-metrics-selftest:
-    name: cgroup-metrics-selftest
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
 
       # Phase 4 of docs/archive/PODMAN_MIGRATION_PLAN.md. `scripts/cgroup-container-metrics.py` reads
       # container metrics straight out of cgroup v2 and writes them for node_exporter's textfile
@@ -355,18 +613,9 @@ jobs:
       # a healthy host never shows -- a prior OOM kill, a throttled cgroup, an unlimited one -- and
       # asserts the output, then has promtool confirm Prometheus accepts it rather than trusting
       # that it looks like exposition format. No kernel, no containers, no privileges.
-      - name: Self-test the cgroup metrics collector
+      - name: cgroup-metrics-selftest / Self-test the cgroup metrics collector
+        if: ${{ !cancelled() }}
         run: bash scripts/cgroup-container-metrics.test.sh
-
-  cert-expiry-selftest:
-    name: cert-expiry-selftest
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
 
       # `scripts/cert-expiry-metrics.py` reports the expiry of certificate FILES, because a
       # blackbox probe can only see a certificate something is SERVING -- and the internal CA is
@@ -384,34 +633,18 @@ jobs:
       # asserts the DN is RFC 2253 -- openssl's default form differs between 3.0 and 3.5 for the
       # same file, which would retire every series on an upgrade. No host, no containers, no
       # secrets.
-      - name: Self-test the certificate expiry collector
+      - name: cert-expiry-selftest / Self-test the certificate expiry collector
+        if: ${{ !cancelled() }}
         run: bash scripts/cert-expiry-metrics.test.sh
-
-  host-updates-selftest:
-    name: host-updates-selftest
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # `scripts/host-updates-metrics.sh` records every dnf-automatic run and whether a reboot is
       # due (REQ-OPS-032), and three alerts read nothing else. The part worth gating is what it
       # does NOT write: a reboot state `needs-restarting` could not establish must be left out
       # rather than written as a reassuring 0, and a boot refresh must carry the last run over
       # instead of erasing it. Stubbed `needs-restarting`, no dnf, no systemd, no host.
-      - name: Self-test the host patch-state collector
+      - name: host-updates-selftest / Self-test the host patch-state collector
+        if: ${{ !cancelled() }}
         run: bash scripts/host-updates-metrics.test.sh
-
-  container-runtime-selftest:
-    name: container-runtime-selftest
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
 
       # Phase 3 of docs/archive/PODMAN_MIGRATION_PLAN.md. `scripts/lib/container-runtime.sh` is the seam
       # between the operational scripts and the container runtime, and it exists because BOTH
@@ -424,18 +657,9 @@ jobs:
       # failed start is reported as a failure (which is what the health gate and the rollback hang
       # off), that pruning never reaches a volume, and that the registry password is piped rather
       # than passed on a command line.
-      - name: Self-test the container-runtime seam
+      - name: container-runtime-selftest / Self-test the container-runtime seam
+        if: ${{ !cancelled() }}
         run: bash scripts/container-runtime.test.sh
-
-  render-env-d-selftest:
-    name: render-env-d-selftest
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
 
       # Phase 2 of docs/archive/PODMAN_MIGRATION_PLAN.md. `scripts/render-env-d.py` fills the per-service
       # environment templates from the host `.env`. Under compose this interpolation was compose's
@@ -449,13 +673,15 @@ jobs:
       # behind -- plus the semantics compose defines (`:-` versus `-`, nesting, a `$` inside a
       # secret) and that the generated header's own ${...} EXAMPLES survive un-interpolated.
       # Needs only python3 and bash; no host, no containers, no secrets.
-      - name: Self-test the environment renderer
+      - name: render-env-d-selftest / Self-test the environment renderer
+        if: ${{ !cancelled() }}
         run: bash scripts/render-env-d.test.sh
 
       # The templates in the tree must still render against a complete .env. This catches a
       # generator change that emits a reference the renderer cannot resolve, which would otherwise
       # only surface on the host at deploy time.
-      - name: Render the real templates against a synthetic complete .env
+      - name: render-env-d-selftest / Render the real templates against a synthetic complete .env
+        if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -485,446 +711,25 @@ jobs:
           fi
           echo "none"
 
-  ansible-lint:
-    name: ansible-lint
+  container-checks:
+    name: Container checks
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      # ADR-0188. `ansible/` provisions hosts; it never deploys, and REQ-OPS-001's pull-only
-      # delivery is untouched by it. The role is the reason "production is built from the same
-      # procedure as testing" can be asserted rather than hoped for, so it is worth having CI
-      # notice when it stops parsing -- it cannot be exercised against a real host here, and an
-      # unrunnable role is discovered at the worst possible moment otherwise.
-      # The galaxy fetch is retried; the pip install is not. Only one of them talks to a service
-      # that has been observed dropping the connection mid-request:
-      #
-      #   [ERROR]: Unknown error when attempting to call Galaxy at
-      #   'https://galaxy.ansible.com/api/v3/collections/ansible/posix/':
-      #   <urlopen error [Errno 104] Connection reset by peer>
-      #
-      # (2026-09-20, PR #1933). The job died in this step, so ansible-lint never ran and the gate
-      # reported a lint failure for a network hiccup. That is the worst shape a gate can have: it
-      # sends whoever reads it looking for a finding that does not exist, and after a few of those
-      # a red ansible-lint stops meaning anything — the same reasoning the .gitattributes and
-      # dead-alert notes elsewhere in this repository turn on.
-      #
-      # Three attempts with a widening pause, matching release-images.yml's cosign retry. A genuine
-      # failure — a collection that does not exist, a version that cannot be satisfied — fails all
-      # three and still stops the build; only the transient is absorbed.
-      # ansible-core and ansible-lint are pinned by version (audit item CI-SEC-12): unpinned, every
-      # run linted with whatever PyPI served that minute, so a new ansible-lint rule could turn the
-      # gate red on a diff that touched nothing under ansible/, and nothing recorded which version
-      # had passed. Bump them together, by hand, and re-run the job.
-      - name: Install ansible-core, ansible-lint and the pinned collections
-        env:
-          ANSIBLE_CORE_VERSION: 2.21.4
-          ANSIBLE_LINT_VERSION: 26.9.0
-        run: |
-          set -euo pipefail
-          pip install --disable-pip-version-check --quiet \
-            "ansible-core==${ANSIBLE_CORE_VERSION}" "ansible-lint==${ANSIBLE_LINT_VERSION}"
-          ansible --version | head -n 1
-          ansible-lint --version
-          attempts=3
-          delay=10
-          for i in $(seq 1 "${attempts}"); do
-            if ansible-galaxy collection install -r ansible/requirements.yml -p ansible/collections; then
-              exit 0
-            fi
-            if [ "${i}" -lt "${attempts}" ]; then
-              echo "::warning::ansible-galaxy attempt ${i}/${attempts} failed; retrying in ${delay}s"
-              sleep "${delay}"
-              delay=$(( delay * 2 ))
-            fi
-          done
-          echo "::error title=ansible-galaxy::collection install failed ${attempts} times" >&2
-          exit 1
-
-      # `-i localhost,` rather than the committed example: an inventory file named
-      # *.example is not recognised by extension, so ansible falls back to scanning and
-      # buries a real error in parser warnings.
-      - name: Syntax-check the playbook
-        working-directory: ansible
-        run: ansible-playbook -i localhost, --syntax-check site.yml
-
-      - name: Lint the role
-        working-directory: ansible
-        run: ansible-lint
-
-  quadlet-drift:
-    name: quadlet-drift
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
+      # Uses the runner's preinstalled python3; PyYAML ships with the ubuntu-latest image and the
+      # fallback keeps the job working if that ever stops being true (pinned, audit item CI-SEC-12).
       - name: Ensure PyYAML
         run: |
           set -eu
-          python3 -c "import yaml" 2>/dev/null || pip3 install --disable-pip-version-check 'pyyaml==6.0.3'
-
-      # Phase 2 of docs/archive/PODMAN_MIGRATION_PLAN.md. quadlet/ holds the unit files the migration
-      # replaces docker-compose.yml with, and for as long as BOTH exist the compose file is
-      # authoritative -- so the units are generated from it and this asserts they still match.
-      #
-      # Without the assertion the two drift silently: a digest bump, a new network membership or a
-      # changed memory limit would land in compose and not in the units, and nothing would notice
-      # until a host ran the stale one. A unit that starts is not a unit that is right.
-      - name: Check the Quadlet units against the compose files
-        run: python3 scripts/generate-quadlet.py --check
-
-      # The drift check above compares the generator against ITS OWN OUTPUT, so a translation that
-      # is uniformly wrong is uniformly consistent and reports clean. Four defects reached the tree
-      # behind that green check (PR #1933 review, 2026-09-18): an exec-form healthcheck re-joined
-      # into an unquoted shell string, `Notify=healthy` with no start timeout, raw systemd `%`
-      # specifiers copied into `Exec=` -- measured LIVE, both databases were running with a
-      # corrupted log_line_prefix -- and a prefix-unsafe variable rewrite. None of them is visible
-      # by diffing the generator against itself; all four are properties of the translation, which
-      # is what this asserts.
-      - name: Self-test the Quadlet generator's translation
-        run: bash scripts/generate-quadlet.test.sh
-
-  probe-vs-allowlist:
-    name: probe-vs-allowlist
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      # Five times an admission was written into the runbook while the probe kept its old
-      # refusal row, and every time the nightly cron on main was the first to say so -- as a red
-      # run that reads like edge drift when it is really a stale table: bank/deposits (phase O),
-      # hangar/import/fleetview (phase X), the participant check-in (2026-09-08), and
-      # refinery-orders/all plus materials/{id} (2026-09-09). The existing probe-table conflict
-      # check catches one path given two codes in the SAME file; this catches one code in each of
-      # two files, which is the shape all five had. It needs no production access: 404 is the
-      # vhost's own refusal, so a 404 row on an admitted path is a contradiction between two
-      # files in this repository.
-      - name: Check the edge probe against the vhost allow-list
-        run: python3 .github/scripts/check_probe_against_allowlist.py
-
-  ingest-audience:
-    name: ingest-audience
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      # The gateway's audience is basetool-ingest; every frontend session token carries
-      # basetool-backend, so a gateway configured with the backend's value admits the very tokens
-      # its client gate exists to refuse -- and the check still passes, so nothing notices. It went
-      # wrong twice (a runbook on 2026-08-18, the ingest application.yml comment until 2026-09-22).
-      - name: Self-test the ingest audience checker
-        run: python3 scripts/check-ingest-audience.py --selftest
-
-      - name: Check no ingest config pairs expected-audiences with basetool-backend
-        run: python3 scripts/check-ingest-audience.py
-
-  frontend-image-lint-exclusions:
-    name: frontend-image-lint-exclusions
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      # frontend/Dockerfile runs `:frontend:build` with every lint task excluded BY NAME, because
-      # the image has no Node toolchain to run them with. So a task wired into `check` is silently
-      # added to the image build too. `lintCssInline` was, on 2026-09-13, and the failure mode is as
-      # indirect as it gets: the image build failed, the e2e stack's `up --wait` never saw a healthy
-      # service, and all 94 e2e classes reported `initializationError` with the real cause visible
-      # only inside compose-up.log in the uploaded artifact. Nothing in the build output said lint.
-      - name: Self-test the comparison
-        run: python3 .github/scripts/check_frontend_image_lint_exclusions.py --selftest
-
-      - name: Check the frontend image excludes every Node-based task
-        run: python3 .github/scripts/check_frontend_image_lint_exclusions.py
-
-  e2e-device-matrix:
-    name: e2e-device-matrix
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      # The E2E matrix's `device:` axis and TouchClassLayoutE2eTest's DEVICE_CLASSES are verbatim
-      # copies of one another, and only ONE of the two drift directions is loud. A device the
-      # workflow names and the test does not fails the job with the sweep's own message; a class
-      # added to the test and forgotten in the workflow is measured by nobody, while the coverage
-      # assertion inside each runner is satisfied by the single class that runner was given. The
-      # touch-class work has already been through exactly this with `PAGES`, which was short by
-      # seventeen routes while its Javadoc and REQ-UI-009 both called it complete.
-      - name: Self-test the comparison
-        run: python3 .github/scripts/check_e2e_device_matrix.py --selftest
-
-      - name: Check the E2E device matrix against DEVICE_CLASSES
-        run: python3 .github/scripts/check_e2e_device_matrix.py
-
-  app-version:
-    name: app-version
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          # The resolver asks whether a tag exists, so a shallow clone with no
-          # tags would make every case look like "not released yet".
-          fetch-depth: 0
-          persist-credentials: false
-
-      # The version string in the footer is the one kind of output that cannot be
-      # wrong loudly, and it WAS wrong: since ADR-0137 the tag run re-tags instead
-      # of rebuilding, so `git describe` is evaluated on `main` before the release
-      # tag exists and the release commit described itself as the PREVIOUS release
-      # plus nine commits. The resolver reads the version from the CHANGELOG in
-      # that one case; this asserts every branch of it, including that one.
-      - name: Self-test the version resolver
-        run: python3 .github/scripts/app_version.py --selftest
-
-  sbom-coverage:
-    name: sbom-coverage
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      # REQ-OPS-025. The published SBOM set is read as "these are the components of this release",
-      # so a module missing from it does not read as missing -- it reads as absent from the product.
-      # It had drifted both possible ways by v1.7.3, and neither drift failed anything: `ingest`
-      # had a committed BOM that no release workflow regenerated, so it aged from 2026-07-11 and
-      # shipped 126 stale component versions while never being attached to a Release at all; and
-      # `keycloak-spi`, whose provider JAR promote.yml pushes to the production Keycloak, had no
-      # SBOM whatsoever. Four lists in four files had to agree by hand, and did not. This asserts
-      # them against settings.gradle.kts instead, so a new module fails here until somebody decides
-      # whether it ships -- the decision both drifts skipped.
-      - name: Check SBOM coverage of every shipped module
-        run: python3 .github/scripts/check_sbom_coverage.py
-
-  adr-numbering:
-    name: adr-numbering
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          # fetch-depth: 0 so the checker can compute the merge-base against the
-          # base branch; a shallow checkout has none and the base-collision
-          # check would silently degrade to "no new ADRs".
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Fetch base branch tip
-        if: github.event_name == 'pull_request'
-        # Brings the base into origin/<base_ref> so the checker can resolve both
-        # the ref and the merge-base against it. Compared against the freshly
-        # fetched tip rather than the PR event's base.sha, so a number that
-        # landed on main after the PR opened is caught on the next re-run.
-        # Through the environment, not `${{ }}` in the script: a branch name is attacker-chosen
-        # text, and an expression is pasted into the shell before it runs (zizmor
-        # `template-injection`).
-        env:
-          BASE_REF: ${{ github.base_ref }}
-        run: git fetch --no-tags origin "${BASE_REF}"
-
-      # The suite runs FIRST so the gate can never pass vacuously: it asserts
-      # that a duplicate, a number already held on the base, and an inherited
-      # duplicate all still fail, while a squash-merge-in-flight and an ADR
-      # filling a gap BELOW the base tip still pass. That last one is what
-      # separates this from the Flyway checker -- an open PR routinely holds a
-      # number main has already passed, and rejecting it would be churn.
-      - name: Self-test the ADR numbering checker
-        # chmod first, like the other script-backed gates: this repo is
-        # developed on Windows where core.filemode=false, so the executable bit
-        # is easy to lose on a re-add and the job would die with exit 126.
-        run: |
-          chmod +x scripts/check-adr-numbering.sh scripts/check-adr-numbering.test.sh
-          scripts/check-adr-numbering.test.sh
-
-      # On push-to-main ADR_BASE_REF is empty, so only the duplicate check runs
-      # -- which is the point: it is the one check that sees a duplicate that
-      # has already landed, and it makes main go red the same day rather than
-      # eleven days later. ADR-0171.
-      - name: Check ADR numbering
-        env:
-          ADR_BASE_REF: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
-        run: scripts/check-adr-numbering.sh
-
-  adr-registry:
-    name: adr-registry
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      # The sibling `adr-numbering` job reads FILENAMES only, so until now nothing read
-      # docs/adr/README.md at all -- and both ways that bites have already happened.
-      #
-      # 0192, 0193 and 0194 reached main with no index row; the table jumped 0191 -> 0195 and
-      # stayed that way until 2026-09-22 (#1963). To the numbering gate an unindexed ADR is a
-      # perfectly well-numbered one.
-      #
-      # And 0123, 0137 and 0140 each carried an UNESCAPED `|` in their prose. GFM splits a row on
-      # every unescaped pipe before it parses inline syntax, so the backticks all three sat inside
-      # were no shelter -- and because GFM keeps the first three cells and DISCARDS the excess, the
-      # `Accepted` status was not merely shifted, it was dropped: the status column rendered a
-      # fragment of the prose instead, or blank for 0123, whose `||` produced an empty cell.
-      # It is invisible by eye -- the table is padded to a fixed width, so a broken row looks
-      # exactly like an intact one -- and 0137 escaped the pipe correctly in one place and not in
-      # the other, in the SAME row.
-      #
-      # The self-test runs first so the gate can never pass vacuously. Its load-bearing case is the
-      # false-positive guard: a legitimately ESCAPED `\|` must stay green, or the gate would be red
-      # on a clean tree from the day it merged.
-      - name: Self-test the ADR registry checker
-        # chmod first, like the other script-backed gates: this repo is developed on Windows where
-        # core.filemode=false, so the executable bit is easy to lose on a re-add and the job would
-        # die with exit 126.
-        run: |
-          chmod +x scripts/check-adr-registry.sh scripts/check-adr-registry.test.sh
-          scripts/check-adr-registry.test.sh
-
-      - name: Check the ADR registry
-        run: scripts/check-adr-registry.sh
-
-  monitoring-image-pins:
-    name: monitoring-image-pins
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      # Dependabot bumps the image tags in docker-compose.monitoring.yml; nothing used to update the
-      # docs that quote them. That drifted unnoticed for months — on 2026-08-02 the monitoring
-      # runbook's version table was stale on 8 of 12 rows. The tables lost their hand-maintained
-      # Version column in the same change (a copy of the compose file cannot stay true, and it never
-      # described the RUNNING container anyway), but the runbooks still pin tags inside COPY-PASTEABLE
-      # commands — `docker run ... grafana/alloy:<tag> fmt /cfg/config.alloy`. Those must stay pinned
-      # to be reproducible, and a stale one is the sharper hazard: the command still succeeds, just
-      # against a binary that is not deployed, so the wrong answer is silent. This gate keeps them
-      # honest. `--fix` rewrites every drifted pin in one go. Since 2026-08-16 the scan covers every
-      # tracked text file rather than only Markdown: the same command sits in the header of each
-      # promtool test under monitoring/prometheus/tests/, where nothing gated it, and nine of the ten
-      # files there had drifted across three Prometheus versions.
-      - name: Check documented monitoring image pins
-        # chmod first, mirroring the migration-numbering gate: this repo is developed on Windows
-        # where `core.filemode=false`, so a local `chmod +x` is not recorded and the executable bit
-        # is easy to lose on a re-add. Without this the job dies with exit 126 before running a
-        # single check -- which is how it failed the first time.
-        run: |
-          chmod +x scripts/check-monitoring-image-pins.sh
-          scripts/check-monitoring-image-pins.sh
-
-  grafana-dashboards:
-    name: grafana-dashboards
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      # The 13 provisioned dashboards had NO validation of any kind until 2026-08-29 (#1708) — not a
-      # Gradle test, not a CI job, not a lint script. Every way they can be wrong is silent: invalid
-      # JSON makes Grafana skip the dashboard with only a line in its own startup log, a duplicate
-      # uid makes provisioning last-writer-wins so one dashboard replaces another, and an
-      # unprovisioned datasource uid renders "Datasource not found" on every panel — which reads as
-      # "no data" to anyone not looking closely. This is the dashboard half of what #1707 found in
-      # the alert rules: a monitoring surface nothing checks drifts silently, and its silence is
-      # indistinguishable from health.
-      #
-      # The suite runs FIRST so the gate can never pass vacuously: it asserts each failure mode is
-      # still detected, including a panel nested in a collapsed row, before the repository's own
-      # dashboards are checked.
-      - name: Self-test the dashboard checker
-        run: |
-          chmod +x scripts/check-grafana-dashboards.py scripts/check-grafana-dashboards.test.sh
-          scripts/check-grafana-dashboards.test.sh
-
-      - name: Check provisioned Grafana dashboards
-        run: python3 scripts/check-grafana-dashboards.py
-
-  alloy-log-masking:
-    name: alloy-log-masking
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      # REQ-OBS-007. Alloy's `stage.replace` does not substitute the match and expands no
-      # back-references: it walks EVERY capture group and overwrites each one with the literal
-      # `replace` value. So the natural way to write a mask -- keep the field name in group 1 so it
-      # survives, `(username=)(\S+)` with replace = "${1}***" -- destroys the field name AND prints
-      # the template text, and the line reaches Loki as `${1}***${1}***` with nothing left to say
-      # which field was scrubbed.
-      #
-      # Eight of the fourteen stages were written that way, and had been since the day each was
-      # added. Nothing failed: the config is valid, `alloy fmt` is happy, the shipper is healthy,
-      # the stream is not silent, and the secret really is gone -- the only symptom is the
-      # REPLACEMENT text, which no alert and no dashboard reads. It was found on 2026-09-20 by
-      # exporting production logs and reading them by hand. The same patterns had a second defect
-      # that leaked rather than over-masked (`\S+` stops at the first space, and Keycloak quotes its
-      # field values, so a login attempt under a full name reached Loki with the surname intact).
-      # Both are fixed; this is what stops them coming back.
-      #
-      # The self-test runs FIRST so the gate can never pass vacuously, exactly as the
-      # grafana-dashboards job above does. It asserts BOTH failure modes are still detected
-      # independently -- a stage can destroy a field name with a purely literal replacement, and a
-      # stage can emit "${1}" with only one group -- because checking for either alone would have
-      # looked sufficient against the real patterns, which had both.
-      - name: Self-test the masking checker
-        # chmod first, like every other script-backed gate here: this repo is developed on Windows
-        # where core.filemode=false, so the executable bit is easy to lose on a re-add and the job
-        # would die with exit 126 before running a single check.
-        run: |
-          chmod +x scripts/check-alloy-log-masking.py scripts/check-alloy-log-masking.test.sh
-          scripts/check-alloy-log-masking.test.sh
-
-      - name: Check the Alloy log-masking stages
-        run: python3 scripts/check-alloy-log-masking.py
-
-  keycloak-issuer:
-    name: keycloak-issuer
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
+          if ! python3 -c "import yaml" >/dev/null 2>&1; then
+            pip3 install --disable-pip-version-check 'pyyaml==6.0.3'
+          fi
+          python3 -c "import yaml; print('PyYAML', yaml.__version__)"
 
       # The OIDC issuer the apps validate has to be the one Keycloak advertises, and until ADR-0167
       # that was manual discipline: the identity base URL is a literal on ~36 lines across 19 files
@@ -950,26 +755,18 @@ jobs:
       # vacuously: it breaks the compose files each way in turn -- including removing the derivation
       # so the issuer stops following the hostname, which today's values hide -- and requires the
       # checker to report each one.
-      - name: Self-test the issuer checker
+      - name: keycloak-issuer / Self-test the issuer checker
+        if: ${{ !cancelled() }}
         run: |
           chmod +x scripts/check-keycloak-issuer.py scripts/check-keycloak-issuer.test.sh
           scripts/check-keycloak-issuer.test.sh
 
-      - name: Check the Keycloak issuer agrees across every stack
+      - name: keycloak-issuer / Check the Keycloak issuer agrees across every stack
+        if: ${{ !cancelled() }}
         run: python3 scripts/check-keycloak-issuer.py
 
-  prometheus-rules:
-    name: prometheus-rules
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
       # The alert rules and their promtool unit tests had no gate of any kind until 2026-09-08 —
-      # the same hole the grafana-dashboards job above closed for the dashboards, one surface over.
+      # the same hole the grafana-dashboards gate closed for the dashboards, one surface over.
       # 18 test files existed and nothing ran them, so every one of them was a claim rather than a
       # check: monitoring/README.md, REQ-OPS-018 and several ADRs all say a behaviour is "pinned by"
       # a file under monitoring/prometheus/tests/, and none of those sentences was true in CI. The
@@ -977,21 +774,60 @@ jobs:
       # such a test.
       #
       # promtool comes out of the pinned prometheus image rather than a release tarball, so the
-      # linter version matches the server that will load these rules. Note the --entrypoint: the
-      # image starts /bin/prometheus, which rejects `promtool` as "unexpected promtool". The globs
-      # are expanded INSIDE the container via `sh -c` — the runner's shell cannot expand a /work
-      # path and promtool would exit with "path does not exist".
-      - name: Check alert rule syntax
+      # linter version matches the server that will load these rules. The reference -- DIGEST
+      # included -- is read from docker-compose.monitoring.yml, the file the Quadlet unit is
+      # generated from, so it is the exact image production runs and a Dependabot bump moves it
+      # without anyone editing this file (it used to be the tag alone, written out here). Note the
+      # --entrypoint: the image starts /bin/prometheus, which rejects `promtool` as "unexpected
+      # promtool". The globs are expanded INSIDE the container via `sh -c` — the runner's shell
+      # cannot expand a /work path and promtool would exit with "path does not exist".
+      - name: prometheus-rules / Resolve the pinned Prometheus image
+        id: prom-image
+        if: ${{ !cancelled() }}
         run: |
-          docker run --rm --entrypoint sh \
-            -v "$PWD/monitoring/prometheus:/work" -w /work \
-            prom/prometheus:v3.14.0 -c 'promtool check rules alerts/*.yml'
+          set -euo pipefail
+          image="$(python3 -c 'import yaml; print(yaml.safe_load(open("docker-compose.monitoring.yml", encoding="utf-8"))["services"]["prometheus"]["image"])')"
+          case "$image" in
+            *@sha256:*) ;;
+            *) echo "::error::prometheus image in docker-compose.monitoring.yml carries no digest: ${image}"; exit 1 ;;
+          esac
+          echo "image=${image}" >> "$GITHUB_OUTPUT"
+          echo "promtool from ${image}"
 
-      - name: Run alert rule unit tests
+      - name: prometheus-rules / Check alert rule syntax
+        if: ${{ !cancelled() }}
+        env:
+          PROM_IMAGE: ${{ steps.prom-image.outputs.image }}
         run: |
           docker run --rm --entrypoint sh \
             -v "$PWD/monitoring/prometheus:/work" -w /work \
-            prom/prometheus:v3.14.0 -c 'promtool test rules tests/*_test.yml'
+            "$PROM_IMAGE" -c 'promtool check rules alerts/*.yml'
+
+      - name: prometheus-rules / Run alert rule unit tests
+        if: ${{ !cancelled() }}
+        env:
+          PROM_IMAGE: ${{ steps.prom-image.outputs.image }}
+        run: |
+          docker run --rm --entrypoint sh \
+            -v "$PWD/monitoring/prometheus:/work" -w /work \
+            "$PROM_IMAGE" -c 'promtool test rules tests/*_test.yml'
+
+      # The rules above were gated; the four CONFIGURATION files that load them were not (audit item
+      # OPS-CI-01): prometheus.yml, the Alertmanager template, config.alloy and loki-config.yml.
+      # Each component keeps its last good config or refuses to start on a bad one, and the three
+      # `*ConfigReloadFailed` alerts exist because that has happened on the host. The checker runs
+      # promtool check config (following rule_files), amtool check-config on the template RENDERED
+      # the way the runbook renders it, alloy fmt --test, alloy validate gated on EMPTY OUTPUT (it
+      # exits 0 on failure), and loki -verify-config -- each in the digest-pinned image from
+      # docker-compose.monitoring.yml. The self-test breaks every file once and must see the right
+      # check fail, so none of the five can pass vacuously.
+      - name: monitoring-configs / Self-test the monitoring config checker
+        if: ${{ !cancelled() }}
+        run: bash scripts/check-monitoring-configs.test.sh
+
+      - name: monitoring-configs / Check the Prometheus, Alertmanager, Alloy and Loki configs
+        if: ${{ !cancelled() }}
+        run: bash scripts/check-monitoring-configs.sh
 
       # The edge proxy's configuration is a first-class artefact since ADR-0162. It
       # used to live half in NPM's SQLite database and half in a runbook block that
@@ -1005,7 +841,8 @@ jobs:
       # reason - the real ones are written by the acme container on the production
       # host and must never be in this repository. It also fails on a [warn], so a
       # configuration that always warns cannot quietly become normal.
-      - name: Check edge nginx configuration
+      - name: edge-nginx / Check edge nginx configuration
+        if: ${{ !cancelled() }}
         run: scripts/check-edge-nginx.sh
 
       # The other half of the edge: acme writes the certificates, the edge reads
@@ -1016,7 +853,8 @@ jobs:
       # is every host after the cutover. This runs the publishing step EXTRACTED
       # from docker-compose.yml under the container's real capabilities, twice,
       # and then opens every file as uid 101 in the real edge image.
-      - name: Check acme certificate publishing
+      - name: acme-publish / Check acme certificate publishing
+        if: ${{ !cancelled() }}
         run: scripts/check-acme-publish.sh
 
       # Nothing validated the Loki ruler's rules until now, and the ruler SKIPS a
@@ -1024,5 +862,6 @@ jobs:
       # silently, leaving one line in the ruler's startup log as the only trace.
       # The first rule added after this step was written failed it immediately: a
       # ": " inside an unquoted YAML scalar.
-      - name: Check Loki alerting rules
+      - name: loki-rules / Check Loki alerting rules
+        if: ${{ !cancelled() }}
         run: scripts/check-loki-rules.sh

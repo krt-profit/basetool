@@ -107,7 +107,7 @@ Vier Klassen tragen `@Tag("e2e")`, sind aber keine Tests im Sinne dieser Suite: 
 ./gradlew :frontend:smokeTest                         # nur @Tag("smoke"): UC-07 und der axe-Scan aus UC-44
 ```
 
-**CI.** [`e2e.yml`](../../.github/workflows/e2e.yml) läuft nächtlich (03:00 UTC), per `workflow_dispatch` und auf Pull Requests mit dem Label `e2e` — als Matrix aus drei Engines × fünf Geräteklassen (`375x812`, `810x1080`, `1024x768`, `1280x800`, `1600x900`). [`e2e-smoke.yml`](../../.github/workflows/e2e-smoke.yml) läuft nächtlich (04:00 UTC) und per `workflow_dispatch` gegen Staging, aber nur wenn die Repository-Variable `E2E_BASE_URL` gesetzt ist.
+**CI.** [`e2e.yml`](../../.github/workflows/e2e.yml) läuft einmal täglich (angesetzt 02:37 UTC; GitHub startet geplante Läufe mehrere Stunden später), per `workflow_dispatch` und auf Pull Requests mit dem Label `e2e` — als Matrix aus drei Engines × fünf Geräteklassen (`375x812`, `810x1080`, `1024x768`, `1280x800`, `1600x900`). Seit 2026-09-22 baut ein vorgelagerter Job `build-stack` die Backend- und Frontend-Images **einmal** pro Lauf und reicht sie als Artefakt an alle fünfzehn Zellen weiter; jede Zelle lädt sie mit `docker load`, startet den Stack mit `-Pe2e.prebuilt=true` (also `docker compose up --no-build`) und installiert nur die eigene Browser-Engine (`-Pe2e.browser`). Lokal ohne `-Pe2e.prebuilt` baut `E2eStackExtension` die Images wie bisher selbst. [`e2e-smoke.yml`](../../.github/workflows/e2e-smoke.yml) läuft nur per `workflow_dispatch` gegen Staging und nur, wenn die Repository-Variable `E2E_BASE_URL` gesetzt ist; der nächtliche Zeitplan ist geparkt, bis es einen Staging-Host gibt (die Anleitung zum Wiedereinschalten steht im Workflow).
 
 ## Use-Case-Schema
 

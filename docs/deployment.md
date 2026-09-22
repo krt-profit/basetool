@@ -258,7 +258,7 @@ python scripts/generate-quadlet.py --check    # what CI runs: fail on drift
 python scripts/generate-quadlet.py --list     # each service's disposition and why
 ```
 
-`repo-lint.yml`'s `quadlet-drift` job runs `--check` and the translation self-test
+`repo-lint.yml`'s `quadlet-drift` check runs `--check` and the translation self-test
 (`generate-quadlet.test.sh`). Dispositions: `node-exporter` and `alloy` become host services, the
 podman exporter is a user unit the role installs, `cadvisor` and `socket-proxy` are deleted; every
 other service is a container. The edge's six network addresses are pinned by the generator and must

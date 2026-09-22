@@ -83,7 +83,13 @@
   Lauf das ganze Audit-Protokoll bzw. alle Benachrichtigungen gelöscht. Jetzt verweigert das Backend
   den Start unter 30 Tagen (Audit), 1 Tag (Benachrichtigungen, abgelehnte Registrierungen) oder
   einem Intervall unter einer Minute.
-  
+
+- **CI: schneller, und ein kaputter Check fällt wieder auf.** Repo-Lint läuft in vier statt 25 Jobs,
+  die E2E-Images werden einmal pro Lauf gebaut statt fünfzehnmal, und jede E2E-Zelle installiert nur
+  ihren Browser. Der Backend-PIT-Lauf liefert nach acht Wochen `PitHelpError` wieder Ergebnisse, der
+  wöchentliche OWASP-Scan meldet einen Fehlschlag als Issue, und die Konfigurationen von Prometheus,
+  Alertmanager, Alloy und Loki werden jetzt in CI geprüft.
+
 - **CI/Lieferkette: Signaturprüfung und Workflows gehärtet.** Die cosign-Signaturidentität in
   `promote*.yml`, `release-images.yml` und `deploy.sh` ist jetzt verankert (`^…$`) – Refs wie
   `main-x` oder `vfoo` gelten nicht mehr als vertrauenswürdig –, und signiert wird nur noch von
