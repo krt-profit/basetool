@@ -219,8 +219,8 @@ class ClientSpec:
     client_roles: list[dict] = field(default_factory=list)
     realm_role_scope: list[str] | None = None
     service_account_roles: dict[str, list[str]] | None = None
-    secret_env: list[str] = field(default_factory=list)
-    secret_doc: str = ""
+    env_vars_to_fill: list[str] = field(default_factory=list)
+    env_doc_hint: str = ""
     frozen_by_dpop_policy: bool = False
 
 
@@ -393,8 +393,8 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None) -> 
                 "<realm>": [f"default-roles-{realm}"],
                 "realm-management": ["manage-users", "view-realm", "view-users"],
             },
-            secret_env=["KEYCLOAK_ADMIN_CLIENT_SECRET"],
-            secret_doc=" (the backend's user sync authenticates with it)",
+            env_vars_to_fill=["KEYCLOAK_ADMIN_CLIENT_SECRET"],
+            env_doc_hint=" (the backend's user sync authenticates with it)",
         ),
         ClientSpec(
             client_id="basetool-ingest-gateway",
@@ -412,8 +412,8 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None) -> 
                             "service_account"],
             optional_scopes=list(_STANDARD_OPTIONAL),
             service_account_roles={"<realm>": [f"default-roles-{realm}"]},
-            secret_env=["IRI_INGEST_SERVICE_ACCOUNT_CLIENT_SECRET"],
-            secret_doc=(" together with the other four values of docs/INGEST_KEYCLOAK_SETUP.md "
+            env_vars_to_fill=["IRI_INGEST_SERVICE_ACCOUNT_CLIENT_SECRET"],
+            env_doc_hint=(" together with the other four values of docs/INGEST_KEYCLOAK_SETUP.md "
                         "step 9b (IRI_INGEST_PUBLIC_BASE_URL, "
                         "IRI_INGEST_SERVICE_ACCOUNT_TOKEN_URI, "
                         "IRI_INGEST_SERVICE_ACCOUNT_CLIENT_ID=basetool-ingest-gateway, and "
@@ -488,8 +488,8 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None) -> 
                     "userinfo.token.claim": "true",
                 },
             }],
-            secret_env=["GRAFANA_OAUTH_CLIENT_SECRET"],
-            secret_doc=" (Grafana's generic_oauth login reads it)",
+            env_vars_to_fill=["GRAFANA_OAUTH_CLIENT_SECRET"],
+            env_doc_hint=" (Grafana's generic_oauth login reads it)",
         ))
     specs.append(android_spec(public_origin))
     return specs
@@ -620,7 +620,7 @@ class Planner:
         self.reports: list[str] = []
         self.problems: list[str] = []
         self.manual: list[str] = []
-        self.secret_notes: list[str] = []
+        self.followup_notes: list[str] = []
         self._scope_cache: dict[str, dict] | None = None
 
     # -- live lookups (read at execution time as well as at plan time) -------------------------
@@ -868,8 +868,8 @@ class Planner:
                 lambda: self._grant_service_account_roles(spec, self.client_uuid(spec.client_id),
                                                           spec.service_account_roles),
                 service_account=True))
-        if spec.secret_env:
-            self.secret_notes.append(self._secret_note(spec))
+        if spec.env_vars_to_fill:
+            self.followup_notes.append(self._confidential_client_note(spec))
         return changes
 
     @staticmethod
@@ -877,12 +877,12 @@ class Planner:
         return ", ".join(f"{container}:{name}" for container, names in sorted(roles.items())
                          for name in names)
 
-    def _secret_note(self, spec: ClientSpec) -> str:
+    def _confidential_client_note(self, spec: ClientSpec) -> str:
         return (f"'{spec.client_id}' is created confidential, so Keycloak generates its client "
                 f"secret. It is NOT printed here: read it in the Admin Console -> Clients -> "
-                f"{spec.client_id} -> Credentials, and put it into {', '.join(spec.secret_env)} "
-                f"in the host .env{spec.secret_doc}, then re-render env.d and restart the "
-                f"consumer.")
+                f"{spec.client_id} -> Credentials, and put it into "
+                f"{', '.join(spec.env_vars_to_fill)} in the host .env{spec.env_doc_hint}, then "
+                f"re-render env.d and restart the consumer.")
 
     def _create_client(self, spec: ClientSpec) -> None:
         payload = {"clientId": spec.client_id, **spec.create_only, **spec.fields,
@@ -892,8 +892,8 @@ class Planner:
                    "defaultClientScopes": list(spec.default_scopes),
                    "optionalClientScopes": list(spec.optional_scopes)}
         self.kc.write("create", "clients", payload, f"client '{spec.client_id}' created")
-        if spec.secret_env:
-            print(f"  NOTE: {self._secret_note(spec)}")
+        if spec.env_vars_to_fill:
+            print(f"  NOTE: {self._confidential_client_note(spec)}")
 
     def _update_client(self, spec: ClientSpec, planned_live: dict) -> None:
         # Re-read: an earlier change in this run may have touched the client.
@@ -1195,9 +1195,9 @@ class Planner:
             print("\n[only on this realm — reported, never deleted]")
             for line in self.reports:
                 print(f"  - {line}")
-        if self.secret_notes:
+        if self.followup_notes:
             print("\n[secrets]")
-            for line in self.secret_notes:
+            for line in self.followup_notes:
                 print(f"  - {line}")
         if self.manual:
             print("\n[manual]")
