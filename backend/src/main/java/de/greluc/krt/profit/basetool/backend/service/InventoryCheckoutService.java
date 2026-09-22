@@ -953,21 +953,6 @@ public class InventoryCheckoutService {
   }
 
   /**
-   * Ratchets any active Materialbörse offer on a Lager row down to the row's current stock
-   * (REQ-MARKET-013/014) — the public seam the item-facade's update path calls after it edits a
-   * row's amount, mirroring the book-out / transfer / rebooking decrement sites that clamp inline.
-   * It is a no-op when the stock did not drop below the offered quantity (an increase never changes
-   * an offer). Delegates to the kind-aware {@link #ratchetBoardOffersToStock(UUID, double)}.
-   *
-   * @param itemId the backing Lager row.
-   * @param stock the row's current (possibly reduced) stock.
-   */
-  @Transactional(propagation = Propagation.MANDATORY)
-  public void clampOffersToStock(UUID itemId, double stock) {
-    ratchetBoardOffersToStock(itemId, stock);
-  }
-
-  /**
    * Ratchets down any active Materialbörse offer on a Lager row to the row's reduced stock in the
    * decrementing transaction (REQ-MARKET-013/014) — kind-aware: a {@code MATERIAL} offer clamps its
    * SCU {@code offeredAmount}, a stock-backed {@code ITEM} offer its whole-unit {@code

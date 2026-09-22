@@ -137,7 +137,7 @@ picker's row cap is still reachable; switching kind clears any already-picked ro
 ### REQ-MARKET-013 — Stock decrease ratchets the offer down (persisted); an increase never changes it
 
 When the Lager row backing an **active** offer is **reduced** — book-out (consume / sell / transfer),
-personal rebooking, amount edit, or job-order handover — and the stored offered quantity is no longer
+personal rebooking, job-order handover, or production consumption — and the stored offered quantity is no longer
 covered, it is **persisted down** to the row's new stock **in the same transaction as the decrement**,
 via an atomic conditional update (`ACTIVE` offers only; only when the stored value `> newStock`). This
 is **kind-aware** (REQ-MARKET-014, ADR-0108): a **material** offer clamps its `offeredAmount`
@@ -146,7 +146,11 @@ whole-unit `itemQuantity` (`clampItemQuantityToStock`); both run at the book-out
 decrement sites in `InventoryCheckoutService`. The job-order handover sites decrement one row kind each
 and clamp only that kind: a **material** handover reduces material rows (`JobOrderHandoverService`,
 `clampOfferedAmountToStock`), an **item** delivery reduces game-item rows (`JobOrderItemHandoverService`,
-REQ-ORDERS-030, `clampItemQuantityToStock`). This is the *persisting* counterpart to the display-time
+REQ-ORDERS-030, `clampItemQuantityToStock`), and booking production against an item order consumes
+material rows and clamps their material offers (`JobOrderItemProductionService`, REQ-ORDERS-025,
+`clampOfferedAmountToStock`). There is no direct amount-edit path on a Lager row: the former
+`PUT /api/v1/inventory/{id}` and its `clampOffersToStock` seam were removed (d03a9238b, 2026-07-14;
+the unused seam itself on 2026-09-22). This is the *persisting* counterpart to the display-time
 clamp-on-read
 (REQ-MARKET-002/014, ADR-0086): the board already never *shows* more than is in stock, but without
 persisting the reduction the stored value would silently **recover** on a later stock increase.
@@ -159,17 +163,17 @@ owner edit is guarded independently by the release/edit `offeredAmount <= curren
 
 **Acceptance**
 - [ ] Reducing a backing row below its active offer's `offeredAmount` persists `offeredAmount` down to
-the new stock (book-out, transfer, rebooking, update, handover).
+the new stock (book-out, transfer, rebooking, handover, production consumption).
 - [ ] Increasing the backing row leaves the offer's `offeredAmount` unchanged (no auto-expand).
 - [ ] A deactivated offer is not touched by the ratchet.
 - [ ] A fully booked-out row's offer is cascade-removed (unchanged from REQ-MARKET-002).
 
 **Enforced by:** `MaterialExchangeOfferClampDataTest`, `InventoryItemServiceBookOutTest` · **Code:**
 `MaterialExchangeOfferRepository#clampOfferedAmountToStock` / `#clampItemQuantityToStock`,
-`InventoryCheckoutService` (book-out / transfer / rebooking + `ratchetBoardOffersToStock` /
-`clampOffersToStock`), `InventoryItemService#updateInventoryItem`,
+`InventoryCheckoutService` (book-out / transfer / rebooking via `ratchetBoardOffersToStock`),
 `JobOrderHandoverService#createHandover`, `JobOrderItemHandoverService#createItemHandover`
-(item-delivery decrement, REQ-ORDERS-030) · **Issues:** #1182
+(item-delivery decrement, REQ-ORDERS-030), `JobOrderItemProductionService` (production
+consumption, REQ-ORDERS-025) · **Issues:** #1182
 
 ### REQ-MARKET-003 — Signal-only
 
