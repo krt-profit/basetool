@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-12.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
 > **Owner area:** REFINERY · **Related:** [`REFINERY_SCREENSHOT_IMPORT_PLAN.md`](../archive/REFINERY_SCREENSHOT_IMPORT_PLAN.md) (epic #439 — historical plan, frozen 2026-06-10), [`DESIGN_SC_EXTRACTOR.md`](../DESIGN_SC_EXTRACTOR.md), [ADR-0007](../adr/0007-client-side-vlm-screenshot-extraction.md), [ADR-0008](../adr/0008-refinery-extract-json-contract.md), [`api-conventions.md`](api-conventions.md), [`security-and-access.md`](security-and-access.md)
 
 # Refinery screenshot import
@@ -16,8 +16,11 @@ backend import endpoint) minted `REQ-REFINERY-001`–`009`, `011` and `012`;
 `REQ-REFINERY-010` hardens the shared alias table the import consults (shipped
 separately, #517); Phase 2 (#435, the frontend upload + pre-filled review form) added
 `REQ-REFINERY-013`–`016`; `REQ-REFINERY-017` (2026-06-11) derives the order start time
-from the screenshots' capture metadata across both repos. The desktop extractor (#436, shipped 2026-06-10 as
-`basetool-bp-extractor` PR #5) lives in its own repo; its binding desktop-side rules —
+from the screenshots' capture metadata across both repos; `REQ-REFINERY-018` pins the one-click
+ingest as a transport only, and the second `REQ-REFINERY-019` below adds the extractor download
+link. The desktop extractor (#436, shipped 2026-06-10 as PR #5 of
+[`krt-profit/basetool-sc-extractor`](https://github.com/krt-profit/basetool-sc-extractor), then still
+named `basetool-bp-extractor`) lives in its own repo; its binding desktop-side rules —
 the frozen read strategy, the deterministic confidence policy, the resource-safety
 guardrails — are recorded there (`CLAUDE.md`,
 `docs/refinery-extractor/PHASE0_FINDINGS.md`, the contract test pinning the §5 example),
@@ -377,6 +380,12 @@ ingest must never persist a refinery order without that human review-and-save st
 
 ### REQ-REFINERY-019 — SC Extractor release link in the create page's import bar
 
+> **ID collision (recorded 2026-09-22).** `REQ-REFINERY-019` also names the refinery-order list
+> pagination in [`refinery-orders-overview.md`](refinery-orders-overview.md). Both are shipped and
+> test-referenced, so neither is renumbered without the owner's sign-off — see the collision list in
+> [`INDEX.md`](INDEX.md#2-requirement-ids-traceability-anchors). Cite this one as "REQ-REFINERY-019
+> (extractor link)" until then. The next free REFINERY id is `REQ-REFINERY-021`.
+
 The screenshot import (REQ-REFINERY-013) consumes an extract the user has to produce with the
 desktop **Basetool SC Extractor** first, so the import bar on `/refinery-orders/create` carries the
 way to obtain that tool directly next to the import trigger it feeds. This is the refinery-side twin
@@ -402,10 +411,10 @@ message key and one URL.
 
 **Acceptance criteria:**
 
-- [ ] The create page renders the link inside the import form, directly after the import button,
+- [x] The create page renders the link inside the import form, directly after the import button,
   pointing at the extractor repository's `releases/latest` URL.
-- [ ] The link opens in a new tab and carries `rel="noopener noreferrer"`.
-- [ ] After an in-place import re-render the link is still present and unchanged.
+- [x] The link opens in a new tab and carries `rel="noopener noreferrer"`.
+- [x] After an in-place import re-render the link is still present and unchanged.
 
 **Enforced by:** `RefineryOrderCreateImportRenderTest#createPage_rendersScExtractorReleaseLink_besideTheImportButton`
 · **Code:** [`refinery-orders-create.html`](../../frontend/src/main/resources/templates/refinery-orders-create.html)

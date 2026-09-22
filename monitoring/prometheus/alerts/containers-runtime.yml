@@ -187,7 +187,7 @@ groups:
             basetool_container_metrics_timestamp_seconds is more than 5 minutes old, so every
             basetool_container_* series is stale and the container memory, OOM, CPU-throttling and
             pids alerts have lost their input on this host. They will NOT fire while this is true.
-            Check the iri-cgroup-metrics timer and the textfile directory.
+            Check iri-container-metrics.timer and the textfile directory.
 
       - alert: ContainerCgroupCollectorFoundNothing
         # It writes a file listing zero containers when the cgroup paths stop matching -- a layout

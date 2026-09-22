@@ -74,6 +74,13 @@ dieser Skill schreibt auf dem Host nichts und darf es auch nicht.
 > Variable nicht gesetzt, sagt das Skript das und bricht ab — **frag dann den
 > Nutzer**, schreib die Adresse nirgends ins Repo.
 
+> [!note] Seit 2026-09-22 über Podman
+> Die Produktion läuft als **rootless Podman** unter dem Dienstkonto `iri` (arc42 §7). Das
+> Skript setzt deshalb `cd / && sudo -n -u iri podman exec -i db-backend …` ab — dieselbe Form
+> wie `rt_exec` in `scripts/lib/container-runtime.sh`. Das `cd /` ist nötig, weil die
+> SSH-Sitzung in `/root` beginnt, das `iri` nicht betreten darf. Am 2026-09-22 mit einer
+> Nur-Lese-Abfrage auf dem Host geprüft.
+
 > [!note] SSH geht auf diesem Rechner nur über den Windows-Client
 > Das Skript wählt `C:\Windows\System32\OpenSSH\ssh.exe` selbst, wenn es existiert.
 > Der MSYS-/Git-Bash-`ssh` erreicht den Windows-ssh-agent nicht und scheitert mit

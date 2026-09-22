@@ -1,6 +1,6 @@
 # ADR-0060 — Write-DTO convention: `…Request` in `model/dto`, collapse Create/Update into one `…WriteRequest`
 
-- **Status:** Proposed
+- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-07-02 (`a45adf77e`: `validation.DtoConstraints`, `validation.OnUpdate` and the collapsed `…WriteRequest` records such as `PromotionTopicWriteRequest`).
 - **Date:** 2026-07-02
 - **Deciders:** Repository owner (@greluc)
 - **Related:** spec [`api-conventions.md`](../specs/api-conventions.md) REQ-API-002 · issue #919 (S13, epic #905)

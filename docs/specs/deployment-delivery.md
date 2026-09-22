@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-08-26.
-> **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md), [ADR-0075](../adr/0075-host-side-cosign-signature-verification.md), [ADR-0079](../adr/0079-redis-session-store-aof-and-maxmemory-noeviction.md), [ADR-0145](../adr/0145-build-provenance-anchored-outside-the-registry.md), [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md)
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md), [ADR-0075](../adr/0075-host-side-cosign-signature-verification.md), [ADR-0079](../adr/0079-redis-session-store-aof-and-maxmemory-noeviction.md), [ADR-0083](../adr/0083-deploy-bot-health-drift-targeted-restart.md), [ADR-0145](../adr/0145-build-provenance-anchored-outside-the-registry.md), [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md), [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md), [ADR-0187](../adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md), [ADR-0188](../adr/0188-the-host-bootstrap-is-an-ansible-role.md), [ADR-0189](../adr/0189-stateful-containers-run-as-their-own-uid.md), [ADR-0190](../adr/0190-every-container-but-keycloak-runs-read-only.md), [ADR-0196](../adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md)
 
 # Deployment delivery & promotion
 
@@ -14,6 +14,15 @@ the GitHub Actions workflows `release-images.yml` / `promote.yml`, the
 `basetool-config` artifact built from `docker/config/Dockerfile`, and the
 `basetool-keycloak-spi` provider-JAR artifact built from `docker/keycloak-spi/Dockerfile`.
 See ADR-0049 / ADR-0055 for the decision records behind the artifact delivery.
+
+**Runtime.** Since 2026-09-22 production runs **rootless Podman under Quadlet** on Rocky Linux 10
+(ADR-0163): every container is a systemd user unit of the service account, generated from the
+compose files by `scripts/generate-quadlet.py` into `quadlet/` and delivered inside the config
+bundle. `deploy.sh` drives both runtimes through `scripts/lib/container-runtime.sh`; the Docker
+Compose branches remain for the local and test stacks, which still run the compose files directly.
+Where a requirement below names a Compose mechanism (`up -d --wait`, a compose override, `docker
+compose run`), that is the **Compose** realisation; the Quadlet one is stated beside it. The host
+itself is provisioned by the Ansible role in `ansible/` (ADR-0188), which is not a delivery path.
 
 These requirements are the first numbered `REQ-OPS-*` ids; the deployment area previously
 existed only as a runbook.
@@ -40,8 +49,13 @@ already published.
 
 - [ ] The host's only inbound deploy credential is a `Packages: Read` GHCR token; no SSH key,
   deploy key, or git credential is provisioned for the deploy path.
-- [ ] `deploy.sh` performs only outbound registry operations (`docker login`, `imagetools
-  inspect`, `pull`, `create`/`cp`); it opens no listening socket and accepts no inbound call.
+- [ ] `deploy.sh` performs only outbound registry operations (`login`; tag resolution with
+  `skopeo inspect` under Podman or `buildx imagetools inspect` under Docker; `pull`;
+  `create`/`cp` to extract the bundles; `cosign verify`); it opens no listening socket and accepts
+  no inbound call.
+- [ ] The Ansible role that provisions the host ships no image, unit file or configuration bundle
+  and is never scheduled on the host (ADR-0188); the scripts and units it installs carry no image
+  digest or application version.
 
 **Enforced by:** `scripts/deploy.sh` · `scripts/iri-deploy.service` (sandbox) · **Runbook:** `docs/deployment.md` → *Why this design*
 
@@ -91,40 +105,67 @@ same finding is advisory at build time and blocking at promotion, and REQ-OPS-02
 
 ### REQ-OPS-003 — Digest pin + health gate + auto-rollback
 
-`deploy.sh` resolves `:stable` to concrete, immutable digests, applies them via a compose
-override with `docker compose up -d --wait --wait-timeout`, and on a health-check failure
-restores the previous state and exits non-zero. Rollback covers **both** the app-image digest
-pin **and** the host config tree swapped in this deploy.
+`deploy.sh` resolves `:stable` to concrete, immutable digests, pins them, applies them, waits for
+health, and on a health-check failure restores the previous state and exits non-zero. Rollback
+covers **both** the app-image digest pin **and** the host config tree swapped in this deploy.
+
+The pin has a record and, under Quadlet, a binding. The record is
+`/var/lib/iri/current-digest-pin.yml` (its predecessor is the rollback anchor); Compose reads it
+directly as an override (`up -d --wait --wait-timeout`). Quadlet reads unit files, so the binding
+is one drop-in per app service, `<svc>.container.d/10-digest-pin.conf`, whose `Image=` replaces
+the unit's tag; the apply is `systemctl --user restart` for every service whose pin or unit changed
+this run and `start` for the rest, and the wait is structural — `Notify=healthy` makes the unit
+`Type=notify`, bounded by its generated `TimeoutStartSec=` (so `IRI_HEALTH_TIMEOUT` governs the
+Compose path only). A rollback that restored the record without re-materialising the drop-ins would
+roll forward into the failed release, so both move together, together with the previous unit files.
 
 **Acceptance**
 
 - [ ] A `:stable` tag flip in GHCR mid-deploy cannot partially apply: the deploy applies a
   single resolved digest set or none.
-- [ ] When the new images fail to become healthy within `IRI_HEALTH_TIMEOUT`, the previous
-  digest pin **and** the previous config tree are restored before the run exits non-zero.
-- [ ] The container readiness probe cannot hang past the Docker `HEALTHCHECK` timeout: every
+- [ ] When the new images fail to become healthy (within `IRI_HEALTH_TIMEOUT` under Compose, the
+  unit's `TimeoutStartSec=` under Quadlet), the previous digest pin — record **and**, under
+  Quadlet, the drop-ins — **and** the previous config tree and unit files are restored before the
+  run exits non-zero.
+- [ ] A service started by hand (`systemctl --user start`) runs the pinned digest, because the pin
+  is part of its unit.
+- [ ] The container readiness probe cannot hang past the container healthcheck timeout: every
   readiness-group health indicator is bounded so `/actuator/health/readiness` returns *within* the
   probe window (frontend: the reactive Redis `PING` is capped by `spring.data.redis.timeout` = 2 s,
   well below the 5 s HEALTHCHECK timeout — ADR-0114). A slow/stalled dependency therefore yields a
   fast, truthful `DOWN`, so the health gate and the deploy `--wait` see a real, timely signal
   instead of a probe that never completed.
 
-**Enforced by:** `scripts/deploy.sh` (rollback block) · `frontend/src/main/resources/application.yml`
-(`spring.data.redis.timeout` / `connect-timeout`, ADR-0114) · **Runbook:** `docs/deployment.md` → *What happens on the server*
+**Enforced by:** `scripts/deploy.sh` (rollback block) · `scripts/lib/container-runtime.sh`
+(`rt_pin_apply`, `rt_pin_rollback`, `rt_apply_stack`) · `frontend/src/main/resources/application.yml`
+(`spring.data.redis.timeout` / `connect-timeout`, ADR-0114) · **Runbook:** `docs/deployment.md` → *What happens on the host*
 
 ### REQ-OPS-004 — Host configuration delivered as a promotable, digest-pinned artifact
 
-The host configuration — `docker-compose.yml`, the NPM maintenance page
-(`docker/maintenance/`) and the Keycloak login theme (`keycloak-theme/`) — is delivered to the
-host as the signed `basetool-config` OCI artifact over the same pull-only, digest-pinned,
-deliberately-promoted GHCR channel as the app images. The idempotence marker
-(`last-deployed.digests`) **includes the config-bundle digest**, so a config-only change (e.g.
-a bumped redis or npm image pin) is detected and applied — it is never skipped by the
-app-image idempotence check. No manual `cp docker-compose.yml` or hand-run
-`docker compose up -d` is required for an auto-appliable change.
+The host configuration — both compose files, the maintenance page (`docker/maintenance/`), the edge
+configuration (`docker/edge/`), the ACME publishing loop (`docker/acme/`), the Keycloak login theme
+(`keycloak-theme/`), the monitoring configuration (`monitoring/`) and the **Quadlet units with their
+environment templates** (`quadlet/`) — is delivered to the host as the signed `basetool-config` OCI
+artifact over the same pull-only, digest-pinned, deliberately-promoted GHCR channel as the app
+images. The idempotence marker (`last-deployed.digests`) **includes the config-bundle digest**, so
+a config-only change (e.g. a bumped redis image pin) is detected and applied — it is never skipped
+by the app-image idempotence check. No manual file copy and no hand-run apply is required for an
+auto-appliable change. `deploy.sh`'s mirror list is explicit, so a directory added to the bundle's
+`COPY` allowlist must be added to `apply_config_tree` in the same change or it stops in the staging
+area (the 2026-09-12 edge and 2026-09-16 acme gaps).
 
-One apply mode is special: a change to the compose **`networks:` topology** (a re-pinned subnet, a
-network added/removed) **cannot** be applied by an in-place `up -d` — Docker can neither move a
+**Under Quadlet the units are part of the delivered definition.** The compose files stay the source:
+`scripts/generate-quadlet.py` generates `quadlet/systemd/` and `quadlet/env.d/*.env.tmpl` from them,
+both are committed, and `repo-lint.yml` (`quadlet-drift`) fails a change whose units no longer match
+the compose files. On a config change `deploy.sh` renders one environment file per service from the
+host's `.env` (`scripts/render-env-d.py`, which refuses to write a half-rendered set), installs every
+unit the bundle names into the service user's delivery directory
+(`/etc/containers/systemd/users/<uid>/`), **stops** a unit the bundle no longer names before removing
+its file, and never touches the `.container.d/` drop-ins beside them. A host with no units at all is
+treated as a config change, so the first deploy on a freshly provisioned host installs them.
+
+One apply mode is special **under Compose**: a change to the compose **`networks:` topology** (a
+re-pinned subnet, a network added/removed) **cannot** be applied by an in-place `up -d` — Docker can neither move a
 running container onto a differently-addressed bridge nor recreate a bridge that still has
 endpoints, so an in-place apply silently **strands** container name resolution (the 2026-07
 `keycloak`↔`backend` / `keycloak`↔`db-keycloak` incident, #974). `deploy.sh` detects it (the promoted
@@ -135,7 +176,9 @@ on the forward apply **and** on the rollback. This is a brief full-stack outage,
 actual `networks:` change; every ordinary config/app change keeps the fast rolling in-place `up`. It
 is **not** operator-gated (unlike the stateful-infra carve-out, REQ-OPS-006) — no data migration is
 involved, and the subnet pinning keeps the recreated gateways stable, so the edge's SSH-tunnel admin
-allow-list stays valid.
+allow-list stays valid. Under Quadlet the networks are `.network` units and `deploy.sh` takes no
+clean-slate action for them; a topology change there is an operator maintenance step (see the
+runbook).
 
 Pinning guarantees that an *existing* gateway keeps its address; it does not guarantee that the
 tunnel still arrives from one of the gateways the allow-list names. Adding or removing a bridge
@@ -143,7 +186,11 @@ changes **which** leg the published ports DNAT over, and that is a `networks:` c
 `net-edge-ingress` did exactly this on 2026-09-12: every gateway in the allow-list kept its address
 and the Keycloak admin console still went dark, because the tunnel began arriving on the new bridge
 instead. **A `networks:` change that touches the edge's own attachments MUST be checked against the
-`/admin` allow-list in `docker/edge/conf.d/20-keycloak.conf.template` in the same change.**
+`/auth/admin` allow-list in `docker/edge/conf.d/10-frontend.conf.template` in the same change** —
+and, under Quadlet, against the edge's pinned addresses, which `EDGE_TRUSTED_PROXY` and the role's
+`basetool_host_edge_trusted_proxies` must name one for one (the generator refuses a mismatch).
+Behind the PROXY-protocol front end the tunnel arrives as the host loopback, which
+`render-and-run.sh` adds to that allow-list only in that mode (ADR-0187).
 
 **Acceptance**
 
@@ -154,13 +201,20 @@ instead. **A `networks:` change that touches the edge's own attachments MUST be 
   makes the marker differ and triggers an apply.
 - [ ] A missing/unresolvable `basetool-config` artifact degrades to the legacy app-only deploy
   rather than failing the loop.
-- [ ] A promotion that changes the compose `networks:` block is applied via a clean down+up (not an
-  in-place `up`) on both apply and rollback, so name resolution is not stranded; a
+- [ ] Under Compose, a promotion that changes the compose `networks:` block is applied via a clean
+  down+up (not an in-place `up`) on both apply and rollback, so name resolution is not stranded; a
   `networks:`-unchanged config bump keeps the in-place `up`.
+- [ ] Under Quadlet, a config change renders `env.d/` before any unit reloads, installs changed
+  units, restarts exactly the application services whose unit or pin changed, stops a retired unit
+  before removing it, and leaves every `.container.d/` drop-in in place. (A changed monitoring unit
+  is not restarted yet — see the known gap under REQ-OPS-013.)
+- [ ] `generate-quadlet.py --check` fails CI when `quadlet/` no longer matches the compose files.
 
-**Enforced by:** `scripts/deploy.sh` (config-delivery block, `EXPECTED_MARKER`, `network_block` /
-`clean_slate_recreate`) · `docker/config/Dockerfile` · `.github/workflows/release-images.yml`
-(`build-config`) · **Runbook:** `docs/deployment.md` → *Infra / host-config bumps*
+**Enforced by:** `scripts/deploy.sh` (config-delivery block, `EXPECTED_MARKER`, `apply_config_tree`,
+`install_quadlet_units`, `network_block` / `clean_slate_recreate`) · `scripts/render-env-d.py` ·
+`scripts/generate-quadlet.py` (`repo-lint.yml` → `quadlet-drift`) · `docker/config/Dockerfile` ·
+`.github/workflows/release-images.yml` (`build-config`) · **Runbook:** `docs/deployment.md` →
+*Configuration changes that are not app releases*
 
 ### REQ-OPS-005 — No secrets in the delivered bundle
 
@@ -174,7 +228,11 @@ bundle and fails the release on any secret-shaped file, and a final re-assertion
 **Acceptance**
 
 - [ ] `release-images.yml` fails if the built `basetool-config` bundle contains a
-  secret-shaped file or is missing `docker-compose.yml`.
+  secret-shaped file or is missing a required payload: both compose files, `docker/maintenance`,
+  `keycloak-theme`, `monitoring`, `quadlet/env.d`, and `quadlet/systemd` holding at least one
+  `.container` unit.
+- [ ] The `env.d` templates carry `${VAR}` references only; every value is rendered on the host
+  from its own `.env` and never enters the bundle.
 - [ ] `deploy.sh` aborts before applying if the staged bundle contains `.env`, a keystore, a
   `realm-export.json`, or a `keycloak/providers` directory.
 
@@ -183,11 +241,15 @@ bundle and fails the release on any secret-shaped file, and a final re-assertion
 ### REQ-OPS-006 — Stateful-infra changes are operator-gated
 
 A change to the **postgres** or **Keycloak** image **tag** is a stateful, choreographed upgrade
-(PGDATA major migration; Keycloak provider + keystore-SAN dance) that a blind `up -d` would
+(PGDATA major migration; Keycloak provider + keystore-SAN dance) that a blind recreate would
 break and the health gate would then roll back in a loop. `deploy.sh` must detect such a change
 and refuse to auto-apply it, alert once, then skip subsequent ticks quietly until a new
-promotion or an explicit operator `--force` after the documented manual upgrade. redis and npm
-image bumps are auto-applied.
+promotion or an explicit operator `--force` after the documented manual upgrade. Every other
+image bump (redis, the edge, acme, the monitoring images) is auto-applied. The tags are read from
+both definitions the bundle can carry — the compose `image:` lines and the Quadlet units' `Image=`
+lines — so a Quadlet host compares like with like (reading only the compose file made the gate
+refuse every Quadlet tick on the testing host, 2026-09-18), and a host that has never received a
+definition is not treated as an upgrade.
 
 **The gate is on the tag, not on the whole pin.** A *same-tag digest refresh* — a rebuilt base
 image, which is normally a security fix — **must** auto-apply. Gating it inverts the purpose of
@@ -209,7 +271,9 @@ the gate: it leaves the stack on the vulnerable build precisely when it should m
 - [ ] A promotion that changes only the **digest** behind an unchanged `postgres:` or
   `quay.io/keycloak/keycloak:` tag **is** auto-applied, with no `CARVE-OUT` line.
 - [ ] `deploy.sh --force` applies a previously-gated stateful-infra change.
-- [ ] A redis or npm image bump (no postgres/Keycloak change) is auto-applied.
+- [ ] Any other image bump (no postgres/Keycloak tag change) is auto-applied.
+- [ ] The first config bundle on a host with no previous definition is applied without a
+  `CARVE-OUT`.
 
 **Enforced by:** `scripts/deploy.sh` (`infra_image_pins`, carve-out block) · **Runbook:** `docs/deployment.md` → *Stateful-infra upgrades*
 
@@ -226,7 +290,8 @@ bytecode (it must load under Keycloak's JDK), built once and cosign-signed like 
 
 When the promoted `keycloak-spi` digest moves, `deploy.sh` (after the app stack is healthy) stages
 the JAR into `keycloak/providers/keycloak-spi.jar` and recreates **only** the keycloak container
-(`up -d --no-deps --force-recreate keycloak`) so its `start` re-runs the provider build and loads
+(`systemctl --user restart keycloak.service` under Quadlet, whose `--replace` makes a restart a
+recreate; `up -d --no-deps --force-recreate keycloak` under Compose) so its `start` re-runs the provider build and loads
 the new JAR — **health-gated**: on failure the previous JAR is restored, keycloak is brought back,
 and the bad target backs off (the marker is not advanced). A provider-JAR-only change
 **auto-applies**; a combined Keycloak-**image** + provider-JAR change stays operator-gated by the
@@ -245,7 +310,7 @@ tick (the manual-staging fallback in the runbook still applies).
   gated until `--force`.
 - [ ] A failed keycloak recreate restores the previous JAR and records the failure for backoff.
 
-**Enforced by:** `.github/workflows/release-images.yml` (`build-keycloak-spi`) · `.github/workflows/promote.yml` (matrix) · `docker/keycloak-spi/Dockerfile` · `scripts/deploy.sh` (`extract_keycloak_spi_jar`, the 5-field marker, the keycloak-recreate + JAR rollback) · **Runbook:** `docs/deployment.md` → *Keycloak custom providers* · **Decision:** ADR-0055
+**Enforced by:** `.github/workflows/release-images.yml` (`build-keycloak-spi`) · `.github/workflows/promote.yml` (matrix) · `docker/keycloak-spi/Dockerfile` · `scripts/deploy.sh` (`extract_keycloak_spi_jar`, the 5-field marker, the keycloak-recreate + JAR rollback) · **Runbook:** `docs/deployment.md` → *Keycloak provider JAR* · **Decision:** ADR-0055
 
 ### REQ-OPS-013 — Idempotence fast-exit only over a verified running stack
 
@@ -253,24 +318,36 @@ tick (the manual-staging fallback in the runbook still applies).
 requirement continues the series at the next free number.)
 
 The idempotence marker (`last-deployed.digests`) records what the last **successful** deploy
-applied — it says nothing about what is running *now*. A manual `docker compose up` without the
-digest-pin overlay resolves `:stable` from the **local** image cache (which `deploy.sh` never
-refreshes — it always pulls by digest) and can silently start an outdated build; a crash loop or
-a half-down stack likewise leaves the marker untouched. `deploy.sh` must therefore take the
-"no change" fast-exit **only after verifying the running stack against the target digest set**:
-every app service (backend, frontend, ingest) has a container that is running, healthy (a
-container without a healthcheck counts as healthy, mirroring `up --wait`), and created from an
-image whose RepoDigest equals the target digest. On any divergence the run logs one
-`drift: <service>: <reason>` line per finding and falls through to the normal apply path
-(digest-pinned pull + `up -d --wait`), still honouring the bad-digest backoff so a
-persistently-failing target does not flap every tick. `--check-only` reports the pending drift
-re-apply without applying. Two deliberate exclusions keep the check free of false positives:
+applied — it says nothing about what is running *now*. Under Compose a manual `docker compose up`
+without the digest-pin overlay resolves `:stable` from the **local** image cache (which `deploy.sh`
+never refreshes — it always pulls by digest) and can silently start an outdated build; under Quadlet
+the pin is part of each unit, so that particular path is closed, but a crash loop, a hand-stopped
+service or a half-down stack still leaves the marker untouched on either runtime. `deploy.sh` must
+therefore take the "no change" fast-exit **only after verifying the running stack against the
+target digest set**: every app service (backend, frontend, ingest) has a container that is running,
+healthy (a container without a healthcheck counts as healthy, mirroring `up --wait`), and created
+from an image whose RepoDigest equals the target digest. Under Quadlet the containers are found by
+the `PODMAN_SYSTEMD_UNIT` label rather than by a compose project, and a host with no unit files is
+reported as such first. The run logs one `drift: <service>: <reason>` line per finding and then
+distinguishes two classes:
+
+- **Structural** — a missing container, or one on a non-target image: the release is wrong, so the
+  run falls through to the normal apply path (verify, pin, pull, apply), still honouring the
+  bad-digest backoff so a persistently-failing target does not flap every tick.
+- **Health only** — every divergent container is on the target image but not healthy: the release
+  is right and the runtime is sick, so `deploy.sh` restarts **only** those services, with no pull,
+  no signature re-verification and no release rollback, throttled by its own backoff
+  (`IRI_HEALTH_RESTART_BASE` / `_MAX`, 300 s doubling to 1 h). A restart that does not restore
+  health is recorded in `deploy-health.prom` and raises `DeployHealthRestartFailing`, never a false
+  `DeployRolledBack` ([ADR-0083](../adr/0083-deploy-bot-health-drift-targeted-restart.md)).
+
+`--check-only` reports the pending re-apply or restart without acting. Two deliberate exclusions keep the check free of false positives:
 a container still inside its healthcheck **start period** (`running/starting`) counts as
 converged for that tick (`up --wait` would merely wait on it, and a re-apply racing a slow
 cold boot could record a false backoff failure for a good target — a genuinely broken container
 surfaces as unhealthy/restarting on a later tick; a wrong image digest drifts regardless of the
 start period), and one-off `docker compose run` containers are ignored (they are not part of
-the deployed stack). Incident precedent: 2026-07-02, a pre-V199 backend started manually
+the deployed stack; Podman has no equivalent, so the flag is always false there). Incident precedent: 2026-07-02, a pre-V199 backend started manually
 off the stale local `:stable` tag against a V201-migrated database crash-looped while
 `deploy.sh` reported "no change" and exited 0.
 
@@ -290,18 +367,34 @@ though the on-disk file was already correct) could not have persisted. On a Prom
 `deploy.sh` stamps `basetool_monitoring_config_applied_timestamp{component="prometheus"}`, which backs
 the `PrometheusConfigStale` alert (REQ-OBS-014). The reconcile is best-effort and **never gates** the
 deploy — a stopped monitoring service or a failed recreate only logs — and force-recreates only on an
-actual content change (config edits are rare, so the brief scrape gap is negligible). Before that
-per-service config diff the reconcile additionally runs a plain
-`docker compose -p iri-monitoring … up -d` (no `--force-recreate`), so a monitoring
-**compose-definition** drift — a service's `mem_limit`, `environment`, `volumes`, or image pin, none of
-which the config-subtree diff can see — is applied by compose per-service (it recreates only the
-services whose config-hash changed, a fast no-op otherwise). Without it a compose-definition change
+actual content change (config edits are rare, so the brief scrape gap is negligible). Under Quadlet
+the recreate is `systemctl --user restart <svc>.service` for the containers and a root
+`systemctl restart alloy.service` for Alloy, which runs as a host service (the deploy account holds
+exactly that one sudo grant). Before that
+per-service config diff the reconcile additionally applies the monitoring **definitions** — a plain
+`docker compose -p iri-monitoring … up -d` (no `--force-recreate`) under Compose, a
+`daemon-reload` plus `systemctl --user start` of the nine monitoring units under Quadlet — so a
+monitoring definition drift — a service's memory limit, `environment`, `volumes`, or image pin, none of
+which the config-subtree diff can see — is applied per service (a fast no-op otherwise).
+
+> [!warning] Known gap under Quadlet — found 2026-09-22, not yet fixed
+> `systemctl --user start` on an **active** unit re-reads nothing, and `rt_apply_stack` restarts
+> changed units only for the eight application services it iterates. A release that changes a
+> **monitoring** `.container` unit (a memory limit, an image pin, an environment line) therefore
+> installs the new unit and leaves the running container on the old definition until something
+> restarts it — the 2026-07-17 shape below, reached by another road. `acme` is in neither list
+> (`RT_STACK_SERVICES`, `RT_MONITORING_SERVICES`), so a changed `acme` unit is not even started.
+> Until `rt_monitoring_up` honours `RT_CHANGED_SERVICES` the way `rt_apply_stack` does, and `acme`
+> belongs to one of the lists, restart such a unit by hand after the deploy (`docs/deployment.md` →
+> *Host-config and unit changes*).
+
+Without the definition apply a compose-definition change
 reached the running container only on a full app deploy, so on a quiet host it silently never landed —
 the 2026-07-17 case where Alloy ran the stale 256M/230MiB definition for days while disk said
 384M/300MiB (and cAdvisor a stale containerd mount), tripping a chronic `ContainerWorkingSetHigh`. A
-host that runs the monitoring stack **must** set `IRI_MONITORING_ENABLED=true` (a systemd drop-in on the `iri-deploy`
-service — `/etc/systemd/system/iri-deploy.service.d/monitoring.conf` with
-`Environment=IRI_MONITORING_ENABLED=true`, then `systemctl daemon-reload`). If the stack is running but
+host that runs the monitoring stack **must** set `IRI_MONITORING_ENABLED=true` — in the host `.env`,
+from which `deploy.sh` reads that one key when its environment does not carry it, or as an
+`Environment=` drop-in on `iri-deploy.service`, which wins over the file. If the stack is running but
 the flag is unset the reconcile gates itself off, yet the config-bundle rsync keeps rewriting
 `monitoring/**` on disk every tick — so on-disk rule/scrape changes silently never reach the running
 Prometheus (the 2026-07-13 drift). `PrometheusConfigStale` cannot catch that: its applied-stamp series
@@ -320,15 +413,18 @@ reconcile is a silent no-op — nothing scrapes the textfile there anyway.
   without pulling or re-applying the app stack; a component whose on-disk config already matches its
   snapshot is left untouched, and the reconcile never gates the deploy.
 - [ ] On a host with monitoring enabled, every reconciling tick — including the converged no-op
-  fast-exit — runs a plain `docker compose -p iri-monitoring … up -d` so a compose-definition drift
-  (mem_limit / environment / volumes / image pin) is applied per-service, while a fully converged
-  monitoring stack (config subtree matching every snapshot) triggers no `--force-recreate`.
+  fast-exit — applies the monitoring definitions (`up -d` under Compose, `start` of the nine units
+  under Quadlet) so a definition drift is applied per service, while a fully converged monitoring
+  stack (config subtree matching every snapshot) triggers no recreate.
 - [ ] On a host running the monitoring stack with `IRI_MONITORING_ENABLED` unset, every tick logs a
   WARN and emits `basetool_monitoring_reconcile_disabled{component="deploy"} == 1` (the
   `MonitoringReconcileDisabled` signal); with the flag set, the gauge is `0` and the reconcile runs.
-- [ ] A matching marker over a container running a non-target image digest, an
-  unhealthy/restarting container, or a missing container triggers a logged drift re-apply of
-  the same digest set.
+- [ ] A matching marker over a container running a non-target image digest, or a missing
+  container, triggers a logged drift re-apply of the same digest set.
+- [ ] A matching marker over containers that are all on the target image but unhealthy or
+  restarting triggers a targeted restart of only those services — no pull, no re-verify, no
+  rollback — throttled by the health-restart backoff; a failed restart updates `deploy-health.prom`
+  and writes no deploy-outcome metric.
 - [ ] A drift re-apply of a target inside the bad-digest backoff window is skipped like any
   other re-apply of that target; a failed drift re-apply records the failure for the backoff.
 - [ ] `deploy.sh --check-only` over a drifted stack reports "would re-apply" and applies
@@ -337,7 +433,7 @@ reconcile is a silent no-op — nothing scrapes the textfile there anyway.
   non-target image digest does, even during the start period); a one-off `compose run`
   container never does.
 
-**Enforced by:** `scripts/deploy.sh` (`running_stack_drift`, idempotence check, `reconcile_monitoring_reload(s)`) · `scripts/deploy.test.sh` (self-tests, run by `.github/workflows/deploy-script.yml`) · **Runbook:** `docs/deployment.md` → *What happens on the server*, *Restarting the stack manually*
+**Enforced by:** `scripts/deploy.sh` (`running_stack_drift`, idempotence check, the health-drift branch, `reconcile_monitoring_reload(s)`) · `scripts/lib/container-runtime.sh` (`rt_service_container_ids`, `rt_monitoring_recreate`) · `scripts/deploy.test.sh` (self-tests, run by `.github/workflows/deploy-script.yml`) · **Runbook:** `docs/deployment.md` → *What happens on the host*, *Driving the stack*
 
 ### REQ-OPS-014 — Every prod service runs with a hardened runtime baseline
 
@@ -366,7 +462,7 @@ needs:
   drop to their service user via gosu, so under Docker they keep `CHOWN`/`DAC_OVERRIDE`/`FOWNER` +
   `SETGID`/`SETUID`. `no-new-privileges` still holds because gosu drops via the `CAP_SETUID` syscall,
   not a setuid binary. **That set was measured on 2026-09-16 and is wrong in both directions**
-  (`PODMAN_MIGRATION_PLAN.md` §20): Postgres needs four of the five, `FOWNER` never among them, and
+  ([`PODMAN_MIGRATION_PLAN.md` §20](../archive/PODMAN_MIGRATION_PLAN.md)): Postgres needs four of the five, `FOWNER` never among them, and
   redis needs only `SETGID`/`SETUID`. Under Quadlet all three instead run **as their own uid** — 70,
   70 and 999 — read-only and with no capabilities at all ([ADR-0189](../adr/0189-stateful-containers-run-as-their-own-uid.md)).
 
@@ -377,11 +473,19 @@ needs:
 > longer open. Never remove `SETGID`/`SETUID` from redis without giving it a uid in the same edit,
 > and assert the **uid of pid 1** rather than the capability list: `check-conformance.py`'s
 > `containers-unprivileged` is what does that.
-> - **`edge`** runs as uid 101 on high ports (8080/8443, published as 80/443) and needs **no**
-> capabilities at all — an empty add-back on the one service most exposed to the internet.
-> - **`acme`** runs as root, because lego writes its state as root, and keeps exactly `CHOWN`: it has
-> to hand the issued certificates to uid 101 for the edge to read them. Nothing else — it listens on
-> nothing and holds no inbound surface.
+
+- **`edge`** runs as uid 101 on high ports (8080/8443) and needs **no** capabilities at all — an
+  empty add-back on the one service most exposed to the internet. Under Quadlet it publishes them on
+  loopback only, behind the host's haproxy front end (ADR-0187); under Compose they are published as
+  80/443.
+- **`acme`** runs as root, because lego writes its state as root, and keeps exactly `CHOWN`: it has
+  to hand the issued certificates to uid 101 for the edge to read them. Nothing else — it listens on
+  nothing and holds no inbound surface.
+
+The **Quadlet units are the production posture** and are generated from the compose file, so the two
+describe the same services with one runtime-specific difference each way: `NoNewPrivileges=true`,
+`DropCapability=ALL` and a `PidsLimit=` on every unit, `AddCapability=CHOWN` on `acme` alone, and
+`User=` 70/70/999 in place of the stateful services' compose `cap_add` sets.
 
 Because the add-back set is not upstream-documented for the third-party images, it **must be
 re-verified on every image bump** of that service before the bump is promoted (a clean boot and its
@@ -420,17 +524,21 @@ without this record being updated.
 **Acceptance**
 
 - [ ] Every `prod`-profile service in `docker-compose.yml` (backend, frontend, ingest, keycloak,
-  redis, db-backend, db-keycloak, edge, acme, and npm while it remains as the rollback path) sets
-  `no-new-privileges:true`, `cap_drop: [ALL]` with an explicit (possibly empty) `cap_add`, and a
-  `pids` ceiling.
+  redis, db-backend, db-keycloak, edge, acme) sets `no-new-privileges:true`, `cap_drop: [ALL]` with
+  an explicit (possibly empty) `cap_add`, and a `pids` ceiling.
 - [ ] `backend`/`frontend`/`ingest`/`keycloak`/`edge` carry no `cap_add`; `acme` carries only
-  `CHOWN`; `postgres`/`redis` carry only the chown + privilege-drop set; `npm` carries only its
-  verified s6 set.
-- [ ] `edge` additionally runs `read_only: true`.
-- [ ] An image bump for any of these services is only promoted after its capability set has been
-  re-verified against the new image (boot + healthcheck [+ `nginx -s reload` for npm]).
+  `CHOWN`; `postgres`/`redis` carry only the chown + privilege-drop set (Compose only).
+- [ ] `edge` additionally runs `read_only: true` under Compose.
+- [ ] Every generated `.container` unit carries `NoNewPrivileges=true`, `DropCapability=ALL`, a
+  `PidsLimit=` and `ReadOnly=true`; only `acme` adds a capability (`CHOWN`); `db-backend`,
+  `db-keycloak` and `redis` run with `User=`/`Group=` 70, 70 and 999. `check-conformance.py`'s
+  `containers-unprivileged` and `containers-read-only` assert the running host.
+- [ ] An image bump for any of these services is only promoted after the new image has been
+  booted under its unit's hardening once (clean start + healthcheck).
 
-**Enforced by:** `docker-compose.yml` (all `prod` services) · verification recipe in the service comments
+**Enforced by:** `docker-compose.yml` (all `prod` services) · `scripts/generate-quadlet.py` and the
+generated `quadlet/systemd/*.container` · `scripts/check-conformance.py` · verification recipe in the
+service comments · **Decisions:** ADR-0189, ADR-0190
 
 ### REQ-OPS-015 — Host-side signature verification before apply
 
@@ -442,8 +550,8 @@ the **host half** of the supply-chain seam; `promote.yml`'s pre-flight verify (R
 CI half. Neither alone is sufficient: `promote.yml` verifies at promotion time in CI, but the host
 re-resolves `:stable` independently on every tick, so a `:stable` tag moved out-of-band — a leaked
 `packages:write` credential retagging an arbitrary digest, or a registry-side tag manipulation —
-would otherwise be pulled and run **unverified** (and the deploy user is in the `docker` group, i.e.
-root-equivalent). The host gate closes that TOCTOU: the tag verified at promote time is no longer
+would otherwise be pulled and run **unverified** — as the service user under rootless Podman, and
+as root-equivalent `docker`-group code on a Docker host. The host gate closes that TOCTOU: the tag verified at promote time is no longer
 assumed to be the artifact the host pulls later.
 
 The trusted signer identity is pinned to `…/release-images.yml@refs/(heads/main|tags/v.+)` — a
@@ -484,7 +592,7 @@ on a genuinely bad signature, which still aborts fail-closed.
 - [ ] `deploy.sh` runs `cosign verify` (identity `…/release-images.yml@refs/(heads/main|tags/v.+)`,
   issuer `token.actions.githubusercontent.com`) against every resolved `image@digest` — backend,
   frontend, ingest, and the config + keycloak-spi bundles when resolved — **before** the first
-  `pull`/`docker create`/`docker cp`/`up`, and aborts the tick non-zero on any verification failure.
+  `pull`, `create`/`cp` extraction or apply, and aborts the tick non-zero on any verification failure.
 - [ ] A `:stable` digest that is unsigned or signed by any other identity is never pulled, extracted
   onto the host, or applied; the failure records a deploy-failure metric (surfacing `DeployFailed`).
 - [ ] Verification does not run on the steady-state idempotence no-op tick (on the apply path it
@@ -493,34 +601,55 @@ on a genuinely bad signature, which still aborts fail-closed.
   reporting per artifact and exiting non-zero on failure — **without** writing a deploy metric or
   applying anything (so it does not trip `DeployFailed`); it runs even over a converged no-op stack.
 - [ ] `cosign` missing on the host with `IRI_COSIGN_VERIFY=true` fails the pre-flight; the sole
-  documented override is `IRI_COSIGN_VERIFY=false` for a Sigstore outage.
+  documented override is `IRI_COSIGN_VERIFY=false` for a Sigstore outage. "Not on `PATH`" is not
+  "missing": the pre-flight also looks in `/usr/local/bin`, `/usr/bin` and `/opt/cosign/bin`, because
+  sudo's `secure_path` on Rocky omits the directory the role installs into.
+- [ ] The host cosign is installed by the Ansible role from the upstream release, checked against
+  a sha256 pinned in the role's defaults; upgrading it is a reviewed change to that pin.
 - [ ] `promote.yml` verifies against the identical `@refs/(heads/main|tags/v.+)` identity regexp.
 - [ ] The host `cosign` is a major **≥** the cosign the CI signs with (`cosign-installer` pin, 3.x);
   a host on cosign 2.x cannot verify the 3.x signatures and is a mis-bootstrap, not a supported mode.
 
 **Enforced by:** `scripts/deploy.sh` (`verify_signature`, `verify_digest_or_die`, cosign pre-flight)
 · `scripts/deploy.test.sh` (signature-gate self-tests) · `.github/workflows/promote.yml` (pinned
-identity) · **Runbook:** `docs/deployment.md` → *Signature verification (cosign)* · **Decision:** ADR-0075
+identity) · `ansible/roles/basetool_host/tasks/15-cosign.yml` · **Runbook:** `docs/deployment.md` → *Signature verification (cosign)* · **Decision:** ADR-0075
 
 ### REQ-OPS-016 — Deploy host runtime hardening
 
 The deploy path is hardened at the host layer, beyond running as an unprivileged user:
 
-- **Systemd sandbox.** `iri-deploy.service` confines the `deploy.sh` process with a defence-in-depth
-  baseline: `NoNewPrivileges`, `ProtectSystem=strict`, `ProtectHome`, `PrivateTmp`, `PrivateDevices`,
+- **The privilege boundary is a named sudo bridge, not a group.** Under rootless Podman the
+  `deploy` account reaches the service user's containers through `/etc/sudoers.d/basetool-deploy`:
+  `podman *` and `systemctl --user *` as that one user, and `systemctl restart alloy.service` as root
+  — nothing else (`22-deploy-user.yml`). The Docker deployment's `docker` group, which is
+  root-equivalent by design, does not exist on the production host.
+- **Systemd sandbox.** `iri-deploy.service` confines the `deploy.sh` process with
+  `ProtectSystem=strict`, `ProtectHome=read-only`, `PrivateTmp`, `PrivateDevices`,
   `ProtectKernelTunables`/`Modules`/`Logs`, `ProtectControlGroups`, `ProtectClock`, `ProtectHostname`,
-  `ProtectProc=invisible`, `RestrictNamespaces`, `RestrictRealtime`, `RestrictSUIDSGID`, `RemoveIPC`,
-  `LockPersonality`, an **empty** `CapabilityBoundingSet`, `RestrictAddressFamilies` limited to
-  AF_UNIX/AF_INET/AF_INET6/AF_NETLINK, `SystemCallArchitectures=native`, and a
-  `SystemCallFilter=@system-service` seccomp allow-list. `ReadWritePaths` is the **narrow** set the
-  script actually writes (`/var/lib/iri /var/log /var/lock /var/iri/code /var/iri/monitoring`) — NOT
-  the whole `/var/iri`, whose DB/redis/npm bind mounts are written by the containers via the root
-  daemon, out-of-band from this sandbox. It is understood that docker-group membership remains
-  root-equivalent (a socket-proxy / rootless-Docker reduction is deferred, documented in the runbook).
-- **Keystore not world-readable.** The shared `keystore.p12` is delivered `0640 root:10001` with a
-  POSIX ACL granting read to uid 1000 (`setfacl -m u:1000:r`) — so both container uids read it (10001
-  via group, 1000 via ACL) without the private-key material being readable by `other`. The previous
-  `0644` made it readable by every account on the host.
+  `ProtectProc=invisible`, `RestrictRealtime`, `RestrictSUIDSGID`, `RemoveIPC`, `LockPersonality`,
+  `RestrictAddressFamilies` limited to AF_UNIX/AF_INET/AF_INET6/AF_NETLINK,
+  `SystemCallArchitectures=native`, a `SystemCallFilter=@system-service @mount` seccomp allow-list,
+  and a `CapabilityBoundingSet=~` **blocklist** (`CAP_SYS_ADMIN`, `CAP_SYS_MODULE`, `CAP_SYS_RAWIO`,
+  `CAP_SYS_BOOT`, `CAP_SYS_TIME`, `CAP_NET_ADMIN`, `CAP_MAC_ADMIN`, `CAP_MAC_OVERRIDE`,
+  `CAP_SYS_PTRACE`). `ReadWritePaths` is the **narrow** set the script actually writes
+  (`/etc/containers/systemd/users /var/lib/iri /var/log /var/lock /var/iri/code
+  /var/iri/monitoring`) — NOT the whole `/var/iri`, whose database and redis bind mounts are written
+  by the containers, out-of-band from this sandbox.
+
+  > [!note] Corrected 2026-09-22 — four directives this requirement named are gone, on purpose
+  > It required `NoNewPrivileges`, `RestrictNamespaces`, an **empty** `CapabilityBoundingSet` and a
+  > bare `@system-service` filter. Each was measured on 2026-09-18 to make the unit unable to run on
+  > the rootless platform: `NoNewPrivileges` forbids the sudo bridge above, rootless Podman *is* a
+  > user namespace, sudo's switch and PAM stack need more than no capabilities, and Podman sets up
+  > its container filesystem with the `@mount` family. The unit file carries the measurement for
+  > each. The boundary they approximated is now the sudo bridge, which is narrower than the docker
+  > group they were compensating for.
+- **Keystore not world-readable.** The shared `keystore.p12` is `0640` with its group set to the
+  app modules' uid and a POSIX ACL granting read to Keycloak's — under rootless Podman the
+  **translated** host uids, `root:110000` plus `user:100999:r` (subuid base 100000), and an extra
+  `user:iri:r` so the backup helper, which runs as the service user, can read it. The private-key
+  material is never readable by `other`; the Docker host's `root:10001` + `u:1000` is the same rule
+  before translation.
 - **Token expiry is monitored (opt-in).** When the pull token **expires**, `deploy.sh` emits
   `basetool_ghcr_token_expiry_timestamp` from an operator-recorded `${TOKEN_FILE}.expiry` on every
   tick (incl. the no-op); `GhcrPullTokenExpiring` (warning, <14 d) and `GhcrPullTokenExpired`
@@ -530,17 +659,22 @@ The deploy path is hardened at the host layer, beyond running as an unprivileged
 
 **Acceptance**
 
-- [ ] `iri-deploy.service` sets the sandbox baseline above, an empty `CapabilityBoundingSet`, a
-  seccomp `SystemCallFilter`, and a `ReadWritePaths` that excludes the DB/redis/npm bind mounts.
-- [ ] The keystore is `0640` with a `user:1000:r` ACL, not world-readable `0644`; the runbook +
-  restore procedure re-apply the ACL.
+- [ ] `iri-deploy.service` sets the sandbox baseline above, the capability blocklist, a seccomp
+  `SystemCallFilter`, and a `ReadWritePaths` that excludes the database and redis bind mounts.
+- [ ] The deploy account holds no privileged group and no sudo grant beyond the three commands of
+  the bridge; `22-deploy-user.yml` proves the grant works rather than only that it parses.
+- [ ] The keystore is `0640` with a Keycloak read ACL (translated uid on the rootless host), never
+  world-readable; the runbook and the restore procedure re-apply the ACL, which restic does not
+  carry.
 - [ ] `deploy.sh` writes `basetool_ghcr_token_expiry_timestamp` when `${TOKEN_FILE}.expiry` exists
   (and nothing when it does not); `ops-automation.yml` alerts on <14 d / expired only — **not** on
   absence, so a non-expiring token is not false-warned.
 
 **Enforced by:** `scripts/iri-deploy.service` (sandbox) · `scripts/deploy.sh` (`write_token_expiry_metric`,
 `HOME` for the cosign cache) · `monitoring/prometheus/alerts/ops-automation.yml` (token alerts) ·
-**Runbook:** `docs/deployment.md` → *5.2 PKCS12 keystore*, *Docker access hardening*, *Token rotation*
+`ansible/roles/basetool_host/tasks/22-deploy-user.yml` (the sudoers bridge) ·
+**Runbook:** `docs/deployment.md` → *Accounts and what runs where*, *Internal keystore and
+certificate rotation*, *Token rotation*
 
 ### REQ-OPS-018 — Redis session store: durable persistence and a session-safe memory ceiling
 
@@ -597,7 +731,8 @@ posture has ever had on the **primary** durability layer.
   with an ageing snapshot does not page. Pinned by
   `monitoring/prometheus/tests/redisrdbstale_idle_guard_test.yml`.
 
-**Enforced by:** `docker-compose.yml` (`x-redis` template + `redis` prod override) ·
+**Enforced by:** `docker-compose.yml` (`x-redis` template + `redis` prod override) · the generated
+`quadlet/systemd/redis.container` (`Exec=` carries the prod line; `quadlet-drift` keeps it equal) ·
 `monitoring/prometheus/alerts/infrastructure.yml` (Redis memory/persistence alerts) · **Decision:** ADR-0079
 
 ### REQ-OPS-019 — Containers with a wget-HTTPS healthcheck reap orphaned subprocesses (PID-1 zombie reaping)
@@ -633,17 +768,21 @@ were `712 × (ssl_client) Z`.
 **Acceptance**
 
 - [ ] `backend`, `frontend` and `ingest` (via their `x-*` compose templates) **and `grafana`** set
-  `init: true`; a prod container that runs a wget-HTTPS healthcheck with a bare runtime as PID 1 is
-  a regression.
+  `init: true`, which the generator carries into the units as `PodmanArgs=--init`; a prod container
+  that runs a wget-HTTPS healthcheck with a bare runtime as PID 1 is a regression.
 - [ ] A long-lived (>17 h) app container's `pids` count stays flat instead of climbing ≈1 per 30 s
   healthcheck — no `<defunct>` `ssl_client` accumulation (spot-check: `docker exec <svc> sh -c 'cut
   -d" " -f3 /proc/[0-9]*/stat | sort | uniq -c'` shows no growing `Z` count).
 - [ ] Host-side cross-check that needs no working `fork()` in the container (the spot-check above
   cannot run once the cap is hit, which is exactly when it matters): for each container,
-  `pids.current` in `/sys/fs/cgroup/system.slice/docker-<id>.scope/` stays well under `pids.max`,
-  and `ps -eo stat,ppid | awk '$1 ~ /^Z/ && $2 == <container host PID>'` counts zero zombies.
+  `pids.current` in its cgroup stays well under `pids.max` — under rootless Quadlet that is
+  `/sys/fs/cgroup/user.slice/user-<uid>.slice/user@<uid>.service/app.slice/<svc>.service/`
+  (the path `scripts/cgroup-container-metrics.py` reads), under Docker
+  `/sys/fs/cgroup/system.slice/docker-<id>.scope/` — and
+  `ps -eo stat,ppid | awk '$1 ~ /^Z/ && $2 == <container host PID>'` counts zero zombies.
 - [ ] `ContainerPidsHigh` (REQ-OBS-014) covers the service — it is cap-relative
-  (`container_threads / container_threads_max > 0.8`) and unscoped by name, so a new service is
+  (`basetool:container:pids / basetool:container:pids_max > 0.8`, recording rules fed by the cgroup
+  collector on the Podman host and by cAdvisor's `container_threads` on a Docker one) and unscoped by name, so a new service is
   monitored automatically.
 - [ ] `.github/scripts/check_pid1_reaping.py` passes. It resolves each service's *effective* probe
   the way Docker does (explicit compose `healthcheck` first, else the image's `HEALTHCHECK` — which
@@ -861,8 +1000,21 @@ Keycloak name resolves to a WAN address its own containers cannot reach. Backend
 ingest load the OIDC metadata from that name at startup, so they never become healthy and the
 health gate rolls the deploy back — a failure that looks like a broken image and is a
 name-resolution problem. `IRI_KEYCLOAK_HOST_ALIAS` supplies a Docker `extra_hosts` entry that
-points the name at the host's own reverse proxy; its default, `localhost:127.0.0.1`, is a no-op,
-so production is untouched.
+points the name at the host's own reverse proxy; its default, `localhost:127.0.0.1`, is a no-op.
+
+> [!note] Corrected 2026-09-22 — on a rootless host this is not a non-production concern
+> Under rootless Podman **no** container can reach its own host through the host's public address,
+> production included: measured on the production host at the cutover, ports 22, 80 and 443 on its
+> public IPv4 and IPv6 all refused from inside a container while `host-gateway` answered. Quadlet
+> units cannot interpolate `IRI_KEYCLOAK_HOST_ALIAS` either — the generator bakes in the no-op
+> default. So every rootless host, production first, aliases **all four** of its public names to
+> `host-gateway` through a drop-in the Ansible role writes from `basetool_host_public_name_aliases`
+> (`<svc>.container.d/10-host-alias.conf` for backend, frontend, ingest, grafana and
+> blackbox-exporter), and the first entry must equal `IRI_KEYCLOAK_HOST_ALIAS` in `.env` —
+> `check-conformance.py`'s `env-reaches-the-units` fails when they disagree
+> ([ADR-0196](../adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md)).
+> The sentence this replaces said the default left production untouched, which stopped being true
+> the day production became rootless.
 
 Resolving the name is not the same as trusting what answers on it. That metadata fetch runs on a
 plain `RestTemplate` and therefore validates against the **JVM default trust store** — the
@@ -871,7 +1023,11 @@ environment whose proxy presents a self-signed certificate fails with `PKIX path
 at exactly the same point. `IRI_TRUSTSTORE_HOST_PATH` mounts a trust store at
 `/run/secrets/truststore.p12` and `IRI_EXTRA_JAVA_OPTS` appends the `javax.net.ssl.trustStore*`
 switches that select it. Both default to no-ops: the mount resolves to the same file as the
-keystore, and with no extra options nothing reads it.
+keystore, and with no extra options nothing reads it. Under Quadlet the mount path is baked into the
+units at that default, so a rootless host with a privately signed edge gets its truststore from a
+second role-written drop-in instead (`basetool_host_jvm_truststore_path` →
+`/run/secrets/jvm-truststore.p12`, `20-jvm-truststore.conf`), and `IRI_EXTRA_JAVA_OPTS` names that
+path. Production's edge certificate is publicly signed and sets neither.
 
 That trust store **must be built as a copy of the JVM's own anchors plus the environment's
 certificate**, not from the keystore. Two reasons, both load-bearing: `-Djavax.net.ssl.trustStore`
@@ -898,10 +1054,11 @@ differs from `KC_HOSTNAME`; setting it wins over the derivation.
 
 **The monitoring stack derives from the same variable.** Grafana's `generic_oauth` provider has no
 discovery option, so `docker-compose.monitoring.yml` names the authorize, token and userinfo URLs
-individually; all three now share one `${IRI_KEYCLOAK_HOSTNAME:-…}` expansion. Both compose projects
-run with the same `--project-directory`, so they read the same `.env` and one value moves the app
-stack and Grafana together. A monitoring stack started from elsewhere falls back to the production
-default, unchanged.
+individually; all three now share one `${IRI_KEYCLOAK_HOSTNAME:-…}` expansion. Under Compose both
+projects run with the same `--project-directory`, so they read the same `.env`; under Quadlet
+`render-env-d.py` renders every service's environment, Grafana's included, from that one `.env`.
+Either way one value moves the app stack and Grafana together. A monitoring stack started from
+elsewhere falls back to the production default, unchanged.
 
 **The agreement is gated rather than documented.** `scripts/check-keycloak-issuer.py` runs in
 `repo-lint.yml` and renders every stack through `docker compose config` — compose's own
@@ -949,7 +1106,12 @@ for why the missing-probe half is not redundant.
   deployed identity base, and the discovery document, `/auth/health` and `/auth/metrics` are all
   still probed.
 - [ ] `IRI_KEYCLOAK_HOST_ALIAS` unset ⇒ the only `extra_hosts` entry is `localhost:127.0.0.1`,
-  which resolves to what `localhost` already resolves to.
+  which resolves to what `localhost` already resolves to (Compose; the generated units carry exactly
+  that default).
+- [ ] A rootless host's inventory lists every public name the containers dial in
+  `basetool_host_public_name_aliases`; the role writes the drop-ins and removes them when the list
+  is empty, and `env-reaches-the-units` fails when its first entry and `IRI_KEYCLOAK_HOST_ALIAS`
+  disagree.
 - [ ] `IRI_EXTRA_JAVA_OPTS` unset ⇒ `JAVA_TOOL_OPTIONS` is character-identical to before, and the
   truststore mount points at the same file as the keystore mount (read, but never consulted).
 - [ ] The documented trust store recipe starts from `$JAVA_HOME/lib/security/cacerts`, so selecting
@@ -958,8 +1120,9 @@ for why the missing-probe half is not redundant.
   non-production environment (`CLAUDE.md`: never use production credentials in test stacks).
 
 **Enforced by:** `.github/workflows/promote-testing.yml` · `docker-compose.yml`
-(`KC_HOSTNAME`, `KEYCLOAK_ISSUER_URI`) · `.env.example` · **Runbook:** `docs/deployment.md` →
-*Promoting to testing*
+(`KC_HOSTNAME`, `KEYCLOAK_ISSUER_URI`) · `.env.example` · `ansible/roles/basetool_host/tasks/50-podman.yml`
+(alias and truststore drop-ins) · `scripts/check-conformance.py` (`env-reaches-the-units`) ·
+**Runbook:** `docs/deployment.md` → *Promoting to testing* · **Decision:** ADR-0196
 
 ### REQ-OPS-023 — Build provenance is anchored outside the registry
 
@@ -1169,8 +1332,13 @@ Three properties make the handover correct, and each of them has failed in produ
 - **The running edge is made to load it.** nginx reads its certificates at startup, so a new file in
   the volume changes nothing on its own. `reconcile_edge` fingerprints them every tick and
   force-recreates the edge when they move — and it has to read them in a way the **deploy user**
-  can. The volume's host path is under `/var/lib/docker` (`0710 root:root`), unreadable to that
-  user, so the fingerprint is taken through the edge, which already mounts them read-only.
+  can. The volume's host path is not readable to that user — under `/var/lib/docker`
+  (`0710 root:root`) on a Docker host, inside the service user's own container store under rootless
+  Podman — so the fingerprint is taken through the edge (`exec` into it), which already mounts them
+  read-only.
+- **The volumes are never pruned.** `edge-certs` and `edge-acme-state` exist in no image and are
+  "dangling" to Podman whenever the stack is down; `podman volume prune` has no anonymous-only mode,
+  so the weekly cleanup skips volume pruning on Podman altogether (ADR-0194).
 
 The certificates the cutover seeds from the previous proxy are valid for weeks, which is exactly why
 a broken handover is invisible: nothing is observably wrong until they expire.
@@ -1187,8 +1355,9 @@ a broken handover is invisible: nothing is observably wrong until they expire.
   one that did not change recreates nothing, and a fingerprint read that fails recreates nothing
   either.
 
-**Enforced by:** `scripts/check-acme-publish.sh` (runs the step extracted from `docker-compose.yml`,
-not a copy of it) · `scripts/check-edge-nginx.sh` (host-list agreement) ·
+**Enforced by:** `scripts/check-acme-publish.sh` (runs `docker/acme/publish-loop.sh` — the file the
+`acme` service and unit actually execute, not a copy of it) · `scripts/check-edge-nginx.sh` (host-list agreement) ·
+`scripts/container-cleanup.sh` (no volume prune on Podman) ·
 `scripts/deploy.test.sh` (`scenario_edge_reloads_a_renewed_certificate`) ·
 `.github/workflows/repo-lint.yml` · **Related:** REQ-OPS-014 (the capability baseline that shapes
 it), ADR-0162 (why the two containers are separate)
@@ -1242,9 +1411,12 @@ to the shared group and restores the defect exactly.
 
 ## Out of scope
 
-- The deploy script (`deploy.sh`) and the systemd units themselves are **not** delivered via
-  the bundle (self-update hazard) — they remain a manual bootstrap step. Bootstrap, token
-  rotation, and the maintenance-page mechanics live in `docs/deployment.md`.
+- The deploy script (`deploy.sh`), the other operational scripts and their `iri-*` systemd units
+  are **not** delivered via the bundle (self-update hazard). They are installed and updated by the
+  Ansible role (`25-scripts.yml`, `27-observability.yml`) as a deliberate, operator-driven host
+  change (ADR-0188) — never by a promotion. The Quadlet units of the stack itself, by contrast,
+  **are** bundle payload (REQ-OPS-004). Bootstrap, token rotation, keystore rotation and the edge
+  mechanics live in `docs/deployment.md` and `ansible/README.md`.
 - Application-level configuration delivered as environment variables in `.env` is host-only and
   out of scope here (it is never bundled). The list of env keys lives in `README.md`.
 

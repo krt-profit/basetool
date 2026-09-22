@@ -38,7 +38,7 @@ ExecStart=/var/iri/code/scripts/cgroup-container-metrics.py --output /var/iri/mo
 
 ; Exit 1 means "nothing matched", which on a host whose stack is deliberately down is normal and
 ; not a failure worth alerting on. The collector's own staleness is alerted on from Prometheus
-; instead (BasetoolContainerMetricsStale), which can tell "the host is quiet" from "the collector
+; instead (ContainerCgroupCollectorStale), which can tell "the host is quiet" from "the collector
 ; stopped" -- something an exit code here cannot.
 SuccessExitStatus=0 1
 

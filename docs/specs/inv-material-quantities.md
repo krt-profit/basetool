@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-06.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
 > **Owner area:** INV · **Related ADRs:** none
 
 # Material quantities (SCU / PIECE)
@@ -73,12 +73,14 @@ see [REQ-INV-003](#req-inv-003--server-side-enforcement--scu-scale-storage). **C
 
 REQ-INV-001 / REQ-INV-002 are enforced server-side as well, so non-browser API clients cannot bypass
 them. **Validation:** `@ValidQuantityAmount` rejects `≤ 0` (both types) and fractional `PIECE`
-amounts on the validated write DTOs — inventory create/update, refinery store, and **job-order
-material (create + the same-shape edit)**; the book-out / handover / claim services apply the same
+amounts on the validated write DTOs — inventory create (`InventoryItemCreateDto`; stock rows are
+append-only, there is no amount-update DTO), refinery store, and **job-order material (create + the
+same-shape edit, `CreateJobOrderMaterialDto`)**; the book-out / handover / claim services apply the same
 `> 0` + PIECE-integer checks inline. **Storage:** SCU excess precision is **rounded, not rejected** —
 every persisted material amount is normalised to three decimals with `RoundingMode.HALF_UP` at the
 persistence boundary via a `@PrePersist`/`@PreUpdate` hook on each amount-bearing entity
-(`InventoryItem`, `JobOrderMaterial`, `MaterialClaim`, `JobOrderHandoverItem`), so the rule holds for
+(`InventoryItem`, its `InventoryJobOrderAllocation` / `InventoryMissionAllocation` slices,
+`JobOrderMaterial`, `MaterialClaim`, `JobOrderHandoverItem`), so the rule holds for
 operator input, `double` arithmetic on book-out / transfer / handover decrements, and summed refinery
 yields (which can land on a binary value like `37.160000000000004`). Rounding is unconditional —
 `PIECE` amounts are whole, so it is a no-op for them. This mirrors the frontend (round, don't reject)
@@ -104,7 +106,7 @@ reference, so bean validation cannot reach them).
 
 **Enforced by:** `ValidQuantityAmountValidatorTest`, `MaterialAmountRoundingTest`. **Code:**
 `backend/.../validation/ValidQuantityAmount*`,
-`backend/.../model/{InventoryItem,JobOrderMaterial,MaterialClaim,JobOrderHandoverItem}` (`roundAmountToScuScale`).
+`backend/.../model/{InventoryItem,InventoryJobOrderAllocation,InventoryMissionAllocation,JobOrderMaterial,MaterialClaim,JobOrderHandoverItem}` (`roundAmountToScuScale`).
 **Issues:** PR #465.
 
 ## Out of scope

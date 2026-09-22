@@ -1,5 +1,13 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-08-02.
-> **Owner area:** OBS · **Related:** [`security-and-access.md`](security-and-access.md), [`org-unit-tenancy.md`](org-unit-tenancy.md), [ADR-0072](../adr/0072-monitoring-stack-prometheus-grafana.md), [ADR-0095](../adr/0095-ship-app-container-stdout-to-loki.md), monitoring epic [#936](https://github.com/krt-profit/basetool/issues/936)
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Owner area:** OBS · **Related:** [`security-and-access.md`](security-and-access.md), [`org-unit-tenancy.md`](org-unit-tenancy.md), [ADR-0072](../adr/0072-monitoring-stack-prometheus-grafana.md), [ADR-0095](../adr/0095-ship-app-container-stdout-to-loki.md), [ADR-0162](../adr/0162-edge-is-native-nginx-with-a-separate-acme-client.md) (native edge, NPM retired), [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md) (rootless Podman), monitoring epic [#936](https://github.com/krt-profit/basetool/issues/936) · **Operator doc:** [`monitoring/README.md`](../../monitoring/README.md)
+>
+> **Runtime.** Since the 2026-09-22 cutover production runs rootless Podman under Quadlet on Rocky
+> Linux 10. The monitoring plane is nine Quadlet container units (generated from
+> `docker-compose.monitoring.yml` by `scripts/generate-quadlet.py`) plus host services installed by
+> the Ansible role (`node_exporter`, `alloy`, `prometheus-podman-exporter`, and the
+> `iri-container-metrics` / `iri-cert-expiry` collector timers). cAdvisor and the docker-socket-proxy
+> no longer exist; container logs reach Loki through the journal. Where a requirement below still
+> names a Docker-era mechanism it says so and dates it.
 
 # Observability & logging
 
@@ -445,9 +453,9 @@ scrape (epic #936, ADR-0072). The endpoint is **never public**:
 > **all** of `/actuator/**` (health + prometheus) on a dedicated **internal-only management port**
 > (frontend `18091`, ingest `11272`; `management.server.port` in `application-prod.yml`, HTTPS via the
 > shared keystore). That port is reachable only on `net-monitoring-scrape` (Prometheus) and
-> `localhost` (the Docker `HEALTHCHECK`) — never host-published and never on an NPM proxy network —
-> so `/actuator/**` is off the public connector entirely (a public probe gets 404 at the app level,
-> independent of the NPM edge deny). On that internal-only port Actuator is **unauthenticated** (a
+> `localhost` (the container health check) — never host-published and never on an edge proxy
+> network — so `/actuator/**` is off the public connector entirely (a public probe gets 404 at the
+> app level, independent of the edge deny). On that internal-only port Actuator is **unauthenticated** (a
 > per-module `ManagementPortSecurityConfig` permit-all chain, gated by `@ConditionalOnProperty`), the
 > Keycloak port-9000 posture: the fail-closed basic-auth **compensating control below is superseded
 > by port isolation** for frontend/ingest and their scrape jobs drop `basic_auth`. The bullets below
@@ -523,24 +531,26 @@ it is invisible until something waits on the container's health.
   browser session (frontend) must **not** grant access to the metrics payload.
 - The scrape chain is stateless (no session, no CSRF token, no request cache) so a 30-second
   scrape interval creates no session state; a scrape response never carries `Set-Cookie`.
-- `/actuator/health` is **unauthenticated at the app** (`permitAll`) so the Docker `HEALTHCHECK`
+- `/actuator/health` is **unauthenticated at the app** (`permitAll`) so the container health check
   can reach it over `localhost` inside the container — but it is **not internet-reachable**: the
-  same `location /actuator` NPM edge deny that hides `/actuator/prometheus` also hides
-  `/actuator/health`, and `blackbox-edge-deny` now asserts the 404 for **both** paths on both public
-  hosts (REQ-OBS-012). "Public" here means unauthenticated-at-the-app, not edge-exposed. The
+  same `location /actuator { return 404; }` edge deny that hides `/actuator/prometheus` also hides
+  `/actuator/health` (`docker/edge/conf.d/10-frontend.conf.template`, `30-ingest.conf.template`,
+  `include/api-allowlist.conf`), and `blackbox-edge-deny` asserts the 404 for **both** paths on
+  every public app host (REQ-OBS-012). "Public" here means unauthenticated-at-the-app, not edge-exposed. The
   frontend/ingest `BotProtectionFilter` whitelists `/actuator/health` (incl. its liveness/readiness
   sub-paths, case-insensitively) and `/actuator/prometheus` as an **exact, case-sensitive match
   only**, mirroring the scrape chain's `securityMatcher`; prometheus sub-paths/case variants and
   every other `/actuator/**` path stay blocked with 404 before the security chains run.
-- **Prod precondition for setting the credentials:** the NPM `/actuator` deny rules on both
-  public hosts (`profit-base.online`, `ingest.profit-base.online`) are applied **before**
-  `MONITORING_SCRAPE_*` is deployed (Phase-2 runbook), so the credentialed endpoint is only
-  reachable from the internal scrape network. This is also the compensating control for the
-  per-request BCrypt cost of basic auth — without the edge deny, an internet client could
-  drive unthrottled credential guesses / CPU load against the endpoint (residual-risk record
-  in ADR-0072). The deny returns HTTP **404** (not 403) so it does not reveal that the
-  Actuator endpoints exist behind the edge; any future blackbox probe asserting the deny
-  must expect 404.
+- **The edge deny was the prod precondition for these credentials** while prod still scraped the
+  app port (ADR-0072, before ADR-0090/-0134): the `/actuator` deny had to be live on every public
+  host before `MONITORING_SCRAPE_*` was deployed, as the compensating control for the per-request
+  BCrypt cost of basic auth (residual-risk record in ADR-0072). Since ADR-0134 no prod scrape uses
+  the credentials, and since ADR-0162 the deny is a line in the edge's own configuration in git
+  rather than an NPM setting. It still returns HTTP **404** (not 403) so it does not reveal that the
+  Actuator endpoints exist behind the edge, and every probe asserting it expects 404. The
+  `scrape_password` secret is still provisioned even though no scrape job reads it: the generated
+  `prometheus.container` still bind-mounts it, and Podman refuses to start a unit whose bind source
+  is missing (`monitoring/README.md` → *Rebuilding the monitoring plane on a new host*).
 - Every meter carries the common tag `application=basetool-{backend,frontend,ingest}` so
   dashboards can select the module.
 
@@ -568,8 +578,8 @@ rule — no blanket "everything is masked" claim:
   label so a mixed masked-JSON / raw-stdout label never muddies the JSON stream's
   `{app="backend",level="error"}` queries. Motive: JVM/glibc native errors (`pthread_create failed` /
   `unable to create native thread`, the `hs_err` preamble) print to the container's stderr **outside
-  logback**, so they land in `docker logs` but never in the JSON file — this stream is the only place
-  Loki can see them. The app's own console lines *are* masked at source (the prod logback CONSOLE
+  logback**, so they land in the container log (the journal, under Podman's journald driver) but
+  never in the JSON file — this stream is the only place Loki can see them. The app's own console lines *are* masked at source (the prod logback CONSOLE
   appender runs through `PiiMaskingPatternLayout`), but the truly-raw non-logback stderr is not, so
   the shipper masks these streams **in Alloy** (`loki.process.container_mask`) mirroring the
   source-side `PiiMasker` (JWT / e-mail / bearer-token keyword) as defense-in-depth. No client IPs or
@@ -578,13 +588,16 @@ rule — no blanket "everything is masked" claim:
   decision for these three modules (ADR-0072); the reversal has owner sign-off (2026-07-12) and its
   rationale/cost live in ADR-0095. The `JvmNativeThreadExhaustion` Loki rule that consumes this stream
   shipped **staged** (commented) under the REQ-OBS-014 dead-alert guard until the signature was
-  verified rather than assumed. **Enabled 2026-08-29**: a JVM under a cgroup pids cap on the same
-  digest-pinned image production runs writes `pthread_create failed (EAGAIN)` and `unable to create
-  native thread`, both matched by the filter; the three `<svc>-stdout` streams were measured
-  carrying 1k–43k lines/24h on the host; and neither the single `older_than = "167h"` drop stage nor
-  any of the three masking replaces can touch a fresh line or either phrase. The observed line is
-  recorded verbatim beside the rule, because its wording is JVM-version-dependent and a Temurin bump
-  is the thing that would silently invalidate it.
+  verified rather than assumed. **Enabled 2026-08-29**: a JVM under a cgroup pids cap on the
+  digest-pinned image production then ran (`eclipse-temurin:25-jre-alpine@sha256:28db6fdf…`) writes
+  `pthread_create failed (EAGAIN)` and `unable to create native thread`, both matched by the filter;
+  the three `<svc>-stdout` streams were measured carrying 1k–43k lines/24h on the host; and neither
+  the single `older_than = "167h"` drop stage nor any of the three masking replaces can touch a fresh
+  line or either phrase. The observed line is recorded verbatim beside the rule, because its wording
+  is JVM-version-dependent and a Temurin bump is the thing that would silently invalidate it. **The
+  runtime digest has moved since** (the three Dockerfiles pin `…@sha256:3137541d…` as of 2026-09-22),
+  so the re-check in [`monitoring/README.md`](../../monitoring/README.md) → *After a Temurin bump* is
+  owed.
 - **Keycloak file log** (`app="keycloak"`) — masked **in the shipper** (Alloy stages scrub
   `username=` / `ipAddress=` before ingestion).
 
@@ -649,31 +662,39 @@ not silent — so the only detector was a human reading a log export.
   reference that happens to contain `" as "` is untouched and the registry host stays readable.
   PII-free operational logging → global 744h retention, no REQ-OBS-010 IP-retention impact. Every
   `ops-automation.yml` alert description now carries the LogQL query for its stream, since that
-  description is what reaches the operator's mailbox. **Precondition:** Alloy runs with
-  `cap_drop: [ALL]` and therefore no `CAP_DAC_OVERRIDE`, so each log file must exist as
-  `0640 deploy:adm` before the unit first writes it — a `0640 root:root` file ships silently empty.
-  `docs/deployment.md` pre-creates the deploy and cleanup logs; the backup and restore-drill logs are
-  a known gap in `docs/backup.md` and are also why those two streams carry no liveness guard
-  (REQ-OBS-014).
-- **NPM access logs, SSH/host-auth logs, and the host security logs
-  (auditd `sshd_config`/`authorized_keys` tamper watches, fail2ban SSH-jail bans)** — ingested **including
-  client IPs and usernames** at a **31-day retention**. This is a deliberate,
+  description is what reaches the operator's mailbox. **Precondition:** the shipper has no
+  `CAP_DAC_OVERRIDE` in either shape — the container ran `cap_drop: [ALL]`, the host service runs as
+  the unprivileged `alloy` user — so each log file must be readable through the `adm` group. The
+  four `scripts/iri-*.logrotate` snippets rotate with `copytruncate`, under which logrotate ignores
+  their `create 0640 deploy adm` line: the live file is truncated in place and keeps whatever owner
+  and mode it had when the unit's `append:` first created it — nothing in the repository sets it
+  (corrected 2026-09-22; this sentence used to claim a `0640 deploy adm` re-create on every
+  rotation). A `0640 root:root` file ships silently empty. The backup, cleanup and restore-drill
+  streams carry no liveness guard (REQ-OBS-014).
+- **Edge access/error log, SSH/host-auth logs, and the host security logs
+  (auditd `sshd_config`/`authorized_keys` tamper watches, fail2ban SSH-jail bans)** — ingested
+  **including client IPs and usernames** at a **31-day retention**. This is a deliberate,
   owner-approved data-protection decision (2026-07-02) for security monitoring and abuse
   detection; it is conditioned on the privacy-policy extension (`privacy.html` + DE/EN
   bundles) that ships with the Phase-2 PR, and Loki is deliberately excluded from backups so
-  the GFS retention cannot silently extend those 31 days (ADR-0072).
-- **NPM container stdout** (`app="npm"`) — operational logs only (nginx reloads, cert
-  renewals, `[emerg]`/`[error]`); **no client IPs or usernames**, so no shipper masking and
-  not part of the 31-day IP-retention set. Surfaced on the SSH/host-auth dashboard's *NPM
-  errors & warnings* panel. Admin-UI login monitoring was originally planned on this stream,
-  but nginx-proxy-manager does not log admin logins to stdout and the admin UI is
-  loopback-only — descoped as an accepted gap (REQ-OBS-010).
+  the GFS retention cannot silently extend those 31 days (ADR-0072). Since ADR-0162 the native
+  edge writes access and error lines to its container stdout (`app="edge"`), which reaches Loki
+  through the container-stdout source and is deliberately **not** in `container_mask`'s selectors —
+  the client IPs are the point of the stream. The NPM-era `npm-access` / `npm-error` file tails were
+  removed from `config.alloy` on 2026-09-20.
+- **Edge-adjacent operational container stdout** (`app="acme"`, the certificate client of
+  ADR-0162) — operational lines only, **no client IPs or usernames**, so no shipper masking and not
+  part of the 31-day IP-retention set. The NPM stdout stream (`app="npm"`) it replaces has had no
+  producer since NPM was retired; `config.alloy` keeps the `npm` alternative in its relabel rule
+  only so a resurrected rollback stack would not ship unlabelled. **Known gap (2026-09-22):** the
+  *NPM errors & warnings* panel on dashboard `09-ssh-host-auth.json` still queries `{app="npm"}`
+  and therefore always reads "No data".
 - **PostgreSQL container logs** — ingested with `log_error_verbosity=terse` so `DETAIL`
   lines cannot leak row data. Both instances additionally run
   `log_line_prefix='%m [%p] %q%u@%d/%a '` (2026-07-29) so **every** line is self-attributing:
   terse strips the `HINT`, and Postgres' default `%m [%p] ` prefix identifies no sender, which
   left a bare `ERROR: column "…" does not exist at character N` indistinguishable between the
-  application, `postgres_exporter` and an interactive `docker exec psql` forensics session —
+  application, `postgres_exporter` and an interactive `podman exec … psql` forensics session —
   they all authenticate as the same `POSTGRES_USER` role. `%a` (`application_name`) is the
   discriminator: `psql` for an ad-hoc session, `PostgreSQL JDBC Driver` for the backend's Hikari
   pool, `postgres_exporter` for the scraper. `%q` suppresses the session fields for
@@ -682,18 +703,30 @@ not silent — so the only detector was a human reading a log export.
   terse PII guarantee and REQ-OBS-004 are untouched. `PostgresFatalOrPanic` matches with plain
   LogQL line filters, not a prefix-anchored regex, so it is unaffected; a future prefix change
   must re-check that.
-- **Monitoring-plane container stdout** (`app="mon-<service>"` for the monitoring services —
-  Prometheus, Grafana, Loki, Tempo, Alloy, Alertmanager, the exporters, the socket proxy; #1041
-  item 24) — shipped so a misbehaving monitoring component (Grafana and Tempo have OOM-looped in
-  prod) leaves evidence in Loki rather than only in the rotation-capped host docker-json logs. Two
+- **Monitoring-plane container stdout** (`app="mon-<service>"` for the containerised monitoring
+  services — Prometheus, Grafana, Loki, Tempo, Alertmanager, the postgres/redis/blackbox exporters;
+  #1041 item 24) — shipped so a misbehaving monitoring component (Grafana and Tempo have OOM-looped
+  in prod) leaves evidence in Loki rather than only in the host's local logs. On the Podman host
+  `alloy` and `node-exporter` are **host services**, not containers, so the `mon-alloy` /
+  `mon-node-exporter` alternatives in the relabel rule match nothing there; their own output stays in
+  the journal under their system units (`journalctl -u alloy.service`). Two
   streams carry PII and are masked **in the shipper**: `mon-grafana` (Keycloak-OIDC admin logins
   log `uname=` + e-mail) and `mon-alertmanager` (SMTP-failure lines carry the recipient e-mail),
   both scrubbed by Alloy `stage.replace` (gated by a `stage.match` on the app label) mirroring the
   Keycloak mask. The streams inherit the global 744h retention — no REQ-OBS-010 IP-retention impact
   once masked.
-- **Idle-container stale-line drop guard (2026-07-19).** Every docker-shipped container stream (the
-  `<svc>-stdout`, `mon-<service>`, `npm`, `postgres-*` streams above) flows through
-  `loki.process.container_mask`, whose first stage drops any entry older than **167h**
+- **Container stdout comes from the journal (2026-09-20).** Under rootless Podman every container
+  unit logs through the journald driver (`LogDriver=journald` in the generated units), and Alloy reads
+  it with `loki.source.journal` from the **persistent** journal at `/var/log/journal`, keyed on
+  `__journal_container_name` — the same value the compose-service label carried under Docker, so
+  every `app=` mapping and every query over it survived the switch. Two host preconditions, both
+  provisioned by `ansible/roles/basetool_host/tasks/27-observability.yml` and both silent when
+  missing: the journal must be persistent (`Storage=persistent`; a RAM-only journal under
+  `/run/log/journal` left Loki without a single container stream on cutover day), and the `alloy`
+  user must be in `systemd-journal`. `max_age = "12h"` bounds the backlog Alloy re-reads on restart.
+- **Idle-container stale-line drop guard (2026-07-19).** Every container-stdout stream (the
+  `<svc>-stdout`, `keycloak-stdout`, `mon-<service>`, `edge`, `acme`, `postgres-*` streams above)
+  flows through `loki.process.container_mask`, whose first stage drops any entry older than **167h**
   (`stage.drop older_than`, a 1 h guard below Loki's `reject_old_samples_max_age` of 168h). A near-idle
   container keeps its last stdout line at the tail, and `loki.source.docker` re-delivered that same line
   on every tailer reconnect (`could not transfer logs: unexpected EOF`); while it is younger than the
@@ -702,9 +735,12 @@ not silent — so the only detector was a human reading a log export.
   continuously (the 2026-07-18 `redis-exporter` incident — line frozen at `2026-07-11T20:05:39Z`,
   rejected from exactly +168h onward, with the two `postgres-*` exporters and `mon-alertmanager` queued
   to hit the same wall days later). Dropping such week-old operational stdout at the source is lossless
-  (Loki would reject it regardless) and generic across every current and future idle container. The file
-  streams (npm/host-auth and the 31-day IP-retention paths) do **not** pass through this processor and
-  stamp their timestamp at read time = now, so their deliberate retention is unaffected.
+  (Loki would reject it regardless) and generic across every current and future idle container. The
+  Docker tailer that caused it is gone, but the guard stays: the journal source replays a backlog on
+  every Alloy restart, so the drop bounds what is *sent* just as `max_age` bounds what is *read*. The
+  file streams (host-auth, auditd, fail2ban, the app JSON and ops logs) do **not** pass through this
+  processor and stamp their timestamp at read time = now, so their deliberate retention is
+  unaffected.
 - Loki labels stay low-cardinality (`app`, `level`, bounded `host`); log lines are never
   turned into per-user labels. The `level` label is carried by the three JSON app streams
   (`backend` / `frontend` / `ingest`), all tailed from their `logs/<app>.json` file sinks through the
@@ -714,16 +750,24 @@ not silent — so the only detector was a human reading a log export.
 
 ### REQ-OBS-008 — Monitoring plane: admin-only access, isolated cleartext carve-out
 
-- **Admin-only UIs:** Grafana is the **only** monitoring UI, published via NPM and
-  authenticated through Keycloak OIDC restricted to the realm role `Admin`
-  (`ROLES_AND_PERMISSIONS.md`). No other monitoring component (Prometheus, Alertmanager,
-  Loki, Tempo, exporters) exposes a host port or a public route; their APIs are reachable
-  only inside the isolated monitoring Docker networks.
-- **Transport:** all app/Keycloak/NPM edges stay HTTPS — Prometheus scrapes the three
+- **Admin-only UIs:** Grafana is the **only** monitoring UI, published via the native edge
+  (ADR-0162, `docker/edge/conf.d/40-grafana.conf.template`) and authenticated through Keycloak OIDC
+  restricted to the realm role `Admin` (`ROLES_AND_PERMISSIONS.md`). No other monitoring component
+  (Prometheus, Alertmanager, Loki, Tempo, exporters) has a public route. Inside the host, two ports
+  are published on **loopback only** so the host-native Alloy can reach them (`loki` on
+  `127.0.0.1:3100`, `tempo`'s OTLP receiver on `127.0.0.1:4327`, `PODMAN_LOOPBACK_PUBLISH` in
+  `generate-quadlet.py`); the host services `node_exporter` (`:9100`), `alloy` (`:12345`) and
+  `prometheus-podman-exporter` (`:9882`) bind all interfaces and are kept off the network by the
+  default-deny host firewall (`ansible/roles/basetool_host/tasks/65-firewall.yml`). Everything else
+  is reachable only inside the isolated monitoring container networks.
+- **Transport:** all app/Keycloak/edge hops stay HTTPS — Prometheus scrapes the three
   modules over HTTPS validating the pinned public certificate (no `insecure_skip_verify`).
   **Inside** the isolated monitoring networks (Prometheus→exporters, Grafana→datasources,
   Alloy→Loki/Tempo, apps→Alloy OTLP span push, →`keycloak:9000`) traffic is deliberately
-  plain HTTP. This carve-out is
+  plain HTTP. On the Podman host the Alloy legs of that list leave the container networks — the apps
+  push spans to `alloy:4318` over `AddHost=alloy:host-gateway`, Prometheus scrapes the three host
+  services the same way, and Alloy pushes to Loki/Tempo over the loopback publishes — and stay plain
+  HTTP under the same carve-out, confined to the host. This carve-out is
   owner-approved (2026-07-02, epic #936) and amends the HTTPS-only posture; the REQ-SEC-014
   wording in [`security-and-access.md`](security-and-access.md) is amended in the Phase-2 PR
   that actually creates those networks. Rationale and residual risk live in ADR-0072.
@@ -740,11 +784,12 @@ not silent — so the only detector was a human reading a log export.
   variant since its cert is not CA-signed, and `probe_ssl_earliest_cert_expiry` is still emitted).
   Their expiry gauge feeds the unfiltered `CertificateExpiringSoon` alert so an internal-cert expiry
   — which would otherwise break all three app scrapes, the frontend→backend WebClient and the
-  NPM→Grafana re-encryption at once — is caught ~14 days ahead instead of only by a same-day
+  edge→Grafana re-encryption at once — is caught ~14 days ahead instead of only by a same-day
   `TargetDown`. These probe jobs stay outside `BlackboxProbeFailed`'s liveness include-list (a down
   app is already paged by `TargetDown`), so they add no double-paging. Enforced by
   `monitoring/blackbox/blackbox.yml`, `monitoring/prometheus/prometheus.yml`
-  (`blackbox-internal-tls*` jobs) and the blackbox CA mount in `docker-compose.monitoring.yml`.
+  (`blackbox-internal-tls*` jobs) and the blackbox CA mount in `docker-compose.monitoring.yml`
+  (carried into the generated `quadlet/systemd/blackbox-exporter.container`).
 
   **What is not served** — added 2026-09-20, and this paragraph **corrects** the sentence above it,
   which read as full coverage and was not. The internal CA itself,
@@ -795,16 +840,21 @@ Tracing on the OTel SDK) behind a hard master gate:
   `management.tracing.enabled` is consumed by nothing, and an endpoint-only gate is likewise
   not possible — with the starter on the classpath, tracing would otherwise be active by
   default.
-- **Export path:** spans go via OTLP/HTTP (`MONITORING_OTLP_ENDPOINT`, Phase 2:
-  `http://alloy:4318/v1/traces` on the scrape network) to Alloy, which forwards to Tempo on
-  the core network — apps never reach the trace store directly. Sampling probability comes
+- **Export path:** spans go via OTLP/HTTP (`MONITORING_OTLP_ENDPOINT`, default
+  `http://alloy:4318/v1/traces`; Keycloak uses OTLP/gRPC on `alloy:4317`) to Alloy, which forwards
+  them to Tempo — apps never reach the trace store directly. On the Podman host Alloy is a host
+  service, so the name `alloy` resolves through `AddHost=alloy:host-gateway` on the backend,
+  frontend, ingest and keycloak units (`PODMAN_HOST_ALIASES` in `generate-quadlet.py`), and Alloy
+  forwards to Tempo's loopback publish (`IRI_ALLOY_TEMPO_ENDPOINT=127.0.0.1:4327`, REQ-OBS-019). Sampling probability comes
   from `MONITORING_TRACING_SAMPLING_PROBABILITY`, which **stays at `1.0`** — the Phase-3 review
   it was flagged for happened on 2026-08-29 (#1705) and found nothing to buy. The deciding
   number is CPU, not memory: tempo's **entire** container CPU over seven days is 0.0181 cores,
   1.81 % of one core, which bounds whatever share of it is GC. Reducing sampling would trade
   trace fidelity for a cost that is not being paid. The variable is **one setting for all three
-  modules** (`docker-compose.yml:580`, `:825`, `:971` all read it), so per-module sampling is a
-  design change and not a configuration one.
+  modules** (the `backend`, `frontend` and `ingest` services in `docker-compose.yml` all read it,
+  and so do the generated `env.d` templates), so per-module sampling is a design change and not a
+  configuration one. *(Narrowed 2026-09-13: that bound covers tempo's cost, not the span
+  construction and export cost the instrumented applications pay, which has not been measured.)*
 - **No user-identifying span data:** span names and the low-cardinality `uri` attribute use
   templated routes (`/api/v1/locations/{id}`). Each module's `ObservationPrivacyFilter`
   scrubs every URL-carrying observation key-value before it becomes a metric tag or span
@@ -873,16 +923,16 @@ Tracing on the OTel SDK) behind a hard master gate:
   > forward to the trace store is broken.
 
   An ungraceful container stop is a distinct trigger of this write-path failure
-  mode: the two dskit stores (`loki`, `tempo`) both set `stop_grace_period: 45s` so a routine
-  `deploy.sh --force-recreate` cannot `SIGKILL` them mid-drain (dskit
-  `server.graceful_shutdown_timeout` 30s) and truncate the write-ahead log (ADR-0072 amendment
-  2026-07-12). The service-graph (node graph) is lit by the metrics-generator's `service-graphs`
+  mode: the two dskit stores (`loki`, `tempo`) both set `stop_grace_period: 45s` in the compose
+  source, which the generator carries into their units as `TimeoutStopSec=45`, so a routine restart
+  cannot `SIGKILL` them mid-drain (dskit `server.graceful_shutdown_timeout` 30s) and truncate the
+  write-ahead log (ADR-0072 amendment 2026-07-12). The service-graph (node graph) is lit by the metrics-generator's `service-graphs`
   processor → Prometheus `remote_write` (#1041 item 22a, ADR-0076 amendment): it authenticates as the
   shared `grafana` web-auth user (Tempo runs `-config.expand-env`), Prometheus adds
   `--web.enable-remote-write-receiver`, cardinality is capped by `max_active_series`, and
   `TempoGeneratorRemoteWriteFailing` / `TempoGeneratorSeriesLimited` alert on a credential or
   stale-loaded-config drift (a `prometheus-web.yml` change not picked up until Prometheus/Tempo are
-  recreated) or a cardinality-cap hit. Span-metrics remote-write stays a non-goal.
+  restarted) or a cardinality-cap hit. Span-metrics remote-write stays a non-goal.
 
 ### REQ-OBS-010 — Edge / host-auth log streams: 31-day IP retention + privacy-policy linkage
 
@@ -891,12 +941,14 @@ The monitoring plane ingests four log streams **including client IPs / usernames
 [#936](https://github.com/krt-profit/basetool/issues/936), ADR-0072) for security monitoring and
 abuse detection:
 
-- **NPM edge access logs** — all public proxy hosts, client IPs (edge 4xx/5xx rates, scan/probe
-  detection, per-host traffic).
-- **SSH / host-auth logs** — `/hostlog/auth.log`, which is Debian's `/var/log/auth.log` and, on the
-  RHEL family, `/var/log/secure` bound onto that name (REQ-OBS-019): failed-auth spikes,
-  invalid users, sudo failures, successful root logins, and a successful password/keyboard-interactive
-  login on a key-only host.
+- **Edge access/error log** (`app="edge"`) — the native edge's stdout since ADR-0162, one stream for
+  all public vhosts, client IPs included (edge 4xx/5xx rates, scan/probe detection; per-vhost
+  questions are answered from the line's own host field, since NPM's per-proxy-host files are gone).
+  Until 2026-09-20 this was the NPM access-log file tail.
+- **SSH / host-auth logs** (`app="host-auth"`) — Debian's `/var/log/auth.log` or, on the RHEL
+  family, `/var/log/secure`; `config.alloy` tails both names under `/hostlog`, and on a given host
+  exactly one exists (REQ-OBS-019): failed-auth spikes, invalid users, sudo failures, successful
+  root logins, and a successful password/keyboard-interactive login on a key-only host.
 - **Host auditd log** — `/var/log/audit/audit.log`: file-integrity watch events on `sshd_config`(.d)
   and root `authorized_keys` (the acting `auid` + path; catches a smuggled key or a security
   downgrade). Ingested unmasked so the acting user stays attributable. `AuditdSshTamper` must match
@@ -909,10 +961,9 @@ abuse detection:
 - **Host fail2ban log** — `/var/log/fail2ban.log`: SSH-jail ban/unban events carrying the offending
   client IP — the active-blocking complement to the `SshFailedAuthSpike` detection.
 
-An NPM admin-UI login stream was originally planned as a fifth stream but was **descoped**:
-nginx-proxy-manager does not log admin logins to its container stdout, and the admin UI is
-loopback-only. Its stdout is still ingested — as **PII-free operational logging** (REQ-OBS-007),
-not an IP-bearing stream — and surfaced on the *NPM errors & warnings* dashboard panel.
+An NPM admin-UI login stream was originally planned as a fifth stream and **descoped**
+(nginx-proxy-manager never logged admin logins to stdout). The question has since disappeared with
+NPM itself: the native edge (ADR-0162) has no admin UI, and its configuration is in git.
 
 Binding conditions on this retention:
 
@@ -953,15 +1004,19 @@ transaction per pass) rather than per-scrape.
 
 `basetool_container_*` and `basetool_container_metrics_*` are written by
 [`scripts/cgroup-container-metrics.py`](../../scripts/cgroup-container-metrics.py) into
-node_exporter's textfile directory. They are registered here because the naming rule is
+node_exporter's textfile directory (`/var/iri/monitoring/textfile/containers.prom`), every 30 s
+under `iri-container-metrics.timer`. They are registered here because the naming rule is
 repository-wide, not module-wide: anything called `basetool_*` obeys REQ-OBS-006, whoever produces
 it. Added 2026-09-18; the collector shipped without them being written down, which made the
-vocabulary look complete while eleven series sat outside it.
+vocabulary look complete while its series sat outside it.
 
-They exist because the Podman migration deletes cAdvisor — its rootless-Podman support is closed
-upstream as *not planned* — and `prometheus-podman-exporter` is a **subset** of what cAdvisor
-published (ADR-0163). The collector supplies the remainder by reading the cgroup v2 tree, which
-needs no daemon, no socket and no privilege beyond reading `/sys/fs/cgroup`.
+They exist because the Podman migration deleted cAdvisor — its rootless-Podman support is closed
+upstream as *not planned*, and the scrape job was removed from `prometheus.yml` on 2026-09-20 — and
+`prometheus-podman-exporter` is a **subset** of what cAdvisor published (ADR-0163). The collector
+supplies the remainder by reading the cgroup v2 tree (the service user's
+`user@<uid>.service/app.slice/<name>.service` cgroups), which needs no daemon, no socket and no
+privilege beyond reading `/sys/fs/cgroup`. The exporter supplies what the cgroup tree cannot:
+container start time and network counters.
 
 | series | type | source file | replaces |
 |---|---|---|---|
@@ -972,7 +1027,8 @@ needs no daemon, no socket and no privilege beyond reading `/sys/fs/cgroup`.
 | `basetool_container_oom_kills_total` | counter | `memory.events` `oom_kill` | `container_oom_events_total` |
 | `basetool_container_memory_anon_bytes` | gauge | `memory.stat` `anon` | `container_memory_rss` |
 | `basetool_container_memory_usage_bytes` | gauge | `memory.current` | — |
-| `basetool_container_memory_working_set_bytes` | gauge | `memory.current` − reclaimable | `container_memory_working_set_bytes` |
+| `basetool_container_memory_working_set_bytes` | gauge | `memory.current` − `memory.stat` `inactive_file` | `container_memory_working_set_bytes` |
+| `basetool_container_memory_mapped_file_bytes` | gauge | `memory.stat` `file_mapped` | `container_memory_mapped_file` |
 | `basetool_container_memory_limit_bytes` | gauge | `memory.max` | `container_spec_memory_limit_bytes` |
 | `basetool_container_pids` | gauge | `pids.current` | `container_threads` |
 | `basetool_container_pids_max` | gauge | `pids.max` | `container_threads_max` |
@@ -985,9 +1041,13 @@ container set, which is a fixed list in the compose files and the Quadlet units.
 recreation, which is unbounded cardinality by definition.
 
 **Consumers.** Nothing reads these names directly. `monitoring/prometheus/alerts/containers-runtime.yml`
-normalises them and the cAdvisor families into one `basetool:container:*` set of recording rules,
-and the alerts and `02-containers.json` read that — so the cutover changes nothing downstream and
-both shapes work while the two runtimes run side by side. See REQ-OBS-014.
+normalises them, the `prometheus-podman-exporter` families (`podman_container_started_seconds`,
+`podman_container_net_{input,output}_total`, joined to `podman_container_info` for the `name`) and
+the retired cAdvisor families into one `basetool:container:*` set of recording rules, and the alerts,
+`02-containers.json` and the Redis dashboard's memory panels read that. Since `prometheus.yml` no
+longer carries a cAdvisor job, the cAdvisor half of each `or` is inert everywhere (the `cadvisor`
+and `socket-proxy` services survive only in `docker-compose.monitoring.yml`, which the generator
+translates by deleting them). See REQ-OBS-014.
 
 ##### `basetool_certificate_*` — expiry for certificates no listener serves
 
@@ -1060,46 +1120,45 @@ and a collector must not add a dependency to a box whose point is a fixed, audit
   renamed to `exported_job` — so the alerts once matched `exported_job` and one silently never fired.
   The rename splits the 180d history (old series carry `exported_job`, new ones `task`; a Grafana
   annotation marks the cutover). The last-success gauge is the source of the
-  staleness alerts — `UserSyncStale` (`user_sync`, > 26h — daily 05:00 cadence, see `app.keycloak.sync.cron`), `ExternalSyncStale` (the catalogue syncs,
-
-  > 48 h), `ScheduledJobStale` (`notification_retention` / `default_blueprint_provisioning` /
-  > `rejected_registration_retention` / `audit_retention`, > 26 h),
-  > `BankLedgerIntegritySweepStale` (`bank_ledger_integrity`, > 6 h, **critical** — while stale the
-  > violations gauge freezes and `BankLedgerIntegrityViolation` cannot fire),
-  > `JobOrderIntegritySweepStale` (`job_order_integrity`, > 6 h — same frozen-gauge trap for
-  > `JobOrderItemBlueprintDrift`) and `BusinessMetricsStale`
-  > (`business_metrics`, > 10 min); it is registered on a job's first success, so a job that has not
-  > yet succeeded in this process publishes nothing at all rather than a falsely-stale `0` (see the
-  > never-succeeded-sentinel bullet below). The items counter is present only for jobs that report a count: user sync,
-  > notification retention, default-blueprint provisioning, and — since #1041 item 2 — `uex_sync` (the
-  > `UexItemSyncService` `game_item` upsert tally, with the unchanged-catalogue carve-out below) and
-  > `scwiki_sync` (the sum of the five SC-Wiki step counts, a failing step contributing `0`; same
-  > carve-out below). For the two catalogue syncs it is populated from the same
-  > per-run tallies the sync-report summary uses and backs the `SyncZeroItems` alert, which fires when
-  > a sync records a successful run in 48 h but has processed zero rows — the empty-200 catalogue outage
-  > that neither `ExternalSyncStale` (last-success stays fresh) nor `ExternalFetchErrors` (an empty 200
-  > is not a fetch error) catches. **Restart-robust guard (2026-07-17):** the second leg is
-  > `increase(...executions_total{outcome="success"}[48h]) > 0`, not `(time() - last_success) < 172800`.
-  > The items counter is registered lazily (its 0→N birth is never scraped) and resets on each backend
-  > restart, so across restarts more frequent than the daily cadence Prometheus sees a permanently-flat
-  > items series and `increase(items[48h])` reads 0 even on a healthy sync — the old last-success leg
-  > then false-fired continuously (the 2026-07-15…17 storm; UEX was upserting ~7499 rows/run).
-  > `executions_total{outcome="success"}` shares the items counter's lazy-registration + per-restart-reset
-  > behaviour, so it cancels the false `0` while still climbing on a genuine outage; same robust shape as
-  > `UserSyncZeroItems`. **Unchanged-catalogue carve-out (`uex_sync` + `scwiki_sync`, #1182):**
-  > `UexClient` and `ScWikiClient` both do conditional GETs, so when the whole catalogue is unchanged
-  > every category/endpoint returns `304 Not Modified` and the run upserts nothing — a healthy no-op
-  > indistinguishable from an empty-200 outage by the raw upsert tally alone. To stop that false
-  > `SyncZeroItems` firing, `UexItemSyncService` reports the live catalogue size
-  > (`GameItemRepository.countLiveUexItems()`) instead of `0` when nothing was upserted but at least
-  > one category was served from the `304` cache, and each `scwiki_sync` step likewise reports its
-  > live linked-row count (`MaterialRepository.countLiveScwikiMaterials` for commodities, plus
-  > `countLiveScwikiShipTypes` / `countLiveScwikiBlueprints` / `countLiveScwikiManufacturers` /
-  > `countLiveScwikiItems` for the other steps) on an all-`304` fetch; a genuine empty-200 (no `304`
-  > at all) still reports `0` and correctly trips the alert. The same success-with-zero-work idea
-  > backs `UserSyncZeroItems`
-  > (`user_sync` synced zero users for 30 min while successful runs happened — Keycloak returned an
-  > empty roster; #1041 item 3).
+  staleness alerts — `UserSyncStale` (`user_sync`, > 26h — daily 05:00 cadence, see
+  `app.keycloak.sync.cron`), `ExternalSyncStale` (the catalogue syncs, more than 48 h),
+  `ScheduledJobStale` (`notification_retention` / `default_blueprint_provisioning` /
+  `rejected_registration_retention` / `audit_retention`, > 26 h),
+  `BankLedgerIntegritySweepStale` (`bank_ledger_integrity`, > 6 h, **critical** — while stale the
+  violations gauge freezes and `BankLedgerIntegrityViolation` cannot fire),
+  `JobOrderIntegritySweepStale` (`job_order_integrity`, > 6 h — same frozen-gauge trap for
+  `JobOrderItemBlueprintDrift`) and `BusinessMetricsStale`
+  (`business_metrics`, > 10 min); it is registered on a job's first success, so a job that has not
+  yet succeeded in this process publishes nothing at all rather than a falsely-stale `0` (see the
+  never-succeeded-sentinel bullet below). The items counter is present only for jobs that report a
+  count: user sync, notification retention, default-blueprint provisioning, and — since #1041 item 2
+  — `uex_sync` (the `UexItemSyncService` `game_item` upsert tally, with the unchanged-catalogue
+  carve-out below) and `scwiki_sync` (the sum of the five SC-Wiki step counts, a failing step
+  contributing `0`; same carve-out below). For the two catalogue syncs it is populated from the same
+  per-run tallies the sync-report summary uses and backs the `SyncZeroItems` alert, which fires when
+  a sync records a successful run in 48 h but has processed zero rows — the empty-200 catalogue outage
+  that neither `ExternalSyncStale` (last-success stays fresh) nor `ExternalFetchErrors` (an empty 200
+  is not a fetch error) catches. **Restart-robust guard (2026-07-17):** the second leg is
+  `increase(...executions_total{outcome="success"}[48h]) > 0`, not `(time() - last_success) < 172800`.
+  The items counter is registered lazily (its 0→N birth is never scraped) and resets on each backend
+  restart, so across restarts more frequent than the daily cadence Prometheus sees a permanently-flat
+  items series and `increase(items[48h])` reads 0 even on a healthy sync — the old last-success leg
+  then false-fired continuously (the 2026-07-15…17 storm; UEX was upserting ~7499 rows/run).
+  `executions_total{outcome="success"}` shares the items counter's lazy-registration + per-restart-reset
+  behaviour, so it cancels the false `0` while still climbing on a genuine outage; same robust shape as
+  `UserSyncZeroItems`. **Unchanged-catalogue carve-out (`uex_sync` + `scwiki_sync`, #1182):**
+  `UexClient` and `ScWikiClient` both do conditional GETs, so when the whole catalogue is unchanged
+  every category/endpoint returns `304 Not Modified` and the run upserts nothing — a healthy no-op
+  indistinguishable from an empty-200 outage by the raw upsert tally alone. To stop that false
+  `SyncZeroItems` firing, `UexItemSyncService` reports the live catalogue size
+  (`GameItemRepository.countLiveUexItems()`) instead of `0` when nothing was upserted but at least
+  one category was served from the `304` cache, and each `scwiki_sync` step likewise reports its
+  live linked-row count (`MaterialRepository.countLiveScwikiMaterials` for commodities, plus
+  `countLiveScwikiShipTypes` / `countLiveScwikiBlueprints` / `countLiveScwikiManufacturers` /
+  `countLiveScwikiItems` for the other steps) on an all-`304` fetch; a genuine empty-200 (no `304`
+  at all) still reports `0` and correctly trips the alert. The same success-with-zero-work idea
+  backs `UserSyncZeroItems` (`user_sync` synced zero users for 30 min while successful runs happened
+  — Keycloak returned an empty roster; #1041 item 3).
 
 - **Never-succeeded sentinel on the last-success gauge (2026-08-10).** The gauge is registered on a
   job's **first success**, seeded with that timestamp — never at run start, and never with a `0`. All
@@ -1216,7 +1275,11 @@ and a collector must not add a dependency to a box whose point is a fixed, audit
   and both the alert comment and the `monitoring/README.md` runbook row say so. Panel 44 on dashboard
   `07` plots the counter per `source`; it had no panel anywhere before. ~~**Still open:** a dedicated
   "sweep stood down" meter would let the alert drop the proxy~~ — **closed 2026-09-02** by the meter
-  below.
+  below. **Narrowed by ADR-0195 (2026-09-22):** a complete residual `/api/items` census now vouches
+  for the kind passes it contains, so an incomplete *kind* walk no longer stands the cross-kind sweep
+  down, and the proxy stopped being equivalent to a stand-down. `ScWikiCensusIncompleteStreak` still
+  fires on three incomplete walks in a row — `/api/vehicle-items` is incomplete on every run, a
+  known floor — while `ScWikiOrphanSweepStandingDown` below is the one that means the sweep stopped.
 - `basetool_catalogue_orphan_sweep_skipped_total{sweep,reason}` counter
   (`ScWikiItemSyncService`), bumped where the cross-kind `scwiki_deleted` sweep stands itself down.
   The stand-down is the correct answer to a fetch that is not a full census — sweeping a half-walked
@@ -1392,9 +1455,7 @@ and a collector must not add a dependency to a box whose point is a fixed, audit
   the operations dashboard.
 - `basetool_ratelimit_rejections_total{bucket,key_source}` counter at the `RateLimitingFilter` reject
   branch (`bucket` = the rule name, or `global` for the umbrella `/api/**` budget), paired since
-
-  # 1041 item 19 with `basetool_ratelimit_requests_total{bucket}` bumped on **every** bucket
-
+  #1041 item 19 with `basetool_ratelimit_requests_total{bucket}` bumped on **every** bucket
   evaluation, so rejections/requests is a rejection ratio (`RateLimitRejectionRatioHigh`) rather than
   429-only detection. The `key_source` tag (2026-08) is the bounded pair `forwarded` / `peer` and
   reports **which branch produced the bucket key** — a trusted-proxy `X-Forwarded-For` element or
@@ -1487,7 +1548,7 @@ and a collector must not add a dependency to a box whose point is a fixed, audit
   returned at 06:30Z while the session gauge held flat at 362–370, producing two firing/resolved
   mail pairs for an idle site. The guard sums `http_server_requests_seconds_count{job="basetool-frontend"}`
   excluding the infrastructure floor that never sleeps (`/` — a constant ~0.133 req/s of blackbox
-  probes and NPM health; `REDIRECTION` — those probes' 302 to the login; `NOT_FOUND` — scanner
+  probes and, at the time, NPM's health checks; `REDIRECTION` — those probes' 302 to the login; `NOT_FOUND` — scanner
   noise; `/actuator*`), leaving human traffic that measures 0.04–0.18 req/s on the site and exactly
   0.0 overnight, well separated by the 0.01 req/s floor. If the frontend job vanishes the guard goes
   absent and the alert stays silent by design — a full outage belongs to `TargetDown` / blackbox.
@@ -1963,23 +2024,27 @@ panel on dashboard `07` — 42 session evictions, 43 client errors by `kind`, 44
 
 ### REQ-OBS-012 — Edge posture assertions (deny / redirect / HSTS probes)
 
-Security-relevant edge configuration lives only in the NPM admin database (per-host toggles and
-Advanced snippets under `/var/iri/npm/data`), not in git — a UI misclick or a proxy-host recreate
-could silently undo it. The monitoring plane therefore **asserts** that posture continuously
-instead of trusting the one-time rollout verification:
+When this requirement was written the security-relevant edge configuration lived only in the NPM
+admin database, not in git, so a UI misclick or a proxy-host recreate could silently undo it. Since
+ADR-0162 the edge is native nginx and its configuration is in git (`docker/edge/`, rendered at start
+by `render-and-run.sh` and applied by `deploy.sh`'s `reconcile_edge`). The assertions stay, because
+git only proves what was *meant*: a template that renders differently on a host, a mis-ordered
+`location`, a stale container or a proxy in front of the edge can still serve something else. The
+monitoring plane therefore **asserts** that posture continuously from where a client stands:
 
 - **`/actuator` edge deny** — the `blackbox-edge-deny` job probes **both** `/actuator/prometheus`
-  **and** `/actuator/health` on **both** public app hosts (`profit-base.online`,
-  `ingest.profit-base.online`) with the `http_deny_404` module: probe success means the edge answers
-  exactly 404 (the live deny). The whole `/actuator` prefix is denied (`location /actuator` on the
-  NPM host), so neither the metrics surface nor the health/liveness/readiness/build-info surface is
-  internet-reachable — Prometheus reaches metrics over `net-monitoring-scrape` and the Docker
-  `HEALTHCHECK` reaches health over `localhost`, so neither needs any edge exposure. Health is
-  asserted explicitly (not only metrics) so a deny narrowed to just `/actuator/prometheus` cannot
-  silently re-expose the health surface. If any of the four probes drifts, the request reaches the
-  app endpoint (metrics → fail-closed 401; health → 200) and `EdgeActuatorDenyBroken` (critical)
-  fires — the continuous version of the ADR-0072 compensating control. The daily external
-  `edge-deny-probe.yml` re-asserts the same four URLs from a GitHub runner.
+  **and** `/actuator/health` on the three public app hosts (`profit-base.online`,
+  `ingest.profit-base.online`, `api.profit-base.online`), plus Keycloak's `/auth/health` and
+  `/auth/metrics` management surface on the app origin, with the `http_deny_404` module: probe
+  success means the edge answers exactly 404 (the live deny). The whole `/actuator` prefix is denied
+  (`location /actuator { return 404; }` in the vhost templates), so neither the metrics surface nor
+  the health/liveness/readiness/build-info surface is internet-reachable — Prometheus reaches metrics
+  over `net-monitoring-scrape` and the container health check reaches health over `localhost`, so
+  neither needs any edge exposure. Health is asserted explicitly (not only metrics) so a deny
+  narrowed to just `/actuator/prometheus` cannot silently re-expose the health surface. If any probe
+  drifts, the request reaches the app endpoint and `EdgeActuatorDenyBroken` (critical) fires — the
+  continuous version of the ADR-0072 compensating control. The daily external `edge-deny-probe.yml`
+  re-asserts the `/actuator` denies from a GitHub runner.
 - **Force-SSL redirect** — the `blackbox-force-ssl` job probes plain-HTTP port 80 of all four
   public vhosts with `http_force_ssl_redirect` (301/308 + `Location: https://…`, redirects not
   followed); `EdgeForceSslRedirectBroken` (warning) fires on drift.
@@ -1990,7 +2055,7 @@ instead of trusting the one-time rollout verification:
   (**critical**, 5 min) fires on drift. These three pages answered anonymously until the
   members-only cut-over (REQ-SEC-052, ADR-0159), and this is the only signal that says otherwise
   from where a member's browser stands: `AnonymousSurfaceSweepMvcTest` runs in-process against
-  MockMvc and stays green while a cache rule, a stale upstream or a mis-ordered NPM `location`
+  MockMvc and stays green while a cache rule, a stale upstream or a mis-ordered edge `location`
   serves the old public page. It is `critical` rather than `warning` — unlike its posture siblings,
   a drift here means member data is served to the internet, not that a working transport got
   weaker. The navigation shape is load-bearing: the same paths answer `401` to a background call by
@@ -2033,13 +2098,16 @@ instead of trusting the one-time rollout verification:
   the edge access log, which carries the user agent. Both `/app/callback` and `/app/link-help` are
   therefore excluded from the `SsePushChannelDead` traffic guard alongside the other probe targets.
 - **HSTS** — the `blackbox-hsts` job asserts `Strict-Transport-Security` on the **first**
-  response of `https://profit-base.online` (app-side HSTS, security-audit finding H-9);
-  `EdgeHstsHeaderMissing` (warning). Extended to the grafana/ingest vhosts once their
-  header posture is verified in the NPM UI.
+  response of `https://profit-base.online` (app-side HSTS, security-audit finding H-9), and
+  `blackbox-hsts-auth` does the same for the API vhost's allow-listed 401 path
+  (`http_2xx_or_401_hsts`, REQ-OBS-018); `EdgeHstsHeaderMissing` (warning, `job=~"blackbox-hsts.*"`).
+  The grafana and ingest vhosts are not HSTS-asserted.
 - **Keycloak `/admin` allow-list** — asserted **externally** by the daily
   `.github/workflows/edge-deny-probe.yml` run. The internal blackbox exporter cannot carry this
-  signal: its hairpinned probe traffic is SNAT'd to the Docker bridge gateways, which are exactly
-  the allow-listed sources, so from inside the console always looks reachable. The workflow also
+  signal: its probes never arrive from a public address — under Docker they were SNAT'd to the
+  bridge gateways, under rootless Podman they reach the edge through `host-gateway` and the
+  host-level front end — and the allow-list in `10-frontend.conf.template` names exactly the
+  container-network gateways, so from inside the console can look reachable. The workflow also
   re-asserts the `/actuator` 404 from outside.
 
 The posture jobs are separate from the `blackbox-http` liveness job; `BlackboxProbeFailed` is
@@ -2080,9 +2148,14 @@ the `blackbox-exporter` container needs its own IPv6 egress: the two nets it oth
 (`net-monitoring-core`, `net-monitoring-scrape`) are IPv4-only, so before #1252 the container had **no
 v6 route** and every probe CONNECT-failed (`probe_success=0`) purely from the missing local route —
 making `EdgeIpv6Unreachable` a **structural false positive** that fired even while the edge answered over
-IPv6. The exporter now also joins a dedicated `net-blackbox-v6` bridge (`enable_ipv6: true`, ULA subnet
-masqueraded onto the host's global v6), so the probe exercises the real edge path and the alert is a
-**true** signal. `EdgeIpv6Unreachable` (warning) fires only when a
+IPv6. The exporter now also joins a dedicated `net-blackbox-v6` network (IPv6-enabled ULA subnet;
+`quadlet/systemd/net-blackbox-v6.network` on the Podman host), so the probe exercises the real edge
+path and the alert is a **true** signal. On a rootless host that alone is not enough: a container
+cannot reach its own host through the host's public address, so the public names are aliased to
+the gateway (ADR-0196, `basetool_host_public_name_aliases`), and the IPv6 probes additionally need
+the v6 half of that alias plus pasta's v6 guest-address mapping
+(`basetool_host_public_name_aliases_v6`, `basetool_host_pasta_map_guest_addrs`). Without it the v6
+probes failed against themselves while IPv6 served correctly (fixed 2026-09-22, v1.9.2). `EdgeIpv6Unreachable` (warning) fires only when a
 vhost answers over IPv4 but not IPv6 (guarded `on(instance)` against the v4 probe, so a full outage
 pages once via `BlackboxProbeFailed`); `DnsResolutionFailed` (warning) fires when the apex or the API
 vhost stops resolving an A or AAAA record. These are reachability probes, not posture assertions — a v6-only or
@@ -2090,9 +2163,11 @@ DNS-only regression is invisible to the IPv4 liveness job.
 
 **Probe scrape timeout + `TargetDown` scoping (probe-liveness semantics).** Every blackbox `/probe`
 job carries its own `scrape_timeout: 15s` (> the 10s module timeout, well under the 30s interval), and
-the generic `TargetDown` alert is scoped to `up{job!~"blackbox-(http|edge|force|hsts|internal|dns).*"}
-== 0` — excluding all 11 `/probe` jobs while keeping the `blackbox-exporter` self-scrape and every
-non-probe target in scope. On a `/probe` job `up==0` is a **scrape-timeout artifact**, not a
+the generic `TargetDown` alert is scoped to
+`up{job!~"blackbox-(http|edge|force|members|public|hsts|internal|dns|app).*"} == 0` — excluding all
+17 `/probe` jobs while keeping the `blackbox-exporter` self-scrape and every non-probe target in
+scope. A new probe job whose name matches none of those prefixes must widen the regex in the same
+change, or its scrape-timeout artifacts page as `TargetDown`. On a `/probe` job `up==0` is a **scrape-timeout artifact**, not a
 target-down signal: the module timeout previously equalled the global `scrape_timeout` (both 10s), so a
 probe that ran to its deadline (an IPv6 connect with no v4 fallback that black-holes, or a slow
 internal-TLS handshake under the host's designed memory pressure) tipped the Prometheus→exporter scrape
@@ -2184,12 +2259,17 @@ The monitoring plane must detect its **own** silent failures — a signal that s
 without any alert noticing (frozen gauges, failed config reloads, dead log streams, absent
 series). `deploy.sh` reconciles the bind-mounted components (Prometheus/Alloy/blackbox) against the
 on-disk config on **every** healthy tick — the config-changing apply, the steady-state idempotence
-no-op, all of them — **force-recreating** a component whenever its on-disk config drifts from a
-persisted per-service snapshot of what it was last applied. (A `SIGHUP` cannot be trusted here: the
-configs are single-file bind mounts and `rsync` replaces the file by a new inode, so the container
-keeps reading the old inode until recreated — the trap behind the ingest incident below.) So a
-missed, lost or rolled-back apply **self-heals** on the next tick instead of leaving the process on a
-stale config. The Watchdog only proves the pipeline is alive, not that it is correct; the plane
+no-op, all of them — **replacing** a component's process whenever its on-disk config drifts from a
+persisted per-service snapshot of what it was last applied (`rt_monitoring_recreate` in
+`scripts/lib/container-runtime.sh`: a `systemctl --user restart` of the Quadlet unit on Podman, or
+of the system `alloy.service` for the host-native Alloy; a compose force-recreate on Docker). (A
+`SIGHUP` cannot be trusted here: the configs are single-file bind mounts and `rsync` replaces the
+file by a new inode, so the container keeps reading the old inode until it is recreated — the trap
+behind the ingest incident below.) So a missed, lost or rolled-back apply **self-heals** on the next
+tick instead of leaving the process on a stale config. Alertmanager, Loki, Tempo and Grafana are
+**not** in that reconcile: Grafana file-provisions its dashboards and the Loki ruler polls its rule
+directory, while an `alertmanager.yml`, `loki-config.yml` or `tempo.yaml` change needs a manual
+restart (`monitoring/README.md`). The Watchdog only proves the pipeline is alive, not that it is correct; the plane
 therefore alerts on:
 
 - **Config-reload failures.** A failed SIGHUP silently keeps the last-good config running.
@@ -2214,7 +2294,7 @@ therefore alerts on:
   Prometheus kept the retired `11262` target through its **inode-pinned** single-file mount, so even
   the on-disk file being correct did not help). `deploy.sh` stamps
   `basetool_monitoring_config_applied_timestamp{component="prometheus"}` (a node_exporter textfile
-  gauge) whenever it force-recreates Prometheus for a config change; `PrometheusConfigStale` (warning)
+  gauge) whenever it restarts Prometheus for a config change; `PrometheusConfigStale` (warning)
   fires when that stamp stays newer than Prometheus's own
   `prometheus_config_last_reload_success_timestamp_seconds` for 15 minutes — long enough for the
   self-healing reconcile to converge, so a persistent alert means it is *not* converging (the
@@ -2231,12 +2311,14 @@ therefore alerts on:
   drift disables its alarm** (the 2026-07-13 overnight false-positive re-fire, where the shipped-and-
   promoted v1.3.6 rule fixes lived on disk but the running Prometheus kept the old rules). `deploy.sh`
   closes this by emitting `basetool_monitoring_reconcile_disabled{component="deploy"}` (a node_exporter
-  textfile gauge) on its **own** path — `1` when the `iri-monitoring` compose project is running but the
-  reconcile is gated off, `0` when the reconcile is enabled and runs — plus a loud per-tick WARN;
+  textfile gauge) on its **own** path — `1` when the monitoring plane is running (any of the nine
+  monitoring units on Podman, the `iri-monitoring` compose project on Docker) but the reconcile is
+  gated off, `0` when the reconcile is enabled and runs — plus a loud per-tick WARN;
   `MonitoringReconcileDisabled` (warning) fires on the `== 1` gauge after 30m. Because that gauge is
   written precisely in the failure state and never depends on the applied-stamp path, it cannot be
-  self-disabled the way `PrometheusConfigStale` was. The fix is a systemd drop-in on the `iri-deploy`
-  service (`Environment=IRI_MONITORING_ENABLED=true`).
+  self-disabled the way `PrometheusConfigStale` was. The fix is `IRI_MONITORING_ENABLED=true` in the
+  host `.env`, which `deploy.sh` reads for this one key since 2026-08 (the unit declares no
+  `EnvironmentFile=`); an `Environment=` drop-in on `iri-deploy.service` still works and wins.
 - **Rule-evaluation & notification failures.** The two independent alert evaluators (Prometheus and
   the Loki ruler) must keep evaluating and delivering. `PrometheusRuleEvaluationFailures`,
   `PrometheusNotificationsDropped`, `LokiRuleEvaluationFailures`, `LokiRulerNotificationsFailing`
@@ -2250,12 +2332,14 @@ therefore alerts on:
   `loki_source_file_read_lines_total` series — a tailed file keeps its series present even when
   quiet, so absence means the file is not being tailed at all, the permission-drift failure
   `config.alloy` warns about) and `LokiWriteFailing` (shipper-side entry drops) — all warning — cover
-  it. **`LogStreamSilent` guards ten tails, each its own rule with a distinct `stream` label:**
+  it. **`LogStreamSilent` guards eight tails, each its own rule with a distinct `stream` label:**
   `host-auth`, `host-auditd`, `host-fail2ban`, `keycloak`, `backend`,
-  `frontend`, `ingest` and `ops-deploy`. It is deliberately **one rule per path, never an
-  alternation** — `absent()` returns 1 only when the selector matches *nothing*, so a combined
-  `path=~"…(backend|frontend|ingest)…"` rule would stay perfectly silent while two of the three tails
-  were dead. Three ops-automation tails are **not** guarded (`ops-backup`, `ops-cleanup`,
+  `frontend`, `ingest` and `ops-deploy`. (It guarded ten until 2026-09-20; the `npm-access` /
+  `npm-error` file tails were removed with their producer, NPM.) It is deliberately **one rule per
+  path, never an alternation** — `absent()` returns 1 only when the selector matches *nothing*, so a
+  combined `path=~"…(backend|frontend|ingest)…"` rule would stay perfectly silent while two of the
+  three tails were dead. The one exception is `host-auth`, whose `path=~"/hostlog/(auth\\.log|secure)"`
+  is an alternation over two names of which exactly one exists on a given host (Debian vs RHEL). Three ops-automation tails are **not** guarded (`ops-backup`, `ops-cleanup`,
   `ops-restore-drill`): those units are separate or optional installs, and with no file there is no
   series, so a guard would fire forever on a correctly-configured host — their liveness is covered
   metric-side by `BackupStaleOrMissing` / `ContainerCleanupStaleOrMissing` / `RestoreDrill*` instead.
@@ -2263,13 +2347,17 @@ therefore alerts on:
   firing with `reason="ingester_error"` and no other symptom is most often the idle-container stale-line
   re-delivery guarded by the `stage.drop older_than = "167h"` in `loki.process.container_mask` (see
   REQ-OBS-007) — read the exact rejected stream from Alloy's own `final error sending batch` log line
-  before touching Loki limits. The **docker-sourced** container streams — the `<svc>-stdout` set
-  (ADR-0095), `keycloak-stdout`, the `mon-*` streams, `npm` and `postgres-*` — are deliberately given
-  **no** per-stream liveness alert, for two independent reasons: neither container-stdout source
-  (`loki.source.docker`, `loki.source.journal`) exposes a per-target
-  `loki_source_file_read_lines_total` series to take `absent()` of, and a native-error
-  breadcrumb is rare by design, so a `rate()`/`absent()` liveness check on such a quiet stream would
-  be a permanent false alarm. Whole-pipeline silence is still caught by `LokiIngestSilent`.
+  before touching Loki limits. The **container-stdout** streams — the `<svc>-stdout` set
+  (ADR-0095), `keycloak-stdout`, the `mon-*` streams, `edge`, `acme` and `postgres-*` — are
+  deliberately given **no** per-stream liveness alert, for two independent reasons: neither
+  container-stdout source (`loki.source.docker` before 2026-09-20, `loki.source.journal` since)
+  exposes a per-target `loki_source_file_read_lines_total` series to take `absent()` of, and a
+  native-error breadcrumb is rare by design, so a `rate()`/`absent()` liveness check on such a quiet
+  stream would be a permanent false alarm. Whole-pipeline silence is still caught by
+  `LokiIngestSilent` — **but not partial silence**: on cutover day the journal source read a path
+  that did not exist, every container stream (the edge access log included) was missing, and
+  `LokiIngestSilent` stayed green because the file tails alone kept the ingest rate up. The
+  persistent journal is provisioned by the Ansible role for that reason (REQ-OBS-007).
 - **Dashboard provisioning.** The 13 dashboards under `monitoring/grafana/dashboards/` are
   provisioned as code with `allowUiUpdates: false`, and until 2026-08-29 (#1708) **nothing validated
   them** — no Gradle test, no CI job, no lint script. Every way they can be wrong is silent: invalid
@@ -2298,20 +2386,30 @@ therefore alerts on:
   the other looks dead, and both are healthy. Describing the panels is the fix; the rest were left
   undescribed on purpose, because 136 blanket descriptions would bury exactly these six.
 
-- **Container-metric blackout.** cAdvisor can stay "up" while emitting zero name-labelled series (a
-  real incident, CHANGELOG v1.1.1), silently blinding the container alerts. `ContainerMetricsMissing`
-  (critical) and `CoreContainerMetricsMissing` (warning) guard the named-series count;
-  `ContainerOomKilled` and `ContainerCpuThrottledHigh` (warning) surface a single OOM kill and
-  sustained CFS throttling that the coarse `ContainerRestartLoop` / `ContainerMemoryHigh` alerts
-  miss. `ContainerRestartLoop` counts restarts with `changes(container_start_time_seconds[15m]) > 3`,
-  **not** `increase()` — that metric is a start-time *gauge* (Unix epoch), so `increase()` returned the
-  epoch delta between the old and new start times and paged CRITICAL on any single restart, including a
-  routine deploy recreate of backend/frontend/ingest (fixed 2026-07-15; the sibling Grafana "Container
-  Restarts" panel already used `changes()`; locked by
-  `tests/containerrestartloop_changes_test.yml`).
+- **Container-metric blackout.** A container-metrics source can stay "up" while emitting zero
+  name-labelled series — cAdvisor did (a real incident, CHANGELOG v1.1.1), and the cgroup collector
+  can write a fresh file matching no cgroup — silently blinding the container alerts.
+  `ContainerMetricsMissing` (critical, fewer than 10 containers) and `CoreContainerMetricsMissing`
+  (warning, fewer than the 7 core app containers) count `basetool:container:present`, which either
+  source feeds (they counted cAdvisor's `container_last_seen` until 2026-09-20 and fired permanently
+  on the Podman host). `ContainerOomKilled` and `ContainerCpuThrottledHigh` (warning) surface a single
+  OOM kill and sustained CFS throttling that the coarse `ContainerRestartLoop` / `ContainerMemoryHigh`
+  alerts miss. `ContainerRestartLoop` counts restarts with `changes(…start_time…[15m]) > 3`, **not**
+  `increase()` — a start time is a *gauge* (Unix epoch), so `increase()` returned the epoch delta
+  between the old and new start times and paged CRITICAL on any single restart, including a routine
+  deploy recreate of backend/frontend/ingest (fixed 2026-07-15; the sibling Grafana "Container
+  Restarts" panel already used `changes()`; locked by `tests/containerrestartloop_changes_test.yml`).
+  **Known gap (2026-09-22):** the rule still reads cAdvisor's `container_start_time_seconds`
+  directly, which has no producer since cAdvisor was removed, so it cannot fire on the Podman host —
+  the dead-alert shape this requirement exists for. The dashboard panel already reads the
+  normalised `basetool:container:start_time_seconds` (fed by `podman_container_started_seconds`);
+  the rule and its test have to follow.
 - **Container memory pressure is measured on ANONYMOUS memory, not the working set** (amended
   2026-08-02). `ContainerMemoryHigh` (warning) fires when
-  `container_memory_rss / container_spec_memory_limit_bytes > 0.90` for 10m. It was named
+  `basetool:container:memory_anon_bytes / basetool:container:memory_limit_bytes > 0.90` for 10m —
+  cgroup `anon` from `memory.stat`, which cAdvisor published as `container_memory_rss` and the cgroup
+  collector publishes as `basetool_container_memory_anon_bytes`. The measurements below were taken
+  on the Docker host with cAdvisor's names. It was named
   `ContainerWorkingSetHigh` and divided `container_memory_working_set_bytes` by the limit until a
   plane-wide measurement showed that metric is **not an OOM predictor**: `working_set` = anon + *active*
   file pages, and the file term includes each service's own memory-mapped **binary**, which is clean,
@@ -2339,8 +2437,9 @@ therefore alerts on:
   fixed at the root by **REQ-OPS-019** (`init: true` PID-1 reaping on backend/frontend/ingest);
   `ContainerPidsHigh` (warning) is the observability complement that closes the *monitoring* blind
   spot and catches **any future** pids/task leak (a different zombie source, a thread runaway) before
-  the cap is hit. It fires when cAdvisor's `container_threads` (the cgroup `pids.current` task count)
-  exceeds **80% of that container's own `container_threads_max`** (= `pids.max`) for 10m. The
+  the cap is hit. It fires when `basetool:container:pids` (the cgroup `pids.current` task count —
+  cAdvisor's `container_threads`, now read directly by the cgroup collector) exceeds **80% of that
+  container's own `basetool:container:pids_max`** (= `pids.max`) for 10m. The
   comparison **must be cap-relative and must cover every named container** (amended 2026-07-26): the
   rule originally read `container_threads{name=~"backend|frontend|ingest|keycloak"} > 1638` and was
   blind twice over — the name list omitted every non-JVM container, and the `1638` literal (80% of
@@ -2350,46 +2449,39 @@ therefore alerts on:
   2026-07-26 it sat at 512/512 pids with 493 unreaped zombies and `pids.events max=7445`, refusing
   every fork and reporting `unhealthy` for two days **with no alert mail at all**. The root cause is
   fixed the same way as #1274 — `init: true` on the grafana service in
-  `docker-compose.monitoring.yml` — and the denominator carries a `> 0` guard so the unnamed cgroup
-  roots that export `container_threads_max=0` cannot divide to `+Inf` and permafire. Headroom is
-  ample: measured on prod, grafana read 100% while the next-highest container (tempo) sat at 12.5%.
-  It is the cgroup-level companion to `JvmThreadsHigh` and covers keycloak as defense-in-depth —
-  keycloak carries the same 2048 cap but exports no `basetool-*` Micrometer series, so
-  `JvmThreadsHigh` cannot see a pids/thread runaway in it at all. Locked by
-  `monitoring/prometheus/tests/containerpidshigh_cap_relative_test.yml`. The signal exists **only because**
-  the cadvisor `process` metric group is enabled in `docker-compose.monitoring.yml`
-  (`--disable_metrics` set to cadvisor's default minus `process`, plus `disk`; `--enable_metrics=process`
-  is wrong — it *replaces* the whole set and would blind the memory/cpu container alerts). The `disk`
-  group is additionally disabled because the host's Docker (containerd `overlayfs` snapshotter) makes
-  cAdvisor's fsHandler fail to stat per-container layers — only log noise, no usable `container_fs_*`;
-  per-container filesystem metrics are unused (host filesystem usage comes from node-exporter's
-  `node_filesystem_*`). The 2048 cap is
-  hardcoded to stay in lockstep with `JvmThreadsHigh` and the compose `pids` limit; do **not** raise
-  the cap to silence the alert.
+  `docker-compose.monitoring.yml`, which the generator carries into the unit as `PodmanArgs=--init` —
+  and the denominator carries a `> 0` guard so a cgroup exporting a zero cap cannot divide to `+Inf`
+  and permafire. Headroom is ample: measured on prod, grafana read 100% while the next-highest
+  container (tempo) sat at 12.5%. It is the cgroup-level companion to `JvmThreadsHigh` and covers
+  keycloak as defense-in-depth — keycloak carries the same 2048 cap but exports no `basetool-*`
+  Micrometer series, so `JvmThreadsHigh` cannot see a pids/thread runaway in it at all. Locked by
+  `monitoring/prometheus/tests/containerpidshigh_cap_relative_test.yml`. Under Docker the signal
+  existed only because cAdvisor's `process` metric group was enabled in
+  `docker-compose.monitoring.yml`; under Podman the cgroup collector reads `pids.current` and
+  `pids.max` directly and needs no such switch. The 2048 cap is hardcoded to stay in lockstep with
+  `JvmThreadsHigh` and the unit's `PidsLimit=`; do **not** raise the cap to silence the alert.
 - **One name per container signal, whichever runtime is serving it** (added 2026-09-18, ADR-0163).
-  The four alerts above read **normalised recording rules** —
-  `basetool:container:{memory_anon_bytes,memory_limit_bytes,pids,pids_max,oom_kills_total,cpu_periods_total,cpu_throttled_periods_total}`
-  — defined in `monitoring/prometheus/alerts/containers-runtime.yml`, not cAdvisor's series
-  directly. Each is `cAdvisor-family or cgroup-collector-family`, both reduced with `max by (name)`
+  The container alerts above read **normalised recording rules** —
+  `basetool:container:{present,memory_anon_bytes,memory_limit_bytes,memory_working_set_bytes,memory_mapped_file_bytes,cpu_usage_seconds_total,cpu_periods_total,cpu_throttled_periods_total,cpu_throttled_seconds_total,pids,pids_max,oom_kills_total}`
+  from the cgroup collector, and `basetool:container:{start_time_seconds,network_receive_bytes_total,network_transmit_bytes_total}`
+  from `prometheus-podman-exporter` — defined in `monitoring/prometheus/alerts/containers-runtime.yml`,
+  not the source series directly. Each is `cAdvisor-family or Podman-family`, both reduced by `name`
   so the two halves are substitutable and the ratio alerts divide without a runtime-specific
-  `on(...)` clause. The Podman migration renames every one of these families at once, and
-  production (Docker + cAdvisor) and the testing host (rootless Podman + the textfile collector)
-  run side by side for the length of the cutover: repointing the consumers at the new names would
-  blind production, and leaving them on the old ones ships a collector nothing reads. The `or`
-  makes the cutover invisible downstream — the left side simply stops producing samples, per
-  container, with no gap and no edit. Normalisation also **strips** cAdvisor's `id` / `image`
-  labels, so an alert keeps its identity across the cutover instead of every notification looking
-  new. Three cAdvisor panels have no cgroup equivalent and stay on the old names until
-  `prometheus-podman-exporter` lands with them (`container_memory_mapped_file`,
-  `container_start_time_seconds`, `container_network_*`); the per-alert mapping is
-  `docs/archive/PODMAN_MIGRATION_PLAN.md` → *"The seven alerts, one by one"*.
+  `on(...)` clause. The `or` existed so the cutover could be invisible downstream while production
+  (Docker + cAdvisor) and the testing host (rootless Podman) ran side by side; since the 2026-09-22
+  cutover only the right-hand side produces samples. Normalisation also **strips** cAdvisor's `id` /
+  `image` labels, so an alert kept its identity across the cutover. The dashboard panels that still
+  read cAdvisor names directly were moved onto these rules on 2026-09-22 (CHANGELOG v1.9.2 — they had
+  read "No data" since the cutover); `ContainerRestartLoop` is the one consumer left behind (above).
+  The per-alert mapping is `docs/archive/PODMAN_MIGRATION_PLAN.md` → *"The seven alerts, one by one"*.
   `ContainerCgroupCollectorStale` and `ContainerCgroupCollectorFoundNothing` (both warning) watch
   the collector itself, because a collector that stops writing — or writes a **fresh** file
-  matching zero cgroups — takes the four alerts above down with it silently, which is the failure
+  matching zero cgroups — takes the container alerts down with it silently, which is the failure
   mode the collector's own docstring names: *"an alert that never fires, which looks exactly like a
-  healthy system"*. Both are inert on a host that never runs it. All nine behaviours, including
-  the no-double-alert property during the cutover window, are locked by
-  `monitoring/prometheus/tests/container_runtime_normalisation_test.yml`.
+  healthy system"*. Both are inert on a host that never runs it. The normalisation, including the
+  no-double-alert property during the cutover window, is locked by
+  `monitoring/prometheus/tests/container_runtime_normalisation_test.yml`, and the exporter-fed
+  rules by `container_network_and_lifetime_rules_test.yml`.
 - **Alertmanager routing & root-cause suppression.** One real fault fans out into many true-positive
   downstream symptoms; the notification plane collapses them so an operator sees the cause, not the
   storm. The route groups by `alertname` only (`group_by: ['alertname']`) — grouping *also* by `job`
@@ -2405,9 +2497,13 @@ therefore alerts on:
   Cross-service symptoms that carry no shared join label (`FrontendLoginBroken`,
   `BackendCallFailureSustained`, the label-less sync-zero warnings) and the independent criticals still
   fire — inhibition suppresses the *notification*, never the firing, and criticals must keep paging.
-  The template is rendered by the runbook with `envsubst` and validated with `amtool check-config`;
-  because monitoring configs are inode-pinned bind mounts the reconcile force-recreates Alertmanager to
-  apply a change (verify `AlertmanagerConfigReloadFailed == 0` after deploy).
+  The template is rendered on the host with `envsubst` into
+  `/var/iri/monitoring/secrets/alertmanager.yml` and validated with `amtool check-config`
+  (`monitoring/README.md`). Nothing renders it automatically, and Alertmanager is **not** in
+  `deploy.sh`'s reconcile: a merged template change reaches the running process only when an operator
+  re-renders the file and restarts `alertmanager.service` (verify `AlertmanagerConfigReloadFailed == 0`
+  afterwards). The 2026-09-10 mails spaced exactly `4h + 5m` apart were this gap — the 720 h cadence
+  below had been in git for weeks and not in the process.
 - **Notification cadence — one mail per event.** Alertmanager has no acknowledged state, so a
   still-firing alert is re-notified every `repeat_interval` indefinitely. At the original 4 h
   (warnings) / 1 h (criticals) that is six respectively twenty-four identical mails a day for as long
@@ -2418,7 +2514,8 @@ therefore alerts on:
   critical lives on the **Discord** route instead, where repetition is free. Muting an alert before it
   resolves is what a time-boxed **Silence** is for, not a shorter `repeat_interval`. The cadence is
   bounded from below by Alertmanager's `--data.retention` — the notification log that remembers
-  “already sent”, default 120 h — so the compose file pins `--data.retention=744 h`; raising
+  “already sent”, default 120 h — so the service definition pins `--data.retention=744h`
+  (`docker-compose.monitoring.yml`, carried into `alertmanager.container`'s `Exec=`); raising
   one without the other silently degrades the cadence back to the retention window.
 
 **A rule whose metric has no series is a dead alert, and the build says so.** The failure mode this
@@ -2435,6 +2532,20 @@ files:
 | the bulkhead rule | `resilience4j_bulkhead_available_concurrent_calls` | same |
 | the retry rule | `resilience4j_retry_calls_total` | same |
 | `SystemdUnitFailed` | `node_systemd_unit_state` | the systemd collector talks to systemd over dbus on `/run/systemd/private`, which `--path.rootfs` does not redirect and the container did not mount |
+
+Two follow-ups, both from the Podman cutover. **`SystemdUnitFailed` is alive again**: node_exporter
+became a host service (`27-observability.yml`) and its systemd collector now reads the system
+manager — which covers `iri-deploy`, `iri-backup`, `iri-restore-drill` and the other system units,
+but **not** the application containers, which are `systemctl --user` units of the service user;
+their state comes from `prometheus-podman-exporter` (`podman_container_state` /
+`podman_container_health`). And **three more joined the table on 2026-09-22**:
+`HostMemoryPressureStalled`, `HostCpuPressure` and `HostIoPressure` read `node_pressure_*`, which
+node_exporter takes from `/proc/pressure` — and Rocky builds PSI in and switches it off
+(`CONFIG_PSI_DEFAULT_DISABLED=y`). Measured on production on cutover day: no `/proc/pressure`, zero
+`node_pressure_*` series, five `01-host` panels empty. The rule file's own comment had called an
+absent `/proc/pressure` "silent, safe" — true on Ubuntu, where PSI is on by default. The role now
+sets `psi=1` with `grubby` and deliberately does **not** reboot, so the three stay dead until the next
+boot; `ls /proc/pressure` says whether it has happened.
 
 The distinction that makes this checkable: **a lazily-created counter with no series is good news**
 — `basetool_*_errors_total` being absent means the error branch has never been taken, which is
@@ -2458,10 +2569,14 @@ groups, incl. `MonitoringReconcileDisabled`) · `monitoring/prometheus/alerts/in
 `monitoring/alertmanager/alertmanager.yml.tmpl` (route grouping + the five root-cause `inhibit_rules`) ·
 `monitoring/prometheus/tests/` (`promtool test rules` units, incl. `monitoring_reconcile_disabled_test.yml`
 and `containerrestartloop_changes_test.yml`) · `scripts/check-loki-rules.sh` (every Loki rule
-file parses and every LogQL expression is valid — a group the ruler skips alerts on nothing) · `docker-compose.monitoring.yml` (cadvisor
-`process` metric group enabling `container_threads`/`container_processes`) ·
+file parses and every LogQL expression is valid — a group the ruler skips alerts on nothing) ·
+`monitoring/prometheus/alerts/containers-runtime.yml` (the `basetool:container:*` normalisation and
+the two collector-liveness alerts) · `scripts/cgroup-container-metrics.py` +
+`iri-container-metrics.timer` and `ansible/roles/basetool_host/tasks/27-observability.yml` (the
+host-side collectors, node_exporter, the podman exporter, the persistent journal and `psi=1`) ·
 `monitoring/prometheus/prometheus.yml` (the `blackbox-exporter` self-metrics scrape job) ·
-`scripts/deploy.sh` (`reconcile_monitoring_reload(s)` self-healing force-recreate + the
+`scripts/deploy.sh` + `scripts/lib/container-runtime.sh` (`reconcile_monitoring_reload(s)`
+self-healing restart + the
 `basetool_monitoring_config_applied_timestamp` and `basetool_monitoring_reconcile_disabled` textfile
 metrics) · `scripts/deploy.test.sh` (config-apply / self-heal / reconcile-disabled self-tests) ·
 `monitoring/grafana/dashboards/13-meta-monitoring.json` (log-pipeline panels) · `monitoring/README.md`
@@ -2573,7 +2688,7 @@ falls through to `anyRequest().authenticated()`. Level changes are **not persist
 returns to the configured levels, so a forgotten `DEBUG` cannot silently outlive the incident that
 motivated it. The accepted cost of the split: a prod DEBUG dive is a **backend-only, admin-only**
 operation, and raising a frontend or ingest logger in prod is back to a config edit plus a
-force-recreate.
+redeploy.
 
 **Acceptance**
 
@@ -2648,12 +2763,14 @@ perfectly healthy while the file stays empty. All three modules therefore:
 
 ### REQ-OBS-019 — The shipper runs in two shapes, and one configuration must be true in both
 
-Alloy is a **container** on the Docker deployment and a **host systemd service** on the Podman one
-(`generate-quadlet.py` translates it, because a rootless container's supplementary groups are
-namespace groups and would lose the `adm` and `systemd-journal` reads it exists for). Both read the
-same `monitoring/alloy/config.alloy`, which ships in the config bundle. Every path, name and port in
-that file is therefore a claim about **two** environments, and on 2026-09-20 none of them held in the
-second one.
+Alloy is a **container** in the Docker shape (`docker-compose.monitoring.yml`, the pre-cutover
+production host and any local monitoring stack) and a **host systemd service** on the Podman host
+that runs production since 2026-09-22 (`generate-quadlet.py` translates it to `host-service`,
+because a rootless container's supplementary groups are namespace groups and would lose the `adm`
+and `systemd-journal` reads it exists for; the RPM from `rpm.grafana.com` is installed and pointed at
+the bundled config by `27-observability.yml`). Both read the same `monitoring/alloy/config.alloy`,
+which ships in the config bundle. Every path, name and port in that file is therefore a claim about
+**two** environments, and on 2026-09-20 none of them held in the second one.
 
 Measured on the testing host before the fix, with the service `active`, its scrape target UP and 112
 `alloy_*` series collected: `loki_source_file_read_lines_total` **absent**, all ten `LogStreamSilent`
@@ -2663,16 +2780,20 @@ healthy one at every level except the one nobody checks.
 
 **The rule: a difference between the two shapes is resolved in the host's provisioning, never by
 rewriting the shared configuration.** Those paths and names are also written into the alert rules —
-ten `LogStreamSilent` instances pin `path="/hostlog/auth.log"` and its nine siblings — so rewriting
-them would have retargeted every one of those rules silently. Three mechanisms, in order of
-preference:
+the eight `LogStreamSilent` instances pin `path="/hostlog/audit/audit.log"`, `/logs/backend/backend.json`
+and their siblings — so rewriting them would have retargeted every one of those rules silently.
+Three mechanisms, in order of preference:
 
 1. **A file or directory is elsewhere → bind it into the shape the config expects.**
-   `alloy.service.d/10-log-sources.conf` recreates `/logs/<service>` and `/hostlog` with
-   `BindReadOnlyPaths=`, one source per line rather than binding `/var/log` wholesale. This also
-   absorbs distro differences: `/var/log/secure` is bound onto `/hostlog/auth.log`, so one `app=
-   "host-auth"` stream and one alert rule serve both families. A `-` prefix marks a source allowed to
-   be absent, which a freshly provisioned host needs for the ops logs no timer has written yet.
+   `/etc/systemd/system/alloy.service.d/10-log-sources.conf` (template
+   `ansible/roles/basetool_host/templates/alloy-log-sources.conf.j2`) recreates `/logs/<service>` and
+   `/hostlog` with `BindReadOnlyPaths=` — **directory** binds, `/var/log:/hostlog` wholesale exactly
+   as the container mounts it. A first version bound each log file individually and was wrong: a file
+   bind resolves to an inode at unit start, and every one of those files is rotated, so after the
+   first rotation Alloy would have tailed a file nothing writes to. Distro differences are absorbed in
+   `config.alloy` instead: the `host_auth` source names both `/hostlog/auth.log` (Debian) and
+   `/hostlog/secure` (RHEL) under one `app="host-auth"` stream, and its `LogStreamSilent` rule matches
+   either path.
 2. **A port cannot be bind-mounted → an environment variable with the container-shape default.**
    `IRI_ALLOY_LOKI_ENDPOINT` and `IRI_ALLOY_TEMPO_ENDPOINT` default to `loki:3100` and `tempo:4317`,
    so the Docker deployment reads the identical file and is untouched; the Podman host sets them to
@@ -2682,7 +2803,8 @@ preference:
    Docker API through the socket-proxy; under Podman there is neither, so it comes from the journal
    (`loki.source.journal`, keyed on `__journal_container_name`, which podman's journald driver sets to
    the same value the compose-service label carried). Every mapping rule is otherwise unchanged, so
-   the `app=` scheme and every query over it survive.
+   the `app=` scheme and every query over it survive. The journal has to be **persistent** for that
+   path to exist; on cutover day it was not, and every container stream was missing (REQ-OBS-007).
 
 **Both directions of the boundary count.** When a service moves to the host, container-to-host and
 host-to-container are two separate problems with two separate answers, and it is the second that gets
@@ -2810,14 +2932,16 @@ re-measured in the same PR** (ADR-0173).
 > either a bounded surface label on the counter or re-ordering the logging filter.
 
 **Probes for a host that does not resolve yet.** The API vhost's liveness, IPv6 twin, `/actuator`
-edge deny, Force-SSL, HSTS and DNS A/AAAA probes are written, reviewed and deployed **staged** —
+edge deny, Force-SSL, HSTS and DNS A/AAAA probes were written, reviewed and deployed **staged** —
 present in `prometheus.yml` and the external `edge-deny-probe.yml` as commented targets — with the
-blackbox modules they need shipped live and inert. Rationale is REQ-OBS-014's: an un-staged probe of
-a host that does not exist pages `BlackboxProbeFailed` and `DnsResolutionFailed` from the minute it
-merges, and a permanently-firing channel is one an operator stops reading. The enable procedure,
-including what to verify first and which alert scopes must be widened in the same edit, is
-[`MONITORING_ROLLOUT_RUNBOOK.md`, Appendix C](../archive/MONITORING_ROLLOUT_RUNBOOK.md). Enabling is
-all-or-nothing per surface: a partially enabled probe set reads as "monitored".
+blackbox modules they need shipped live and inert, and all of them were enabled in one commit on
+2026-08-18 once the vhost resolved (procedure and record:
+[`MONITORING_ROLLOUT_RUNBOOK.md`, Appendix C](../archive/MONITORING_ROLLOUT_RUNBOOK.md), archived).
+The rule outlives that surface: an un-staged probe of a host that does not exist pages
+`BlackboxProbeFailed` and `DnsResolutionFailed` from the minute it merges, and a permanently-firing
+channel is one an operator stops reading (REQ-OBS-014). A future public surface ships its probes
+staged the same way and enables them all-or-nothing, widening the affected alert scopes in the same
+edit — a partially enabled probe set reads as "monitored".
 
 The liveness probe deliberately targets an **allow-listed path that answers 401**
 (`/api/v1/terms/status`), not the vhost root: the vhost is a default-deny allow-list that 404s its
@@ -2845,7 +2969,7 @@ loosening the frontend's `http_2xx_hsts` assertion.
 - [x] `ApiUnknownClient` fires on sustained `other` traffic, stays silent for known clients at any
   volume, and does not claim the `none` series (`tests/apiunknownclient_scope_test.yml`).
 - [x] The staged probes are enabled and `EdgeHstsHeaderMissing` is widened to
-  `job=~"blackbox-hsts.*"` in the same edit (2026-08-18, runbook Appendix C). Their **green** state
+  `job=~"blackbox-hsts.*"` in the same edit (2026-08-18, archived runbook Appendix C). Their **green** state
   is a deploy-time observation, not a repo property: confirm every new `blackbox-*` target is `up`
   with `probe_success == 1` after the config reaches production.
 - [ ] The staged `ApiClientAttributionBlind` rule is enabled once a week of production data shows the

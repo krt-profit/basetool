@@ -1,6 +1,6 @@
 # ADR-0138 — The Terms-of-Use wording is a backend resource, readable without a token
 
-- **Status:** Proposed
+- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since v1.7.7 (2026-09-09) at the latest (`GET /api/v1/terms/document` in `SecurityConfig`, `TermsDocumentStructureTest`).
 - **Date:** 2026-08-19
 - **Related:** [ADR-0136](0136-external-contract-set-for-shipped-clients.md) (the contract set this
   joins) · [ADR-0135](0135-public-api-vhost-not-a-gateway.md) (the allow-list this appears on) ·

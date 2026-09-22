@@ -158,8 +158,8 @@ class ExternalContractTest {
    * server actually serves and not what someone believed it served.
    */
   /**
-   * The nginx include that decides what the internet can reach through the API vhost — the source of
-   * truth since 2026-09-12 (ADR-0162), applied by the deploy reconcile.
+   * The nginx include that decides what the internet can reach through the API vhost — the source
+   * of truth since 2026-09-12 (ADR-0162), applied by the deploy reconcile.
    */
   private static final String ALLOW_LIST = "docker/edge/include/api-allowlist.conf";
 
@@ -1494,7 +1494,8 @@ class ExternalContractTest {
               // request for
               // OPEN + IN_PROGRESS, split on the device.
               .addressedBy(Set.of("status:array", "page:integer", "size:integer")),
-          // The squadron-wide list, admitted at the edge on 2026-09-08 (API vhost runbook phase U). Same
+          // The squadron-wide list, admitted at the edge on 2026-09-08 (API vhost runbook phase U).
+          // Same
           // envelope and same row as `/my-orders` -- the app switches between them without a
           // second mapping -- plus `owner`, which is the whole reason it reads this one: a card
           // that does not name its owner is useless the moment foreign runs are on screen.
@@ -2035,7 +2036,8 @@ class ExternalContractTest {
           // REQ-APP-BANK-017, design ch. 12 artboard 10, shipped 2026-08-30 -- and refused by the
           // edge ever since, on a stem whose `/settings` GET is admitted. So the section drew its
           // current values correctly and every write answered 404. `approval-limit` appeared
-          // NOWHERE in the API vhost runbook: not admitted, and not among the deliberate exclusions either.
+          // NOWHERE in the API vhost runbook: not admitted, and not among the deliberate exclusions
+          // either.
           //
           // All four leaves answer the account's whole settings object, which is why their frozen
           // response set is the same one `/settings` carries above -- the section redraws from the
@@ -3579,9 +3581,9 @@ class ExternalContractTest {
   /**
    * The allow-list, as predicates over a concrete URI.
    *
-   * <p>Two rule shapes appear in the allow-list and both are honoured: {@code $uri = "…"} is an exact
-   * comparison, {@code $uri ~ "…"} a regular expression. Anything else on a {@code krt_api_allowed
-   * 1} line is ignored rather than guessed at.
+   * <p>Two rule shapes appear in the allow-list and both are honoured: {@code $uri = "…"} is an
+   * exact comparison, {@code $uri ~ "…"} a regular expression. Anything else on a {@code
+   * krt_api_allowed 1} line is ignored rather than guessed at.
    *
    * @return one predicate per parsed rule
    * @throws IOException if the allow-list cannot be read

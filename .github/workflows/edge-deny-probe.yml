@@ -1,11 +1,11 @@
 # External deny assertions for the public edge (REQ-OBS-012).
 #
 # Why a GitHub Action and not the blackbox exporter: the Keycloak /auth/admin lockdown is an nginx
-# allow-list matching the pinned Docker bridge gateways (docs/deployment.md → "Keycloak Admin
-# Console via SSH tunnel"). Probe traffic from the internal blackbox exporter hairpins through
-# the host and is SNAT'd to exactly those gateways, so from inside the console ALWAYS looks
-# reachable — only a genuinely external vantage point (a GitHub-hosted runner) can assert the
-# deny. The /actuator check duplicates the internal blackbox-edge-deny probe from outside as a
+# allow-list admitting only addresses that originate on the host itself — the container-bridge
+# gateways and, behind the haproxy PROXY-protocol front end, loopback (docs/deployment.md →
+# "Keycloak Admin Console via SSH tunnel"). Probe traffic from the internal blackbox exporter
+# reaches the edge from the host side, so from inside the console ALWAYS looks reachable — only a
+# genuinely external vantage point (a GitHub-hosted runner) can assert the deny. The /actuator check duplicates the internal blackbox-edge-deny probe from outside as a
 # cross-check. A failing run notifies the repository owner via GitHub's workflow-failure e-mail.
 name: Edge deny probe
 
@@ -74,7 +74,7 @@ jobs:
           # The internal blackbox-members-only job asserts the same thing, and this run is the
           # cross-check from a vantage point that shares nothing with it: no Docker bridge, no
           # hairpin, no local resolver. What both are really watching for is a cache rule or a
-          # mis-ordered NPM `location` serving the old page — which republishes the roster and
+          # mis-ordered edge `location` serving the old page — which republishes the roster and
           # leaves every in-process test green, because those run against MockMvc.
           #
           # Sent as a navigation on purpose. The same paths answer 401 to a background call by
@@ -100,11 +100,12 @@ jobs:
         run: |
           # The counterpart to the runbook's manual § D.3a check, run nightly from outside.
           #
-          # This is the only vantage point that can see it. The allow-list lives in NPM's admin
-          # database, so no PR and no in-repo test can read it -- and the failure it produces has
-          # no other signal at all: a path that was never pasted answers 404 exactly like a path
-          # that was never meant to be there, and the app's screen simply goes blank. That is not
-          # hypothetical. A half-applied paste shipped a mission-detail 404 while the read-only
+          # This is the only check of what the LIVE edge answers. The allow-list is
+          # docker/edge/include/api-allowlist.conf since ADR-0162, and in-repo gates read that
+          # file (probe-vs-allowlist, ExternalContractTest) -- but a path missing on the running
+          # edge answers 404 exactly like a path that was never meant to be there, and the app's
+          # screen simply goes blank. That is not hypothetical: when the list still lived in NPM's
+          # admin database, a half-applied paste shipped a mission-detail 404 while the read-only
           # guard from the same block was live, and it was found by hand.
           #
           # Failing in the other direction matters more: a path that starts answering 2xx where
@@ -191,26 +192,20 @@ jobs:
             probe GET "$p" 401
           done
 
-          # Anonymous by design, and the reason REQ-SEC-037 exists: these are catalogues the public
-          # web frontend already renders. A 401 here is not a security problem but a broken picker.
+          # Once anonymous catalogues (REQ-SEC-037); since ADR-0159 there is no anonymous surface
+          # beyond version-policy and the terms document, so an anonymous caller gets 401 like
+          # everywhere else. A 404 would mean the allow-list lost the picker; a 200 an anonymous
+          # read that REQ-SEC-052 forbids.
           probe GET /api/v1/ship-types 401
           probe GET /api/v1/materials/search 401
           probe GET /api/v1/locations/search 401
           # Phase M - the create form's write and its two mandatory pickers. All three must reach
           # the backend; the org-wide list and the extractor import must not.
           #
-          # Only the write is refused with a 401. Both pickers were first written down as 401 too,
-          # on the assumption that a mandatory field of a gated form must be gated like the form
-          # around it -- and the backend has never answered that on either. The vhost admits all
-          # three; what differs is the layer that judges the caller, and each of the two is what
-          # the role matrix already recorded (ROLES_AND_PERMISSIONS.md, "Read master data"):
-          #   /locations/refineries -> 403. /api/v1/locations/** is permitAll in the chain, so the
-          #     request is dispatched and the method-level isAuthenticated() refuses it at the
-          #     method seam, which GlobalExceptionHandler renders as 403. Identical in shape and in
-          #     number to /locations/home-locations, probed further down.
-          #   /refining-methods -> 200. An anonymous master-data catalogue with no method gate, the
-          #     same family as /ship-types, /materials/search and /locations/search probed above:
-          #     method names and their UEX ratings, no member, org unit or order anywhere in it.
+          # All three answer 401. The vhost admits them, and since ADR-0159 the chain refuses every
+          # anonymous caller before dispatch. (Before that the two pickers answered differently:
+          # /locations/refineries 403 from the method seam and /refining-methods 200 as an
+          # anonymous catalogue. Neither surface exists any more.)
           probe POST /api/v1/refinery-orders 401
           probe GET /api/v1/locations/refineries 401
           probe GET /api/v1/refining-methods 401
@@ -222,7 +217,7 @@ jobs:
           probe POST /api/v1/refinery-orders/import-extract 404
           probe GET "/api/v1/materials/$nil/terminals" 401
 
-          # Refused at the method seam, which renders 403 rather than 401.
+          # 401 from the chain since ADR-0159 (it used to be a 403 from the method seam).
           probe GET /api/v1/locations/home-locations 401
 
           # The writes themselves. Each must reach the backend and be refused there -- a 405 would
@@ -288,10 +283,9 @@ jobs:
           probe DELETE "/api/v1/orders/$nil" 405
           probe DELETE "/api/v1/operations/$nil" 405
 
-          # Phase S - the four pickers, and they answer FOUR different ways. Grouping them is what
-          # hid that: /orders/** and /operations/** are authenticated (401), GET /missions/** is
-          # permitAll so the method seam refuses it (403), and /job-types is anonymous by design
-          # (200, REQ-SEC-037 - a role-name catalogue, like /ship-types).
+          # Phase S - the four pickers. They once answered three different ways (401, a 403 from the
+          # method seam for /missions, 200 for the anonymous /job-types catalogue); since ADR-0159
+          # every one is refused by the chain with 401. A 404 means the allow-list lost a line.
           probe GET /api/v1/orders/lookup 401
           probe GET /api/v1/operations/lookup 401
           probe GET /api/v1/missions/lookup 401
@@ -322,9 +316,9 @@ jobs:
           probe PATCH "/api/v1/inventory/$nil/allocation" 401
           probe DELETE "/api/v1/inventory/$nil/allocation" 401
 
-          # Phase V - the Einsatz planning set. The writes are all 401, and the ONE read is not:
-          # GET /api/v1/missions/** is permitAll, so unit-ship-options is dispatched and refused at
-          # the method seam with a 403 - the same seam /missions/lookup met in phase S.
+          # Phase V - the Einsatz planning set. All 401, the one read (unit-ship-options) included:
+          # since ADR-0159 the chain refuses an anonymous GET under /missions before dispatch, as it
+          # does /missions/lookup in phase S.
           probe GET "/api/v1/missions/$nil/unit-ship-options" 401
           for leaf in core schedule flags; do
             probe PATCH "/api/v1/missions/$nil/$leaf" 401

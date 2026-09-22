@@ -237,8 +237,8 @@ groups:
           summary: "Edge 5xx spike"
           description: "The edge access log shows an elevated 5xx rate — catches upstream failures app metrics cannot see."
 
-      # 429s come from the edge limiter (REQ-SEC-023, limit_req/limit_conn in the custom
-      # server_proxy.conf snippet) or the backend Bucket4j limiter passing through the edge —
+      # 429s come from the edge limiter (REQ-SEC-023, limit_req/limit_conn in
+      # docker/edge/include/limits.conf) or the backend Bucket4j limiter passing through the edge —
       # either way a sustained rate means someone is flooding or brute-forcing.
       - alert: EdgeRateLimitSpike
         expr: sum(rate({app="edge"} |~ " 429 " [5m])) > 1

@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Dokumentation: vollständig gegen den Code geprüft, umgesetzte Pläne archiviert.** Specs, ADRs,
+  arc42, Betriebs- und Rollen-Dokumente beschreiben jetzt den Stand nach dem Podman-Umzug;
+  `docs/deployment.md` ist dafür neu geschrieben. Erledigte Pläne und einmalige Runbooks liegen
+  gesammelt in `docs/archive/`. Rein dokumentarisch.
+
+### Fixed
+
+- **Betrieb: der monatliche Bankbericht liest die Zahlen wieder.** Das Abfrageskript rief auf dem
+  neuen Server noch `docker exec` auf und wäre beim nächsten Lauf gescheitert; es nutzt jetzt
+  Podman. Rein betriebsseitig.
+
 ## [v1.9.2](https://github.com/krt-profit/basetool/releases/tag/v1.9.2) - 2026-09-22
 
 ### Fixed

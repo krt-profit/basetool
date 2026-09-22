@@ -1,10 +1,10 @@
 ; systemd service for the periodic Profit Basetool deploy check.
 ;
-; Installation (on the production host, one-time):
-;   sudo cp /var/iri/code/scripts/iri-deploy.service /etc/systemd/system/
-;   sudo cp /var/iri/code/scripts/iri-deploy.timer   /etc/systemd/system/
-;   sudo systemctl daemon-reload
-;   sudo systemctl enable --now iri-deploy.timer
+; Installation is by the Ansible role (ansible/roles/basetool_host/tasks/25-scripts.yml), not by
+; hand: it copies this unit and iri-deploy.timer to /etc/systemd/system/, verifies them with
+; `systemd-analyze verify`, and enables the timer without starting it -- the first deploy on a host
+; is an operator's decision (docs/deployment.md -> "Bootstrapping a host"). A changed unit reaches
+; the host the same way (docs/deployment.md -> "Updating the operational scripts and units").
 ;
 ; Force an immediate run (bypassing the next scheduled tick):
 ;   sudo systemctl start iri-deploy.service
@@ -15,19 +15,19 @@
 ;   tail -f /var/log/iri-deploy.log         # what the script actually printed
 ; Off-host (no SSH needed): Grafana -> Explore -> Loki, `{app="ops-deploy"}`.
 ;
-; The unit deliberately runs as a dedicated `deploy` user (no shell, no sudo) —
-; not as root. It is a member of the `docker` group so it can invoke
-; `docker compose` without sudo. Be honest about what that bounds: docker-group
-; membership is effectively root-equivalent on the host (the group can bind-mount
-; `/` into a container and escape), so the `deploy` user is NOT a hard privilege
-; boundary against a fully-compromised deploy.sh. What DOES bound the blast radius
-; is: (1) the host-side cosign signature gate (REQ-OPS-015) — deploy.sh refuses to
-; run an image not signed by our release-images identity, so a moved `:stable` tag
-; or a compromised GHCR pull token cannot get attacker code executed here; and
-; (2) the systemd sandbox below, which confines deploy.sh's own process.
-; Further hardening deferred (would reduce the docker-group surface itself):
-; routing docker access through a read-restricted docker-socket-proxy, or moving
-; to rootless Docker. See docs/deployment.md → "Docker access hardening".
+; The unit deliberately runs as a dedicated `deploy` user (no shell, no password
+; sudo) — not as root, and not as the rootless service user `iri` that owns the
+; containers. It reaches them only through /etc/sudoers.d/basetool-deploy
+; (ansible/roles/basetool_host/tasks/22-deploy-user.yml): `podman *` and
+; `systemctl --user *` as `iri`, plus `systemctl restart alloy.service` as root.
+; Be honest about what that bounds: `podman *` as `iri` is full control of the
+; application's containers and data, so `deploy` is NOT a hard boundary around the
+; application against a fully-compromised deploy.sh — only around the host, which
+; the retired Docker host's root-equivalent `docker` group was not. What bounds the
+; blast radius is: (1) the host-side cosign signature gate (REQ-OPS-015) — deploy.sh
+; refuses to run an image not signed by our release-images identity, so a moved
+; `:stable` tag or a compromised GHCR pull token cannot get attacker code executed
+; here; and (2) the systemd sandbox below, which confines deploy.sh's own process.
 
 [Unit]
 Description=Profit Basetool — pull and apply latest GHCR images
@@ -50,10 +50,10 @@ After=network-online.target docker.service
 [Service]
 Type=oneshot
 
-# The `deploy` user is created during host bootstrap (see docs/deployment.md).
-# Group `docker` is required to invoke `docker compose` without sudo. The
-# user has NO sudo grants and a `/sbin/nologin` shell — interactive use is
-# impossible.
+# The `deploy` user is created by the Ansible role
+# (ansible/roles/basetool_host/tasks/22-deploy-user.yml) with a `/sbin/nologin`
+# shell — interactive use is impossible — and no sudo beyond the bridge named in
+# the header.
 User=deploy
 # NOT `Group=docker`. That group does not exist on a rootless-Podman host, and a unit naming a
 # group that does not exist refuses to start -- so all four of these were unstartable on the
@@ -154,7 +154,7 @@ LockPersonality=true
 # that would let this account reconfigure the host, load code into the kernel, or read another
 # process's memory. That is a real restriction, and it is one that can be stated exactly.
 CapabilityBoundingSet=~CAP_SYS_ADMIN CAP_SYS_MODULE CAP_SYS_RAWIO CAP_SYS_BOOT CAP_SYS_TIME CAP_NET_ADMIN CAP_MAC_ADMIN CAP_MAC_OVERRIDE CAP_SYS_PTRACE
-# The script talks to the docker socket over AF_UNIX and makes outbound HTTPS
+# The script talks to local sockets (sudo, the user's systemd bus, podman) over AF_UNIX and makes outbound HTTPS
 # (GHCR pulls + cosign's Sigstore reach) over AF_INET/AF_INET6; AF_NETLINK covers
 # routing/interface lookups the CLIs do at startup. Everything else is denied.
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
@@ -174,9 +174,9 @@ SystemCallArchitectures=native
 SystemCallFilter=@system-service @mount
 SystemCallErrorNumber=EPERM
 # The script writes ONLY to these paths (everything else is read-only under
-# ProtectSystem=strict). Deliberately NOT the whole /var/iri: the DB / redis / npm
-# bind mounts under /var/iri are written by the containers via the root daemon,
-# out-of-band from this sandbox, so deploy.sh needs no write access to them.
+# ProtectSystem=strict). Deliberately NOT the whole /var/iri: the DB / redis
+# bind mounts under /var/iri are written by the containers, which run as the
+# service user outside this sandbox, so deploy.sh needs no write access to them.
 #   /var/lib/iri/       — state files (digest pins, last-deployed marker, the
 #                         config-stage/ + config-previous/ dirs, config-blocked.marker,
 #                         the DOCKER_CONFIG credential + the $HOME/.sigstore cosign cache)
@@ -199,7 +199,7 @@ ReadWritePaths=/etc/containers/systemd/users /var/lib/iri /var/log /var/lock /va
 
 # Hard memory and CPU caps so a runaway script cannot starve the production
 ; stack of resources during a deploy. Generous on purpose — the actual work
-; is delegated to docker, the script itself is a thin wrapper.
+; is delegated to the container runtime, the script itself is a thin wrapper.
 MemoryMax=512M
 CPUQuota=200%
 

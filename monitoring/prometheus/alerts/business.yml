@@ -458,16 +458,15 @@ groups:
 
       # (#1041 item 6) Authorization-probing signal: 401 (UNAUTHENTICATED) is charted, 403 was not.
       # baseline-tune: 0.2/s is an initial guess; 403s occur normally, so tune against the baseline
-      # week. Two known-benign sources, neither of which may be absorbed by raising the threshold:
+      # week. One known-benign source, which may not be absorbed by raising the threshold:
       #   - Mission-surface refusals for a caller outside the owning scope (the canSeeMission /
       #     canAccessParticipant checks, REQ-SEC-018). NOTE this is NOT "guest field redaction", which
       #     the earlier version of this comment claimed: redaction answers 200 with fields stripped
       #     and never produces a 403 at all (corrected 2026-09-02).
-      #   - The nightly edge-deny probe (.github/workflows/edge-deny-probe.yml, 17 5 * * * UTC), which
-      #     asserts 403 on exactly four paths — /api/v1/locations/refineries, /locations/home-locations
-      #     and the two /api/v1/missions/{id}/finance-entries reads. Up to four per run, ~0.013/s: it
-      #     cannot satisfy `for: 10m` and is therefore never what is firing this. Its backend log
-      #     signature is written up under REQ-SEC-037.
+      # The nightly edge-deny probe (.github/workflows/edge-deny-probe.yml) is NOT a source: it calls
+      # anonymously, and since ADR-0159 every anonymous refusal it asserts is a 401
+      # (code="UNAUTHENTICATED"), never an ACCESS_DENIED 403. It used to assert 403 on four
+      # method-seam paths; that stopped with ADR-0159 (corrected 2026-09-22).
       - alert: AccessDeniedSpike
         expr: sum by (application) (rate(basetool_http_error_total{code="ACCESS_DENIED"}[5m])) > 0.2
         for: 10m
@@ -1200,8 +1199,11 @@ groups:
           summary: "Sustained frontend→backend call failures"
           description: "The frontend's backend-call failure rate has been elevated for 10 minutes ({{ $value }}/s)."
 
-      # (#1041 item 1) Ingest handoff relay health. WoltLab is the account source of truth, so a dead
-      # relay means identity-data drift that otherwise only surfaces much later via user-sync staleness.
+      # (#1041 item 1) Ingest handoff relay health. The ingest gateway relays a desktop extractor's
+      # payload (a refinery extract) to the backend and stages the returned draft for a one-time
+      # browser pickup (IngestService, REQ-INGEST-001); a dead relay means members' extractor imports
+      # silently fail to arrive. (Corrected 2026-09-22: this comment used to describe a "WoltLab"
+      # account sync, which does not exist -- the user sync is Keycloak -> backend.)
       # The metrics (basetool_ingest_handoff_total/_errors_total) already ship from the ingest module.
       # baseline-tune: 0.05/s error rate is the issue's initial threshold.
       - alert: IngestHandoffErrors
@@ -1211,7 +1213,7 @@ groups:
           severity: warning
         annotations:
           summary: "Ingest handoff errors ({{ $labels.reason }})"
-          description: "The ingest gateway is failing to relay handoffs (reason: {{ $labels.reason }}) at an elevated rate — WoltLab identity data may be drifting from basetool."
+          description: "The ingest gateway is failing to relay handoffs (reason: {{ $labels.reason }}) at an elevated rate — extractor imports are not reaching the backend, so members' uploads fail."
 
       - alert: IngestBackendUnavailable
         expr: rate(basetool_ingest_handoff_errors_total{reason="backend_unavailable"}[5m]) > 0

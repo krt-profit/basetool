@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-30.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
 > **Owner area:** OPS · **Related ADRs:** [ADR-0056](../adr/0056-offsite-encrypted-backup-to-nextcloud.md)
 
 # Backup & disaster recovery
@@ -6,8 +6,8 @@
 ## Context & goal
 
 The production host carries irreplaceable state — two PostgreSQL databases (the backend
-`krt_basetool` and the Keycloak `keycloak` realm/users), the nginx-proxy-manager
-configuration, and a handful of host secrets — but until this spec there was **no automated
+`krt_basetool` and the Keycloak `keycloak` realm/users), the edge's TLS certificates and ACME
+account, the monitoring plane's state, and a handful of host secrets — but until this spec there was **no automated
 backup of any of it**. A lost or corrupted host, a bad migration, an accidental delete, or a
 ransomware event would be unrecoverable.
 
@@ -43,6 +43,8 @@ nothing is pulled or exposed), consistent with the pull-only host posture of REQ
 - [ ] After each upload the job runs `restic forget --keep-daily 7 --keep-weekly 4 --keep-monthly 6
   --prune` and `restic check`.
 - [ ] The job opens no listening socket and requires no inbound access to the host.
+- [ ] A successful run writes `basetool_backup_last_success_timestamp`; `BackupStaleOrMissing`
+  pages when it is older than 26 h or absent, so a failed or never-run backup is not silent.
 
 **Enforced by:** `scripts/backup.sh` · `scripts/iri-backup.{service,timer}` · **Runbook:** [`docs/backup.md`](../backup.md)
 
@@ -54,7 +56,7 @@ services** (`frontend`, `backend`, `ingest`) for the **dump only**, then restart
 the slow upload — so the user-facing window is the dump duration (seconds), never the upload.
 The quiesce must (a) happen inside the **04:00–05:00** window, (b) be as short as possible, (c)
 **guarantee the stack is restarted** even if a dump step fails, and (d) **coordinate with the
-deployer** so a deploy tick cannot recreate containers mid-backup. NPM stays up throughout and
+deployer** so a deploy tick cannot recreate containers mid-backup. The edge stays up throughout and
 serves the existing maintenance page. An operator may opt into a zero-downtime online dump
 (`--no-quiesce`), accepting only the benign theoretical cross-database edge case.
 
@@ -76,10 +78,17 @@ accidental. **Captured:** `pg_dump -Fc` of `krt_basetool`; `pg_dump -Fc` of `key
 source of truth — **not** the sanitized `realm-export.json`); the **edge's TLS material and ACME
 account state** (the `edge-certs`, `edge-acme-state` and `edge-acme-webroot` volumes); and the host
 secrets/config needed to stand the stack up (`.env`, `keystore.p12`, `realm-export.json`,
-`keycloak/providers`, and the **redis `users.acl`**). **Excluded by design:** Redis *session* data —
-`appendonlydir` and `dump.rdb`, which transparently re-login — logs, and the WireGuard `wg0.conf`
-key, which the operator backs up **out-of-band** (irreplaceable, but must not ride the same channel
-as the application data, by owner decision).
+`keycloak/providers`, and the **redis `users.acl`**); and the monitoring plane (ADR-0072) — the
+Grafana SQLite database, the rendered monitoring secrets/certs, the Alertmanager state, and a weekly
+Prometheus TSDB snapshot. **Excluded by design:** Redis *session* data — `appendonlydir` and
+`dump.rdb`, which transparently re-login — logs, and the Loki log store (its GFS retention would
+silently extend the approved 31-day IP retention, ADR-0072); Tempo traces and exporter data are
+regenerable.
+
+> **Corrected 2026-09-22:** earlier revisions also excluded "the WireGuard `wg0.conf` key", to be
+> backed up out-of-band. A read-only check of the production host on 2026-09-22 found no WireGuard
+> on it at all — the management VPN was never built
+> ([`MGMT_VPN_PLAN.md`](../archive/MGMT_VPN_PLAN.md)) — so there is nothing to exclude.
 
 > [!warning] Two of those were added on 2026-09-18, and their absence was a live gap
 > This paragraph named *"the nginx-proxy-manager state (`/var/iri/npm` = SQLite config + Let's
@@ -104,24 +113,25 @@ as the application data, by owner decision).
 
 Because `keystore.p12` is delivered root-owned and **not** world-readable (mode `0640` + a uid-1000
 POSIX ACL — REQ-OPS-016, #1018), the backup — which runs as the unprivileged `deploy` user — reads it
-through a throwaway **root helper container** (the same mechanism already used for the root-owned NPM
-bind mount and `grafana.db`), never a direct `cp`. A direct copy `EACCES`es and, under `set -e`, aborts
+through a throwaway **helper container** (the same mechanism used for the edge volumes, the redis
+ACL, `realm-export.json` and `grafana.db`; under rootless Podman it runs as the service user, whose
+namespace root can read them), never a direct `cp`. A direct copy `EACCES`es and, under `set -e`, aborts
 the *entire* run — the 2026-07-06 regression, where tightening the keystore mode silently killed the
 whole off-site backup, DB dumps included. A keystore read failure is therefore logged and **skipped**,
 never fatal, so the irreplaceable database dumps always reach the repo.
 
 Because the host-config archive carries the live secrets (`.env`, `keystore.p12`, `realm-export.json`,
-the `keycloak/providers` JARs), a restore that follows a **suspected host compromise** (ransomware is
-a named DR driver, above) restores *potentially-exposed* secrets. Such a restore must therefore be
+the `keycloak/providers` JARs, the redis ACL), a restore that follows a **suspected host
+compromise** (ransomware is a named DR driver, above) restores *potentially-exposed* secrets. Such a restore must therefore be
 followed by **rotation** of the restored secrets — the DB/Redis/Keycloak-admin passwords, the OIDC
 client secrets, the SPI shared secret, the internal keystore, and the GHCR pull token — not treated
 as clean. A restore for hardware loss / accidental deletion (no compromise suspected) does not.
 
 **Acceptance**
 
-- [ ] A backup contains both database dumps, the NPM archive, and the host-config archive.
-- [ ] `wg0.conf` and the Redis dump are **not** in the backup set; the runbook documents the
-  operator's out-of-band responsibility for `wg0.conf`.
+- [ ] A backup contains both database dumps, the three `edge-*` volume archives, the host config
+  (including `users.acl`), and — where the monitoring stack runs — the monitoring artifacts.
+- [ ] Redis session data and the Loki log store are **not** in the backup set.
 - [ ] The Keycloak DB dump — not `realm-export.json` — is the documented restore source for
   realm/users/clients.
 - [ ] The restore runbook documents that a **compromise-driven** restore must be followed by
@@ -153,6 +163,8 @@ content, so nothing it logs can carry a key — and reports each through
   exits non-zero (`failed`).
 - [ ] A snapshot missing the edge certificates, the ACME state or the redis ACL reports
   `artifact_ok=0` for that artifact, which `RestoreDrillArtifactNotRestorable` pages on.
+- [ ] Every run writes `basetool_restore_drill_last_success_timestamp` (bumped only when both
+  dumps restored); `RestoreDrillStaleOrMissing` pages when it is older than 35 days or absent.
 
 **Enforced by:** `scripts/restore-drill.sh` · `scripts/iri-restore-drill.{service,timer}` · **Runbook:** [`docs/backup.md`](../backup.md)
 
@@ -180,17 +192,14 @@ link), so a host compromise is contained by revoking one token.
 - **Point-in-time recovery (PITR / WAL archiving).** Logical `pg_dump` snapshots give a per-day
   recovery point, which fits this app's size and RPO. Continuous WAL archiving is deliberately not
   pursued (see ADR-0056 alternatives); promote to an ADR if a sub-day RPO is ever required.
-- **The WireGuard `wg0.conf` key.** Irreplaceable, but backed up out-of-band by the operator by
-  owner decision (REQ-OPS-010) — not this job's concern.
-- **Restoring/rebuilding the host OS, Docker, the `deploy` user, systemd units, and the GHCR pull
-  token.** These are the bootstrap concern of [`docs/deployment.md`](../deployment.md); the restore
-  runbook in [`docs/backup.md`](../backup.md) assumes a bootstrapped host and restores *data + config*
-  onto it.
+- **Restoring/rebuilding the host OS, Podman, the service and `deploy` users, the directory tree,
+  the operational units, and the GHCR pull token.** These are the bootstrap concern of the
+  `basetool_host` Ansible role ([ADR-0188](../adr/0188-the-host-bootstrap-is-an-ansible-role.md),
+  [`ansible/README.md`](../../ansible/README.md)) and [`docs/deployment.md`](../deployment.md); the
+  restore runbook in [`docs/backup.md`](../backup.md) assumes a bootstrapped host and restores
+  *data + config* onto it.
 
 ## Open questions
 
-- Wiring an `OnFailure=` alerting unit (e-mail / notification) onto `iri-backup.service` and
-  `iri-restore-drill.service` so a failed backup or drill pages the operator rather than only showing
-  `failed` in `systemctl`. Promote to an ADR/issue when an alerting transport is chosen.
 - Whether to add an occasional `restic check --read-data-subset` (full data re-read) beyond the
   structural nightly `restic check`, traded off against egress cost.

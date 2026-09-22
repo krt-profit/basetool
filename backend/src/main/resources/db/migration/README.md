@@ -1,8 +1,8 @@
 # Flyway Migration Conventions
 
 This directory holds every schema change the backend has ever shipped. Flyway
-applies the files in lexical order by version on every Spring Boot start in the
-`dev` and `prod` profiles. Hibernate's `ddl-auto` is **`validate`** in those
+applies the files in order of their version on every Spring Boot start in the
+`dev`, `test` and `prod` profiles. Hibernate's `ddl-auto` is **`validate`** in those
 profiles, so a schema that doesn't match the JPA entities fails the app
 boot — there is no "auto-fix" path in production.
 
@@ -64,7 +64,7 @@ something broke once.
     `squadron(id)` (`promotion_topic`, `mission_participant`,
     `job_order_handover`) to `org_unit(id)`, drop the V100 sync trigger and
     drop the legacy `squadron` table (R9 step 6).
-- **V106–V116** — SC Wiki + UEX-Items sync (see `SC_WIKI_SYNC_PLAN.md`). Adds the
+- **V106–V116** — SC Wiki + UEX-Items sync (see [`SC_WIKI_SYNC_PLAN.md`](../../../../../../docs/archive/SC_WIKI_SYNC_PLAN.md)). Adds the
   Star Citizen Wiki API as a second catalogue source alongside UEX, joined on the
   shared in-game asset UUID. Additive throughout, one release phase at a time:
   - **V106–V109** (R1, foundation) — Wiki/UEX cross-ref columns plus
@@ -100,14 +100,59 @@ something broke once.
     `mission_participant.squadron_id` FK with a join table over `org_unit`. Phase 1
     of a two-phase drop: the entity stops writing the column, the column stays.
 - **V125 (destructive)** — SC Wiki sync R9 step 4 (see
-  `SC_WIKI_SYNC_DESTRUCTIVE_ROADMAP.md`), shipped 2026-06-01. Drops
+  [`SC_WIKI_SYNC_DESTRUCTIVE_ROADMAP.md`](../../../../../../docs/archive/SC_WIKI_SYNC_DESTRUCTIVE_ROADMAP.md)), shipped 2026-06-01. Drops
   `material.is_manual_entry` and `ship_type.description`, whose readers had moved to
   `source_systems` and `description_en` / `description_de` one release earlier. It is
   the worked example for the two-phase DROP rule below.
 
-This timeline is curated, not exhaustive, and it stops at V125 — later releases have
-shipped many more migrations. `ls | sort -V | tail -1` in this directory is the only
-reliable answer to "what is the current tip?".
+- **V126–V244** — grouped by feature rather than listed file by file (the file names
+  say the rest):
+  - **Blueprints** — personal and default blueprints plus their alias tables:
+    V126–V127, V157, V163, V176, V228.
+  - **Job orders** — the responsible / requesting org-unit split (V129–V130), squadron
+    material claims (V131), assignee notes (V147), requester updates, item production
+    and the retired SK-intake setting (V128, V170, V191, V214, V219, V234).
+  - **Ownerless personal aggregates** — `owning_org_unit_id` relaxed to nullable for
+    the personal aggregates, `mission` and `operation`: V132, V144, V145.
+  - **Two-phase PII drop** — `app_user` first/last name scrubbed (V133), then dropped
+    one release later (V134).
+  - **Org hierarchy and org chart** — Bereich / Organisationsleitung kinds and
+    departments (V164–V166), membership roles replacing the boolean flags
+    (V184, V187, V188, V190), and the org-chart tables (V136, V138, V167, V171,
+    V185–V186, V215).
+  - **P4K import lane** — V140–V141.
+  - **Kartellbank** — the double-entry ledger and its accounts, holders, grants,
+    booking requests, approval tiers and counterparties: V150–V154, V159–V161,
+    V168, V180–V183, V189, V193–V194, V196–V198, V202–V203, V205, V222,
+    V231–V232.
+  - **Notifications** — the engine (V155–V156) and one seed migration per new rule
+    (V160–V161, V174, V194, V211, V214, V225, V243).
+  - **Discord login and account lifecycle** — Discord ids and nicknames, the approval
+    queue and its decisions, Keycloak presence tracking: V172–V174, V178, V223,
+    V230, V233, V241.
+  - **Activity audit trail** — `audit_event` (V179) and the client id on both audit
+    tables (V237–V238).
+  - **Missions** — steps, objectives, meeting point, frequencies, the owning-org-unit
+    section counter, unit responsibles and the ordering / uniqueness backstops: V149,
+    V192, V195, V199–V201, V204, V206–V209.
+  - **Materialbörse** — V210–V213, V221, V224–V225.
+  - **Lager rework** — merged piece rows, allocation tables and game-item rows:
+    V216–V218, V220.
+  - **Identity columns** — foreign keys on the user identity columns and the
+    `sub` → `user_id` rename: V235–V236.
+  - **Members-only** — V177 added the guest edit token; V239 dropped it together with
+    the guest role (the single-phase exception below).
+  - **Data-subject rights** — terms acceptance (V229), deletion requests (V242–V243)
+    and their query indexes (V244).
+  - **Catalogue, inventory, promotion and housekeeping** — material / manufacturer
+    aliases, home locations, terminal types, payout-preference default, the
+    rank-requirement owner, rounding, indexes, the orphan purge and
+    `pg_stat_statements`: V135, V137, V139, V142–V143, V146, V148, V158, V162, V175,
+    V226–V227, V240.
+
+This timeline is curated, not exhaustive (checked against the directory on
+2026-09-22, tip V244). `ls | sort -V | tail -1` in this directory is the only reliable
+answer to "what is the current tip?".
 
 ## Hard rules
 
@@ -161,7 +206,7 @@ Rules:
     `ddl-auto=validate` green: during the soak both the field and the column existed,
     after V125 neither did, and at no point was there a field without its column.
   - **Owner-approved single-phase exception: V239** (`drop_guest_role_and_guest_edit_token`,
-    2026-09-06, decision D10 of `MEMBERS_ONLY_PLAN.md`). The `mission_participant`
+    2026-09-06, decision D10 of [`MEMBERS_ONLY_PLAN.md`](../../../../../../docs/archive/MEMBERS_ONLY_PLAN.md)). The `mission_participant`
     `guest_edit_token_hash` column is dropped in the same unit of work that removes its last
     reader, deliberately, because the column stored the **hash of a capability token**: leaving it
     through a soak would leave a credential-shaped artefact in the database with no code able to
@@ -222,9 +267,12 @@ migrations are where things go subtly wrong.
   Flyway runs each file in a transaction by default. Long-running index
   creation has to either:
   - run outside Flyway (manual DBA step, documented in the PR), or
-  - be added with `-- ${flyway:noTransaction}` at the top of the file plus an
-    explicit `CREATE INDEX CONCURRENTLY` statement.
-    Currently the codebase does not need this; if you do, see
+  - live in a migration of its own that Flyway runs outside a transaction (a
+    per-script configuration, `executeInTransaction=false` — confirm the mechanism
+    against the Flyway version in `gradle/libs.versions.toml` before relying on it;
+    there is no `${flyway:…}` placeholder that does this).
+    Currently the codebase does not need this — V91–V93 and V122 build their indexes
+    inside the transaction, and say so in their headers; if you do, see
     [`db.DatabaseIndexMigrationTest`](../../../../test/java/de/greluc/krt/profit/basetool/backend/db/DatabaseIndexMigrationTest.java)
     for how the existing test enforces what indexes ship.
 
@@ -251,7 +299,7 @@ the same contract as prod:
   test container never has):
 
   ```bash
-  docker compose --profile dev up -d db-backend-dev keycloak-dev redis-dev
+  docker compose --profile dev up -d db-backend-dev db-keycloak-dev keycloak-dev redis-dev
   ./gradlew :backend:bootRun
   ```
 
@@ -298,7 +346,7 @@ comment should answer the obvious "why now?" question before they need to.
 - [ ] If indexes were added, [`DatabaseIndexMigrationTest`](../../../../test/java/de/greluc/krt/profit/basetool/backend/db/DatabaseIndexMigrationTest.java)
   knows about them.
 - [ ] The change is mentioned in `CHANGELOG.md` under the right `### Added`
-  / `### Changed` / `### Migration` heading.
+  / `### Changed` / `### Removed` heading when it is user-visible.
 - [ ] Version numbering passes the `Flyway Migrations` CI check (no duplicate
   `V<n>`, new files numbered after the current tip on `main`). Run it
   locally before pushing:

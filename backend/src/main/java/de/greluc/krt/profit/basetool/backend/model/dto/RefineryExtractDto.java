@@ -29,9 +29,9 @@ import java.util.List;
 /**
  * Envelope of the frozen {@code RefineryExtract} JSON contract (v1) produced by the desktop
  * extractor and consumed by {@code POST /api/v1/refinery-orders/import-extract} — see {@code
- * docs/archive/REFINERY_SCREENSHOT_IMPORT_PLAN.md} §5 (epic #439, Phase 1 #434). The provenance fields
- * ({@code tool}, {@code toolVersion}, {@code model}, {@code generatedAt}, {@code clientLanguage})
- * are echoed for display only and never influence matching.
+ * docs/archive/REFINERY_SCREENSHOT_IMPORT_PLAN.md} §5 (epic #439, Phase 1 #434). The provenance
+ * fields ({@code tool}, {@code toolVersion}, {@code model}, {@code generatedAt}, {@code
+ * clientLanguage}) are echoed for display only and never influence matching.
  *
  * <p>Only {@code schemaVersion == 1} is accepted; the service rejects other versions with a 400 so
  * an outdated extractor fails loudly instead of producing a silently wrong draft. The {@code @Size}

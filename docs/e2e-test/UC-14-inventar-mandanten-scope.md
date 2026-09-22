@@ -8,13 +8,13 @@
 
 ## Akteur
 
-Fünf Profile, die alle Mitgliedschafts-Konstellationen abdecken — Admin (IRIDIUM), Staffel-A-Mitglied, Staffel-B + SK-X-Mitglied, reines SK-X-Mitglied, Mitglied **ohne jede** Zugehörigkeit — sowie der unauthentifizierte Gast.
+Fünf Profile, die alle Mitgliedschafts-Konstellationen abdecken — Admin (IRIDIUM), Staffel-A-Mitglied, Staffel-B + SK-X-Mitglied, reines SK-X-Mitglied, Mitglied **ohne jede** Zugehörigkeit. Einen nicht angemeldeten Besucher gibt es seit ADR-0159 nicht mehr als Viewer; er erreicht das Lager gar nicht ([UC-12](UC-12-mitgliederbereich.md)).
 
 ## Vorbedingungen
 
 Die direkte Lager-View ist **strict-staffel** (REQ-ORG-003): ein Eintrag ist auf seinen `owning_org_unit_id`-Pool beschränkt und verlässt ihn nie. Per REST geseedet (nur ephemerer Modus):
 
-- **Nutzer/Mitgliedschaften:** `test-admin` (ADMIN, Staffel A), `test-member` (nur Staffel A), `test-both` (Staffel B **+** SK X), `test-sk` (nur SK X), `test-none` (keine Mitgliedschaft). SK-Mitgliedschaft via `POST /api/v1/special-commands/{id}/members/{userId}`; Staffel via `PATCH /api/v1/users/{id}/squadron`. `test-both`, `test-sk` und `test-none` sind dedizierte Realm-Nutzer (`realm-export.e2e.json`) — bewusst nicht der geteilte `test-officer`, damit die zusätzliche SK-Mitgliedschaft nicht in Schwester-Suites leakt, die `test-officer` als Einzelmitglied erwarten.
+- **Nutzer/Mitgliedschaften:** `test-admin` (ADMIN, Staffel A), `test-member` (nur Staffel A), `test-both` (Staffel B **+** SK X), `test-sk` (nur SK X), `test-none` (keine Mitgliedschaft). SK-Mitgliedschaft via `POST /api/v1/special-commands/{id}/members/{userId}`; Staffel via `PATCH /api/v1/users/{id}/memberships` (`assignStaffelMembership`). `test-both`, `test-sk` und `test-none` sind dedizierte Realm-Nutzer (`realm-export.e2e.json`) — bewusst nicht der geteilte `test-officer`, damit die zusätzliche SK-Mitgliedschaft nicht in Schwester-Suites leakt, die `test-officer` als Einzelmitglied erwarten.
 - **Je ein nicht-persönlicher Eintrag pro Eigentümer**, jeweils auf **eigenem Material** (Material ↔ Eigentümer 1:1): Staffel A, Staffel B, SK X und ein **eigentümerloser** (`owningOrgUnit = null`) Eintrag, erfasst vom mitgliedschaftslosen Nutzer. Erstellt **als** der im Zielpool beheimatete Nutzer, damit der Create-Resolver den gewünschten Eigentümer stempelt.
 
 ## Auslöser
@@ -23,7 +23,7 @@ Jeder Viewer ruft die gescopten Inventar-Endpunkte ab bzw. öffnet `/inventory/a
 
 ## Hauptablauf & Erwartetes Ergebnis
 
-UI treiben, **per API verifizieren** (wie UC-08): die Matrix wird durch Abruf der gescopten Endpunkte als jeweiliger Nutzer über den `BackendSeeder` geprüft; die Grenze wird zusätzlich über die echte `/inventory/all`-UI (repräsentativer Viewer) und den Gast-Redirect gefahren. Der Admin-Pin wird über den `X-Active-Org-Unit-Id`-Header gesetzt, den das Frontend relayt.
+UI treiben, **per API verifizieren** (wie UC-08): die Matrix wird durch Abruf der gescopten Endpunkte als jeweiliger Nutzer über den `BackendSeeder` geprüft; die Grenze wird zusätzlich über die echte `/inventory/all`-UI für ein reines Staffel-Mitglied gefahren (Gruppenzeile der eigenen Staffel sichtbar, die einer fremden nicht). Der Admin-Pin wird über den `X-Active-Org-Unit-Id`-Header gesetzt, den das Frontend relayt.
 
 Sichtbarkeitsraster im globalen Lager (`/inventory/all`) für einen Eintrag im Besitz von OrgUnit O:
 
@@ -34,7 +34,7 @@ Sichtbarkeitsraster im globalen Lager (`/inventory/all`) für einen Eintrag im B
 | Mitglied von O                 | ✓                          |
 | Mitglied einer anderen OrgUnit | ✗                          |
 | Staffel **+** SK-Mitglied      | Vereinigung beider Pools   |
-| mitgliedschaftslos / Gast      | ✗                          |
+| mitgliedschaftslos             | ✗                          |
 
 Zusätzlich abgedeckt:
 

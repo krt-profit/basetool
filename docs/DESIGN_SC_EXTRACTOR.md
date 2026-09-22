@@ -1,6 +1,6 @@
 # Design Spec — Basetool SC Extractor (GUI rebuild for epic #439)
 
-> **Doc type:** Binding design spec for epic #439 — **implemented** (desktop tool: `basetool-bp-extractor` PR #5; frontend review surface: basetool #518; both 2026-06-10). Registered in [`docs/specs/INDEX.md`](specs/INDEX.md). Remains the binding visual reference for the extractor GUI and the shared review language; UI changes must keep matching it or amend it in the same PR.
+> **Doc type:** Binding design spec for epic #439 — **implemented** (desktop tool: [`krt-profit/basetool-sc-extractor`](https://github.com/krt-profit/basetool-sc-extractor) PR #5, merged while the repository was still `basetool-bp-extractor`; frontend review surface: basetool #518; both 2026-06-10). Registered in [`docs/specs/INDEX.md`](specs/INDEX.md). Remains the binding visual reference for the extractor GUI and the shared review language; UI changes must keep matching it or amend it in the same PR. Last reviewed: 2026-09-22, against the extractor at `c5c6e84`.
 >
 > **Provenance / how to read this.** This is the **binding** UI/UX design for the SC
 > Extractor desktop tool (and the shared visual language of the frontend review
@@ -15,16 +15,14 @@
 > through every screen offline. This Markdown file is the written contract that
 > travels with the basetool repo; the prototype is the pixel source of truth. Where
 > the two disagree, the prototype wins and this doc is updated. Imported 2026-06-05.
-> When Phase 3 (#436) is built in `basetool-sc-extractor`, carry this doc (and the
-> prototype from the bundle) into that repo too.
+> Phase 3 (#436) has shipped. The extractor repository keeps **no copy** of this file: its
+> `CLAUDE.md` names this document as the binding design, so there is exactly one.
 >
-> **Zusammenfassung (DE):** Verbindliches UI/UX-Design für den Umbau von
-> `basetool-bp-extractor` → **`basetool-sc-extractor`**. Ein zentraler Launcher
-> führt per **Top-Tabs** in zwei Workflows: **Blueprints** (bestehend, Game.log →
-> JSON) und **Refinery** (neu, Screenshots → lokales VLM via Ollama → JSON). Das
-> Design ist als interaktiver Prototyp umgesetzt und soll bei der Umsetzung des
-> Epics **1:1** als Vorlage dienen. Festgelegte Entscheidungen: **Tabs-Navigation,
-> komfortable Dichte, Honeycomb-Textur an, Konfidenz als Prozentwert.**
+> **Summary:** the binding UI/UX design for turning `basetool-bp-extractor` into
+> **`basetool-sc-extractor`**. One launcher leads through **top tabs** into two workflows:
+> **Blueprints** (Game.log → JSON) and **Refinery** (screenshots → local VLM via Ollama →
+> JSON). The interactive prototype is the template, screen for screen. Locked decisions:
+> **tab navigation, comfortable density, honeycomb texture on, confidence as a percentage.**
 >
 > **Reference prototype:** the interactive HTML prototype inside the Claude Design
 > bundle linked above (`project/Basetool SC Extractor.html`), or — fully offline — the
@@ -62,7 +60,8 @@ the prototype for reference.
 ## 2. Design foundations
 
 All visuals come from the **DAS KARTELL / KRT design system** — do not invent
-tokens. The desktop app already mirrors these in `ui/Theme.kt`; keep them in sync.
+tokens. The desktop app mirrors these in `src/main/kotlin/com/basetool/bpextractor/ui/Theme.kt`
+(extractor repo); keep them in sync.
 
 - **Palette.** Near-black `#000` canvas, `#141414` surfaces, `#1C1C1C` input/head
   fill, hairlines `#282828`, body text `#D2D2D2`, muted `#646464`. One hero accent:
@@ -144,12 +143,16 @@ browse button. Single CTA **„Blueprints extrahieren"** + a neutral reassurance
 **4.2 Extraktion (transient).** Streaming progress: a status dot, `N / 424 files`
 data-value, a progress bar, and a couple of mono log lines. Auto-advances to summary.
 
-**4.3 Zusammenfassung.** Success alert (green, 4px left border) with the written JSON
-path + `schemaVersion 1 · <count> blueprints · 424 log files`. Left column: detected
+**4.3 Zusammenfassung.** Success alert (green, 4px left border) with
+`schemaVersion 1 · <count> blueprints · 424 log files`, prefixed by the JSON path once the
+export has been saved. Left column: detected
 player chip (`greluc · 179 BP`) + "by category" mini-bars (Weapon/Armor/Ammo/
 MiningTool/Other, each tinted by a department hue used as a neutral category colour).
 Right: "most recently received" table (product · category chip · received · build).
-Header actions: ghost "Im Explorer zeigen" + outline "Erneut".
+Header actions: ghost "Im Ordner anzeigen" + "JSON öffnen" (only once saved) + ghost "Erneut".
+Footer: the filled CTA is **„An Basetool senden"** (the same one-click send as §5.5, to the
+ingest's blueprint endpoint), with a ghost **„Als JSON exportieren"** as the local alternative —
+no file is written unless that is chosen.
 
 ---
 
@@ -168,10 +171,11 @@ between them; in the product they are driven by real detection):
   - *Ollama unreachable* → danger alert with a 2-step install hint
     (download from ollama.com → `ollama serve`) + a ghost **„Erneut prüfen"**.
 - **Hardware preflight card.** GPU / VRAM / RAM rows; an **auto-selected model** chip;
-  a min/recommended **tier bar** (CPU · MIN 6–8GB · EMPF 10–12GB+). Below recommended
-  → warning with a **radio fallback**: low-VRAM model (Phase-0 bake-off winner —
-  `glm-ocr` two-stage / `qwen3-vl:4b-instruct` / `gemma4:e4b-it-qat`) **or** CPU mode
-  (works but slow). Above recommended → green "full accuracy".
+  a min/recommended **tier bar** (CPU · MIN ≥ 8 GB · EMPF ≥ 12 GB VRAM). Below recommended
+  → warning with a **radio fallback**: the low-VRAM model `qwen3-vl:4b-instruct` (the Phase-0
+  bake-off result, `docs/refinery-extractor/PHASE0_FINDINGS.md` in the extractor repo) **or**
+  CPU mode (works but slow). Above recommended → green "full accuracy" with
+  `qwen3-vl:8b-instruct`. The thresholds live in the extractor's `refinery/Preflight.kt`.
 - **SC-running soft warning.** If `StarCitizen.exe` is detected → non-blocking warning
   ("VLM and SC share GPU/VRAM — close SC for safe extraction") + an
   **„trotzdem fortfahren"** acknowledge checkbox that re-enables the CTA. Otherwise a
@@ -216,12 +220,13 @@ design system or the basetool frontend — implement Refine as a styled checkbox
 introduce a new switch component **with an ADR + design-skill update in the same
 PR**; the frontend also lacks a global `.alert-info` variant. Below: a "stays
 manual — please complete" chip row (Besitzer default `greluc`, Mission, Sonstige
-Kosten, Erzverkäufe, Start) with the empty/uncertain ones amber. CTA **„Als JSON
-exportieren"**.
+Kosten, Erzverkäufe, Start) with the empty/uncertain ones amber. CTA **„Weiter zum Export"**.
 
-**5.5 Export & Upload.** Green success alert with the written
-`RefineryExtract.json` path + a small summary. The step's single filled CTA is now
-**„An Basetool senden"** — the **one-click send** of epic
+**5.5 Export & Upload.** The step's single filled CTA is **„An Basetool senden"**, sent
+straight from memory; a ghost **„Als JSON exportieren"** saves `RefineryExtract.json` locally
+instead (a green success alert then names the written path), and the send stays disabled —
+with a danger alert naming the reason — while a row lacks its quantity or an order lacks its
+goods or source screenshots. The send is the **one-click send** of epic
 [#639](https://github.com/krt-profit/basetool/issues/639) (transport spec
 [`docs/specs/desktop-ingest.md`](specs/desktop-ingest.md), `REQ-INGEST-*`;
 [ADR-0018](adr/0018-desktop-ingest-gateway-device-grant.md)). Pressing it:
@@ -233,16 +238,18 @@ exportieren"**.
    *„nichts verlässt deinen Rechner"* promise — egress is explicit and user-triggered.
 2. **Browser approval (device grant).** The modal shows a short user code and opens
    the browser; under an existing Keycloak SSO session the approval is one click.
-3. **Send + open.** The exact exported bytes go to the ingest gateway over TLS (the
-   gateway forwards the per-`sub` token to the backend's import endpoint and stages
-   the matched draft in single-use Redis), then the browser opens the **pre-filled**
+3. **Send + open.** The exact exported bytes go to the ingest gateway over TLS with a
+   DPoP-bound token (the gateway validates it, calls the backend's import endpoint under its
+   own service identity on behalf of the member — ADR-0129 — and stages the matched draft in
+   single-use Redis), then the browser opens the **pre-filled**
    review form via `…?handoff=<id>`. The human **review-before-commit** step (§6) is
    unchanged — nothing is persisted until the user confirms in the browser.
 
 The earlier **manual-upload flow** (Refinery → Import order → pick the JSON → review
 the pre-filled form) remains documented as the offline fallback; **„Neue Extraktion"**
 is demoted to a ghost action. A side **provenance** panel mirrors the contract fields
-(tool, model, schemaVersion, panelType=SETUP, generatedAt). The CLI never sends.
+(tool, model, schemaVersion, panelType=SETUP, generatedAt). The tool has no CLI mode;
+sending is only ever this user-triggered GUI action.
 
 ---
 
@@ -262,8 +269,8 @@ is demoted to a ghost action. A side **provenance** panel mirrors the contract f
 
 ## 7. Per-issue integration (paste-ready)
 
-Append each block to the corresponding issue (or post as a comment). They add a
-**Design / UI acceptance** section; they do not alter existing behavioural DoD.
+These blocks were appended to the corresponding issues, all of which are now closed. They are
+kept as the design acceptance record; they do not alter existing behavioural DoD.
 
 ### → Epic #439
 

@@ -1,6 +1,6 @@
 # ADR-0187 — The edge learns the client address from a host-level PROXY-protocol front end
 
-- **Status:** Accepted
+- **Status:** Accepted — implemented: in production since the rootless-Podman cutover of 2026-09-22 (host haproxy from the Ansible role, `docker/edge/render-and-run.sh` switching the listeners to `proxy_protocol`). On that host it **supersedes the client-address transport of [ADR-0112](0112-edge-real-client-ip-restore-native-ipv6.md)** (native IPv6 DNAT on the proxy bridge); ADR-0112's `/64` limiter key stands
 - **Date:** 2026-09-16
 - **Deciders:** @greluc (the decision), Claude (measurement and analysis)
 - **Related:** [ADR-0163](0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md) ·
@@ -201,6 +201,13 @@ Two things are deliberately **not** settled yet, and neither may be guessed at d
    is what keeps the candidate set finite; the behavioural one
    (`check-conformance.py`'s `client-address-visible`, which is how this was found) stays as the
    backstop that reads the running system.
+
+   > **Note (2026-09-22):** `.github/scripts/check_edge_trust_pins.py` does not exist. The
+   > structural check shipped inside `scripts/generate-quadlet.py` (the pin/trust comparison that
+   > refuses when a joined network carries no pin, a pin falls outside its subnet, or
+   > `basetool_host_edge_trusted_proxies` differs from the pinned set), run by the `quadlet-drift`
+   > job in `repo-lint.yml` (commit 5bb8607c2); `scripts/check-edge-nginx.sh` renders the edge
+   > with `EDGE_TRUSTED_PROXY` set.
 2. **Unreachability from a third machine.** The probe above established that the port is closed on
    the host's own global addresses. The stronger test — a direct connection from somewhere else —
    runs on Rocky before this is built for real, and the note above is why it carries the whole

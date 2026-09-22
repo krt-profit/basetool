@@ -1,5 +1,6 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-08-04.
-> **Owner area:** ORDERS · **Related ADRs:** none
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Owner area:** ORDERS/UI · **Related ADRs:** [ADR-0104](../adr/0104-no-silent-caps-on-complete-list-surfaces.md),
+> [ADR-0120](../adr/0120-per-browser-filter-selection-persistence.md)
 
 # Cross-order material demand
 
@@ -126,6 +127,10 @@ that changes what the page shows MUST poke it: the order detail's queue cross-pu
 `['queue', 'demand']` (a status change adds or removes an order's whole contribution), and the two
 inventory pages send `orders`/`demand` after a write that touches order-linked stock (the `Bestand`
 column). A peer's change re-fetches the `demandResults` fragment in place, with no full-page reload.
+The Lager book-in form is a third, read-only listener on the same key: its
+`INVENTORY_INPUT_ORDER_SECTIONS` map (`inventory-input.js`) joins the room with `demand` only, a
+subset of the whitelist, to re-read the per-order need figures of its allocation picker
+([`inventory-lager.md`](inventory-lager.md) REQ-INV-039).
 
 **Performance.** The aggregation MUST NOT introduce an N+1 across orders, materials or inventory:
 the orders load in one query with both requirement branches eager-fetched, the linked stock through
@@ -151,7 +156,8 @@ one batched index, and the claims through the batched per-order claim lookup (RE
 - [ ] An unreachable backend degrades the page to its empty state rather than an error page.
 - [ ] Every label comes from the DE + EN message bundles under `orders.demand.*` / `nav.orders.*`.
 - [ ] The `orders-index.js` and `orders-material-demand.js` seam maps together cover exactly the
-  `ORDERS_QUEUE` whitelist, and the order-detail / inventory cross-publishes carry `demand`.
+  `ORDERS_QUEUE` whitelist, and the order-detail / inventory cross-publishes carry `demand`; the
+  book-in form's `INVENTORY_INPUT_ORDER_SECTIONS` stays a subset of it.
 - [ ] The filter panel sits behind a *Filter* button, does not displace the tables, shows the active
   filter count, and is rendered expanded server-side; with no stored choice it starts collapsed only
   when nothing is filtered.
@@ -172,7 +178,8 @@ claims-vs-gap separation, PIECE rounding), `JobOrderControllerTest`
 (render, drill-down, empty state, fragment seam, backend-failure degradation),
 `LiveSyncSectionMapParityTest` (`ordersQueueSeamMaps_partitionTheOrdersQueueTopicWhitelist`,
 `orderDetailCrossPublish_keepsTheDemandOverviewInSync`,
-`inventoryPages_pokeTheDemandOverviewWhenOrderLinkedStockChanges`),
+`inventoryPages_pokeTheDemandOverviewWhenOrderLinkedStockChanges`,
+`inventoryInputOrderSeamMap_isASubsetOfTheOrdersQueueWhitelist`),
 `JobOrderMaterialDemandE2eTest` (browser: the two-order fold, the drill-down toggle and its
 localStorage restore across a reload, the nav entry, the collapsible panel + active-filter
 count, hide-covered, the material filter and its search, and the sort cycle) ·

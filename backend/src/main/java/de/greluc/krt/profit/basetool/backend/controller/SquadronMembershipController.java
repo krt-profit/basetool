@@ -87,8 +87,8 @@ public class SquadronMembershipController {
       description =
           "Flips is_logistician and / or is_mission_manager on the Staffel membership row."
               + " ADMIN only. Replaces the legacy /api/v1/users/{id}/logistician and"
-              + " /api/v1/users/{id}/mission-manager query-param endpoints, which stay live as"
-              + " transitional aliases during the R6.e soak.")
+              + " /api/v1/users/{id}/mission-manager query-param endpoints, which have been"
+              + " removed.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Flags patched."),
     @ApiResponse(responseCode = "400", description = "Validation error on the inbound payload."),

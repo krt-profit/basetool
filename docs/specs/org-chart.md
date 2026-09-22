@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-20.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
 > **Owner area:** ORG · **Related ADRs:** ADR-0029
 
 # Organisation org chart (Funktionsränge)
@@ -6,18 +6,26 @@
 ## Context & goal
 
 The org chart (`/org-chart`, "Organigramm") is a purely **descriptive** view of who holds which
-functional rank across the Bereichsleitung, the Staffeln and the Spezialkommandos. It grants no
-permission — authorization stays with the role model and the `org_unit_membership` flags — so it is
-deliberately not org-unit-scoped. An admin edits it inline; everyone else reads it. The aggregate is
-the `OrgChartPosition` row (Flyway `V136`, extended by `V138` and `V171`); the read/write rules live in
-[`OrgChartService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/OrgChartService.java)
-and [`OrgChartController`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/OrgChartController.java).
+functional rank across the Organisationsleitung, the Bereichsleitung, the Staffeln and the
+Spezialkommandos. It grants no permission — authorization stays with the role model
+([`role-model.md`](role-model.md)) and the `org_unit_membership` ranks — so it is deliberately not
+org-unit-scoped. An admin edits its free-text holders and structure inline; everyone else reads it.
+The aggregate is the `OrgChartPosition` row (Flyway `V136`, extended by `V138`, `V167`, `V171` and
+`V186`); the read model is assembled by
+[`OrgChartReadService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/OrgChartReadService.java),
+the write rules and the rank mirror live in
+[`OrgChartService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/OrgChartService.java),
+behind [`OrgChartController`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/OrgChartController.java).
+
+> **Numbering note.** `REQ-ORG-010`, `-011`, `-018` and `-021` are also used, for different
+> requirements, in [`org-unit-tenancy.md`](org-unit-tenancy.md) (see the note there). Ids are never
+> renumbered; cite them together with this file.
 
 > **Widened by epic #692 (REQ-ORG-018):** the chart was originally a single "Profit-Bereich" tree
 > (`OrgChartScope.AREA` as a singleton). With the real hierarchy (REQ-ORG-014: OL > Bereich > Staffel/SK)
 > it becomes **multi-Bereich with an Organisationsleitung at the top**. It stays **purely descriptive**
-> (REQ-ORG-010): a position grants no permission — authorization lives in the role model and
-> `org_unit_membership` flags. The authoritative hierarchy and the descriptive chart are kept
+> (REQ-ORG-010): a position grants no permission — authorization lives in the role model and the
+> `org_unit_membership` ranks. The authoritative hierarchy and the descriptive chart are kept
 > consistent by the admin who maintains both.
 >
 > **Mirrored from the functional ranks (epic #800, REQ-ROLE-006):** the account-linked chart seats are
@@ -147,8 +155,10 @@ between siblings, ←/→ between levels, Home/End to the ends. Keyboard focus i
 deliberately distinct from the Bereichsleiter's bloom. The inline editor's dialog traps
 focus (Tab/Shift+Tab cycle within it), closes on Esc, returns focus to the control that
 opened it, and renders the page chrome `inert` + `aria-hidden` while open. A successful edit
-preserves the chart's horizontal scroll and the page's vertical scroll across the reload
-(the editor reloads on success by design — see the concurrency notes in `CLAUDE.md`). Because a
+re-renders the tree in place (`?fragment=chartBody` swapped into `#oc-chart` through `krtFetch`,
+REQ-FE-005 — no page reload) and preserves the chart's horizontal scroll and the page's vertical
+scroll across the swap; a peer's edit reaches other open charts over the live-sync channel the same
+way. Because a
 wide chart is usually also tall, its own horizontal scrollbar would sit far down the page (below the
 fixed footer); a **sticky proxy scrollbar** (`#oc-scrollbar`, org-chart.js) is therefore pinned just
 above the footer and kept in sync with the chart's horizontal scroll, so panning is always reachable
@@ -180,7 +190,8 @@ the `aria-pressed` toggle and the edit-mode hint) and the Playwright e2e spec
 roving tabindex + arrow-key / Home/End navigation, the modal focus-trap / Esc / focus-return,
 and the horizontal-scroll restoration across a successful edit (`@Tag("e2e")`, so it runs on the
 ephemeral stack and is gated on the `e2e` PR label — see `.github/workflows/e2e.yml`).
-**Code:** `org-chart.html` (inline tree-nav + per-Bereich collapse + dialog JS), `org-chart.css`
+**Code:** `org-chart.html`, `static/js/org-chart.js` (tree-nav + per-Bereich collapse + dialog +
+in-place refresh), `org-chart.css`
 (`.oc-fan--bereiche`, `.oc-leader-wrap`, `.oc-collapse`, `.oc-bereich-body`),
 `fragments/org-chart-node.html` (`ocBereich`) · **Issues:** —
 
@@ -223,8 +234,8 @@ trees, the `oc-dept--profit` tint, the Bereichsleiter hero, the hidden legacy ti
 `OrgChartServiceTest#getOrgChart_includesNonProfitEligibleUnitsUnderBereich` and the per-Bereich
 `createPosition`/`validateCardinality` tests, migrations `V166` (`org_unit.department`) + `V167`
 (widened `chk_org_chart_scope` + per-Bereich `BEREICHSLEITER` unique index) · **Code:**
-`OrgChartService#getOrgChart`/`buildBereich`, `OrgUnitRepository#findActiveSquadronsAndSpecialCommands`,
-`OlChartDto`, `BereichChartDto`, `org-chart.html`
+`OrgChartReadService#getOrgChart`/`buildBereich`, `OrgUnitRepository#findActiveSquadronsAndSpecialCommands`,
+`OlChartDto`, `BereichChartDto`, `org-chart.html` + `org-chart.js`
 (OL → Bereich connector fan + multi-tree keyboard nav + per-Bereich collapse), `fragments/org-chart-node.html`
 (`ocBereich`, `ocUnitFan`), `org-chart.css` (`oc-dept--*`, `oc-bereich-tier`, `oc-fan--bereiche`,
 `oc-collapse`) · **Issues:** #692, #698.

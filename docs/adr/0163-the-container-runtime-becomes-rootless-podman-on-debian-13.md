@@ -2,7 +2,10 @@
 
 - **Status:** **Accepted 2026-09-16**, with choice 1 amended **twice on the same day**. Read
   *The second re-ruling* immediately below; then *The re-ruling* and *The measurement came back
-  negative* for the first one. Choices 2 to 5 were never in question.
+  negative* for the first one. Choices 2 to 5 were never in question. **Implemented:** production
+  was cut over to rootless Podman under Quadlet on the rebuilt Rocky Linux 10 host on 2026-09-22
+  (serving since 11:21 UTC, old host shut down —
+  [`PODMAN_CUTOVER_RUNBOOK.md`](../archive/PODMAN_CUTOVER_RUNBOOK.md)).
 - **Published title:** this ADR shipped as *… rootless Podman on Debian 13 …* and the file name
   keeps that spelling so no link breaks. The decision is **Rocky Linux 10**.
 
@@ -413,3 +416,10 @@ governs is [`PODMAN_MIGRATION_PLAN.md`](../archive/PODMAN_MIGRATION_PLAN.md); no
 has been touched. The phases were sequenced so that the measurements which could reject this ADR came
 first and cost nothing but time — and that is what happened: §3.1 was answered from vendor
 documentation on 2026-09-16, before a host was built, and it rejected the platform as specified.
+
+> **Note (2026-09-22):** "no host has been touched" was true on 2026-09-16 and is not any more. The
+> hosts were built by the Ansible role (ADR-0188), the units are generated from the compose files by
+> `scripts/generate-quadlet.py` into `quadlet/`, and production cut over on 2026-09-22 — see the
+> Status line and [`PODMAN_CUTOVER_RUNBOOK.md`](../archive/PODMAN_CUTOVER_RUNBOOK.md). The current
+> runtime is described in [`deployment.md`](../deployment.md) and
+> [arc42 §7](../arc42/07-deployment-view.md).

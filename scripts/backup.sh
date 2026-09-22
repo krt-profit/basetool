@@ -26,9 +26,8 @@
 #   * the monitoring plane (epic #936, ADR-0072)     — Grafana SQLite (consistent
 #     copy), the rendered monitoring secrets/certs, the Alertmanager state, and a
 #     WEEKLY Prometheus TSDB snapshot (admin API) protecting the 180-day archive
-#   NOT captured by design: Redis (sessions just re-login), logs, the WireGuard
-#     wg0.conf key (operator backs that up out-of-band — REQ-OPS-010), and — a
-#     DELIBERATE data-protection decision (ADR-0072) — the Loki log store, whose
+#   NOT captured by design: Redis session data (sessions just re-login), logs,
+#     and — a DELIBERATE data-protection decision (ADR-0072) — the Loki log store, whose
 #     GFS retention would silently extend the approved 31-day IP retention; Tempo
 #     traces and exporter/textfile data (regenerable) are excluded too.
 #
@@ -273,7 +272,7 @@ trap cleanup EXIT
 
 # --- Quiesce writers (REQ-OPS-009) ------------------------------------------
 if [[ "${QUIESCE}" == "true" ]]; then
-  log "quiescing writers for the dump: stop ${WRITER_SERVICES[*]} (NPM serves the maintenance page)"
+  log "quiescing writers for the dump: stop ${WRITER_SERVICES[*]} (the edge serves the maintenance page)"
   rt_service_stop "${WRITER_SERVICES[@]}"
   QUIESCED=true
 else
@@ -297,11 +296,10 @@ rt_exec db-keycloak sh -c \
 
 # --- Capture the edge's TLS material and ACME account state -----------------
 #
-# This replaces the nginx-proxy-manager capture, and it is not a rename. NPM was
-# removed from the stack; its successor keeps the same material in three NAMED
-# VOLUMES, and for a while the backup captured the retired proxy's directory and
-# none of them. REQ-OPS-010 says the set is "exactly what a full restore needs",
-# and without these a restore cannot serve HTTPS:
+# The edge (docker/edge, ADR-0162) and its ACME client keep this material in
+# three NAMED VOLUMES, not in a host directory, so it has to be captured through
+# the helper rather than copied. REQ-OPS-010 says the set is "exactly what a full
+# restore needs", and without these a restore cannot serve HTTPS:
 #
 #   edge-certs        the issued certificates and their private keys
 #   edge-acme-state   the ACME account key and the issuance history
@@ -309,8 +307,8 @@ rt_exec db-keycloak sh -c \
 #
 # Losing the ACME state is not merely inconvenient. Let's Encrypt allows five
 # duplicate certificates per week for a SAN set, so a host rebuilt without them
-# re-issues into a rate limit — and the migration plan's cutover explicitly seeds
-# the certificates from the old host rather than re-issuing.
+# re-issues into a rate limit — which is why a host rebuild seeds the
+# certificates from a snapshot rather than re-issuing.
 #
 # Each volume is optional and reported: a host that does not run the edge has
 # none of them, and that must read differently from one where the read failed.
@@ -361,9 +359,10 @@ if [[ -f "${KEYSTORE_PATH}" ]]; then
   # root, group 10001 (the JVM containers) and uid 1000 via a POSIX ACL (Keycloak).
   # The deploy user that runs this backup is none of those and CANNOT read it
   # directly — a plain `cp` here is what broke the 2026-07-06 run. Capture it the
-  # same way as the other root-owned artifacts (NPM mount, grafana.db): stream the
-  # bytes out through a throwaway root helper container. This uses docker access the
-  # deploy user already has, so it needs no extra host ACL and leaves the keystore's
+  # same way as the other artifacts it cannot open (the edge volumes, grafana.db):
+  # stream the bytes out through a throwaway helper container (rt_read_mount). This
+  # uses the container access the deploy user already has (on the Podman host, its
+  # sudo grant to the service user), so it needs no extra host ACL and leaves the keystore's
   # 0640 hardening untouched. Best-effort + loud: a read failure must never abort the
   # whole backup and lose the irreplaceable DB dumps (the original set -e landmine).
   if rt_read_mount "$(dirname "${KEYSTORE_PATH}")" "${HELPER_IMAGE}" \

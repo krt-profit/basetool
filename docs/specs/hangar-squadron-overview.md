@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-12.
-> **Owner area:** HANGAR/UI · **Related ADRs:** none
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Owner area:** HANGAR/UI · **Related ADRs:** [ADR-0048](../adr/0048-ol-sees-every-ship-in-the-unit-overview.md)
 
 # Unit hangar overview (Org-Einheitsübersicht) — pagination, scope & server-side filter
 

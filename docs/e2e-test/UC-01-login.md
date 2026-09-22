@@ -28,8 +28,8 @@ Der Browser ruft den Spring-OAuth2-Login-Einstieg `/oauth2/authorization/keycloa
 ## Erwartetes Ergebnis
 
 - Der Browser landet wieder auf der Frontend-Origin (Authorization-Code-Flow abgeschlossen).
-- Eine Redis-backed Spring-Session ist etabliert (Session-Cookie gesetzt) — die Session ist **cookie-**, nicht token-getragen.
-- Der authentifizierte Zustand wird als Playwright-`storageState` gesichert und von den übrigen Flows wiederverwendet.
+- Eine Redis-backed Spring-Session ist etabliert: der Browser-Kontext hält ein Cookie namens `SESSION` — die Session ist **cookie-**, nicht token-getragen.
+- Der authentifizierte Zustand wird als Playwright-`storageState` nach `build/e2e/storageState.json` geschrieben (für Diagnose und manuelle Wiederverwendung; die übrigen Testklassen melden sich selbst an, siehe unten).
 
 ## Sonderfälle & Lehren
 

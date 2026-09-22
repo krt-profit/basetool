@@ -57,6 +57,12 @@ decision:**
 > that is serving traffic.**
 > Whatever a future contributor needs, the answer is never to widen this role's job.
 
+> **Note (2026-09-22):** in practice the role is also run against the serving hosts, but only as a
+> deliberate, owner-approved, **tag-limited** change — e.g. `--tags deploy,scripts` to deliver
+> updated host tooling (`tasks/22-deploy-user.yml`, `ansible/README.md`). A full run stays reserved
+> for a host that is not serving yet, and the role still never deploys the stack or ships units as
+> part of a release, so the rule above holds in substance.
+
 ### On `REQ-OPS-001`, and a correction it forced
 
 The obvious objection is that Ansible is push-over-SSH while `REQ-OPS-001` is "pull-only delivery".

@@ -7429,7 +7429,7 @@
       "put" : {
         "tags" : [ "Operations" ],
         "summary" : "Toggle the per-participant paid-out flag for an operation",
-        "description" : "Records that a mission manager has marked the participant as paid out (or unset it). Setting `paidOut=true` requires the MISSION_MANAGER role (admins and officers satisfy it via the role hierarchy). Setting `paidOut=false` is reserved for ADMIN and OFFICER — a plain mission manager cannot undo a paid-out confirmation. Last-writer-wins: no client-supplied version is required because the field is a boolean. The audit fields (`paidOutAt`, `paidOutByUser`) are always refreshed when `paidOut=true`; setting `paidOut=false` keeps the last audit fields as a historical record. The participantKey matches the opaque key returned by `/payouts` (real user UUID stringified or `guest_<name>`). Returns only the participant's paid-out status block (flag + audit trace) — a toggle never changes any amount, so the payout computation is not re-run.",
+        "description" : "Records that a mission manager has marked the participant as paid out (or unset it). Setting `paidOut=true` requires the MISSION_MANAGER role (admins and officers satisfy it via the role hierarchy). Setting `paidOut=false` is reserved for ADMIN and OFFICER — a plain mission manager cannot undo a paid-out confirmation. Last-writer-wins: no client-supplied version is required because the field is a boolean. The audit fields (`paidOutAt`, `paidOutByUser`) are always refreshed when `paidOut=true`; setting `paidOut=false` keeps the last audit fields as a historical record. The participantKey matches the opaque key returned by `/payouts` (real user UUID stringified, `guest_<name>` for an external participant, or `deleted_<participantId>` for a participant whose account was deleted). Returns only the participant's paid-out status block (flag + audit trace) — a toggle never changes any amount, so the payout computation is not re-run.",
         "operationId" : "setPayoutStatus",
         "parameters" : [ {
           "name" : "id",
@@ -32857,7 +32857,7 @@
       "patch" : {
         "tags" : [ "squadron-membership-controller" ],
         "summary" : "Patch per-Squadron-membership role flags",
-        "description" : "Flips is_logistician and / or is_mission_manager on the Staffel membership row. ADMIN only. Replaces the legacy /api/v1/users/{id}/logistician and /api/v1/users/{id}/mission-manager query-param endpoints, which stay live as transitional aliases during the R6.e soak.",
+        "description" : "Flips is_logistician and / or is_mission_manager on the Staffel membership row. ADMIN only. Replaces the legacy /api/v1/users/{id}/logistician and /api/v1/users/{id}/mission-manager query-param endpoints, which have been removed.",
         "operationId" : "patchFlags_1",
         "parameters" : [ {
           "name" : "id",

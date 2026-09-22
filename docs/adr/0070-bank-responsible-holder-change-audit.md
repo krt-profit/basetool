@@ -48,6 +48,9 @@ the leadership change, not a background job; (4) no optimistic-locking trap may 
      `ON DELETE CASCADE`, so it snapshots the accounts of **all** the user's org units up front
      (`snapshotResponsibleHoldersForUser`), then **flushes** the user delete before the re-diff so the
      recompute observes the post-cascade state.
+
+     > **Note (2026-09-22):** the user deletion has since moved out of `UserService`; the
+     > bracket described here now lives in `UserDeletionService.deleteUser`.
 2. **Keep all bank access in the seam.** The bracket operations live on the sanctioned
    `OrgUnitBankAccessService`: `snapshotResponsibleHolders(orgUnitId)` (returns, per affected account,
    its current responsible-holder set), `snapshotResponsibleHoldersForUser(userId)` (the same across

@@ -82,9 +82,9 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p>The backend is a pure resource server — incoming JWTs are validated against the Keycloak
  * issuer, the {@code CustomJwtGrantedAuthoritiesConverter} maps both Keycloak realm roles AND the
- * project-specific {@code is_logistician} / {@code is_mission_manager} flags on {@code app_user}
- * into Spring authorities. The role hierarchy mirrors the CLAUDE.md matrix (admin/officer imply
- * logistician/mission-manager).
+ * project-specific {@code is_logistician} / {@code is_mission_manager} flags on the caller's {@code
+ * org_unit_membership} rows into Spring authorities. The role hierarchy mirrors the CLAUDE.md
+ * matrix (admin/officer imply logistician/mission-manager).
  *
  * <p>The {@code authorizeHttpRequests} matrix in {@link #filterChain} is the single, exhaustive
  * source for which endpoints are public, which require authentication, and which require a specific
@@ -651,31 +651,33 @@ public class SecurityConfig {
                     .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER)
                     .requestMatchers(HttpMethod.GET, "/api/v1/users/*")
                     .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER)
-                    // Post Phase-4-Lockdown (MULTI_SQUADRON_PLAN.md section 2): flag-vergabe
-                    // (Logistician/Mission-Manager) und attribute-patches sind admin-only. Die
-                    // method-level @PreAuthorize auf UserController#patchLogistician /
-                    // #patchMissionManager / #updateAttributes verlangt bereits hasRole('ADMIN');
-                    // der Path-Matcher hier war ein Relikt der Pre-Phase-4-Konfiguration und wird
-                    // jetzt mit der Method-Level-Annotation in Deckung gebracht, damit
-                    // SecurityConfig nicht mehr suggeriert OFFICER duerfe diese Endpunkte
-                    // erreichen.
+                    // Post Phase-4 lockdown (docs/archive/MULTI_SQUADRON_PLAN.md section 2):
+                    // granting the flags (logistician / mission manager) and patching attributes
+                    // are admin-only. The method-level @PreAuthorize on
+                    // UserController#updateAttributes already requires hasRole('ADMIN'); the path
+                    // matchers here were a relic of the pre-Phase-4 configuration and were
+                    // aligned with the method-level annotation so that SecurityConfig no longer
+                    // suggests OFFICER may reach these endpoints. The two PATCH .../logistician
+                    // and .../mission-manager endpoints no longer exist in UserController (the
+                    // flags are patched through SquadronMembershipController); their matchers
+                    // only keep those paths admin-only should anything be mapped there again.
                     .requestMatchers(HttpMethod.PATCH, "/api/v1/users/*/logistician")
                     .hasRole(Roles.ADMIN)
                     .requestMatchers(HttpMethod.PATCH, "/api/v1/users/*/mission-manager")
                     .hasRole(Roles.ADMIN)
                     .requestMatchers(HttpMethod.PUT, "/api/v1/users/*/attributes")
                     .hasRole(Roles.ADMIN)
-                    // GET .../memberships ist die Picker-Read-Variante (SPEZIALKOMMANDO_PLAN.md
-                    // §7.4) — gibt nur OrgUnit-Names + Shorthands zurueck, keine PII. Wird vom
-                    // Frontend OrgUnitContextAdvice (Sidebar-Switcher + Bereichskontext-Chip)
-                    // sowie von den R5.d Owner-Picker-Fragments fuer jeden authenticated Caller
-                    // gelesen. Ohne diese explizite Regel faellt die URL in die catch-all
-                    // `/api/v1/users/**` darunter — die ist `hasRole("ADMIN")` und verursachte
-                    // einen 403 fuer Non-Admins beim eigenen Memberships-Lookup (Sidebar-Chip
-                    // zeigte dann "Kein Bereichskontext"). Der Method-Level @PreAuthorize auf
-                    // UserController#getUserMemberships ist die zweite Verteidigungslinie
-                    // (defense in depth) und bleibt das Source-of-truth fuer die zulaessigen
-                    // Rollen — die URL-Regel oeffnet nur das Tor.
+                    // GET .../memberships is the picker read variant
+                    // (docs/archive/SPEZIALKOMMANDO_PLAN.md section 7.4) — it returns only OrgUnit
+                    // names + shorthands, no PII. The frontend's OrgUnitContextAdvice (sidebar
+                    // switcher + area-context chip) and the R5.d owner-picker fragments read it
+                    // for every authenticated caller. Without this explicit rule the URL falls
+                    // into the catch-all `/api/v1/users/**` below — which is `hasRole("ADMIN")`
+                    // and caused a 403 for non-admins on their own memberships lookup (the
+                    // sidebar chip then showed "Kein Bereichskontext"). The method-level
+                    // @PreAuthorize on UserController#getUserMemberships is the second line of
+                    // defence (defence in depth) and stays the source of truth for the allowed
+                    // roles — the URL rule only opens the gate.
                     // BANK_EMPLOYEE widening (REQ-BANK-044): the deposit/withdrawal counterparty
                     // org-unit picker resolves the chosen user's memberships here; a bank employee
                     // need not hold any org-role (REQ-BANK-008). BANK_EMPLOYEE covers

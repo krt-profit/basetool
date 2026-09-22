@@ -1755,9 +1755,13 @@ services:
   # The hardening is the point of the swap, so each line is load-bearing:
   #   user 101:101        the image is the unprivileged build; the master runs as
   #                       uid 101 too, not just the workers
-  #   cap_drop [ALL]      with NO cap_add. nginx listens on 8080/8443 INSIDE and
-  #                       the host publishes 80/443 onto them, so not even
-  #                       NET_BIND_SERVICE is needed. NPM needed seven.
+  #   cap_drop [ALL]      with NO cap_add. nginx listens on 8080/8443 INSIDE, so
+  #                       not even NET_BIND_SERVICE is needed. NPM needed seven.
+  #                       The `ports:` below publish 80/443 onto them for a
+  #                       Compose stack; the generated Quadlet unit ignores
+  #                       them and publishes 8080/8443 on loopback only, where
+  #                       haproxy on the host (which owns 80/443) forwards with
+  #                       PROXY protocol (ADR-0187).
   #   read_only true      impossible with NPM, whose boot sed-edits its own
   #                       configuration and pip-installs certbot plugins
   #   no egress           its five networks are `internal: true`; ACME lives in

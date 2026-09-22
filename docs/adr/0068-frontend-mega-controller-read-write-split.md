@@ -1,6 +1,6 @@
 # ADR-0068 — Split the four mega frontend page controllers into read + write controllers
 
-- **Status:** Proposed
+- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-07-03 (`3e6ef0782`, #959: `MissionWriteController`, `JobOrderWriteController`, `RefineryOrderWriteController`, `InventoryWriteController`).
 - **Date:** 2026-07-03
 - **Deciders:** Repository owner (@greluc)
 - **Related:** issue #924 (L5, epic #905) · ADR-0061/0062/0063/0064 (the backend god-class splits, same behaviour-preserving campaign) · REQ-FE-001…010 (krtFetch/fragment-swap live update) · #916 (S10) / #918 (S12)

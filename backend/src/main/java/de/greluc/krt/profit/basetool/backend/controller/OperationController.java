@@ -412,7 +412,9 @@ public class OperationController {
               + "`paidOutByUser`) are always refreshed when `paidOut=true`; setting "
               + "`paidOut=false` keeps the last audit fields as a historical record. The "
               + "participantKey matches the opaque key returned by `/payouts` (real user UUID "
-              + "stringified or `guest_<name>`). Returns only the participant's paid-out status "
+              + "stringified, `guest_<name>` for an external participant, or "
+              + "`deleted_<participantId>` for a participant whose account was deleted). Returns "
+              + "only the participant's paid-out status "
               + "block (flag + audit trace) — a toggle never changes any amount, so the payout "
               + "computation is not re-run.")
   @ApiResponses({

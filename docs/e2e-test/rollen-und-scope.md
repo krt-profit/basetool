@@ -10,11 +10,11 @@ Diese Referenz hält die Rollen- und Tenancy-Regeln fest, auf denen die rollen- 
 | **Officer**                                                                  | Keycloak-Rolle                                                      | Erbt `LOGISTICIAN` + `MISSION_MANAGER` (Hierarchie), aber **staffel-scoped** über `canEditOrgUnit(...)`.                                                                                         |
 | **Logistician**                                                              | Kontextuell: `org_unit_membership.is_logistician`                   | Lager- & Auftragsverwaltung. Flache Rolle wird vom JWT-Konverter befördert, wenn das Flag auf *irgendeiner* Mitgliedschaft `true` ist; das Per-OrgUnit-Scoping erfolgt über `OwnerScopeService`. |
 | **Einsatzleiter** (Keycloak-Rolle `Mission Manager`, Code `MISSION_MANAGER`) | Kontextuell: `org_unit_membership.is_mission_manager`               | Einsatz-Verwaltung; gleiche Beförderungslogik.                                                                                                                                                   |
-| **SK Lead**                                                                  | Kontextuell: `org_unit_membership.is_lead` (nur auf einer SK-Zeile) | Darf in *diesem einen* SK Mitglieder verwalten — sonst nichts.                                                                                                                                   |
+| **SK Lead**                                                                  | Kontextuell: Mitgliedschaftsrang `org_unit_membership.role = SK_LEAD` (nur auf einer SK-Zeile; seit V187 statt des Flags `is_lead`) | Darf in *diesem einen* SK Mitglieder verwalten — sonst nichts. |
 | **KRT Member**                                                               | Basis-User                                                          | `HANGAR_READ/WRITE`, `MISSION_READ`. Keine erhöhten Rechte.                                                                                                                                      |
 | **Kein Rollenträger** (`ROLE_NO_ROLE`)                                       | Konto ohne Anwendungsrolle                                          | Erreicht nichts — `403 NO_ROLE` vor jedem Handler (`REQ-SEC-053`). Der Vorgänger hieß `Guest` und war unauthentifiziert; ohne Anmeldung gibt es seit ADR-0159 nur Startseite und Rechtsseiten.   |
 
-**Hierarchie:** `ADMIN > LOGISTICIAN`, `ADMIN > MISSION_MANAGER`, `OFFICER > LOGISTICIAN`, `OFFICER > MISSION_MANAGER`.
+**Hierarchie** (`SecurityConfig#roleHierarchy`): `ADMIN > LOGISTICIAN`, `OFFICER > LOGISTICIAN`, `ADMIN > MISSION_MANAGER`, `OFFICER > MISSION_MANAGER`, `ADMIN > BANK_MANAGEMENT > BANK_EMPLOYEE`. Die Bank-Rollen sind unabhängig von der Mitgliedschaft in einer OrgUnit (→ [UC-32](UC-32-kartellbank-antraege-berechtigungen.md)).
 
 ## Rollen × Flow-Matrix (Schreib-Operationen)
 
@@ -29,21 +29,33 @@ Diese Referenz hält die Rollen- und Tenancy-Regeln fest, auf denen die rollen- 
 | Eigenes Inventar an Job Order verknüpfen | ✓ (nur eigenes)         | ✓ (fremder Owner)      | ✓ (nur eigenes) | ✓       | ✓     |
 | Job-Order-Handover (UC-06)               | ✗                       | ✓                      | ✗               | ✓       | ✓     |
 | Job Order / Item-Order löschen           | ✗                       | ✗                      | ✗               | ✗       | ✓     |
-| Einsatz/Operation anlegen                | ✗                       | ✗                      | ✓               | ✓       | ✓     |
+| Operation anlegen                        | ✗                       | ✗                      | ✓               | ✓       | ✓     |
 | SK anlegen / umbenennen / löschen        | ✗                       | ✗                      | ✗               | ✗       | ✓     |
 | SK-Mitglieder verwalten                  | nur als **Lead** des SK | –                      | –               | ✗       | ✓     |
 
-Die Gates verbatim: Einsatz `isAuthenticated()`, Job Order `permitAll()`, Refinery Order + Inventar `isAuthenticated()` (fremder Owner nur `isLogisticianOrAbove`), Handover `hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN')`, Job Order bearbeiten/Status `hasRole('LOGISTICIAN')` (+ `canEditJobOrder`), Job Order löschen `hasRole('ADMIN')`, Operation `hasRole('MISSION_MANAGER')`, SK-Lifecycle `hasRole('ADMIN')`, SK-Member-Verwaltung `@SpecialCommandSecurityService.canManageMembers(...)`.
+Die Gates verbatim: Einsatz `isAuthenticated() and @authHelperService.isMemberOrAbove()`, Job Order `isAuthenticated()` (bis ADR-0149 `permitAll()` für das öffentliche Anfrageformular), Refinery Order + Inventar `isAuthenticated()` (Refinery Order für einen fremden Owner nur als Logistiker; Inventar für ein fremdes Mitglied nur mit gemeinsamem editierbarem OrgUnit-Scope, im Service gegen den Empfänger geprüft, REQ-SEC-005), Handover `(hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN')) and @ownerScopeService.canEditJobOrder(#id)`, Job Order bearbeiten/Status `hasRole('LOGISTICIAN')` (+ `canEditJobOrder`), Job Order löschen `hasRole('ADMIN')`, Operation `hasRole('MISSION_MANAGER')`, SK-Lifecycle `hasRole('ADMIN')`, SK-Member-Verwaltung `@specialCommandSecurityService.canManageMembers(#id, authentication)`. Vor jedem dieser Gates weist das Backend ein Konto ohne Anwendungsrolle mit `403 NO_ROLE` ab (`REQ-SEC-053`).
+
+## Control-Gating je Rolle (`RolePermissionsE2eTest`)
+
+Die Rollen-Matrix oben prüft im Browser [`RolePermissionsE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/RolePermissionsE2eTest.java) (`@Tag("e2e")`) an einem geseedeten MATERIAL-Auftrag auf `orders-detail.html`. Drei Nutzer — `test-member`, `test-officer`, `test-admin` — melden sich je in einem eigenen Browser-Kontext an und öffnen denselben Auftrag:
+
+| Control (`sec:authorize`)                                          | KRT Member | Officer | Admin |
+|--------------------------------------------------------------------|------------|---------|-------|
+| Handover `order-handover-open` (`hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')`) | ✗   | ✓       | —     |
+| Bearbeiten, Trigger des `edit-modal` (`hasRole('LOGISTICIAN')`)    | ✗          | ✓       | ✓     |
+| Löschen, `/delete`-Formular (`hasRole('ADMIN')`)                   | ✗          | ✗       | ✓     |
+
+„—" heißt: nicht geprüft. Die Klasse verlässt sich darauf, dass JUnit die Testklassen nacheinander ausführt — die hier gesetzte IRIDIUM-Heimat würde sonst von einer staffel-übergreifenden Klasse überschrieben.
 
 ## Mandanten-Scope-Modell
 
 Der Scope wird **im Service-Layer** durchgesetzt (`OwnerScopeService`), nicht im Controller. Drei Aggregat-Scope-Arten:
 
 - **Strict-Staffel** (kein staffel-übergreifender Zugriff): `Ship`, `InventoryItem` (direkte Lager-View), `RefineryOrder`, **`Operation`**. Listen filtern auf `owning_org_unit_id`; Detail-/Schreibendpunkte gaten über `canSee*`/`canEdit*`.
-- **Cross-Staffel mit Public-Escape**: `Mission` (Einsatz). Für andere OrgUnits sichtbar, *wenn* `is_internal = false`; editierbar nur durch die besitzende OrgUnit + Admins. → UC-10.
+- **Cross-Staffel mit organisationsweitem Escape**: `Mission` (Einsatz). Für andere OrgUnits sichtbar, *wenn* `is_internal = false`; editierbar nur durch die besitzende OrgUnit + Admins. → UC-10.
 - **Bedingt staffel-scoped (Sichtbarkeit über `responsibleOrgUnit.kind`, REQ-ORG-003)**: `JobOrder` + verknüpfte `JobOrderMaterial` + `JobOrderHandover`. Responsible = SK → **öffentlich** für alle profit-eligible Mitglieder (geteilte SK-Warteschlange); Responsible = Staffel → **privat** für diese Staffel + Admins. Vorgeschaltet ist das Profit-Gate (`canViewJobOrders`: Admin oder mindestens eine profit-eligible Mitgliedschaft). SK-Auftrags-*Edits* laufen über das Rollen-Gate (LOGISTICIAN+), nicht über den Staffel-Scope. Verknüpftes Inventar ist im Auftrags-Kontext cross-OrgUnit sichtbar (`findByJobOrderIdOrdered`, ungegated), leakt aber nie in eine fremde Lager-View. → UC-08, UC-09, UC-18.
 
-> **Wichtig (Korrektur einer häufigen Annahme):** **Einsätze/Operationen und Refinery Orders sind strict-staffel, NICHT staffel-übergreifend.** Die staffel-übergreifende Zusammenarbeit läuft über **öffentliche Einsätze** (Teilnehmer aus anderen Staffeln, UC-10) und über den **Job-Order-Workspace** inkl. Handover (UC-08/UC-09) — nicht über Operationen oder Refinery Orders.
+> **Wichtig (Korrektur einer häufigen Annahme):** **Einsätze/Operationen und Refinery Orders sind strict-staffel, NICHT staffel-übergreifend.** Die staffel-übergreifende Zusammenarbeit läuft über **organisationsweite Einsätze** (`is_internal = false`, UC-10) und über den **Job-Order-Workspace** inkl. Handover (UC-08/UC-09) — nicht über Operationen oder Refinery Orders.
 
 ## Admin-Pin & Scope-Auflösung (`ScopePredicate`)
 
@@ -58,7 +70,7 @@ Beim Anlegen wird die OrgUnit zentral gestempelt (`resolveSquadronForPickerOutpu
 ## SK (Spezialkommando) — Grundlagen
 
 - SK und Staffel teilen die `org_unit`-Tabelle mit `kind`-Diskriminator (`SQUADRON` / `SPECIAL_COMMAND`). SK ist also eine vollwertige OrgUnit mit Mitgliedschaften.
-- **SK-Lifecycle** (anlegen/umbenennen/löschen) ist ADMIN-only. **SK-Mitgliederverwaltung** ist offen für ADMIN oder den `is_lead`-Träger genau dieses SK (`canManageMembers`); der Lead-Toggle selbst bleibt ADMIN-only (kein Self-Escalation).
+- **SK-Lifecycle** (anlegen/umbenennen/löschen) ist ADMIN-only. **SK-Mitgliederverwaltung** ist offen für ADMIN oder den SK-Lead (Rang `SK_LEAD`) genau dieses SK (`canManageMembers`); den Lead zu setzen bleibt ADMIN-only (kein Self-Escalation). Die Leitungsränge aller OrgUnit-Arten stehen seit epic #800 in der einen Spalte `org_unit_membership.role` (REQ-ROLE-001); die fünf früheren Leitungs-Flags hat V187 entfernt.
 - **SK als besitzende OrgUnit von strict-Aggregaten ist möglich** (Inventar, Ship, Refinery Order, Mission, Operation): die Legacy-Spalte `owning_squadron_id` wurde in V102/V103 entfernt, `owning_org_unit_id` referenziert die polymorphe `org_unit`-Tabelle (und ist seit V132 für die personenbezogenen Aggregate nullable). Ein SK kann also Inventar besitzen — die `memberOrgUnitIds`-Vereinigung umfasst Staffel **und** SK. → UC-14. **Ausnahme Job Order:** ein nicht-profit-fähiges SK darf nicht die *bearbeitende* (responsible) Einheit eines Job Orders sein (400, Profit-Eligibility V128) → UC-11; als *anfragende* (requesting) Einheit ist jede OrgUnit zulässig.
 - **SK können nicht am Beförderungssubsystem teilnehmen** (DB-CHECK + Trigger + JPA-Guards).
 

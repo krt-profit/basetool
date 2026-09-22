@@ -5,6 +5,10 @@
 > interface that keeps mappers out of the service layer), `REQ-SEC-047`, `REQ-SEC-048`,
 > `docs/specs/security-and-access.md`, `ROLES_AND_PERMISSIONS.md`
 
+> **Note (2026-09-22):** "ADR-0011" in this record is **`basetool-android`'s** ADR-0011 (*the app
+> knows its permissions, and refuses in place instead of hiding*), not this repository's
+> [ADR-0011](0011-bank-authorization-model.md), which is the bank authorization model.
+
 ## Context
 
 An admin signed in to the Android app could not assign a Lager entry, could not rebook another

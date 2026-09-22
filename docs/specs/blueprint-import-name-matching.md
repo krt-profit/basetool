@@ -1,14 +1,14 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-21.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
 > **Owner area:** INV · **Related ADRs:** [ADR-0008](../adr/0008-refinery-extract-json-contract.md)
 > (its additive-v1 evolution rule is mirrored by REQ-INV-014),
 > [ADR-0033](../adr/0033-scmdb-net-export-and-structural-tag-matching.md) (scmdb.net export +
-> structural tag match) · **Plan:** `SC_WIKI_SYNC_PLAN.md` (historical)
+> structural tag match) · **Plan:** [`SC_WIKI_SYNC_PLAN.md`](../archive/SC_WIKI_SYNC_PLAN.md) (historical)
 
 # Blueprint import — product name matching
 
 ## Context & goal
 
-The personal-inventory blueprint feature ([#327](https://github.com/greluc/basetool/issues/327))
+The personal-inventory blueprint feature ([#327](https://github.com/krt-profit/basetool/issues/327))
 lets a user own crafting blueprints and import them from the game. The in-game
 `"Received Blueprint: <name>"` notification — captured by the SCMDB log-watcher / Basetool
 Blueprint Extractor — is matched, by name, against the blueprint **product master**.
@@ -39,7 +39,7 @@ from `output_name` (not the resolved `output_item`/`game_item` name), so a bluep
 
 **Enforced by:** `BlueprintNameNormalizerTest`, `BlueprintProductServiceTest` · **Code:**
 `BlueprintNameNormalizer`, `BlueprintProductService`, `ScWikiBlueprintSyncService` · **Issues:**
-[#327](https://github.com/greluc/basetool/issues/327)
+[#327](https://github.com/krt-profit/basetool/issues/327)
 
 ### REQ-INV-007 — Curated, guarded, self-healing correction of CIG-mislabeled `output_name`s
 
@@ -87,7 +87,7 @@ of known upstream bugs that need the correct name in code review, not a runtime-
 `P4kImportServiceTest` · **Code:** `BlueprintOutputNameOverrides`,
 `ScWikiBlueprintSyncService.upsertBlueprintWithinTransaction`,
 `P4kImportService.maybeSeedBlueprint` · **Issues:**
-[#327](https://github.com/greluc/basetool/issues/327)
+[#327](https://github.com/krt-profit/basetool/issues/327)
 
 ### REQ-INV-014 — Tolerant export-envelope parsing (additive v1 evolution)
 
@@ -138,8 +138,9 @@ entry level (`BlueprintExportEntryDto`):
 `preview_acceptsBpExtractorWithNullAdditionalSourceFolders`, `preview_acceptsScmdbNetNameAlias`,
 `preview_acceptsFullScmdbNetProfileExportIgnoringMissions`, `preview_skipsNotCompletedScmdbNetEntries`,
 `preview_acceptsBareArrayOfScmdbNetEntries`) · **Code:** `BlueprintExportFileDto`,
-`BlueprintExportEntryDto`, `BlueprintImportService#parse` · **Issues:**
-[#327](https://github.com/greluc/basetool/issues/327)
+`BlueprintExportEntryDto`, `BlueprintExportParser#parse` (called from `BlueprintImportService`) ·
+**Issues:**
+[#327](https://github.com/krt-profit/basetool/issues/327)
 
 ### REQ-INV-015 — Variant family key (cosmetic-variant grouping)
 
@@ -234,7 +235,7 @@ tag-less no-op), `BlueprintProductServiceTest`
 (`scwikiKeyToProductKeyIndex_mapsLowercasedKeyToProductKey`,
 `scwikiKeyToProductKeyIndex_excludesAmbiguousKeys`) · **Code:**
 `BlueprintProductService#scwikiKeyToProductKeyIndex`, `BlueprintImportService#resolveViaTag`,
-`BlueprintImportService#parse` · **ADR:**
+`BlueprintExportParser#parse` (tag-vs-name de-duplication) · **ADR:**
 [ADR-0033](../adr/0033-scmdb-net-export-and-structural-tag-matching.md)
 
 ### REQ-INV-020 — Case-insensitive blueprint-alias uniqueness
@@ -342,7 +343,7 @@ precedence), `BlueprintFuzzyMatcherTest#topSuggestions_stillCatchesAGermanCapaci
   item name) — a separate concern resolved by `external_uuid`, not by this name-correction layer.
 - The fuzzy-suggestion ranking of the import matcher itself (it consumes the corrected master).
 - The broader SC Wiki / UEX / P4K catalog-sync mechanics, documented in the historical
-  `SC_WIKI_SYNC_PLAN.md` and the sync services' Javadoc.
+  [`SC_WIKI_SYNC_PLAN.md`](../archive/SC_WIKI_SYNC_PLAN.md) and the sync services' Javadoc.
 
 ## Open questions
 

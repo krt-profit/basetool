@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-17.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
 > **Owner area:** UI · **Related ADRs:** ADR-0105 (builds on ADR-0102/0103)
 
 # Materials pages — complete lists + server-filtered matrix

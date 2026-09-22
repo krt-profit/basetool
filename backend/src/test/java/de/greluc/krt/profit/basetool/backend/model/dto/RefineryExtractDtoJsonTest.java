@@ -28,11 +28,11 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Binding test deserializing the frozen-contract example from {@code
- * docs/archive/REFINERY_SCREENSHOT_IMPORT_PLAN.md} §5 verbatim (#434) — including the 2026-06-10 contract
- * amendments {@code quoted}, {@code rowIndex}, the header totals, {@code cropMode}, a {@code null}
- * {@code outputQuantity} on an un-quoted row, and the 2026-06-11 additive v1 field {@code
- * capturedAt} (REQ-REFINERY-017). A shape drift between the documented contract and these records
- * fails here before it fails in the field.
+ * docs/archive/REFINERY_SCREENSHOT_IMPORT_PLAN.md} §5 verbatim (#434) — including the 2026-06-10
+ * contract amendments {@code quoted}, {@code rowIndex}, the header totals, {@code cropMode}, a
+ * {@code null} {@code outputQuantity} on an un-quoted row, and the 2026-06-11 additive v1 field
+ * {@code capturedAt} (REQ-REFINERY-017). A shape drift between the documented contract and these
+ * records fails here before it fails in the field.
  */
 class RefineryExtractDtoJsonTest {
 

@@ -224,7 +224,7 @@ class AdminOrgStructurePageControllerMvcTest {
   }
 
   // REQ-DATA-007 — a Bereich / OL create and an org-unit re-parent all change the cached
-  // /api/v1/org-units/active-all-kinds picker, so each must evict STATIC_DATA_CACHE.
+  // /api/v1/org-units/active-all-kinds picker, so each must evict the CacheDomain.ORG_UNIT cache.
   @Test
   @WithMockUser(roles = "ADMIN")
   void createBereich_ajax_evictsStaticDataCache() throws Exception {

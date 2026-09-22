@@ -67,7 +67,7 @@ class OrgUnitContextAdviceTest {
   @Test
   void availableSquadrons_routesSquadronCatalogueThroughCache() {
     // REQ-DATA-007: the squadron catalogue is a slow-changing global list fetched on every
-    // authenticated render; it must go through the 10-min STATIC_DATA_CACHE (getCached), not a
+    // authenticated render; it must go through the CacheDomain.SQUADRON cache (getCached), not a
     // per-render plain GET. getCached is unstubbed (returns null → advice degrades to empty); the
     // assertion is about the routing, not the payload.
     when(authHelper.isAuthenticated()).thenReturn(true);

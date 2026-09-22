@@ -5,6 +5,14 @@
 - **Deciders:** @greluc
 - **Related:** spec [REQ-SEC-023](../specs/security-and-access.md) · [ADR-0049](0049-config-as-promotable-oci-artifact.md) (config as a promotable OCI artifact) · runbook [`docs/deployment.md`](../deployment.md) → *Edge rate limiting* · the 2026-07-20 edge-rate-limit incident (PR #1382)
 
+> **Note (2026-09-22):** the mechanism below — a dual-stack Docker bridge so the published port's
+> IPv6 DNAT hands nginx the real client address, read off NPM's access log — describes the Docker
+> host. NPM was replaced by native nginx on 2026-09-12 (ADR-0162), and since the 2026-09-22 cutover
+> to rootless Podman (ADR-0163) the client address reaches the edge from a host-level haproxy by
+> PROXY protocol instead ([ADR-0187](0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md)).
+> The part of this decision that still holds is the limiter key: IPv6 clients collapse to their
+> `/64` prefix (`$krt_limit_key` in `docker/edge/conf.d/00-maps.conf`).
+
 ## Context
 
 The edge per-IP rate limiter (REQ-SEC-023) keys `limit_req` / `limit_conn` on nginx's

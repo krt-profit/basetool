@@ -44,17 +44,15 @@ import org.jetbrains.annotations.NotNull;
  *       superclass; existing call sites that read or set {@code name}, {@code shorthand}, {@code
  *       description}, {@code active}, {@code isPromotionEnabled} continue to compile and behave
  *       identically.
- *   <li>The legacy {@code squadron} table is kept in lockstep with {@code org_unit} by the V97
- *       trigger {@code sync_org_unit_to_squadron} so every existing foreign-key constraint ({@code
- *       app_user.squadron_id}, {@code mission_participant.squadron_id}, every aggregate's {@code
- *       owning_squadron_id} / {@code creating_squadron_id} / {@code requesting_squadron_id}) still
- *       resolves cleanly. Callers that touch those FKs do not need to know the application now
- *       writes through {@code org_unit}; that abstraction lives entirely at the database layer.
+ *   <li>The legacy {@code squadron} table was kept in lockstep with {@code org_unit} by a sync
+ *       trigger during the transition; V105 dropped it and retargeted the remaining Squadron-typed
+ *       foreign keys ({@code promotion_topic.owning_squadron_id}, {@code
+ *       mission_participant.squadron_id}, {@code job_order_handover.executing_squadron_id}) at
+ *       {@code org_unit}, keeping their column names.
  * </ul>
  *
  * <p>The {@link #IRIDIUM_ID} canonical UUID is preserved verbatim — the application code that
- * references it (backfill paths, test fixtures, the {@code SquadronScopeService} default-tenant
- * resolution) stays unchanged.
+ * references it (backfill paths, test fixtures) stays unchanged.
  *
  * <p>No subclass-specific columns are added in R2.b; the JPA-layer existence of {@code Squadron} is
  * enough to give the inheritance hierarchy a complete shape. Squadron-specific behaviour (e.g.

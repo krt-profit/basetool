@@ -1,6 +1,6 @@
 # Data protection (GDPR) — documentation index
 
-> **Doc type:** Living documents — kept in sync with `main`. Last reviewed: 2026-09-16.
+> **Doc type:** Living documents — kept in sync with `main`. Last reviewed: 2026-09-22.
 
 This folder holds the **organisational** half of the project's data-protection obligations: the
 documents the GDPR requires a controller to *have*, as opposed to the behaviour it requires the
@@ -51,15 +51,18 @@ promises more than the code delivers is the worst of the three failure modes, be
 a supervisory authority reads first.
 
 > [!important] Retention periods appear in prose in the privacy policy
-> The policy names the numbers (90 days, 180 days, 31 days, 14 days, 180 days for metrics) in
-> sentences, while the code reads them from configuration. Changing a configured window without
+> The policy names the numbers (90 and 180 days for notifications, 90 days for a refused
+> registration, 24 months for the audit trails, 31 days for logs, 30 days for Keycloak events and for
+> a session, 14 days for traces, 180 days for metrics, about six months for backups) in sentences,
+> while the code and the platform configuration hold them. Changing a configured window without
 > changing the sentence makes the published policy false. The windows and their configuration keys
 > are tabulated in [`processing-activities.md`](processing-activities.md#retention).
 
 ## Scope
 
 These documents cover the Profit Basetool as deployed: backend, frontend, ingest gateway, the
-Keycloak SPI and theme, the Android app and the desktop extractor, plus the platform they run on.
+Keycloak SPI and theme, the Android app and the desktop extractor, plus the platform they run on —
+since 2026-09-22 a rootless-Podman host on Rocky Linux 10 with the monitoring stack beside it.
 They describe **shapes and locations**, never values: no credentials, no internal hostnames, no
 member names, no production subject ids. This is a public repository.
 

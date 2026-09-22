@@ -1,6 +1,6 @@
 # ADR-0030 — Discord federation via an owned Keycloak SPI with a fail-closed first-login membership gate
 
-- **Status:** Accepted — Track 1 implemented (operator Discord + Keycloak setup pending)
+- **Status:** Accepted — Track 1 implemented. The import-attribute half of the *link claim* is **superseded by [ADR-0036](0036-discord-link-recognised-from-federated-identity.md)**. *Status corrected 2026-09-22:* it said "operator Discord + Keycloak setup pending"; the Discord identity provider is live in production — a read-only production query on 2026-09-13 counted 45 Discord-linked accounts.
 - **Date:** 2026-06-20
 - **Deciders:** @greluc, Claude
 - **Related:** spec REQ-SEC-016 · REQ-DATA-006 · REQ-SEC-017 · REQ-NOTIF-012 · REQ-DATA-008 · issue #720 · #721 · #723 · runbook `docs/keycloak/DISCORD_KEYCLOAK_SETUP.md`

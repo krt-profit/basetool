@@ -38,11 +38,11 @@ import org.springframework.http.HttpStatus;
  * {@code code}) — each hand-copying the same {@code problem(...)} + {@code resolveDetail(...)} +
  * {@code logProblem(...)} sequence. That collapses to <b>one</b> dispatch handler ( {@code
  * GlobalExceptionHandler.handleAppException}) reading the accessors below, plus the {@link
- * AppExceptionKind} enum holding the seven fixed-per-type identities and {@link
+ * AppExceptionKind} enum holding the fixed-per-type identities (seven then, ten now) and {@link
  * ErrorDisclosurePolicy} covering the one behavioural fork (message suppression + ERROR logging for
  * {@code ExternalServiceException}/{@code ReportGenerationException}).
  *
- * <p><b>Nine of the ten subtypes never override an accessor.</b> They pass their fixed {@link
+ * <p><b>Ten of the eleven subtypes never override an accessor.</b> They pass their fixed {@link
  * AppExceptionKind} constant to the {@link #AppException(AppExceptionKind, String)} constructor and
  * inherit {@link #status()}/{@link #code()}/{@link #titleKey()}/{@link #detailKey()}/{@link
  * #typeSuffix()}/{@link #logLabel()}/{@link #disclosurePolicy()} unchanged — all of them simply
@@ -78,7 +78,7 @@ public abstract sealed class AppException extends RuntimeException
         ReportGenerationException {
 
   /**
-   * The fixed per-type identity for the six subtypes that have one; {@code null} for {@link
+   * The fixed per-type identity for the ten subtypes that have one; {@code null} for {@link
    * BankConflictException}, whose accessors are computed per-instance and therefore all overridden.
    */
   private final @Nullable AppExceptionKind kind;

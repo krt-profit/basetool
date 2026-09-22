@@ -153,7 +153,10 @@ public final class E2eStackExtension implements BeforeAllCallback {
           "docker-compose.build.yml",
           "docker-compose.e2e.yml");
 
-  /** The dev-profile services the E2E stack needs (npm is intentionally excluded). */
+  /**
+   * The dev-profile services the E2E stack needs. {@code ingest-dev}, the one other dev-profile
+   * service, is not started; the edge and its ACME client are prod-profile only.
+   */
   private static final List<String> SERVICES =
       List.of(
           "db-backend-dev",
@@ -501,7 +504,7 @@ public final class E2eStackExtension implements BeforeAllCallback {
     cmd.add("--profile");
     cmd.add("dev");
     cmd.addAll(List.of(verbAndArgs));
-    // Scope `up` and `logs` to the explicit service list (npm is intentionally excluded); scope
+    // Scope `up` and `logs` to the explicit service list (ingest-dev is not started); scope
     // `pull` to only the external, registry-sourced images (the built services have no pullable
     // tag).
     if ("up".equals(verbAndArgs[0]) || "logs".equals(verbAndArgs[0])) {

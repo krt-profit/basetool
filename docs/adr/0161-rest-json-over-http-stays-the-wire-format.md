@@ -1,6 +1,6 @@
 # ADR-0161 — REST/JSON over HTTP stays the wire format; gRPC is rejected as a migration
 
-- **Status:** Proposed
+- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-09-10 (`350a0499c`): REST/JSON stayed, and the five §8 improvements shipped with it (`app.http.backend-protocol`, `app.http.codec`, the narrowed ETag, the DTO generator, the schema diff).
 - **Date:** 2026-09-10
 - **Deciders:** @greluc (pending)
 - **Related:** [`WIRE_PROTOCOL_EVALUATION.md`](../archive/WIRE_PROTOCOL_EVALUATION.md) (the full analysis) ·

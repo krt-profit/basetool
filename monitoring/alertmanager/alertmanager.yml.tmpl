@@ -1,9 +1,10 @@
 # Alertmanager configuration TEMPLATE. Alertmanager 0.33.x (verified 2026-07). Epic #936, ADR-0072.
 #
-# Alertmanager does NOT expand environment variables, so this is a TEMPLATE: the rollout runbook
-# renders it with `envsubst` to /var/iri/monitoring/secrets/alertmanager.yml and runs
-# `amtool check-config` against the RENDERED file. The ${...} placeholders below come from the host
-# .env (SMTP credentials + healthchecks.io ping URL). Alert e-mails never contain user data.
+# Alertmanager does NOT expand environment variables, so this is a TEMPLATE: the operator renders
+# it with `envsubst` to /var/iri/monitoring/secrets/alertmanager.yml and runs `amtool check-config`
+# against the RENDERED file (monitoring/README.md -> "Re-rendering the Alertmanager config"). The
+# ${...} placeholders below are exported in the operator's shell for that render (SMTP credentials,
+# recipient, healthchecks.io ping URL, Discord webhook). Alert e-mails never contain user data.
 #
 # SMTP: 587 STARTTLS, smtp_require_tls enforced. The Watchdog alert (always firing) is routed to the
 # external heartbeat receiver — the dead-man's switch: if this stack or the host dies, the pings stop

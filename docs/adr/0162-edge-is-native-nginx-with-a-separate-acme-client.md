@@ -1,10 +1,15 @@
 # ADR-0162 — The edge is native nginx, configured from git, with ACME in a separate container
 
-- **Status:** Proposed
+- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the
+  edge was cut over to native nginx on 2026-09-12
+  ([`EDGE_CUTOVER_RUNBOOK.md`](../archive/EDGE_CUTOVER_RUNBOOK.md)) and NPM was removed from the
+  stack on 2026-09-16 (`4d1e99953`). The deferred rootless-Podman question was decided by
+  [ADR-0163](0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md) and
+  [ADR-0187](0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md).
 - **Date:** 2026-09-12
 - **Deciders:** @greluc (pending)
-- **Related:** [ADR-0072](0072-monitoring-stack-decoupled-from-the-app-deploy.md) ·
-  [ADR-0112](0112-edge-per-ip-limit-keys-on-the-ipv6-64-prefix.md) ·
+- **Related:** [ADR-0072](0072-monitoring-stack-prometheus-grafana.md) ·
+  [ADR-0112](0112-edge-real-client-ip-restore-native-ipv6.md) ·
   [ADR-0135](0135-public-api-vhost-not-a-gateway.md) ·
   [ADR-0139](0139-shared-committed-tls-material-for-the-test-stack.md) ·
   specs `REQ-SEC-023`, `REQ-SEC-031`, `REQ-SEC-032`, `REQ-SEC-033`, `REQ-OBS-012`,
@@ -85,6 +90,12 @@ into a separate container.**
 **NPM is not removed.** Its service definition, data and volumes stay in place and unreferenced, so
 `docker compose up -d npm` restores the previous edge in seconds. It is removed in a later, separate
 change, and deliberately later than feels necessary.
+
+> **Note (2026-09-22):** that later change came on 2026-09-16 (`4d1e99953`): the `npm` service, its
+> `rollback` profile and its volumes are gone, so neither rollback command in this ADR exists any
+> more. Since the 2026-09-22 cutover the edge also runs as a Quadlet unit on the rootless Podman host
+> (ADR-0163), published on loopback behind a host-level haproxy that passes the client address by
+> PROXY protocol (ADR-0187); the configuration in `docker/edge/` is still the source of truth.
 
 ## Consequences
 

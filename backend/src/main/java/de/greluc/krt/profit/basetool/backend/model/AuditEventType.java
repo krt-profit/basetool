@@ -36,7 +36,15 @@ public enum AuditEventType {
   /** A warehouse inventory row was created. */
   INVENTORY_ITEM_CREATED(AuditDomain.INVENTORY),
 
-  /** A warehouse inventory row's associations / quality / amount were edited. */
+  /**
+   * A warehouse inventory row's associations / quality / amount were edited.
+   *
+   * @deprecated Historical only — no longer emitted since the in-place edit endpoint {@code PUT
+   *     /api/v1/inventory/{id}} was removed (commit d03a9238b, 2026-07-14); allocations are now
+   *     changed through their own endpoints. Retained because {@code audit_event.event_type} stores
+   *     the enum name, so existing rows would become unreadable if the constant were removed.
+   */
+  @Deprecated
   INVENTORY_ITEM_UPDATED(AuditDomain.INVENTORY),
 
   /**

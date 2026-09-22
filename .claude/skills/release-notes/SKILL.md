@@ -420,6 +420,14 @@ Git-Tag (`vX.Y.Z`) veröffentlicht wurden, gehören in den Abschnitt **dieses
 Tags** — nicht weiter ins „Unreleased". So spiegelt der Changelog die echten
 Releases wider, und `[Unreleased]` enthält nur noch wirklich Unveröffentlichtes.
 
+**Seit dem zweiphasigen Release-Ablauf ist das meist schon erledigt:**
+`.github/workflows/release-prepare.yml` ruft genau dieses Skript (`--write`) und
+danach `.github/scripts/cut_release.py` auf, der `[Unreleased]` in den neuen
+Versionsabschnitt schneidet, bevor `release-publish.yml` das Tag setzt. Der Lauf
+hier ist deshalb das Sicherheitsnetz für Einträge, die am Release-PR vorbei in
+`[Unreleased]` gelandet sind — auf einem sauberen Changelog meldet er schlicht
+keine Verschiebung (idempotent, siehe unten).
+
 Das macht ein zweites Hilfsskript mechanisch. **Immer erst der Probelauf**, den
 Bericht prüfen, dann schreiben:
 
@@ -452,8 +460,8 @@ gebündelt.
   ignoriert; gewertet wird ausschließlich `^v\d+\.\d+\.\d+$`.
 - **Datei-Hygiene:** kein BOM, LF-Zeilenenden und bereits vorhandene
   Versions-Abschnitte am Dateiende bleiben unangetastet. Die Versions-Überschrift
-  ist `## [vX.Y.Z](<repo>/releases/tag/vX.Y.Z) - JJJJ-MM-TT` (Datum = Commit-Datum
-  des Tags). Umlaute bleiben echtes UTF-8 (Markdown-Regel, **kein** `\uXXXX`).
+  ist `## [vX.Y.Z](https://github.com/krt-profit/basetool/releases/tag/vX.Y.Z) - JJJJ-MM-TT`
+  (Repo-URL aus `origin` abgeleitet oder per `--repo-url`; Datum = Commit-Datum des Tags). Umlaute bleiben echtes UTF-8 (Markdown-Regel, **kein** `\uXXXX`).
 
 **Grenzen / was es NICHT tut:** Es ist ein rein **struktureller** Umbau. Es
 repariert **keine** kaputt kodierten Umlaute (Mojibake wie `fÃ¼r`/`â€"` in alten

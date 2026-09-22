@@ -118,13 +118,12 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * combination land in {@code build/e2e-artifacts/touch-layout/} whether the run passes or fails —
  * the point is to look at them, not only to read a diff.
  *
- * <p><b>Tagged both {@code smoke} and {@code e2e}</b>, and the second tag is the one that makes
- * this guard real. It mutates nothing and is target-agnostic, which is what {@code smoke} means —
- * but the smoke workflow is nightly and gated on an {@code E2E_BASE_URL} staging host that does not
- * exist yet, so on its own this file would only ever run when somebody remembered to start it
- * locally. The {@code e2e} tag puts it on every pull request carrying the {@code e2e} label, which
- * is exactly the set that touches frontend flows, auth or controllers. Owner decision 2026-09-13,
- * at a cost of roughly five minutes on those runs.
+ * <p><b>Tagged {@code e2e} only, and deliberately not {@code smoke}</b> (owner decision 2026-09-13;
+ * the comment on the class says why). The {@code e2e} tag puts it on every pull request carrying
+ * the {@code e2e} label, which is exactly the set that touches frontend flows, auth or controllers,
+ * at a cost of roughly five minutes on those runs. It opens every modal on every route and needs
+ * the rows the destructive CRUD flows create, which is more than the non-destructive smoke contract
+ * allows.
  */
 // LAST in the suite, and that is a dependency rather than a preference: this class measures
 // against the rows the destructive CRUD flows create, and a fresh stack hides what it exists to

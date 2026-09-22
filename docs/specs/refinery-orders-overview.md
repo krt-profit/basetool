@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-28.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
 > **Owner area:** REFINERY · **Related ADRs:** none
 
 # Refinery-order overview list
@@ -11,11 +11,17 @@ with a status filter and a "Meine Aufträge" (own-orders) toggle. It used to fet
 set in a single unbounded `size=1000` response and render every row at once. As the order history
 grows this is wasteful and unbounded; this spec pins the page down to a server-side page using the
 shared pagination component, exactly like the blueprint availability overview (REQ-INV-013) and the
-squadron hangar overview.
+unit hangar overview (REQ-HANGAR-001).
 
 ## Requirements
 
 ### REQ-REFINERY-019 — Refinery-order list is paginated server-side
+
+> **ID collision (recorded 2026-09-22).** `REQ-REFINERY-019` also names the SC Extractor release
+> link in [`refinery-screenshot-import.md`](refinery-screenshot-import.md). Both are shipped and
+> test-referenced, so neither is renumbered without the owner's sign-off — see the collision list in
+> [`INDEX.md`](INDEX.md#2-requirement-ids-traceability-anchors). Cite this one as "REQ-REFINERY-019
+> (list pagination)" until then.
 
 The refinery-order overview MUST fetch one **server-side page** of orders (from
 `/api/v1/refinery-orders/all` or, when the own-orders toggle is on, `/api/v1/refinery-orders/my-orders`)

@@ -27,8 +27,10 @@ that). Link related issues (e.g. `closes #123`, `refs #456`).
 
 - [ ] `backend`
 - [ ] `frontend`
-- [ ] Both
-- [ ] Other (build / Compose / docs / workflows)
+- [ ] `ingest`
+- [ ] `keycloak-spi` / `keycloak-theme`
+- [ ] Deployment (Compose / generated Quadlet units / `ansible/` / edge / `monitoring/`)
+- [ ] Other (build / docs / workflows)
 
 ## How was this tested?
 
@@ -55,11 +57,11 @@ don't use "tests pass" as a stand-in.
 
 ### Code Quality
 
-- [ ] `./gradlew check` passes locally (Checkstyle, SpotBugs, tests).
+- [ ] `./gradlew spotlessApply` was run, and `./gradlew check` passes locally (Spotless, Checkstyle, SpotBugs, the frontend asset linters and type check, tests).
 - [ ] All Checkstyle and SpotBugs findings in the **changed code** are fixed — no new warnings on top.
 - [ ] No `@SuppressWarnings` / `@SuppressFBWarnings` / Checkstyle suppressions without a one-line comment that explains the justification for this specific call site.
 - [ ] Constructor injection via Lombok `@RequiredArgsConstructor`, no field `@Autowired`.
-- [ ] Loggers exclusively via `@Slf4j`, not instantiated manually.
+- [ ] Loggers exclusively via `@Slf4j` (`@JBossLog` in `keycloak-spi`), not instantiated manually.
 - [ ] Records for DTOs and immutable config wrappers, no POJO boilerplate.
 - [ ] Javadoc on every new/changed class, interface, enum, record, and public/protected method — concrete and code-specific, no generic "Returns the value".
 
@@ -67,7 +69,7 @@ don't use "tests pass" as a stand-in.
 
 - [ ] New features / fixes have tests (naming: `*Test`, Given/When/Then structure).
 - [ ] Tests run **exclusively** via `./gradlew test` — no IDE test runner.
-- [ ] For concurrency/locking changes: optimistic-lock paths tested, `*WithinTransaction` pattern respected (see CLAUDE.md > Concurrency).
+- [ ] For concurrency/locking changes: optimistic-lock paths tested, `*WithinTransaction` pattern respected (see [`backend/CLAUDE.md`](../backend/CLAUDE.md) > Concurrency).
 - [ ] No production credentials in tests or in locally spun-up test stacks (use `.env.test` + throwaway keystore + stripped realm).
 
 ### API & Database (if affected)
@@ -89,6 +91,7 @@ don't use "tests pass" as a stand-in.
 - [ ] No direct `SecurityContextHolder` access outside the auth-helper service (enforced via ArchUnit).
 - [ ] Frontend does not depend on Spring Data JPA and does not access the DB or Keycloak Admin API directly (ArchUnit rule).
 - [ ] No tokens, emails, or real names in logs.
+- [ ] Every new or changed mutation in an audited area records its audit event (REQ-AUDIT-001, [`docs/specs/audit.md`](../docs/specs/audit.md)).
 
 ### UI / Frontend (if affected)
 
@@ -96,13 +99,21 @@ don't use "tests pass" as a stand-in.
 - [ ] Styleguide respected (brand orange `#E77E23`, `Lato`-only type — headlines = Lato Bold + uppercase, department colors semantically correct).
 - [ ] No `confirm()` / `alert()` / native browser dialogs — KRT modals/toasts instead.
 - [ ] Every user-visible string comes from `messages.properties` (de + en + fallback); umlauts in `.properties` as `\uXXXX`, in Markdown literal UTF-8.
+- [ ] Mutations update the DOM in place via `krtFetch` — no full-page reload on success — and shared surfaces propagate a peer's change (REQ-FE-001…010).
 - [ ] DOM `data-version` attributes are consistently propagated after AJAX updates to **all** related elements (edit buttons, modals, action buttons in the same `<tr>`/container) — otherwise 409 on the next click.
 - [ ] Resilience4j paths considered for new backend calls (Timeout / Retry / CircuitBreaker / Bulkhead).
 
+### Documentation (if affected)
+
+- [ ] Specs (`docs/specs/`, `REQ-<AREA>-NNN`) and, for a design decision, an ADR (`docs/adr/`) move with the change.
+- [ ] `README.md`, [`ROLES_AND_PERMISSIONS.md`](../ROLES_AND_PERMISSIONS.md), the arc42 chapters (`docs/arc42/`) and the German user wiki are updated where the change affects them.
+- [ ] Monitoring (metrics, alert rules, dashboards, probes under `monitoring/`) is adjusted for new or changed jobs, endpoints and integrations (REQ-OBS-005…011).
+
 ### Configuration & Dependencies (if affected)
 
-- [ ] Dependency updates exclusively in `versions.properties` / `gradle/libs.versions.toml` (not directly in `build.gradle.kts`).
-- [ ] New env vars / properties are documented (`README.md`, `application-*.yml`, `@ConfigurationProperties` with `@Validated`).
+- [ ] Dependency updates exclusively in the version catalog `gradle/libs.versions.toml` (not directly in `build.gradle.kts`).
+- [ ] New env vars / properties are documented (`.env.example`, `README.md`, `application-*.yml`, `@ConfigurationProperties` with `@Validated`).
+- [ ] A change to a `docker-compose*.yml` service regenerates the Quadlet units (`python3 scripts/generate-quadlet.py`; CI checks with `--check`).
 - [ ] Refresh-Versions / Dependabot reviewers do not have competing open PRs on the same configuration area.
 
 ## Migration and Deployment Notes

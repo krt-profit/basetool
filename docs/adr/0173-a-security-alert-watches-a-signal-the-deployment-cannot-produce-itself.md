@@ -1,6 +1,6 @@
 # ADR-0173 — A security alert watches a signal the deployment cannot produce itself
 
-- **Status:** Proposed
+- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-09-13 (`1bfadefc4`: the `no_credentials` reason and the `invalid_token`-keyed brute-force alerts).
 - **Date:** 2026-09-13
 - **Deciders:** @greluc (pending)
 - **Related:** [`observability.md`](../specs/observability.md) > *REQ-OBS-018* ·

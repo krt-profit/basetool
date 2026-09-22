@@ -485,7 +485,10 @@
   # the families scripts/cgroup-container-metrics.py cannot produce --
   # podman_container_started_seconds (for container_start_time_seconds) and the
   # podman_container_net_* family (for container_network_*). container_memory_mapped_file has no
-  # equivalent here either and stays retired; saying "all three come back" would be wrong.
+  # equivalent HERE -- it comes back from the cgroup collector instead, as
+  # basetool_container_memory_mapped_file_bytes (memory.stat file_mapped), which the
+  # basetool:container:memory_mapped_file_bytes recording rule reads. (Corrected 2026-09-22: this
+  # comment used to say the series stayed retired.)
   #
   # It also covers what node_exporter's systemd collector cannot see: podman_container_health and
   # podman_container_state for the eight application units.

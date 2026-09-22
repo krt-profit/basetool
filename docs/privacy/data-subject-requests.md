@@ -1,6 +1,6 @@
 # Handling a data-subject request (Art. 12, 15–21 GDPR)
 
-> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-09-15.
+> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-09-22.
 
 A request can arrive by any channel and in any wording. Somebody writing *"please delete my
 account"* has exercised Art. 17 whether or not they cite it, and the clock starts when the message

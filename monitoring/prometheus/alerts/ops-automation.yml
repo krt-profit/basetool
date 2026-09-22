@@ -13,7 +13,7 @@
 # Grafana -> Explore -> Loki:
 #   deploy          {app="ops-deploy"}
 #   backup          {app="ops-backup"}
-#   docker-cleanup  {app="ops-cleanup"}
+#   cleanup         {app="ops-cleanup"}
 #   restore drill   {app="ops-restore-drill"}
 # Each description carries the query it needs, because that is what reaches the responder's mailbox
 # at 03:40. LogStreamSilent{stream="ops-deploy"} (meta.yml) guards the deploy tail, so a dead tailer
@@ -95,7 +95,7 @@ groups:
           severity: critical
         annotations:
           summary: "Restore drill stale >35d or metric absent"
-          description: "The monthly restore drill last succeeded more than 35 days ago, or the metric is absent (never ran). `{app=\"ops-restore-drill\"} |~ \"FATAL|WARN\"` in Grafana -> Explore -> Loki over the last 40d carries the abort reason; an empty stream means the unit never fired — check `systemctl list-timers iri-restore-drill.timer`. Not visible via `journalctl -u iri-restore-drill.service` (stdout/stderr are appended to /var/log/iri-restore-drill.log)."
+          description: "The weekly restore drill (iri-restore-drill.timer, Sun 05:30) last succeeded more than 35 days ago, or the metric is absent (never ran). `{app=\"ops-restore-drill\"} |~ \"FATAL|WARN\"` in Grafana -> Explore -> Loki over the last 40d carries the abort reason; an empty stream means the unit never fired — check `systemctl list-timers iri-restore-drill.timer`. Not visible via `journalctl -u iri-restore-drill.service` (stdout/stderr are appended to /var/log/iri-restore-drill.log)."
 
       - alert: RestoreDrillArtifactNotRestorable
         expr: basetool_restore_drill_artifact_ok == 0

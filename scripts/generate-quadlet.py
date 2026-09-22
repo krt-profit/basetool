@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """Profit Basetool - generate Quadlet units from the Compose files, and detect drift between them.
 
-Phase 2 of ``docs/archive/PODMAN_MIGRATION_PLAN.md``. Twenty-two services, nineteen networks and three
-volumes become roughly forty unit files. Transcribing that by hand is how a digest pin or a network
-membership goes quietly wrong, and nothing would notice: a unit that starts is not a unit that is
-right.
+Phase 2 of ``docs/archive/PODMAN_MIGRATION_PLAN.md``. The two compose files become thirty-nine
+unit files -- eighteen containers, eighteen networks and three volumes (counted 2026-09-22; the
+services not translated are listed in ``DISPOSITION``). Transcribing that by hand is how a digest
+pin or a network membership goes quietly wrong, and nothing would notice: a unit that starts is
+not a unit that is right.
 
 So this generates them, and the same code detects drift. ``--check`` regenerates into memory and
 diffs against the tree, which is what keeps the two representations honest for as long as both
-exist. After the cutover the compose file retires and these units become the source; until then the
-compose file is authoritative and this tool is the bridge.
+exist. The plan was for the compose file to retire at the cutover and the units to become the
+source; the cutover (2026-09-22) kept it instead, because the local and test stacks still run on
+Compose. So the compose file stays authoritative and this tool stays the bridge.
 
 What it refuses to do
 ---------------------

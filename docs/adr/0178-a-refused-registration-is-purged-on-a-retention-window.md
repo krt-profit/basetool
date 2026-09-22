@@ -1,6 +1,6 @@
 # ADR-0178 — A refused registration is purged on a retention window, not kept forever
 
-- **Status:** Proposed
+- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-09-17 (`f8b6c19ae`, PR #1920: `RejectedRegistrationRetentionTask`, REQ-SEC-057).
 - **Date:** 2026-09-15
 - **Deciders:** @greluc (pending)
 - **Related:** specs `REQ-SEC-057` (new) · [`security-and-access.md`](../specs/security-and-access.md)

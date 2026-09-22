@@ -1,6 +1,6 @@
 # ADR-0136 — The endpoints a shipped client consumes are a frozen contract
 
-- **Status:** Proposed
+- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since v1.7.7 (2026-09-09) at the latest (`ExternalContractTest`, REQ-API-009).
 - **Date:** 2026-08-18
 - **Amended:** 2026-09-02 (owner-approved) — "keeps every field it had" narrowed to "keeps every
   **recorded** field", matching `ExternalContractTest` and REQ-API-009's acceptance criteria (see

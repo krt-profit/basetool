@@ -1,9 +1,16 @@
 # Notifications & alerting
 
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-17.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
 > **Owner area:** NOTIF · **Related ADRs:** [ADR-0014](../adr/0014-notification-system-architecture.md),
 > [ADR-0015](../adr/0015-notification-data-driven-rule-engine.md),
-> [ADR-0016](../adr/0016-notification-transport-polling-sse.md) · **Epic:**
+> [ADR-0016](../adr/0016-notification-transport-polling-sse.md),
+> [ADR-0022](../adr/0022-bank-booking-request-notifications-account-grant-selector.md),
+> [ADR-0064](../adr/0064-transactional-email-delivery-channel.md),
+> [ADR-0078](../adr/0078-mission-page-fragment-gated-reads-scale-hardening.md),
+> [ADR-0094](../adr/0094-tool-wide-topic-room-live-sync-relay.md) (Redis fan-out),
+> [ADR-0096](../adr/0096-notification-supersede-on-lifecycle-close.md),
+> [ADR-0113](../adr/0113-frontend-sse-relay-request-thread-commit.md),
+> [ADR-0146](../adr/0146-the-notification-push-carries-what-arrived.md) · **Epic:**
 > [#622](https://github.com/krt-profit/basetool/issues/622)
 > **Status:** Implemented — all phases (0–8) delivered (epic
 > [#622](https://github.com/krt-profit/basetool/issues/622)). Real-time SSE push is best-effort with
@@ -19,6 +26,36 @@ engine** that admins configure at runtime. A new producer plugs in without a sch
 First wired use case (UC1): when a **new job order** is created, notify the **officers of the
 responsible Squadron / leads of the responsible Special Command**, plus the **logisticians of
 that responsible unit** and the **global admins**; the creating actor is excluded.
+
+**Requirement numbering.** `REQ-NOTIF-012` (admins notified on a pending registration),
+`REQ-NOTIF-014` (account decision e-mail) and `REQ-NOTIF-015` (pending-registration admin e-mail)
+live in [`discord-integration.md`](discord-integration.md), beside the registration flow they belong
+to. `REQ-NOTIF-020` was never allocated.
+
+## Wired use cases (registry)
+
+Every producer in the code, reconciled against `NotificationEventType`, `NotificationType` and the
+seeded default rules (all admin-editable at runtime). A row whose requirement lives in another spec
+is the notification-engine view of it; the linked requirement is canonical.
+
+| Event (`NotificationEventType`) | Notification type(s) raised | Seed | Recipients (selectors) | Requirement |
+|---|---|---|---|---|
+| `JOB_ORDER_CREATED` | `JOB_ORDER_CREATED` | V156 | `ORG_RELATIVE_ROLE` OFFICER / LEAD / LOGISTICIAN on `RESPONSIBLE` + `ROLE` ADMIN | REQ-NOTIF-008 |
+| `JOB_ORDER_UPDATED_BY_REQUESTER` | `JOB_ORDER_UPDATED_BY_REQUESTER` | V214 | `ORG_RELATIVE_ROLE` OFFICER / LEAD on `RESPONSIBLE` | REQ-NOTIF-017 |
+| `BANK_BOOKING_REQUEST_CREATED` | `BANK_BOOKING_REQUEST_CREATED` | V160 + V194 | `ROLE` BANK_MANAGEMENT, `ACCOUNT_GRANT`, `ACCOUNT_RESPONSIBLE` | REQ-NOTIF-011, [REQ-BANK-026](bank.md) |
+| `BANK_BOOKING_REQUEST_CONFIRMED` | `BANK_BOOKING_REQUEST_CONFIRMED` · `BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED` | V161 · V194 | `EVENT_RECIPIENT` (requester) · `ACCOUNT_RESPONSIBLE`; supersedes `…_CREATED` | REQ-NOTIF-011/-018, REQ-BANK-026 |
+| `BANK_BOOKING_REQUEST_REJECTED` | `BANK_BOOKING_REQUEST_REJECTED` · `BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED` | V161 · V194 | `EVENT_RECIPIENT` (requester) · `ACCOUNT_RESPONSIBLE`; supersedes `…_CREATED` | REQ-NOTIF-011/-018, REQ-BANK-026 |
+| `BANK_BOOKING_REQUEST_CANCELLED` | none (no rule) | — | supersedes `…_CREATED` only | REQ-NOTIF-018 |
+| `DISCORD_REGISTRATION_PENDING` | `DISCORD_REGISTRATION_PENDING` | V174 | `ROLE` ADMIN (`exclude_actor = false`) | REQ-NOTIF-012 ([discord-integration.md](discord-integration.md)) |
+| `MATERIAL_EXCHANGE_INTEREST_REGISTERED` | `MATERIAL_EXCHANGE_INTEREST_REGISTERED` | V211 | `EVENT_RECIPIENT` (offer owner) | REQ-NOTIF-016, [REQ-MARKET-011](materialboerse.md) |
+| `MATERIAL_REQUEST_FULFILLMENT_SIGNALLED` | `MATERIAL_REQUEST_FULFILLMENT_SIGNALLED` | V225 | `EVENT_RECIPIENT` (requester) | [REQ-MARKET-020](materialboerse.md) |
+| `ACCOUNT_DELETION_REQUESTED` | `ACCOUNT_DELETION_REQUESTED` | V243 | `ROLE` ADMIN (`exclude_actor = false`) | [REQ-SEC-061](security-and-access.md) |
+| `ACCOUNT_DELETION_REQUEST_DECLINED` | `ACCOUNT_DELETION_REQUEST_DECLINED` | V243 | `EVENT_RECIPIENT` (requesting member); supersedes `ACCOUNT_DELETION_REQUESTED` | REQ-SEC-061 |
+| `ACCOUNT_DELETION_REQUEST_RESOLVED` | none (no rule) | — | supersedes `ACCOUNT_DELETION_REQUESTED` only | REQ-SEC-061, REQ-NOTIF-018 |
+
+Every notification type renders through `notifications.type.<TYPE>` in all three frontend bundles.
+The e-mail consumers of REQ-NOTIF-013 (`UserApprovalMailService`, `PendingRegistrationMailService`)
+are hand-wired after-commit listeners, not rule-engine rows.
 
 ---
 
@@ -37,7 +74,7 @@ frontend renders `type` + `params` via `notifications.type.*` messages.
 - [x] The schema validates against the entity under `ddl-auto = validate` (V155).
 
 **Enforced by:** `NotificationRepositoryIntegrationTest`, `NotificationParamsCodecTest` ·
-**Code:** `model/Notification`, `model/NotificationType`, `service/NotificationParamsCodec`,
+**Code:** `model/Notification`, `model/NotificationType`, `support/NotificationParamsCodec`,
 `db/migration/V155__create_notification.sql`
 
 ### REQ-NOTIF-002 — Event-driven, after-commit production
@@ -56,7 +93,7 @@ source aggregate (no second `@Version` bump).
   write on the order.
 
 **Enforced by:** `NotificationCreationServiceTest`, `NotificationRuleEngineIntegrationTest`,
-`JobOrderServiceTest` · **Code:** `event/NotificationEvent`, `event/NotificationEventListener`,
+`JobOrderServiceTest` · **Code:** `event/NotificationEvent`, `service/NotificationEventListener`,
 `config/AsyncConfig`, `service/NotificationCreationService`
 
 ### REQ-NOTIF-003 — Extensibility without schema changes
@@ -137,10 +174,13 @@ Recipients are decided by admin-managed `notification_rule` rows, each owning a 
 `MISSION_MANAGER` — evaluated against an org unit the event carries, by `context_role`
 `RESPONSIBLE` / `REQUESTING`), `ACCOUNT_GRANT` (the bank employees holding a
 `bank_account_grant` on the **bank account** the event carries — see `NotificationEvent.contextAccountId()`),
-and `EVENT_RECIPIENT` (the single user the event is **directed at** — see
-`NotificationEvent.contextRecipientSub()`, e.g. the officer/lead notified when their booking request is
-decided). The last two were added for the bank booking-request use case (ADR-0022/REQ-NOTIF-011) and read
-no selector columns — the account / recipient comes from the event.
+`EVENT_RECIPIENT` (the single user the event is **directed at** — see
+`NotificationEvent.contextRecipientUserId()`, e.g. the officer/lead notified when their booking request is
+decided) and `ACCOUNT_RESPONSIBLE` (the derived responsible holder(s) of the bank account the event
+carries, REQ-BANK-034 — resolved by `OrgUnitBankResponsibilityService` so the bank stays
+org-unit-blind). The last three were added for the bank booking-request use case
+(ADR-0022/REQ-NOTIF-011, REQ-BANK-026) and read no selector columns — the account / recipient comes
+from the event.
 A rule's `exclude_actor` flag drops the triggering user. The selector `kind` is an open enum so a
 future `GROUP` selector slots in without reworking the engine. Rules are created, edited, enabled /
 disabled and deleted at runtime via an admin-only API.
@@ -166,11 +206,12 @@ frontend `controller/AdminNotificationRulePageController`,
 
 When a job order is created, the seeded default rule resolves recipients from the **responsible
 org unit**: officers (global `OFFICER` role ∩ membership of that unit), leads
-(`org_unit_membership.is_lead`), logisticians (`org_unit_membership.is_logistician`), plus the
+(`org_unit_membership.role = SK_LEAD`), logisticians (`org_unit_membership.is_logistician`), plus the
 global admins (`ROLE` `ADMIN`). The creating actor is excluded. The seeded rule is
 admin-editable and -deletable. Officer-ness is a Keycloak role mirrored into `user_roles`, so a
 freshly-promoted-but-not-yet-logged-in officer becomes a recipient only after the next
-`UserSyncTask` run (≤ 5 min) — an accepted eventual-consistency window.
+Keycloak reconciliation (`UserSyncTask`, daily at 05:00 Europe/Berlin by default, or an admin's
+manual sync) — an accepted eventual-consistency window. A login re-syncs the roles at once.
 
 **Acceptance**
 
@@ -219,18 +260,19 @@ which is the question a half that has quietly stopped raises (REQ-OBS-011).
 **Acceptance**
 
 - [x] Read notifications past `max-age` are removed by the sweep.
-- [ ] Unread notifications past `unread-max-age` are removed by the sweep, measured from
+- [x] Unread notifications past `unread-max-age` are removed by the sweep, measured from
   `createdAt`; a read row of the same age is left to the read window.
-- [ ] The unread cutoff is strictly older than the read cutoff, so a notification is never reaped
+- [x] The unread cutoff is strictly older than the read cutoff, so a notification is never reaped
   sooner for being unread than it would have been for being read.
 - [x] The sweep never tears down the scheduler thread on failure.
-- [ ] A failure in one half still lets the other half run, and the run is still recorded as
+- [x] A failure in one half still lets the other half run, and the run is still recorded as
   failed.
-- [ ] The two halves are counted separately as well as together.
+- [x] The two halves are counted separately as well as together.
 
 **Enforced by:** `NotificationRetentionTaskTest`, `NotificationRepositoryIntegrationTest`
-(`deleteReadOlderThan`) · **Code:** `task/NotificationRetentionTask`,
-`service/NotificationService#purgeReadOlderThan`
+(`deleteReadOlderThan`, `deleteUnreadOlderThan`) · **Code:** `task/NotificationRetentionTask`,
+`service/NotificationService#purgeReadOlderThan` / `#purgeUnreadOlderThan`,
+`metrics/ScheduledJob#NOTIFICATION_RETENTION`, `metrics/MetricNames#NOTIFICATION_RETENTION_DELETED`
 
 ### REQ-NOTIF-021 — The `notification` event says what arrived
 
@@ -303,8 +345,12 @@ periodic **named** `heartbeat` event (not an SSE comment, which browsers' `Event
 and the client runs a liveness watchdog: if no SSE traffic (`heartbeat`/`notification`) arrives
 within ~3× the heartbeat interval, the stream is treated as **half-open** (still "connected" but
 dead, so it never fires `error`) and the poll falls back to the fast cadence without waiting for an
-`error`; a later event re-promotes it. The registry is single-backend-instance; multi-instance
-fan-out via Redis pub/sub remains a follow-up. When the 30-minute emitter timeout elapses the
+`error`; a later event re-promotes it. The emitter registry is per backend instance; delivery across
+replicas goes through the `NotificationFanout` seam — `RedisNotificationFanout` delivers to the local
+emitters first and then publishes the signal on the `basetool:notify:published` Redis channel
+(`app.notifications.redis-fanout.*`, on by default in the `prod` profile and off elsewhere, where
+`LocalNotificationFanout` stands in), so a Redis outage degrades to single-instance behaviour
+(ADR-0094, discharging ADR-0016's follow-up). When the 30-minute emitter timeout elapses the
 backend **completes** the emitter rather than leaving Spring MVC to raise
 `AsyncRequestTimeoutException` — which Micrometer would otherwise book as a phantom `503` on
 `http.server.requests` even though the client received a clean stream and simply reconnects. A
@@ -364,7 +410,9 @@ Hikari connection (#1152).
 
 **Enforced by:** `NotificationStreamServiceTest` (named `connected`/`heartbeat`/`notification`
 events + clean timeout completion), full build (bean wiring), frontend lint gate · **Code:**
-`service/NotificationStreamService`, `controller/NotificationController#stream`, frontend
+`service/NotificationStreamService`, `service/NotificationFanout` / `RedisNotificationFanout` /
+`LocalNotificationFanout`, `support/NotificationFanoutProperties`,
+`controller/NotificationController#stream`, frontend
 `controller/NotificationPageController#stream`, `config/WebClientConfig#sseWebClient`,
 `static/js/notifications.js`
 
@@ -381,9 +429,15 @@ account comes from the event, mirroring how `ORG_RELATIVE_ROLE` reads the org un
 
 **UC3 — on decision (→ the requester).** A `BANK_BOOKING_REQUEST_CONFIRMED` /
 `BANK_BOOKING_REQUEST_REJECTED` event carries the **directed recipient**
-(`NotificationEvent.contextRecipientSub()` = the requesting officer/lead) and is mapped by seeded
+(`NotificationEvent.contextRecipientUserId()` = the requesting officer/lead) and is mapped by seeded
 default rules (V161) to same-named notifications, each with a single `EVENT_RECIPIENT` selector that
 resolves to that recipient. The rejection reason is rendered in the text.
+
+**Responsible holder (V194).** The account's derived responsible holder (REQ-BANK-034) is notified
+too: an `ACCOUNT_RESPONSIBLE` selector joins the UC2 creation rule, and two further rules map the
+confirm/reject events to the account-centric `BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED` /
+`…_RESPONSIBLE_REJECTED` types, so one event raises a requester-directed and a holder-directed
+notification (REQ-NOTIF-021's per-type signal).
 
 In both use cases the triggering actor is excluded (`exclude_actor = TRUE`) and every rule stays
 admin-editable at runtime.
@@ -404,10 +458,13 @@ admin-editable at runtime.
 **Enforced by:** `RuleEvaluationServiceTest`, `BankBookingRequestServiceTest` · **Code:**
 `event/BankBookingRequest{Created,Confirmed,Rejected}Event`,
 `service/RecipientResolutionService#resolveAccountGrantHolders`,
-`service/RuleEvaluationService#resolveEventRecipient`, `model/SelectorKind#{ACCOUNT_GRANT,EVENT_RECIPIENT}`,
+`service/RuleEvaluationService#resolveEventRecipient`,
+`service/OrgUnitBankResponsibilityService#resolveResponsibleHolderUserIds`,
+`model/SelectorKind#{ACCOUNT_GRANT,EVENT_RECIPIENT,ACCOUNT_RESPONSIBLE}`,
 `model/NotificationEventType`, `model/NotificationType`,
 `db/migration/V160__seed_bank_booking_request_notification_rule.sql`,
-`db/migration/V161__seed_bank_booking_request_decision_notification_rules.sql` · **Issues:** #666
+`db/migration/V161__seed_bank_booking_request_decision_notification_rules.sql`,
+`db/migration/V194__seed_bank_booking_request_responsible_holder_notifications.sql` · **Issues:** #666
 
 ### REQ-NOTIF-013 — Reusable, best-effort transactional e-mail channel
 
@@ -449,7 +506,7 @@ logged** (REQ-OBS).
 
 When a member registers interest in a Materialbörse offer, the offer owner (the Anbieter) is notified
 through the engine (#1187). A `MATERIAL_EXCHANGE_INTEREST_REGISTERED` event carries the **directed
-recipient** (`NotificationEvent.contextRecipientSub()` = the offer owner) and is mapped by a seeded
+recipient** (`NotificationEvent.contextRecipientUserId()` = the offer owner) and is mapped by a seeded
 default rule (V211) to a same-named notification with a single `EVENT_RECIPIENT` selector — the same
 directed-recipient mechanism as the bank decision notifications (REQ-NOTIF-011, UC3). The registering
 member is excluded (`exclude_actor = TRUE`; moot because a member can never register interest in their
@@ -489,11 +546,11 @@ never the editing member's personal name (no PII in params).
 
 **Acceptance**
 
-- [ ] A requester edit (after commit) notifies the responsible unit's officers + leads, excluding the
+- [x] A requester edit (after commit) notifies the responsible unit's officers + leads, excluding the
   actor (`JobOrderServiceTest`, `RuleEvaluationServiceTest`).
-- [ ] The new event/notification types need no schema migration (open enums; the seed rule is V214
+- [x] The new event/notification types need no schema migration (open enums; the seed rule is V214
   data).
-- [ ] The notification renders via `notifications.type.JOB_ORDER_UPDATED_BY_REQUESTER` (DE + EN + base
+- [x] The notification renders via `notifications.type.JOB_ORDER_UPDATED_BY_REQUESTER` (DE + EN + base
   bundles, named placeholders `{displayId}`/`{orgUnit}`/`{requester}`).
 
 **Enforced by:** `JobOrderServiceTest`, `MessageBundleConsistencyTest` · **Code:**
@@ -524,6 +581,11 @@ request is decided or withdrawn the "new booking request" items shown to the ban
 account's grant holders disappear from their inboxes. `BANK_BOOKING_REQUEST_CANCELLED` notifies
 nobody (the requester is the actor and seeds no rule); its sole pipeline effect is the removal.
 
+**Second wired use case:** the Art. 17 deletion request (REQ-SEC-061).
+`ACCOUNT_DELETION_REQUEST_DECLINED` and the notify-nobody `ACCOUNT_DELETION_REQUEST_RESOLVED` each
+resolve `ACCOUNT_DELETION_REQUESTED`, so the admins' "erasure requested" items disappear once the
+request is closed.
+
 **Acceptance**
 
 - [x] A confirm / reject / cancel of a booking request (after commit) deletes the
@@ -538,8 +600,10 @@ nobody (the requester is the actor and seeds no rule); its sole pipeline effect 
 `BankBookingRequestServiceTest` · **Code:** `event/NotificationEvent#resolvesNotificationTypes`,
 `event/BankBookingRequest{Confirmed,Rejected,Cancelled}Event`,
 `service/NotificationCreationService#removeSupersededNotifications`,
-`repository/NotificationRepository#{findRecipientSubsByTypeInAndEntity,deleteByTypeInAndEntity}`,
-`service/BankBookingRequestService#cancelOwn`, `model/NotificationEventType` · **Issues:** #1252
+`repository/NotificationRepository#{findRecipientUserIdsByTypeInAndEntity,deleteByTypeInAndEntity}`,
+`service/BankBookingRequestService#cancelOwn`, `event/AccountDeletionRequest{Declined,Resolved}Event`,
+`model/NotificationEventType` · **Decision:**
+[ADR-0096](../adr/0096-notification-supersede-on-lifecycle-close.md) · **Issues:** #1252
 
 ### REQ-NOTIF-019 — The inbox page shows its full history (hint + load-more), never a silent cap
 
@@ -601,6 +665,6 @@ bundle) · **Code:** `frontend controller/NotificationPageController#page` / `#p
   REQ-NOTIF-014 and the pending-registration admin mail REQ-NOTIF-015); wiring it into the rule
   engine per notification type is deferred.
 - Discord channel delivery.
-- OS / browser push notifications.
-- Multi-backend-instance push fan-out (Redis pub/sub).
+- Browser (Web Push) and push-service (FCM) notifications. The Android app raises its own OS
+  notifications from its authenticated SSE stream (REQ-NOTIF-021); no push service is involved.
 - A dedicated user-group entity (the `GROUP` selector kind is reserved for it).

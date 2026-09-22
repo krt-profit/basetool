@@ -288,7 +288,7 @@ public class PersonalBlueprintController {
   })
   public BlueprintImportPreviewDto previewImport(
       @RequestParam("file") @NotNull MultipartFile file, @CurrentUserId UUID ownerUserId) {
-    // Plain @CurrentUserSub again — ActingMemberFilter has already made the acting member the
+    // Plain @CurrentUserId again — ActingMemberFilter has already made the acting member the
     // security identity when the ingest gateway calls this (ADR-0129).
     return importService.previewImport(ownerUserId, file);
   }

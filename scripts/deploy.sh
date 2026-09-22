@@ -13,7 +13,7 @@
 #
 # The config bundle travels the SAME pull-only, digest-pinned, deliberately
 # promoted GHCR channel as the app images (see docs/adr/0049-*), so a promoted
-# compose change — e.g. a bumped redis/npm image pin — reaches the host and is
+# compose change — e.g. a bumped redis/edge image pin — reaches the host and is
 # applied automatically, with no manual `cp docker-compose.yml` or hand-run
 # `docker compose up -d`. A postgres/Keycloak image change is the one carve-out:
 # it is operator-gated (stateful migration / provider+keystore choreography),
@@ -406,7 +406,7 @@ assert_no_secrets() {
 # Emit the postgres + Keycloak image pins of a compose file, normalised and
 # sorted. These are the stateful/choreographed images whose change must be
 # operator-gated (PGDATA major migration; Keycloak provider+keystore dance);
-# everything else (redis, npm) is safe to auto-apply via a declarative `up -d`.
+# everything else (redis, the edge) is safe to auto-apply via a declarative `up -d`.
 infra_image_pins() {
   # `|| true`: a compose file with no match makes grep exit 1, which under
   # `set -o pipefail` would abort the surrounding command substitution. An empty
@@ -476,7 +476,8 @@ network_block() {
 # strands name resolution (#974). This is a brief FULL-STACK outage, which is why it
 # is gated on an actual topology change, never taken on an ordinary config swap.
 # Because the pinning fixes each subnet, the recreated bridges keep the same
-# addresses/gateways, so the NPM SSH-tunnel admin allow-list stays valid.
+# addresses/gateways, so the edge's gateway-address allow-list
+# (docker/edge/conf.d/10-frontend.conf.template) stays valid.
 clean_slate_recreate() {
   log "network topology changed -> clean recreate (brief full-stack downtime)"
   if [[ "${IRI_MONITORING_ENABLED:-false}" == "true" ]] && rt_monitoring_configured; then
@@ -818,7 +819,8 @@ reconcile_edge() {
   # every single tick, this whole branch was skipped in silence, and certs.sha256
   # was never written. A renewed certificate would therefore never have been
   # loaded, however correctly acme published it. Found on 2026-09-12, after acme
-  # itself was fixed and the edge went on serving the material seeded from NPM.
+  # itself was fixed and the edge went on serving the material seeded from the
+  # retired Nginx Proxy Manager at the ADR-0162 cutover.
   # The edge already mounts the volume read-only, so `exec` needs neither a new
   # container nor root.
   if rt_is_running edge; then
@@ -1745,8 +1747,8 @@ rt_pin_apply \
   "ingest=${INGEST_IMAGE}@${INGEST_DIGEST}"
 
 # --- Deliver promoted host config -------------------------------------------
-# The compose file and its sibling host config (NPM maintenance page, Keycloak
-# theme) ride the SAME promoted, digest-pinned GHCR channel as the app images.
+# The compose file and its sibling host config (the edge's maintenance page,
+# Keycloak theme) ride the SAME promoted, digest-pinned GHCR channel as the app images.
 # Only (re)stage them when the promoted config digest actually moved, so an
 # app-only promotion stays byte-for-byte the legacy path.
 if [[ "${CONFIG_CHANGED}" == "true" ]]; then
@@ -1838,7 +1840,7 @@ fi
 cd "${COMPOSE_DIR}"
 
 # Only pre-pull the images this deploy actually moves (backend + frontend +
-# ingest from GHCR). The third-party infra images (keycloak/postgres/redis/npm)
+# ingest from GHCR). The third-party infra images (keycloak/postgres/redis/edge)
 # are pinned by digest and change only on a deliberate compose edit; pulling
 # them here would make every deploy hostage to a transient outage of a
 # third-party registry (e.g. a quay.io 502/504 on the Keycloak manifest aborting
