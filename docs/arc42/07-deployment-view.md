@@ -229,6 +229,15 @@ ride the bundle. Provider JARs are barred from the config bundle and get their o
 signed artifact (ADR-0055). Requirements:
 [`deployment-delivery.md`](../specs/deployment-delivery.md).
 
+**The Keycloak realm is the one piece of the deployment no artifact carries.** It lives in
+`db-keycloak` on each host, so delivery keeps images, units and provider JAR in lock-step across
+production and testing while the two realms were free to diverge — and did: on 2026-09-22 the
+testing realm lacked three of the Basetool's clients, both audience scopes and the DPoP policy.
+Its Basetool-owned part is therefore code too, applied by an operator rather than by the timer:
+`scripts/provision-keycloak-realm.py` converges a realm to production's shape, additively, and
+`scripts/keycloak-config-snapshot.sql` is the diff that shows whether two realms still agree
+(`REQ-OPS-033`, ADR-0202).
+
 ## 7.6 Backups leave the host
 
 `restic` through an `rclone` WebDAV remote to **Nextcloud**, on a GFS retention policy, with the

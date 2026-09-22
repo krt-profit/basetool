@@ -562,6 +562,22 @@ p.write_text(json.dumps(d), encoding="utf-8")
 '
 run_provisioner "$state" --apply >/dev/null
 assert_eq "$(grep -c '^update client-policies/policies' "${state}/calls.log" || true)" "0" "an unrelated client edit leaves the policy attached"
+# A realm role added to the app's scope by hand is taken back (REQ-SEC-035) — the one scope this
+# script converges in both directions — while the policy stays attached around it.
+STUB_STATE="$state" "$PYTHON" -c '
+import json, os, pathlib
+p = pathlib.Path(os.environ["STUB_STATE"]) / "state.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+d["roles"].append({"id": "r-brl", "name": "Bereichsleitung"})
+uuid = next(c for c in d["clients"] if c["clientId"] == "basetool-android")["id"]
+d["client_scope_mappings"][uuid].append({"id": "r-brl", "name": "Bereichsleitung"})
+p.write_text(json.dumps(d), encoding="utf-8")
+'
+output="$(run_provisioner "$state" --apply)"
+assert_contains "$output" "take back Bereichsleitung" "the plan names the hand-added role"
+assert_eq "$(query "$state" "sorted(r['name'] for r in d['client_scope_mappings'][client('basetool-android')['id']])")" \
+  "['Admin', 'Bank Employee', 'Bank Management', 'KRT Member', 'Officer']" "a hand-added realm role is taken back off the app's scope"
+assert_eq "$(query "$state" "'krt-mobile-dpop-policy' in [p['name'] for p in d['policies']['policies']]")" "True" "and the policy is attached afterwards"
 rm -rf "$state"
 
 # ---------------------------------------------------------------------------
