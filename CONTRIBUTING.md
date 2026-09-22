@@ -256,6 +256,10 @@ monitoring and logging-facade gates),
 [`wrapper-validation.yml`](.github/workflows/wrapper-validation.yml),
 [`deploy-script.yml`](.github/workflows/deploy-script.yml) and
 [`keycloak-provisioner.yml`](.github/workflows/keycloak-provisioner.yml).
+[`cache-janitor.yml`](.github/workflows/cache-janitor.yml) is housekeeping,
+not a check: after each CodeQL run and when a PR closes it deletes Actions
+caches nothing will read again, so the repository stays under GitHub's 10 GB
+cache cap.
 
 The Playwright end-to-end suite ([`e2e.yml`](.github/workflows/e2e.yml))
 runs on a PR **only when it carries the `e2e` label** (and nightly on

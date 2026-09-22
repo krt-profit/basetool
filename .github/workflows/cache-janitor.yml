@@ -1,0 +1,120 @@
+name: Cache Janitor
+
+# Keeps the repository's Actions cache under GitHub's 10 GB cap by deleting
+# caches nothing will read again.
+#
+# Why this exists (2026-09-22): GitHub Code Quality - a repository setting with
+# no workflow file - writes a ~1.2 GB `codeql-dependencies-1-Linux-java-<hash>`
+# cache on every push and pull request. The key embeds a per-run hash, so each
+# run adds a new entry instead of replacing one. Past the cap GitHub evicts the
+# least-recently-used entries, and the first to go is the NVD dataset that
+# `dependency-check.yml` reads once a week - which is how the weekly OWASP scan
+# went without a verdict from 2026-07-20 on (every run started cold and hit its
+# ceiling). `codeql.yml` itself sets `dependency-caching: false` and writes no
+# such cache; Code Quality cannot be configured from here.
+#
+# What it deletes:
+#   - every `codeql-dependencies-*` cache except the newest one on
+#     refs/heads/main. That one stays because runs on pull requests restore it
+#     by prefix from the base branch, so Code Quality keeps its warm start.
+#   - on a closed pull request, every cache scoped to that pull request's refs
+#     (refs/pull/<n>/merge and refs/pull/<n>/head). Nothing can read them any
+#     more unless the pull request is reopened, and then they are rebuilt.
+#
+# When it runs:
+#   - after every completed CodeQL run. codeql.yml runs on the same pushes and
+#     pull requests as Code Quality and finishes at about the same time, so this
+#     is the closest event to "Code Quality just saved a cache". It checks out
+#     nothing and reads no artifact, so `workflow_run`'s usual risk - running
+#     untrusted pull-request code with a write token - does not arise here.
+#   - when a pull request is closed, for its own caches.
+#   - daily, as a backstop (scheduled runs start hours late on this repository,
+#     which is fine for a backstop), and on demand.
+#
+# It only ever deletes caches; a deleted cache is rebuilt by the next run that
+# needs it, so the worst case of a wrong deletion is one slower job.
+
+on:
+  workflow_run:
+    workflows: [CodeQL]
+    types: [completed]
+  pull_request:
+    types: [closed]
+  schedule:
+    - cron: '41 4 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: cache-janitor-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'global' }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  prune:
+    name: Prune unreachable caches
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # A pull request from a fork gets a read-only token and cannot delete caches;
+    # its caches are swept by the next global run instead.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      actions: write
+
+    steps:
+      - name: Delete superseded CodeQL dependency caches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          caches="$(gh cache list --key codeql-dependencies- --limit 100 \
+            --sort created_at --order desc --json id,key,ref,sizeInBytes)"
+          keep="$(jq -r '[.[] | select(.ref == "refs/heads/main")][0].id // empty' <<<"$caches")"
+          freed=0
+          count=0
+          while IFS=$'\t' read -r id size ref key; do
+            [ -n "$id" ] || continue
+            if [ "$id" = "$keep" ]; then
+              echo "keep   $ref  $key"
+              continue
+            fi
+            if gh cache delete "$id"; then
+              echo "delete $ref  $key  ($((size / 1048576)) MiB)"
+              freed=$((freed + size))
+              count=$((count + 1))
+            else
+              echo "::warning::could not delete cache $id ($key on $ref)"
+            fi
+          done < <(jq -r '.[] | [.id, .sizeInBytes, .ref, .key] | @tsv' <<<"$caches")
+          echo "Deleted $count CodeQL dependency caches, $((freed / 1048576)) MiB." | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Delete the closed pull request's caches
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          count=0
+          for ref in "refs/pull/${PR_NUMBER}/merge" "refs/pull/${PR_NUMBER}/head"; do
+            while IFS= read -r id; do
+              [ -n "$id" ] || continue
+              if gh cache delete "$id"; then
+                count=$((count + 1))
+              else
+                echo "::warning::could not delete cache $id on $ref"
+              fi
+            done < <(gh cache list --ref "$ref" --limit 100 --json id --jq '.[].id')
+          done
+          echo "Deleted $count caches of pull request #${PR_NUMBER}." | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Report cache usage
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          usage="$(gh api "repos/${GH_REPO}/actions/cache/usage" --jq '.active_caches_size_in_bytes')"
+          echo "Cache usage after pruning: $((usage / 1048576)) MiB of 10240 MiB." | tee -a "$GITHUB_STEP_SUMMARY"
