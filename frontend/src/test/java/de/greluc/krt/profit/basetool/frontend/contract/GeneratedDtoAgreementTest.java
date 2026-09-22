@@ -130,7 +130,13 @@ class GeneratedDtoAgreementTest {
           "BereichCreateRequest",
           "MaterialUpdateAjaxRequest",
           "MissionActualTimeUpdateRequest",
-          "OrganisationsleitungCreateRequest");
+          "OrganisationsleitungCreateRequest",
+          // The browser-to-frontend contract of the in-place default-blueprint add (REQ-INV-017):
+          // the page sends every staged key in one request, the frontend fans it out to one
+          // backend add per key and folds the outcomes into one answer. The backend has neither
+          // shape — it takes DefaultBlueprintCreateRequest and returns DefaultBlueprintResponse.
+          "DefaultBlueprintAddSelectionRequest",
+          "DefaultBlueprintAddResultDto");
 
   /**
    * Drift that existed before this guard did, frozen so it fails on anything new.
@@ -217,7 +223,9 @@ class GeneratedDtoAgreementTest {
         .as(
             "frontend-only types. A genuine new view model raises this AND gets a reason beside its"
                 + " name; a backend type that stopped existing does NOT belong here")
-        .hasSize(10);
+        // 10 -> 12 on 2026-09-22: the in-place default-blueprint add's request and result, which
+        // exist only between the page and the frontend (see the reason beside their names).
+        .hasSize(12);
     assertThat(ALIASES)
         .as(
             "mirror-to-schema aliases. A rename on either side raises this and moves the entry, and"
