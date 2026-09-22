@@ -339,18 +339,39 @@ grep -c '^KC_METRICS_ENABLED=true' /var/iri/code/.env    # expect 1
 ### 0.6b2 `.env` carries `EDGE_TRUSTED_PROXY` — found on the day
 
 ```bash
-grep -c '^EDGE_TRUSTED_PROXY=172.28.15.10' /var/iri/code/.env      # expect 1
+# every Network= of the edge unit carries an ip=, and .env names exactly those addresses
+grep -c '^Network=.*:ip=' /etc/containers/systemd/users/994/edge.container   # expect 6
+sed -n 's/^EDGE_TRUSTED_PROXY=//p' /var/iri/code/.env | tr ' ' '\n' | sort > /tmp/trusted
+sed -n 's/^Network=.*:ip=//p' /etc/containers/systemd/users/994/edge.container | sort > /tmp/pinned
+diff /tmp/trusted /tmp/pinned && echo "trusted == pinned"                    # expect no output
 ```
 
 > [!warning] A restored `.env` can never carry this, because the Docker host has no front end
 > The rootless host puts haproxy in front of the edge (ADR-0187) and haproxy forwards with
 > `send-proxy-v2`. The edge only turns its listeners into PROXY-protocol listeners when
-> `EDGE_TRUSTED_PROXY` names the one address it accepts a header from — its pinned address on
-> `net-edge-ingress`, which its own Quadlet unit carries.
+> `EDGE_TRUSTED_PROXY` names the addresses it accepts a header from.
 >
 > Empty, the edge logs `no front end configured - listeners are plain, no header is trusted`,
 > haproxy's header arrives at a plain listener, and `curl` reports `wrong version number`. The
 > whole site is unreachable and the error names TLS, which is the wrong place to look.
+
+> [!important] It is SIX addresses, not one — corrected 2026-09-22, after the single value failed
+> in production
+> This step said `EDGE_TRUSTED_PROXY=172.28.15.10` and was wrong. The peer is the edge's **own**
+> address, and podman chooses which of the container's networks to present it on. Measured here,
+> three recreations with nothing else changed: `net-proxy-frontend`, then `net-proxy-grafana`, then
+> `net-proxy-api`. So every network the edge joins is pinned and all six addresses are named.
+>
+> **The failure is silent, which is why it is checked by comparison rather than by value.** nginx
+> does not reject a `set_real_ip_from` that never matches — it drops the PROXY header and falls
+> back to the TCP peer. The edge starts clean, the site works, and every request is logged from one
+> bridge address: 2340 in ten minutes here, with the per-IP rate limiter and the admin allow-list
+> collapsed onto that single address the entire time.
+>
+> If the `diff` above is not empty, do not edit `.env` alone: the addresses come from the unit, and
+> the unit comes from `generate-quadlet.py`. Fix the mismatch at the source, then
+> `systemctl --user restart edge.service`. `.github/scripts/check_edge_trust_pins.py` asserts the
+> same equality in CI.
 
 ### 0.6c The certificate files are being watched for expiry
 

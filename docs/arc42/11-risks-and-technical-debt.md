@@ -124,6 +124,41 @@ un-migrated inventory still carries. That converts the silent breakage into a fa
 message naming the replacement. **Remove this entry once a full role run has been made against both
 hosts and the drop-ins survived it.**
 
+## 11.5c Podman decides which of the edge's addresses the client sees, and we only bound it
+
+Under rootless Podman the PROXY header the edge receives comes from the edge's **own** address:
+`rootlessport` dials the container's published port from inside its netns, so the peer nginx sees is
+whichever of the container's addresses podman chose. **Which one is not ours to choose**, and it is
+not stable — measured on the production host 2026-09-22, three recreations with nothing else
+changed, the peer appeared on `net-proxy-frontend`, then `net-proxy-grafana`, then `net-proxy-api`.
+
+The mitigation does not remove the choice, it **bounds** it: every network the edge joins is pinned
+with `ip=`, so the candidate set is finite and fixed, and `EDGE_TRUSTED_PROXY` names all six of
+those addresses. That keeps ADR-0187's rule intact — name the address, never a prefix — because six
+named addresses are no more a range than one is.
+
+**Why this is an entry here and not a closed item.** A future podman could present an address that
+is not in the set — an IPv6 one, say, or a new interface — and the failure mode is silent: nginx
+does not reject a `set_real_ip_from` that never matches, it drops the header and falls back to the
+TCP peer. That is exactly what happened while only the ingress address was pinned: 2340 requests in
+ten minutes logged from one bridge address, one rate-limit bucket for the whole internet, with a
+valid configuration and a green build. It was not a recreate that caused it — the first deploy after
+the cutover happened to produce a matching peer, so the next release would have done it unattended.
+
+Three guards stand against it, and their division of labour is the point:
+
+- `.github/scripts/check_edge_trust_pins.py` (CI) — the generator's pins, the emitted unit and the
+  Ansible list must name the same set, **and every network the edge joins must carry a pin**. That
+  last clause is what keeps the set finite: adding a network without one fails the build.
+- `render-and-run.sh` (start) — each entry is validated separately, so a prefix appended to a
+  working list is refused rather than accepted alongside it.
+- `check-conformance.py`'s `client-address-visible` (running system) — reads what the edge actually
+  logs. It is the only one of the three that can see a peer nobody predicted, and it is how this was
+  found.
+
+**Remove this entry** if podman ever gains a way to pin the forwarder's source address explicitly;
+until then the risk is bounded, named and watched, which is the most this layer allows.
+
 ## 11.6 Post-cutover follow-ups that are not yet closed
 
 - ~~**The new host's first own backup.**~~ **Closed 2026-09-22.** The edge certificates, the ACME

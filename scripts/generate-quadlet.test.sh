@@ -217,18 +217,52 @@ for svc in backend frontend ingest keycloak; do
     'True'
 done
 
-echo "== the two addresses the front end depends on =="
-# The peer the edge presents to haproxy is the container's OWN address, and rootlessport picks it
-# from net-proxy-frontend rather than from the pinned ingress network. That network is SHARED with
-# the frontend container and its allocator drifts, so the peer moved .10 -> .11 across one recreate
-# on 2026-09-22: set_real_ip_from stopped matching, nginx discarded the PROXY header, and the edge
-# logged 2340 requests in ten minutes from one bridge address -- one rate-limit bucket for the whole
-# internet, which is the 2026-07-20 outage reached by another road.
-expect "the ingress address is pinned"   'print(g.FRONT_END["edge"]["ip"])'   '172.28.15.10'
-expect "so is the peer address, on the network rootlessport actually uses"   'print(g.FRONT_END["edge"]["peer_network"] + " " + g.FRONT_END["edge"]["peer_ip"])'   'net-proxy-frontend 172.28.3.250'
-# High on purpose: netavark allocates from the low end and both members of that network drift
-# upward, so a low pin is a collision waiting to happen.
-expect "the peer pin is out of the allocator's way"   'print(int(g.FRONT_END["edge"]["peer_ip"].split(".")[-1]) > 200)'   'True'
+echo "== every address the front end can present the PROXY header from =="
+# The peer the edge presents to haproxy is the container's OWN address, and podman chooses WHICH of
+# its networks that address comes from. Measured on the production host 2026-09-22, three recreates
+# with nothing else changed: net-proxy-frontend, then net-proxy-grafana, then net-proxy-api. So the
+# question is not which network to pin -- it is that ALL of them are pinned, which is the only thing
+# that makes the candidate set finite.
+#
+# While only the ingress address was pinned: set_real_ip_from never matched, nginx discarded the
+# PROXY header and the edge logged 2340 requests in ten minutes from one bridge address -- one
+# rate-limit bucket for the whole internet, the 2026-07-20 outage reached by another road, with a
+# valid configuration throughout.
+expect "the ingress address is pinned" \
+  'print(g.FRONT_END["edge"]["pins"]["net-edge-ingress"])' \
+  '172.28.15.10'
+expect "every network the edge joins is pinned, and no pin names a network it does not join" \
+  'import io, yaml;
+d = yaml.safe_load(io.open(g.COMPOSE_APP, encoding="utf-8"));
+nets = d["services"]["edge"]["networks"];
+print(sorted(nets) == sorted(g.FRONT_END["edge"]["pins"]))' \
+  'True'
+# High on purpose, except on the ingress network the edge has to itself: netavark allocates from
+# the low end and these networks are shared with the upstream they front, whose container drifts
+# upward on every recreate. A low pin is a collision waiting to happen.
+expect "every shared-network pin is out of the allocator's way" \
+  'print(all(int(a.split(".")[-1]) > 200 for n, a in g.FRONT_END["edge"]["pins"].items() if n != "net-edge-ingress"))' \
+  'True'
+
+# The three representations of that set -- this table, the emitted unit, and the role variable that
+# becomes EDGE_TRUSTED_PROXY -- have to agree, and the generator REFUSES when they do not. The
+# checks below mutate the table and read the refusal, because a guard that has never been seen to
+# fail is a guard nobody has tested.
+expect "the role's trusted list names exactly the pinned addresses" \
+  'g.generate(); print("no refusal")' \
+  'no refusal'
+expect "a network joined without a pin is refused" \
+  'g.FRONT_END["edge"]["pins"].pop("net-proxy-grafana"); g.generate()' \
+  'REFUSAL: edge: joins net-proxy-grafana with no pinned address'
+expect "a pin on a network the edge does not join is refused" \
+  'g.FRONT_END["edge"]["pins"]["net-proxy-loki"] = "172.28.9.250"; g.generate()' \
+  'REFUSAL: edge: pins an address on net-proxy-loki, which it does not join'
+expect "a pin outside its network's subnet is refused" \
+  'g.FRONT_END["edge"]["pins"]["net-proxy-api"] = "10.0.0.9"; g.generate()' \
+  'REFUSAL: edge: 10.0.0.9 is outside 172.28.13.0/24'
+expect "a pinned address the role does not trust is refused" \
+  'g.FRONT_END["edge"]["pins"]["net-proxy-ingest"] = "172.28.7.249"; g.generate()' \
+  'pinned for edge but missing from basetool_host_edge_trusted_proxies'
 
 echo "== the loopback publishes a host service depends on =="
 # AddHost= solves container->host. Nothing solves host->container, because rootless Podman keeps

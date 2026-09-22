@@ -49,7 +49,7 @@ fi
 
 # --- optional: a PROXY-protocol front end in front of the edge (ADR-0187) -----
 #
-# EDGE_TRUSTED_PROXY holds the ONE address the edge accepts a PROXY header from.
+# EDGE_TRUSTED_PROXY holds the addresses the edge accepts a PROXY header from.
 # Unset means there is no front end: the listeners stay plain and the edge trusts
 # nothing, which is what the Docker deployment does today. Setting it switches
 # every public listener to `proxy_protocol` AND restores the client address from
@@ -59,24 +59,39 @@ fi
 # PROXY protocol ASSERTS a source address; it does not measure one. So this value
 # is a trust decision, and the refusals below are the two ways it is got wrong:
 # trusting everything, or trusting a range wide enough to contain an attacker.
+# A SPACE-SEPARATED LIST since 2026-09-22, and it was one address before that. The rule that
+# matters is unchanged -- never a prefix, name each address -- and a list of literals is the
+# opposite of a wildcard rather than a step toward one.
+#
+# Why it has to be a list: under rootless Podman the peer the edge sees is the edge's OWN address,
+# and rootlessport picks WHICH of the container's networks to present it on. Measured on the
+# production host 2026-09-22 across three recreations with nothing else changed: the peer appeared
+# on net-proxy-frontend, then net-proxy-grafana, then net-proxy-api. Pinning one network only moves
+# the choice to another. So every network the edge is on is pinned, and all of those addresses are
+# named here -- a finite, fixed set, each one the edge itself, none of them reachable by anybody
+# else.
 EDGE_LISTEN_OPTS=''
 if [ -n "${EDGE_TRUSTED_PROXY:-}" ]; then
-  case "${EDGE_TRUSTED_PROXY}" in
-    0.0.0.0/0|::/0|*' '*)
-      echo "edge: refusing to start - EDGE_TRUSTED_PROXY=${EDGE_TRUSTED_PROXY}" >&2
-      echo "edge: that trusts every client to forge its own address. Name the" >&2
-      echo "edge: front end's single address (ADR-0187), never a wildcard." >&2
-      exit 1
-      ;;
-    */*)
-      echo "edge: refusing to start - EDGE_TRUSTED_PROXY=${EDGE_TRUSTED_PROXY}" >&2
-      echo "edge: a prefix is not specific enough. The front end has ONE address," >&2
-      echo "edge: pinned with IP= in its unit, and anything else in that range" >&2
-      echo "edge: could forge a client address past the rate limiter and the" >&2
-      echo "edge: admin allow-list (ADR-0187)." >&2
-      exit 1
-      ;;
-  esac
+  for _tp in ${EDGE_TRUSTED_PROXY}; do
+    case "${_tp}" in
+      0.0.0.0|::)
+        echo "edge: refusing to start - EDGE_TRUSTED_PROXY contains ${_tp}" >&2
+        echo "edge: that trusts every client to forge its own address. Name each" >&2
+        echo "edge: address the front end can reach the edge from (ADR-0187)," >&2
+        echo "edge: never a wildcard." >&2
+        exit 1
+        ;;
+      */*)
+        echo "edge: refusing to start - EDGE_TRUSTED_PROXY contains ${_tp}" >&2
+        echo "edge: a prefix is not specific enough. Each address is pinned with" >&2
+        echo "edge: ip= in the edge's unit, and anything else in that range could" >&2
+        echo "edge: forge a client address past the rate limiter and the admin" >&2
+        echo "edge: allow-list (ADR-0187)." >&2
+        exit 1
+        ;;
+    esac
+  done
+  unset _tp
   EDGE_LISTEN_OPTS='proxy_protocol'
 fi
 export EDGE_LISTEN_OPTS
@@ -205,9 +220,12 @@ echo "edge: resolver ${RESOLVERS% }"
 if [ -n "${EDGE_TRUSTED_PROXY:-}" ]; then
   # http context: `include /tmp/edge-conf.d/*.conf` sits inside `http`, the same
   # place 00-maps.conf is already included from.
-  printf 'set_real_ip_from %s;
-real_ip_header proxy_protocol;
-'     "${EDGE_TRUSTED_PROXY}" > "${CONF_OUT}/00-realip.conf"
+  : > "${CONF_OUT}/00-realip.conf"
+  for _tp in ${EDGE_TRUSTED_PROXY}; do
+    printf 'set_real_ip_from %s;\n' "${_tp}" >> "${CONF_OUT}/00-realip.conf"
+  done
+  unset _tp
+  printf 'real_ip_header proxy_protocol;\n' >> "${CONF_OUT}/00-realip.conf"
   echo "edge: PROXY protocol on, trusting ${EDGE_TRUSTED_PROXY} only"
 else
   echo "edge: no front end configured - listeners are plain, no header is trusted"
