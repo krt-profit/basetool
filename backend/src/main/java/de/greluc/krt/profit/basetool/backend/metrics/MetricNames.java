@@ -721,6 +721,14 @@ public final class MetricNames {
   public static final String BUCKET_SUBJECT = "subject";
 
   /**
+   * Rate-limit bucket label: the per-subject export budget (REQ-SEC-033 carve-out, APPSEC-10) over
+   * the export, statement, report and PDF endpoints, kept apart from {@link #BUCKET_SUBJECT} so a
+   * rejection says which of the two budgets an account ran out of. Bounded like its sibling; the
+   * subject is never a label value.
+   */
+  public static final String BUCKET_SUBJECT_EXPORT = "subject_export";
+
+  /**
    * Rate-limit key source: the key was resolved from a trusted proxy's {@code X-Forwarded-For}
    * chain — the first untrusted hop walking from the right, which is the address the proxy appended
    * — i.e. per-client bucketing behind the edge works as designed.

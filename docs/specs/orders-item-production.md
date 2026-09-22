@@ -94,7 +94,9 @@ not want booked out of stock). The service:
 - For **each consumption entry**, under a pessimistic write lock
   (`inventoryItemRepository.findByIdForUpdate`): checks the entry's own optimistic lock
   (`OptimisticLock.check`, stale → 409); requires the entry to be **earmarked to this order**
-  (`InventoryAllocations.jobOrderSlice`, else `IllegalStateException` "does not belong" → 400);
+  (`InventoryAllocations.jobOrderSlice`, else `BadRequestException`
+  `error.job_order.inventory_item_not_linked` → 400 — an `IllegalStateException` until 2026-09-22,
+  APPSEC-06);
   requires the entry to hold the claimed material (else 400); requires the consumed amount to be
   positive and a whole number for `PIECE` materials (else 400); and **caps the consumed amount at
   the order's own earmark slice and the entry's stock** (over-draw → `ProductionAllocationException`

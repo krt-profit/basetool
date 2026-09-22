@@ -733,31 +733,30 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Maps {@link IllegalStateException} (service-layer invariant guard — typically the multi-tenant
-   * cross-staffel pre-write check in {@code JobOrderHandoverService}, MULTI_SQUADRON_PLAN.md
-   * section 4.4) to 400. The exception message is generic and safe to echo because these checks
-   * never embed user input or implementation details — they describe the violated invariant (e.g.
-   * "Inventory item does not belong to this JobOrder"). The message goes through {@link
-   * #resolveDetail(String, String)} so callers can keep raising it with either an i18n key or a
-   * literal string.
+   * Maps a raw {@link IllegalStateException} to a generic 500, exactly as the {@link
+   * #handleAllExceptions catch-all} does — its message is logged with the stack trace and never
+   * echoed (REQ-API-004, APPSEC-06).
+   *
+   * <p>This handler used to answer every {@code IllegalStateException} with a 400 and echo its
+   * message as the problem detail, on the assumption that only the application's own guards threw
+   * it. They were not the only ones: the JDK, Spring, Hibernate and every library throw it too, for
+   * conditions that are server defects and with messages that can carry data values, internal names
+   * or query fragments. So a defect reached the client as "your request was wrong", with an
+   * internal message attached, and escaped every 5xx alert. The application's genuine client-side
+   * guards now throw {@link BadRequestException} with an i18n key instead, so a raw {@code
+   * IllegalStateException} means what its name says: the server is in a state it should not be in.
+   *
+   * <p>Kept as an explicit handler rather than left to the catch-all so that the decision is
+   * visible here, and re-adding a 400 mapping has to argue with this comment.
    *
    * @param ex thrown {@link IllegalStateException}
    * @param request servlet request for instance URI + access-log enrichment
-   * @return RFC 7807 problem-detail response
+   * @return RFC 7807 problem-detail response with status 500 and a generic detail
    */
   @ExceptionHandler(IllegalStateException.class)
   public ResponseEntity<ProblemDetail> handleIllegalState(
       @NotNull IllegalStateException ex, HttpServletRequest request) {
-    ProblemDetail pd =
-        problem(
-            HttpStatus.BAD_REQUEST,
-            tr("problem.bad_request.title"),
-            resolveDetail(ex.getMessage(), "problem.bad_request.detail"),
-            request,
-            "bad-request",
-            CODE_BAD_REQUEST);
-    logProblem(request, pd, "Illegal state", null);
-    return toEntity(pd);
+    return handleAllExceptions(ex, request);
   }
 
   /**

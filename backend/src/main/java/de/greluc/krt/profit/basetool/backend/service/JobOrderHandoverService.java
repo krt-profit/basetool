@@ -71,6 +71,13 @@ public class JobOrderHandoverService {
    */
   private static final double QUANTITY_EPSILON = 1e-4;
 
+  /**
+   * I18n key of the 400 detail for a payload naming an inventory entry that carries no slice for
+   * the order it is booked against (a stale client payload or a concurrent unlink). Shared with
+   * {@link JobOrderItemProductionService}, which applies the same guard to consumed entries.
+   */
+  static final String ERROR_ITEM_NOT_LINKED_TO_ORDER = "error.job_order.inventory_item_not_linked";
+
   private final JobOrderRepository jobOrderRepository;
   private final JobOrderHandoverRepository jobOrderHandoverRepository;
   private final InventoryItemRepository inventoryItemRepository;
@@ -224,9 +231,9 @@ public class JobOrderHandoverService {
         // in
         // the allocation table, so the item must carry a job-order slice for this order. A mismatch
         // means either a stale client payload or a concurrent unlink — in both cases the handover
-        // cannot proceed and the application is in an inconsistent state for this request.
-        // GlobalExceptionHandler maps IllegalStateException to 400 so the wire format is unchanged.
-        throw new IllegalStateException("Inventory item does not belong to this JobOrder");
+        // cannot proceed. A client-side condition, so a 400 with a localized detail — not a raw
+        // IllegalStateException, which GlobalExceptionHandler answers as a 500 (APPSEC-06).
+        throw new BadRequestException(ERROR_ITEM_NOT_LINKED_TO_ORDER);
       }
 
       if (inventoryItem.getMaterial() == null) {

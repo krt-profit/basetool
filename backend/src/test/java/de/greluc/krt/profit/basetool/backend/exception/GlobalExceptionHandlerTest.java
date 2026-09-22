@@ -597,6 +597,81 @@ class GlobalExceptionHandlerTest {
         "internal exception message must not leak to client");
   }
 
+  /**
+   * APPSEC-06: a raw {@link IllegalStateException} is a server defect — the JDK, Spring and
+   * Hibernate throw it for states that should not exist, with messages that can carry data values.
+   * It must therefore be a 500 with the generic detail, never a 400 echoing its message.
+   */
+  @Test
+  void handleIllegalState_returns500AndNeverEchoesTheMessage() {
+    ResponseEntity<ProblemDetail> resp =
+        handler.handleIllegalState(
+            new IllegalStateException("Duplicate key member-42@example.invalid"), request);
+
+    assertCommon(
+        resp, HttpStatus.INTERNAL_SERVER_ERROR, GlobalExceptionHandler.CODE_INTERNAL_ERROR);
+    String detail = resp.getBody().getDetail();
+    assertNotNull(detail);
+    assertTrue(
+        !detail.contains("member-42"),
+        "an IllegalStateException message must not reach the client");
+    assertNotNull(
+        resp.getBody().getProperties().get("correlationId"),
+        "the 500 carries the correlation id that ties it to the logged stack trace");
+  }
+
+  /**
+   * The client-side guards that used to throw {@link IllegalStateException} now throw {@link
+   * BadRequestException} with i18n keys. Their details are user-visible, so each key is asserted
+   * against both bundles rather than trusted to exist.
+   */
+  @Test
+  void handleBadRequest_resolvesTheFormerIllegalStateGuardKeysInBothLocales() {
+    assertEquals(
+        "This stock entry is not (or no longer) allocated to this job order. Please reload the"
+            + " page.",
+        handler
+            .handleAppException(
+                new BadRequestException("error.job_order.inventory_item_not_linked"), request)
+            .getBody()
+            .getDetail());
+    assertEquals(
+        "The refinery order is already completed and stored.",
+        handler
+            .handleAppException(
+                new BadRequestException("error.refinery_order.already_stored"), request)
+            .getBody()
+            .getDetail());
+    assertEquals(
+        "The account still exists in Keycloak and therefore cannot be deleted.",
+        handler
+            .handleAppException(new BadRequestException("error.user.still_in_keycloak"), request)
+            .getBody()
+            .getDetail());
+
+    LocaleContextHolder.setLocale(Locale.GERMAN);
+    assertEquals(
+        "Der Lagereintrag ist diesem Auftrag nicht (mehr) zugeordnet. Bitte lade die Seite neu.",
+        handler
+            .handleAppException(
+                new BadRequestException("error.job_order.inventory_item_not_linked"), request)
+            .getBody()
+            .getDetail());
+    assertEquals(
+        "Der Raffinerieauftrag ist bereits abgeschlossen und eingelagert.",
+        handler
+            .handleAppException(
+                new BadRequestException("error.refinery_order.already_stored"), request)
+            .getBody()
+            .getDetail());
+    assertEquals(
+        "Das Konto existiert noch in Keycloak und kann deshalb nicht gelöscht werden.",
+        handler
+            .handleAppException(new BadRequestException("error.user.still_in_keycloak"), request)
+            .getBody()
+            .getDetail());
+  }
+
   // ---------------------------------------------------------------------
   // EntityInUseException — 409 with i18n-aware detail
   // ---------------------------------------------------------------------

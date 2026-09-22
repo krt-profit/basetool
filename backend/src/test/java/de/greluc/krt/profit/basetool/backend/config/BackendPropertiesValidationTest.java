@@ -21,8 +21,11 @@ package de.greluc.krt.profit.basetool.backend.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.support.AuditRetentionProperties;
 import de.greluc.krt.profit.basetool.backend.support.AuthoritiesCacheProperties;
+import de.greluc.krt.profit.basetool.backend.support.NotificationRetentionProperties;
 import de.greluc.krt.profit.basetool.backend.support.RateLimitProperties;
+import de.greluc.krt.profit.basetool.backend.support.RejectedRegistrationRetentionProperties;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -50,6 +53,12 @@ class BackendPropertiesValidationTest {
   private final ApplicationContextRunner keycloakSyncRunner = runnerFor(KeycloakSyncConfig.class);
   private final ApplicationContextRunner authoritiesCacheRunner =
       runnerFor(AuthoritiesCacheConfig.class);
+  private final ApplicationContextRunner auditRetentionRunner =
+      runnerFor(AuditRetentionConfig.class);
+  private final ApplicationContextRunner notificationRetentionRunner =
+      runnerFor(NotificationRetentionConfig.class);
+  private final ApplicationContextRunner rejectedRetentionRunner =
+      runnerFor(RejectedRegistrationRetentionConfig.class);
 
   /**
    * Builds a context runner around one properties configuration and a real JSR-380 validator.
@@ -97,6 +106,54 @@ class BackendPropertiesValidationTest {
   @Configuration
   @EnableConfigurationProperties(AuthoritiesCacheProperties.class)
   static class AuthoritiesCacheConfig {
+    /**
+     * The JSR-380 validator {@code @Validated} properties binding delegates to.
+     *
+     * @return a real validator factory, so constraint violations fail the context as in production
+     */
+    @Bean
+    LocalValidatorFactoryBean validator() {
+      return new LocalValidatorFactoryBean();
+    }
+  }
+
+  /** Registers {@link AuditRetentionProperties} and the validator enforcing its floors. */
+  @Configuration
+  @EnableConfigurationProperties(AuditRetentionProperties.class)
+  static class AuditRetentionConfig {
+    /**
+     * The JSR-380 validator {@code @Validated} properties binding delegates to.
+     *
+     * @return a real validator factory, so constraint violations fail the context as in production
+     */
+    @Bean
+    LocalValidatorFactoryBean validator() {
+      return new LocalValidatorFactoryBean();
+    }
+  }
+
+  /** Registers {@link NotificationRetentionProperties} and the validator enforcing its floors. */
+  @Configuration
+  @EnableConfigurationProperties(NotificationRetentionProperties.class)
+  static class NotificationRetentionConfig {
+    /**
+     * The JSR-380 validator {@code @Validated} properties binding delegates to.
+     *
+     * @return a real validator factory, so constraint violations fail the context as in production
+     */
+    @Bean
+    LocalValidatorFactoryBean validator() {
+      return new LocalValidatorFactoryBean();
+    }
+  }
+
+  /**
+   * Registers {@link RejectedRegistrationRetentionProperties} and the validator enforcing its
+   * floor.
+   */
+  @Configuration
+  @EnableConfigurationProperties(RejectedRegistrationRetentionProperties.class)
+  static class RejectedRegistrationRetentionConfig {
     /**
      * The JSR-380 validator {@code @Validated} properties binding delegates to.
      *
@@ -208,5 +265,149 @@ class BackendPropertiesValidationTest {
         (context) ->
             assertThat(context.getBean(AuthoritiesCacheProperties.class).getTtl())
                 .isEqualTo(Duration.ofMinutes(5)));
+  }
+
+  // covers REQ-SEC-033 carve-out (APPSEC-10) — a zero export capacity would refuse every export
+  @Test
+  void shouldFail_WhenSubjectExportCapacityIsZero() {
+    rateLimitRunner
+        .withPropertyValues("app.rate-limit.subject.export.capacity=0")
+        .run((context) -> assertThat(context).hasFailed());
+  }
+
+  /** The shipped export budget is ten a minute (owner decision 2026-09-22). */
+  @Test
+  void shouldDefaultToTenPerMinute_WhenSubjectExportOmitted() {
+    rateLimitRunner.run(
+        (context) -> {
+          RateLimitProperties.Export export =
+              context.getBean(RateLimitProperties.class).getSubject().getExport();
+          assertThat(export.getCapacity()).isEqualTo(10);
+          assertThat(export.getRefillTokens()).isEqualTo(10);
+          assertThat(export.getRefillPeriod()).isEqualTo(Duration.ofMinutes(1));
+        });
+  }
+
+  // covers REQ-AUDIT-006 (BE-MOD-03) — P0D would put the cutoff at "now" and purge the whole trail
+  @Test
+  void shouldFail_WhenAuditRetentionMaxAgeIsZero() {
+    auditRetentionRunner
+        .withPropertyValues("app.audit.retention.max-age=P0D")
+        .run((context) -> assertThat(context).hasFailed());
+  }
+
+  /** A negative window puts the cutoff in the future — every row would be "older". */
+  @Test
+  void shouldFail_WhenAuditRetentionMaxAgeIsNegative() {
+    auditRetentionRunner
+        .withPropertyValues("app.audit.retention.max-age=-P1D")
+        .run((context) -> assertThat(context).hasFailed());
+  }
+
+  /** One day under the floor is refused; the floor itself is accepted (the twin below). */
+  @Test
+  void shouldFail_WhenAuditRetentionMaxAgeIsBelowTheFloor() {
+    auditRetentionRunner
+        .withPropertyValues("app.audit.retention.max-age=P29D")
+        .run((context) -> assertThat(context).hasFailed());
+  }
+
+  /** The floor itself is allowed — the constraint is "at least", not "above". */
+  @Test
+  void shouldBind_WhenAuditRetentionMaxAgeIsExactlyTheFloor() {
+    auditRetentionRunner
+        .withPropertyValues("app.audit.retention.max-age=P30D")
+        .run(
+            (context) ->
+                assertThat(context.getBean(AuditRetentionProperties.class).maxAge())
+                    .isEqualTo(Duration.ofDays(AuditRetentionProperties.MIN_MAX_AGE_DAYS)));
+  }
+
+  /** A zero interval would turn the daily sweep into a busy loop against the audit tables. */
+  @Test
+  void shouldFail_WhenAuditRetentionIntervalIsZero() {
+    auditRetentionRunner
+        .withPropertyValues("app.audit.retention.interval=PT0S")
+        .run((context) -> assertThat(context).hasFailed());
+  }
+
+  /** With nothing set, the shipped two-year window and daily pace apply. */
+  @Test
+  void shouldDefault_WhenAuditRetentionOmitted() {
+    auditRetentionRunner.run(
+        (context) -> {
+          AuditRetentionProperties properties = context.getBean(AuditRetentionProperties.class);
+          assertThat(properties.enabled()).isTrue();
+          assertThat(properties.maxAge()).isEqualTo(Duration.ofDays(730));
+          assertThat(properties.interval()).isEqualTo(Duration.ofHours(24));
+        });
+  }
+
+  // covers REQ-SEC-057 (BE-MOD-03) — "not zero on purpose" is a startup check now
+  @Test
+  void shouldFail_WhenRejectedRetentionMaxAgeIsZero() {
+    rejectedRetentionRunner
+        .withPropertyValues("app.registrations.rejected-retention.max-age=P0D")
+        .run((context) -> assertThat(context).hasFailed());
+  }
+
+  /** The one-day floor itself binds, and the default stays ninety days. */
+  @Test
+  void shouldBind_WhenRejectedRetentionMaxAgeIsOneDay() {
+    rejectedRetentionRunner
+        .withPropertyValues("app.registrations.rejected-retention.max-age=P1D")
+        .run(
+            (context) ->
+                assertThat(context.getBean(RejectedRegistrationRetentionProperties.class).maxAge())
+                    .isEqualTo(Duration.ofDays(1)));
+    rejectedRetentionRunner.run(
+        (context) ->
+            assertThat(context.getBean(RejectedRegistrationRetentionProperties.class).maxAge())
+                .isEqualTo(Duration.ofDays(90)));
+  }
+
+  // covers REQ-NOTIF-009 (BE-MOD-03) — both windows carry the floor
+  @Test
+  void shouldFail_WhenNotificationReadMaxAgeIsZero() {
+    notificationRetentionRunner
+        .withPropertyValues("app.notifications.retention.max-age=P0D")
+        .run((context) -> assertThat(context).hasFailed());
+  }
+
+  /** The unread window is floored on its own, not only through the read one. */
+  @Test
+  void shouldFail_WhenNotificationUnreadMaxAgeIsNegative() {
+    notificationRetentionRunner
+        .withPropertyValues(
+            "app.notifications.retention.max-age=P1D",
+            "app.notifications.retention.unread-max-age=-P1D")
+        .run((context) -> assertThat(context).hasFailed());
+  }
+
+  // covers REQ-NOTIF-009 — an unread notification is never reaped sooner than a read one
+  @Test
+  void shouldFail_WhenNotificationUnreadWindowIsShorterThanReadWindow() {
+    notificationRetentionRunner
+        .withPropertyValues(
+            "app.notifications.retention.max-age=P90D",
+            "app.notifications.retention.unread-max-age=P30D")
+        .run((context) -> assertThat(context).hasFailed());
+  }
+
+  /** Equal windows are allowed ("never sooner"), and the defaults are 90 / 180 days. */
+  @Test
+  void shouldBind_WhenNotificationWindowsAreEqualOrDefault() {
+    notificationRetentionRunner
+        .withPropertyValues(
+            "app.notifications.retention.max-age=P1D",
+            "app.notifications.retention.unread-max-age=P1D")
+        .run((context) -> assertThat(context).hasNotFailed());
+    notificationRetentionRunner.run(
+        (context) -> {
+          NotificationRetentionProperties properties =
+              context.getBean(NotificationRetentionProperties.class);
+          assertThat(properties.maxAge()).isEqualTo(Duration.ofDays(90));
+          assertThat(properties.unreadMaxAge()).isEqualTo(Duration.ofDays(180));
+        });
   }
 }

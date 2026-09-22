@@ -170,7 +170,9 @@ public class SecurityConfig {
    * expiry, and the effective authority comes from realm roles, so requiring {@code aud} is a
    * defense-in-depth knob an operator enables once they know the value their realm issues (a wrong
    * value would reject every token). Set {@code app.security.jwt.expected-audiences} (comma-list)
-   * to the backend client / resource id to turn it on.
+   * to the backend client / resource id to turn it on. Under the {@code prod} profile it is not
+   * optional: {@link JwtAudienceStartupCheck} refuses to start the context while it is blank
+   * (APPSEC-08), so "empty = off" holds only for dev, test and e2e.
    */
   @Value("${app.security.jwt.expected-audiences:}")
   private List<String> expectedAudiences;
@@ -552,17 +554,22 @@ public class SecurityConfig {
                     .requestMatchers("/actuator/health", "/actuator/health/**")
                     .permitAll()
                     // REQ-OBS-016: `loggers` is exposed so a log level can be raised at RUNTIME
-                    // during an incident, and its POST variant MUTATES that level. The backend
-                    // configures NO separate management port — Actuator rides the ordinary 11261
-                    // connector, unreachable from the internet only because that connector lives
-                    // on internal Docker networks — so without this rule the write would fall
-                    // through to `anyRequest().authenticated()` below and ANY valid realm JWT
-                    // could set the ROOT logger to TRACE, which makes Spring Security / WebClient
-                    // / Netty write bearer tokens and request bodies into a log stream retained
-                    // for 744 h. Only the mutator is gated; the read (GET /actuator/loggers) stays
-                    // on the authenticated catch-all. Frontend and ingest serve Actuator on a
-                    // dedicated, UNAUTHENTICATED management port where no identity exists to gate
-                    // on, so there the write is removed instead
+                    // during an incident, and its POST variant MUTATES that level. Where Actuator
+                    // lives depends on the profile. In prod it is on a dedicated, internal-only
+                    // management port, 11271 (`management.server.port`, application-prod.yml,
+                    // ADR-0134), and a 404 on the 11261 application connector. On that port
+                    // ManagementPortSecurityConfig's @Order(0) chain permits ONLY an enumerated
+                    // read list (health, health/**, prometheus, info) without credentials; every
+                    // other management path, `loggers` included, falls through to THIS chain. In
+                    // dev/test/e2e there is no management port and Actuator rides the application
+                    // connector. Either way, without this rule the write would reach
+                    // `anyRequest().authenticated()` below and ANY valid realm JWT could set the
+                    // ROOT logger to TRACE, which makes Spring Security / WebClient / Netty write
+                    // bearer tokens and request bodies into a log stream retained for 744 h. Only
+                    // the mutator is gated; the read (GET /actuator/loggers) stays on the
+                    // authenticated catch-all. Frontend and ingest permit all of /actuator/** on
+                    // their UNAUTHENTICATED management port, where no identity exists to gate on,
+                    // so there the write is removed instead
                     // (`management.endpoint.loggers.access: read-only`, prod profile only).
                     .requestMatchers(HttpMethod.POST, "/actuator/loggers/**")
                     .hasRole(Roles.ADMIN)

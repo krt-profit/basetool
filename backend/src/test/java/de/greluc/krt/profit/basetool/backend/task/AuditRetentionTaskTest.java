@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.service.AuditRetentionService;
+import de.greluc.krt.profit.basetool.backend.support.AuditRetentionProperties;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
@@ -42,12 +43,16 @@ class AuditRetentionTaskTest {
 
   private static final Duration MAX_AGE = Duration.ofDays(730);
 
+  /** The sweep interval; irrelevant to these direct calls, but the properties record needs one. */
+  private static final Duration INTERVAL = Duration.ofHours(24);
+
   @Mock private AuditRetentionService retentionService;
 
   private final TaskMetrics taskMetrics = new TaskMetrics(new SimpleMeterRegistry());
 
   private AuditRetentionTask task() {
-    return new AuditRetentionTask(retentionService, taskMetrics, MAX_AGE);
+    return new AuditRetentionTask(
+        retentionService, taskMetrics, new AuditRetentionProperties(true, MAX_AGE, INTERVAL));
   }
 
   // covers REQ-AUDIT-006 — the cutoff is "now - max-age"

@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
@@ -203,7 +204,7 @@ class UserDeletionServiceTest {
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(keycloakService.userExists(userId)).thenReturn(true);
 
-    assertThrows(IllegalStateException.class, () -> userDeletionService.deleteUser(userId));
+    assertThrows(BadRequestException.class, () -> userDeletionService.deleteUser(userId));
 
     verify(userRepository, never()).delete(any());
     verify(inventoryItemRepository, never()).deleteByUserId(any());
@@ -242,7 +243,7 @@ class UserDeletionServiceTest {
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(keycloakService.userExists(userId)).thenReturn(true);
 
-    assertThrows(IllegalStateException.class, () -> userDeletionService.deleteUser(userId));
+    assertThrows(BadRequestException.class, () -> userDeletionService.deleteUser(userId));
 
     verify(userRepository, never()).delete(any());
   }
@@ -257,7 +258,7 @@ class UserDeletionServiceTest {
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
 
     assertThrows(
-        IllegalStateException.class,
+        BadRequestException.class,
         () ->
             userDeletionService.deleteUser(
                 userId,
@@ -300,7 +301,7 @@ class UserDeletionServiceTest {
     when(keycloakService.userExists(userId)).thenReturn(true);
     when(keycloakService.usernameOf(userId)).thenReturn(Optional.of("Redshift"));
 
-    assertThrows(IllegalStateException.class, () -> userDeletionService.deleteUser(userId));
+    assertThrows(BadRequestException.class, () -> userDeletionService.deleteUser(userId));
 
     verify(userRepository, never()).delete(any());
   }
@@ -317,7 +318,7 @@ class UserDeletionServiceTest {
     when(keycloakService.usernameOf(userId))
         .thenThrow(new ResourceAccessException("keycloak admin call refused"));
 
-    assertThrows(IllegalStateException.class, () -> userDeletionService.deleteUser(userId));
+    assertThrows(BadRequestException.class, () -> userDeletionService.deleteUser(userId));
 
     verify(userRepository, never()).delete(any());
   }
@@ -407,7 +408,7 @@ class UserDeletionServiceTest {
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
 
     // When & Then
-    assertThrows(IllegalStateException.class, () -> userDeletionService.deleteUser(userId));
+    assertThrows(BadRequestException.class, () -> userDeletionService.deleteUser(userId));
     verify(userRepository, never()).delete(any());
   }
 

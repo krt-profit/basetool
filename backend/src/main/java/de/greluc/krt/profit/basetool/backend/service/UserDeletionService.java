@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
@@ -79,6 +80,12 @@ public class UserDeletionService {
    */
   private static final String SERVICE_ACCOUNT_PREFIX =
       IngestGatewayProperties.SERVICE_ACCOUNT_PREFIX;
+
+  /**
+   * I18n key of the 400 detail for deleting an account that still exists in Keycloak — by the
+   * stored flag or by the live probe; the caller is told the same either way.
+   */
+  static final String ERROR_STILL_IN_KEYCLOAK = "error.user.still_in_keycloak";
 
   /**
    * Whether {@link #deleteUser(UUID, KeycloakPresenceCheck)} must verify against Keycloak that the
@@ -198,12 +205,13 @@ public class UserDeletionService {
    *
    * @param userId user to delete
    * @throws NoSuchElementException when the user id is unknown
-   * @throws IllegalStateException when the user is still present in Keycloak — checked both against
+   * @throws BadRequestException when the user is still present in Keycloak — checked both against
    *     the stored {@code in_keycloak} flag and, because that flag is only a cached mirror a
-   *     swallowed sync error can leave stale, against Keycloak itself — or when no other admin
-   *     exists to receive the reassigned owner references. The second check exempts the service
-   *     account of a configured ingest gateway, for which the two views disagree by construction
-   *     (see {@link #isConfiguredGatewayServiceAccount})
+   *     swallowed sync error can leave stale, against Keycloak itself. The second check exempts the
+   *     service account of a configured ingest gateway, for which the two views disagree by
+   *     construction (see {@link #isConfiguredGatewayServiceAccount})
+   * @throws IllegalStateException when no other admin exists to receive the reassigned owner
+   *     references — a deployment defect, answered as a 500
    * @throws org.springframework.web.client.RestClientException when Keycloak cannot be reached for
    *     that check; the deletion is refused rather than performed on an unverified assumption
    */
@@ -236,8 +244,9 @@ public class UserDeletionService {
    * @param presenceCheck whether the Keycloak presence probe applies; {@link
    *     KeycloakPresenceCheck#ENFORCED} for every admin-facing deletion
    * @throws NoSuchElementException when the user id is unknown
-   * @throws IllegalStateException as {@link #deleteUser(UUID)}, except that the Keycloak probe is
+   * @throws BadRequestException as {@link #deleteUser(UUID)}, except that the Keycloak probe is
    *     skipped under {@link KeycloakPresenceCheck#WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER}
+   * @throws IllegalStateException as {@link #deleteUser(UUID)}
    */
   @Transactional
   public void deleteUser(UUID userId, @NotNull KeycloakPresenceCheck presenceCheck) {
@@ -247,7 +256,9 @@ public class UserDeletionService {
             .orElseThrow(() -> new NoSuchElementException("User not found"));
 
     if (user.isInKeycloak()) {
-      throw new IllegalStateException("Cannot delete user that is still in Keycloak");
+      // An admin's request against an account that still exists — a 400 with a localized detail,
+      // not a raw IllegalStateException, which is answered as a 500 (APPSEC-06).
+      throw new BadRequestException(ERROR_STILL_IN_KEYCLOAK);
     }
     // The stored flag is only a cached mirror of Keycloak, maintained by the sync. A single
     // swallowed sync error leaves it stale at false, which used to be enough for an admin to
@@ -263,8 +274,9 @@ public class UserDeletionService {
     if (presenceCheck == KeycloakPresenceCheck.ENFORCED
         && keycloakService.userExists(userId)
         && !isConfiguredGatewayServiceAccount(userId)) {
-      throw new IllegalStateException(
-          "Cannot delete user that is still in Keycloak (stored flag was stale)");
+      // Same answer as the stored-flag guard above: the caller cannot tell the two apart and
+      // need not. The stale flag is the sync's business, logged there.
+      throw new BadRequestException(ERROR_STILL_IN_KEYCLOAK);
     }
 
     User admin =
