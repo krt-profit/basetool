@@ -118,6 +118,13 @@
       # scripts/check-conformance.py fails the host when the two disagree.
       [Container]
       AddHost={{ basetool_host_public_name_aliases | join('\nAddHost=') }}
+      {% if item in basetool_host_public_name_alias_v6_services and basetool_host_public_name_aliases_v6 | length > 0 %}
+      # The IPv6 half (ADR-0196 amendment 1). Only for a service on an IPv6-capable network, and
+      # only useful because containers.conf gives the rootless netns pasta a v6 --map-guest-addr.
+      # Without BOTH, the ip6-pinned probes fail locally with "no suitable address found" and
+      # EdgeIpv6Unreachable fires about the monitoring instead of about the edge.
+      AddHost={{ basetool_host_public_name_aliases_v6 | join('\nAddHost=') }}
+      {% endif %}
   loop: "{{ basetool_host_public_name_alias_services }}"
   when: basetool_host_public_name_aliases | length > 0
   notify: Reload the service user's units

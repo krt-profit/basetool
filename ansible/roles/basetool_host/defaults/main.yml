@@ -415,6 +415,12 @@ basetool_host_manage_frontend: true
 # Empty means "write no drop-in and remove any this role wrote", so clearing the variable actually
 # clears the alias instead of leaving a stale one behind.
 basetool_host_public_name_aliases: []
+# The same names again, pointed at the address pasta maps to this host over IPv6 (see
+# basetool_host_pasta_map_guest_addrs). Separate from the list above because only a container with
+# an IPv6 route can use them, and because an AAAA record in a container that has none is a resolver
+# trap: Go sorts a reachable IPv4 behind an unreachable IPv6 often enough that it has already cost
+# this deployment a day. Empty means the v6 half is simply not written.
+basetool_host_public_name_aliases_v6: []
 # The services whose containers need it. The three JVM modules resolve the issuer; grafana's OAuth
 # token exchange is a back-channel call to the same origin; blackbox-exporter dials all four public
 # names. The generator emits `AddHost=` for the first three (their compose templates carry
@@ -425,6 +431,25 @@ basetool_host_public_name_alias_services:
   - ingest
   - grafana
   - blackbox-exporter
+# Which of them also get the IPv6 half. ONLY services that are on an IPv6-capable network: the
+# exporter is, on net-blackbox-v6, and nothing else is. Adding a service here that has no v6 route
+# gives its resolver an address it cannot use.
+basetool_host_public_name_alias_v6_services:
+  - blackbox-exporter
+
+# --- the addresses pasta translates back to this host ----------------------------------------------
+# Podman starts the rootless netns pasta with `--map-guest-addr 169.254.1.2`, which is what
+# `host-gateway` resolves to and the whole mechanism ADR-0196 relies on. It REPLACES that argument
+# with whatever `pasta_options` says rather than appending to it -- measured on the testing host
+# 2026-09-22, where setting only a v6 mapping took `host-gateway` from open to unreachable. So the
+# IPv4 entry is restated here on purpose: dropping it breaks every alias at once.
+#
+# The v6 entry is what makes the IPv6 blackbox probes possible at all. It is a ULA chosen to read as
+# the v6 twin of the v4 one, and it must not overlap any network in the stack (fd00:bb::/64,
+# fd00:28:*::/64 are taken).
+basetool_host_pasta_map_guest_addrs:
+  - "169.254.1.2"
+  - "fd00:169:254::2"
 
 # --- a JVM truststore for a privately-signed edge --------------------------------------------------
 # A non-production host reaches its own public name through an edge holding a certificate from a

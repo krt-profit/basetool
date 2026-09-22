@@ -4,6 +4,12 @@
 
 ### Fixed
 
+- **Betrieb: die IPv6-Prüfungen der öffentlichen Adressen laufen wieder.** Ein Container erreicht
+  auf dem neuen Server die eigene Maschine nicht über deren öffentliche Adresse; der Umweg, der
+  das löst, gab es bisher nur für IPv4. Die v6-Prüfungen scheiterten deshalb an sich selbst und
+  meldeten eine Störung, während IPv6 einwandfrei bediente. Es gibt den Umweg jetzt für beide
+  Protokolle — auf dem Testsystem gemessen, gleiche Antwort wie über IPv4. Rein betriebsseitig.
+
 - **Betrieb: die drei Host-Auslastungswarnungen können wieder auslösen.** Der Kernel dieses
   Betriebssystems bringt die Auslastungsmessung mit, schaltet sie aber ab — seit dem Serverwechsel
   fehlten damit alle Druckwerte, drei Warnungen waren tot und fünf Panels leer. Betroffen war

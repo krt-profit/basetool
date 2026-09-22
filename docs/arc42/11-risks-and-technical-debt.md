@@ -91,24 +91,32 @@ routing and the application. What it no longer traverses is public DNS and inter
 never did. The Docker host's hairpin kept the packet on the machine too. What these probes proved
 was *"the name has a record and the edge answers"*, and that is what they still prove.
 
-*Larger:* **the IPv6 modules cannot work here at all.** `host-gateway` is IPv4-only, the host's
-public IPv6 is refused from a container, and the netavark bridge's own gateway is inside the
-namespace where no host process listens — all three measured. `http_2xx_ipv6` and
-`http_2xx_or_401_ipv6` therefore fail with *"no suitable address found"*, and their alerts fire
-against endpoints that are serving IPv6 perfectly well.
+*Larger, and **solved on 2026-09-22** — this paragraph said the IPv6 modules "cannot work here at
+all", and that was true of the configuration, not of the platform.* `host-gateway` is IPv4-only
+because podman implements it with a single `--map-guest-addr 169.254.1.2` on the rootless netns's
+pasta, so an ip6-pinned probe had no address and failed with *"no suitable address found"* — while
+the edge served IPv6 perfectly well, measured from the host itself at `302`/`302`/`401`.
 
-Two ways out, neither taken yet and neither a cutover-window decision:
+The first of the two ways out below was measured on the testing host and taken:
+`containers.conf` now sets `pasta_options` with **both** a v4 and a v6 `--map-guest-addr`, and the
+alias drop-in points the public names at the v6 one for `blackbox-exporter`, the only container with
+an IPv6 route. A real named HTTPS request over the mapped address answers **200**, byte-identical to
+its IPv4 twin. [ADR-0196 Amendment 1](../adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md)
+has the measurement table.
 
-- **Give pasta an IPv6 host mapping.** This is the one worth measuring, because it would make
-  *every* alias in ADR-0196 unnecessary and restore both protocols at once. It means setting
-  `pasta_options` in a `containers.conf` the role keeps deliberately empty — and whose emptiness is
-  itself documented — so it belongs on the testing host first.
-- **Move the IPv6 assertion to a host-level probe.** The host reaches its own public IPv6 without
-  difficulty (measured), so a small timer writing a textfile metric proves exactly what the
-  container-side module used to. Strictly weaker than the first option and strictly simpler.
+Two corrections to what stood here, because both would mislead the next reader:
 
-Until one of them lands, those two modules are red and their redness means nothing — which is the
-state every other entry in this chapter exists to prevent.
+- **It does not make the IPv4 aliases unnecessary.** Podman *replaces* its own `--map-guest-addr`
+  rather than appending to it, so the v4 address has to be restated in `pasta_options` and the
+  aliases are what carry v4. Setting only the v6 mapping takes `host-gateway` from open to
+  unreachable — measured.
+- **The second way out was not needed.** *"Move the IPv6 assertion to a host-level probe"* stays
+  recorded as the simpler fallback if a future podman drops `pasta_options` support for the rootless
+  namespace; it is not the current design.
+
+What remains true is the paragraph above it: the probe still does not leave the machine. It reaches
+haproxy through a mapping instead of through public DNS and internet routing — which is exactly what
+the IPv4 probe does, so the two families are now equal rather than one being blind.
 
 ## 11.5b The alias drop-ins were hand-written before the role could write them
 

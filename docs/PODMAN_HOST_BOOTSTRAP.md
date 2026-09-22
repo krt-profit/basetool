@@ -273,6 +273,12 @@ forwarder, not nginx, which already listens on 8080/8443 inside the container as
 > The text is kept rather than deleted because it records what was tried and what it cost, and
 > because a future podman that fixes the IPv6 path would make it relevant again — though even
 > then, turning it on would make the edge trust two sources for one fact.
+>
+> **`containers.conf` is no longer empty — 2026-09-22.** It carries `pasta_options` with a v4 and a
+> v6 `--map-guest-addr`, which is what lets a container reach this host over IPv6 at all
+> ([ADR-0196](adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md)
+> Amendment 1). `rootless_port_forwarder` is still deliberately unset; a different setting arrived,
+> that one did not.
 
 ```ini
 # ~iri/.config/containers/containers.conf
