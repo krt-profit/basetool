@@ -15,6 +15,11 @@
 
 ### Changed
 
+- **Build: Release-Tags und Release-PRs legt jetzt die GitHub-App „basetool-release“ an.** Seit die
+  Tag-Regel nur noch sie und den Maintainer zulässt, scheiterte das persönliche Token beim Anlegen
+  des Tags, und v1.10.0 musste von Hand getaggt werden. Beide Release-Workflows holen sich jetzt ein
+  kurzlebiges, pro Schritt beschränktes App-Token; das alte Token wird nicht mehr gelesen.
+
 - **Server-Härtung.** Datenbank- und Redis-Netze haben in Produktion keinen Internetzugang mehr,
   Keycloak bindet Theme und Provider nur lesend und `realm-export.json` gar nicht mehr ein, die
   ungenutzte Prometheus-Lifecycle-API ist abgeschaltet, und das Host-Journal löscht Einträge nach
