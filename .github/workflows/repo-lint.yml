@@ -22,6 +22,13 @@ name: Repo Lint
 #                   pick "the next free number" from their own checkout, so two
 #                   of them land on the same one; 0154 named two accepted
 #                   decisions on main for eleven days before anyone noticed.
+#   - adr-registry -> docs/adr/README.md still agrees with docs/adr/: every ADR
+#                   has an index row, every row links to a real decision, and
+#                   every row renders as three cells. adr-numbering reads
+#                   filenames, so nothing read the index at all -- 0192-0194 sat
+#                   unindexed, and three rows contained an unescaped "|" that
+#                   Markdown read as a cell separator, putting their status in
+#                   the wrong column.
 #   - alloy-log-masking -> the PII masks in monitoring/alloy/config.alloy. Alloy's
 #                   stage.replace overwrites EVERY capture group and expands no
 #                   back-references, so the natural way to write a mask destroys
@@ -601,6 +608,44 @@ jobs:
         env:
           ADR_BASE_REF: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
         run: scripts/check-adr-numbering.sh
+
+  adr-registry:
+    name: adr-registry
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The sibling `adr-numbering` job reads FILENAMES only, so until now nothing read
+      # docs/adr/README.md at all -- and both ways that bites have already happened.
+      #
+      # 0192, 0193 and 0194 reached main with no index row; the table jumped 0191 -> 0195 and
+      # stayed that way until 2026-09-22 (#1963). To the numbering gate an unindexed ADR is a
+      # perfectly well-numbered one.
+      #
+      # And 0123, 0137 and 0140 each carried an UNESCAPED `|` in their prose. GFM splits a row on
+      # every unescaped pipe before it parses inline syntax, so the backticks all three sat inside
+      # were no shelter -- and because GFM keeps the first three cells and DISCARDS the excess, the
+      # `Accepted` status was not merely shifted, it was dropped: the status column rendered a
+      # fragment of the prose instead, or blank for 0123, whose `||` produced an empty cell.
+      # It is invisible by eye -- the table is padded to a fixed width, so a broken row looks
+      # exactly like an intact one -- and 0137 escaped the pipe correctly in one place and not in
+      # the other, in the SAME row.
+      #
+      # The self-test runs first so the gate can never pass vacuously. Its load-bearing case is the
+      # false-positive guard: a legitimately ESCAPED `\|` must stay green, or the gate would be red
+      # on a clean tree from the day it merged.
+      - name: Self-test the ADR registry checker
+        # chmod first, like the other script-backed gates: this repo is developed on Windows where
+        # core.filemode=false, so the executable bit is easy to lose on a re-add and the job would
+        # die with exit 126.
+        run: |
+          chmod +x scripts/check-adr-registry.sh scripts/check-adr-registry.test.sh
+          scripts/check-adr-registry.test.sh
+
+      - name: Check the ADR registry
+        run: scripts/check-adr-registry.sh
 
   monitoring-image-pins:
     name: monitoring-image-pins
