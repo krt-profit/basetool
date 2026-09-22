@@ -19,13 +19,12 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationRuleDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationRuleWriteRequest;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
@@ -33,7 +32,6 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -198,15 +196,13 @@ public class AdminNotificationRulePageController {
   @ResponseBody
   @GetMapping(value = "/{id}", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> get(@PathVariable @NotNull UUID id) {
-    try {
-      return ResponseEntity.ok(
-          backendApiClient.get(BACKEND_BASE + "/" + id, NotificationRuleDto.class));
-    } catch (BackendServiceException e) {
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Load notification rule {} (ajax) failed", id, e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+    return relay(
+        log,
+        "load notification rule " + id + " (ajax)",
+        () -> {
+          return ResponseEntity.ok(
+              backendApiClient.get(BACKEND_BASE + "/" + id, NotificationRuleDto.class));
+        });
   }
 
   /**
@@ -218,15 +214,13 @@ public class AdminNotificationRulePageController {
   @ResponseBody
   @PostMapping(headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> create(@RequestBody NotificationRuleWriteRequest request) {
-    try {
-      return ResponseEntity.ok(
-          backendApiClient.post(BACKEND_BASE, request, NotificationRuleDto.class));
-    } catch (BackendServiceException e) {
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Create notification rule (ajax) failed", e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+    return relay(
+        log,
+        "create notification rule (ajax)",
+        () -> {
+          return ResponseEntity.ok(
+              backendApiClient.post(BACKEND_BASE, request, NotificationRuleDto.class));
+        });
   }
 
   /**
@@ -240,15 +234,13 @@ public class AdminNotificationRulePageController {
   @PutMapping(value = "/{id}", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> update(
       @PathVariable @NotNull UUID id, @RequestBody NotificationRuleWriteRequest request) {
-    try {
-      return ResponseEntity.ok(
-          backendApiClient.put(BACKEND_BASE + "/" + id, request, NotificationRuleDto.class));
-    } catch (BackendServiceException e) {
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Update notification rule {} (ajax) failed", id, e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+    return relay(
+        log,
+        "update notification rule " + id + " (ajax)",
+        () -> {
+          return ResponseEntity.ok(
+              backendApiClient.put(BACKEND_BASE + "/" + id, request, NotificationRuleDto.class));
+        });
   }
 
   /**
@@ -260,14 +252,12 @@ public class AdminNotificationRulePageController {
   @ResponseBody
   @DeleteMapping(value = "/{id}", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> delete(@PathVariable @NotNull UUID id) {
-    try {
-      backendApiClient.delete(BACKEND_BASE + "/" + id, Void.class);
-      return ResponseEntity.noContent().build();
-    } catch (BackendServiceException e) {
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Delete notification rule {} (ajax) failed", id, e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+    return relay(
+        log,
+        "delete notification rule " + id + " (ajax)",
+        () -> {
+          backendApiClient.delete(BACKEND_BASE + "/" + id, Void.class);
+          return ResponseEntity.noContent().build();
+        });
   }
 }

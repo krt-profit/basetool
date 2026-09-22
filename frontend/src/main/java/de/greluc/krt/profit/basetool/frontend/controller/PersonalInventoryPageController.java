@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.logging.LogSafe;
@@ -30,7 +30,6 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalInventoryItemUpd
 import de.greluc.krt.profit.basetool.frontend.model.dto.UexLocationDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.PersonalInventoryForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import jakarta.validation.Valid;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -265,16 +264,14 @@ public class PersonalInventoryPageController {
     if (isInvalidCreate(request)) {
       return validationProblem();
     }
-    try {
-      backendApiClient.post("/api/v1/personal-inventory", request, PersonalInventoryItemDto.class);
-      return ResponseEntity.noContent().build();
-    } catch (BackendServiceException e) {
-      log.debug("Failed to create personal inventory item (ajax): {}", e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Failed to create personal inventory item (ajax)", e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "create personal inventory item (ajax)",
+        () -> {
+          backendApiClient.post(
+              "/api/v1/personal-inventory", request, PersonalInventoryItemDto.class);
+          return ResponseEntity.noContent().build();
+        });
   }
 
   /**
@@ -301,17 +298,14 @@ public class PersonalInventoryPageController {
         || request.quantity() < 1) {
       return validationProblem();
     }
-    try {
-      backendApiClient.put(
-          "/api/v1/personal-inventory/" + id, request, PersonalInventoryItemDto.class);
-      return ResponseEntity.noContent().build();
-    } catch (BackendServiceException e) {
-      log.debug("Failed to update personal inventory item {} (ajax): {}", id, e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Failed to update personal inventory item {} (ajax)", id, e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "update personal inventory item " + id + " (ajax)",
+        () -> {
+          backendApiClient.put(
+              "/api/v1/personal-inventory/" + id, request, PersonalInventoryItemDto.class);
+          return ResponseEntity.noContent().build();
+        });
   }
 
   /**
@@ -325,16 +319,13 @@ public class PersonalInventoryPageController {
   @PostMapping(value = "/{id}/delete", headers = "X-Requested-With=XMLHttpRequest")
   @ResponseBody
   public ResponseEntity<Object> deleteAjax(@PathVariable @NotNull UUID id) {
-    try {
-      backendApiClient.delete("/api/v1/personal-inventory/" + id, Void.class);
-      return ResponseEntity.noContent().build();
-    } catch (BackendServiceException e) {
-      log.debug("Failed to delete personal inventory item {} (ajax): {}", id, e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Failed to delete personal inventory item {} (ajax)", id, e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "delete personal inventory item " + id + " (ajax)",
+        () -> {
+          backendApiClient.delete("/api/v1/personal-inventory/" + id, Void.class);
+          return ResponseEntity.noContent().build();
+        });
   }
 
   /**

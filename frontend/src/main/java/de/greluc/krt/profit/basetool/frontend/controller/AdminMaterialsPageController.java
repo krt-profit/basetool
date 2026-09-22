@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
@@ -44,7 +44,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -215,20 +214,17 @@ public class AdminMaterialsPageController {
     if (!(nameValue instanceof String name) || name.isBlank()) {
       return ResponseEntity.badRequest().build();
     }
-    try {
-      MaterialCategoryDto created =
-          backendApiClient.post(
-              "/api/v1/material-categories",
-              new MaterialCategoryDto(null, name, null),
-              MaterialCategoryDto.class);
-      return ResponseEntity.ok(created);
-    } catch (BackendServiceException e) {
-      log.debug("Create category (ajax) failed", e);
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Create category (ajax) failed", e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+    return relay(
+        log,
+        "create category (ajax)",
+        () -> {
+          MaterialCategoryDto created =
+              backendApiClient.post(
+                  "/api/v1/material-categories",
+                  new MaterialCategoryDto(null, name, null),
+                  MaterialCategoryDto.class);
+          return ResponseEntity.ok(created);
+        });
   }
 
   /**
@@ -244,16 +240,13 @@ public class AdminMaterialsPageController {
   @ResponseBody
   @PostMapping(value = "/categories/{id}/delete", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> deleteCategoryAjax(@PathVariable UUID id) {
-    try {
-      backendApiClient.delete("/api/v1/material-categories/" + id, Void.class);
-      return ResponseEntity.ok().build();
-    } catch (BackendServiceException e) {
-      log.debug("Delete category (ajax) failed", e);
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Delete category (ajax) failed", e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+    return relay(
+        log,
+        "delete category (ajax)",
+        () -> {
+          backendApiClient.delete("/api/v1/material-categories/" + id, Void.class);
+          return ResponseEntity.ok().build();
+        });
   }
 
   /**

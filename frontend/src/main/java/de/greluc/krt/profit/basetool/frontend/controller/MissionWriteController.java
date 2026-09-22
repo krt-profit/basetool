@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
@@ -332,27 +333,24 @@ public class MissionWriteController {
   @ResponseBody
   public ResponseEntity<Object> setPartyLeadAjax(
       @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
-    try {
-      Map<String, Object> out = new HashMap<>();
-      Object userId = body.get("userId");
-      if (userId != null && !String.valueOf(userId).isBlank()) {
-        out.put("userId", userId);
-      }
-      Object guestName = body.get("guestName");
-      if (guestName != null && !String.valueOf(guestName).isBlank()) {
-        out.put("guestName", guestName);
-      }
-      out.put("version", body.get("version") != null ? body.get("version") : 0L);
-      backendApiClient.put("/api/v1/missions/" + id + "/party-lead", out, Void.class);
-      MissionDto mission = backendApiClient.get("/api/v1/missions/" + id, MISSION);
-      return ResponseEntity.ok(mission);
-    } catch (BackendServiceException e) {
-      log.debug("Set party lead (AJAX) failed: status={}", e.getStatusCode());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("UNEXPECTED ERROR in setPartyLeadAjax for mission {}", id, e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "set party lead (ajax) for mission " + id,
+        () -> {
+          Map<String, Object> out = new HashMap<>();
+          Object userId = body.get("userId");
+          if (userId != null && !String.valueOf(userId).isBlank()) {
+            out.put("userId", userId);
+          }
+          Object guestName = body.get("guestName");
+          if (guestName != null && !String.valueOf(guestName).isBlank()) {
+            out.put("guestName", guestName);
+          }
+          out.put("version", body.get("version") != null ? body.get("version") : 0L);
+          backendApiClient.put("/api/v1/missions/" + id + "/party-lead", out, Void.class);
+          MissionDto mission = backendApiClient.get("/api/v1/missions/" + id, MISSION);
+          return ResponseEntity.ok(mission);
+        });
   }
 
   /**
@@ -432,24 +430,21 @@ public class MissionWriteController {
       @PathVariable @NotNull UUID participantId,
       @RequestBody UpdatePayoutPreferenceRequest request,
       @AuthenticationPrincipal OidcUser principal) {
-    try {
-      Object updatedParticipant =
-          backendApiClient.put(
-              "/api/v1/missions/"
-                  + id
-                  + "/participants/"
-                  + participantId
-                  + "/payout-preference/slim",
-              request,
-              Object.class);
-      return ResponseEntity.ok(updatedParticipant);
-    } catch (BackendServiceException e) {
-      log.debug("Update payout preference failed with status {}", e.getStatusCode());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Update payout preference failed", e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+    return relay(
+        log,
+        "update payout preference",
+        () -> {
+          Object updatedParticipant =
+              backendApiClient.put(
+                  "/api/v1/missions/"
+                      + id
+                      + "/participants/"
+                      + participantId
+                      + "/payout-preference/slim",
+                  request,
+                  Object.class);
+          return ResponseEntity.ok(updatedParticipant);
+        });
   }
 
   /**
@@ -1072,24 +1067,21 @@ public class MissionWriteController {
       }
       return ResponseEntity.unprocessableContent().body(fieldErrors);
     }
-    try {
-      applyMissionUpdate(id, form);
-      // #1235: mirrors the classic twin above — a core edit changes the /missions list row.
-      liveSyncLocalBus.publish("missions", MISSIONS_LIST_SECTION);
-      MissionDto refreshed = backendApiClient.get("/api/v1/missions/" + id, MissionDto.class);
-      Map<String, Object> versions = new LinkedHashMap<>();
-      versions.put("version", refreshed.version());
-      versions.put("coreVersion", refreshed.coreVersion());
-      versions.put("scheduleVersion", refreshed.scheduleVersion());
-      versions.put("flagsVersion", refreshed.flagsVersion());
-      return ResponseEntity.ok(versions);
-    } catch (BackendServiceException e) {
-      log.debug("Update mission (ajax) failed for {}: {}", id, e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Update mission (ajax) failed for {}", id, e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "update mission (ajax) for " + id,
+        () -> {
+          applyMissionUpdate(id, form);
+          // #1235: mirrors the classic twin above — a core edit changes the /missions list row.
+          liveSyncLocalBus.publish("missions", MISSIONS_LIST_SECTION);
+          MissionDto refreshed = backendApiClient.get("/api/v1/missions/" + id, MissionDto.class);
+          Map<String, Object> versions = new LinkedHashMap<>();
+          versions.put("version", refreshed.version());
+          versions.put("coreVersion", refreshed.coreVersion());
+          versions.put("scheduleVersion", refreshed.scheduleVersion());
+          versions.put("flagsVersion", refreshed.flagsVersion());
+          return ResponseEntity.ok(versions);
+        });
   }
 
   /**
@@ -1188,51 +1180,41 @@ public class MissionWriteController {
   public ResponseEntity<Object> removeManager(
       @PathVariable String id, @PathVariable String userId) {
     log.debug("START removeManager - id: '{}', userId: '{}'", id, userId);
-    try {
-      if (id == null || id.isBlank() || userId == null || userId.isBlank()) {
-        log.debug("MISSING PARAMETERS in removeManager - id: '{}', userId: '{}'", id, userId);
-        return ResponseEntity.badRequest().build();
-      }
-      UUID missionUuid;
-      UUID userUuid;
-      try {
-        missionUuid = UUID.fromString(id.trim());
-      } catch (IllegalArgumentException e) {
-        log.debug(
-            "INVALID MISSION ID FORMAT in removeManager - id: '{}', Error: {}", id, e.getMessage());
-        return ResponseEntity.badRequest().build();
-      }
-      try {
-        userUuid = UUID.fromString(userId.trim());
-      } catch (IllegalArgumentException e) {
-        log.debug(
-            "INVALID USER ID FORMAT in removeManager - userId: '{}', Error: {}",
-            userId,
-            e.getMessage());
-        return ResponseEntity.badRequest().build();
-      }
+    return relay(
+        log,
+        "remove manager " + userId + " from mission " + id,
+        () -> {
+          if (id == null || id.isBlank() || userId == null || userId.isBlank()) {
+            log.debug("MISSING PARAMETERS in removeManager - id: '{}', userId: '{}'", id, userId);
+            return ResponseEntity.badRequest().build();
+          }
+          UUID missionUuid;
+          UUID userUuid;
+          try {
+            missionUuid = UUID.fromString(id.trim());
+          } catch (IllegalArgumentException e) {
+            log.debug(
+                "INVALID MISSION ID FORMAT in removeManager - id: '{}', Error: {}",
+                id,
+                e.getMessage());
+            return ResponseEntity.badRequest().build();
+          }
+          try {
+            userUuid = UUID.fromString(userId.trim());
+          } catch (IllegalArgumentException e) {
+            log.debug(
+                "INVALID USER ID FORMAT in removeManager - userId: '{}', Error: {}",
+                userId,
+                e.getMessage());
+            return ResponseEntity.badRequest().build();
+          }
 
-      log.debug("CALLING BACKEND DELETE - Mission: {}, User: {}", missionUuid, userUuid);
-      backendApiClient.delete(
-          "/api/v1/missions/" + missionUuid + "/managers/" + userUuid + "/slim", Object.class);
-      log.debug("SUCCESS DELETE - Manager {} removed from mission {}", userUuid, missionUuid);
-      return ResponseEntity.ok().build();
-    } catch (BackendServiceException e) {
-      log.debug(
-          "BACKEND ERROR removing manager: Status={}, Message={}, Readable={}",
-          e.getStatusCode(),
-          e.getMessage(),
-          e.getReadableErrorMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.debug(
-          "UNEXPECTED ERROR in removeManager: id='{}', userId='{}', error={}",
-          id,
-          userId,
-          e.getMessage(),
-          e);
-      return ResponseEntity.internalServerError().build();
-    }
+          log.debug("CALLING BACKEND DELETE - Mission: {}, User: {}", missionUuid, userUuid);
+          backendApiClient.delete(
+              "/api/v1/missions/" + missionUuid + "/managers/" + userUuid + "/slim", Object.class);
+          log.debug("SUCCESS DELETE - Manager {} removed from mission {}", userUuid, missionUuid);
+          return ResponseEntity.ok().build();
+        });
   }
 
   /**
@@ -1308,26 +1290,24 @@ public class MissionWriteController {
   @ResponseBody
   public ResponseEntity<Object> setMissionOwningOrgUnit(
       @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
-    try {
-      Map<String, Object> out = new HashMap<>();
-      Object owningOrgUnitId = body.get("owningOrgUnitId");
-      // Forward an explicit null for the ownerless target; a blank/empty string also means "none".
-      out.put(
-          "owningOrgUnitId",
-          (owningOrgUnitId != null && !String.valueOf(owningOrgUnitId).isBlank())
-              ? owningOrgUnitId
-              : null);
-      out.put("version", body.get("version") != null ? body.get("version") : 0L);
-      backendApiClient.put("/api/v1/missions/" + id + "/owning-org-unit", out, Void.class);
-      MissionDto mission = backendApiClient.get("/api/v1/missions/" + id, MISSION);
-      return ResponseEntity.ok(mission);
-    } catch (BackendServiceException e) {
-      log.debug("Reassign owning org unit (AJAX) failed: status={}", e.getStatusCode());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.debug("UNEXPECTED ERROR in setMissionOwningOrgUnit for mission {}", id, e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "set mission owning org unit for mission " + id,
+        () -> {
+          Map<String, Object> out = new HashMap<>();
+          Object owningOrgUnitId = body.get("owningOrgUnitId");
+          // Forward an explicit null for the ownerless target; a blank/empty string also means
+          // "none".
+          out.put(
+              "owningOrgUnitId",
+              (owningOrgUnitId != null && !String.valueOf(owningOrgUnitId).isBlank())
+                  ? owningOrgUnitId
+                  : null);
+          out.put("version", body.get("version") != null ? body.get("version") : 0L);
+          backendApiClient.put("/api/v1/missions/" + id + "/owning-org-unit", out, Void.class);
+          MissionDto mission = backendApiClient.get("/api/v1/missions/" + id, MISSION);
+          return ResponseEntity.ok(mission);
+        });
   }
 
   /**
@@ -1392,20 +1372,15 @@ public class MissionWriteController {
   @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
   public ResponseEntity<Object> addOrUpdateFrequencyAjax(
       @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
-    try {
-      Object result =
-          backendApiClient.post("/api/v1/missions/" + id + "/frequencies/slim", body, Object.class);
-      return ResponseEntity.ok(result);
-    } catch (BackendServiceException e) {
-      log.debug(
-          "Add/update frequency (AJAX) failed: status={}, msg={}",
-          e.getStatusCode(),
-          e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.debug("UNEXPECTED ERROR in addOrUpdateFrequencyAjax for mission {}", id, e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "add or update frequency (ajax) for mission " + id,
+        () -> {
+          Object result =
+              backendApiClient.post(
+                  "/api/v1/missions/" + id + "/frequencies/slim", body, Object.class);
+          return ResponseEntity.ok(result);
+        });
   }
 
   /**
@@ -1419,20 +1394,15 @@ public class MissionWriteController {
   @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
   public ResponseEntity<Object> deleteFrequencyAjax(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID frequencyId) {
-    try {
-      Object result =
-          backendApiClient.delete(
-              "/api/v1/missions/" + id + "/frequencies/" + frequencyId + "/slim", Object.class);
-      return ResponseEntity.ok(result);
-    } catch (BackendServiceException e) {
-      log.debug(
-          "Delete frequency (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.debug(
-          "UNEXPECTED ERROR in deleteFrequencyAjax for mission {} freq {}", id, frequencyId, e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "delete frequency (ajax) for mission " + id + " freq " + frequencyId,
+        () -> {
+          Object result =
+              backendApiClient.delete(
+                  "/api/v1/missions/" + id + "/frequencies/" + frequencyId + "/slim", Object.class);
+          return ResponseEntity.ok(result);
+        });
   }
 
   /**
@@ -1449,21 +1419,15 @@ public class MissionWriteController {
   @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
   public ResponseEntity<Object> addCustomFrequencyAjax(
       @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
-    try {
-      Object result =
-          backendApiClient.post(
-              "/api/v1/missions/" + id + "/frequencies/custom/slim", body, Object.class);
-      return ResponseEntity.ok(result);
-    } catch (BackendServiceException e) {
-      log.debug(
-          "Add custom frequency (AJAX) failed: status={}, msg={}",
-          e.getStatusCode(),
-          e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.debug("UNEXPECTED ERROR in addCustomFrequencyAjax for mission {}", id, e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "add custom frequency (ajax) for mission " + id,
+        () -> {
+          Object result =
+              backendApiClient.post(
+                  "/api/v1/missions/" + id + "/frequencies/custom/slim", body, Object.class);
+          return ResponseEntity.ok(result);
+        });
   }
 
   /**
@@ -1485,27 +1449,17 @@ public class MissionWriteController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID frequencyId,
       @RequestBody Map<String, Object> body) {
-    try {
-      Object result =
-          backendApiClient.put(
-              "/api/v1/missions/" + id + "/frequencies/custom/" + frequencyId + "/slim",
-              body,
-              Object.class);
-      return ResponseEntity.ok(result);
-    } catch (BackendServiceException e) {
-      log.debug(
-          "Update custom frequency (AJAX) failed: status={}, msg={}",
-          e.getStatusCode(),
-          e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.debug(
-          "UNEXPECTED ERROR in updateCustomFrequencyAjax for mission {} freq {}",
-          id,
-          frequencyId,
-          e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "update custom frequency (ajax) for mission " + id + " freq " + frequencyId,
+        () -> {
+          Object result =
+              backendApiClient.put(
+                  "/api/v1/missions/" + id + "/frequencies/custom/" + frequencyId + "/slim",
+                  body,
+                  Object.class);
+          return ResponseEntity.ok(result);
+        });
   }
 
   /**
@@ -1517,17 +1471,14 @@ public class MissionWriteController {
   @ResponseBody
   public ResponseEntity<Object> addUnitAjax(
       @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
-    try {
-      Object result =
-          backendApiClient.post("/api/v1/missions/" + id + "/units/slim", body, Object.class);
-      return ResponseEntity.ok(result);
-    } catch (BackendServiceException e) {
-      log.debug("Add unit (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("UNEXPECTED ERROR in addUnitAjax for mission {}", id, e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "add unit (ajax) for mission " + id,
+        () -> {
+          Object result =
+              backendApiClient.post("/api/v1/missions/" + id + "/units/slim", body, Object.class);
+          return ResponseEntity.ok(result);
+        });
   }
 
   /**
@@ -1540,18 +1491,15 @@ public class MissionWriteController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID unitId,
       @RequestBody Map<String, Object> body) {
-    try {
-      Object result =
-          backendApiClient.put(
-              "/api/v1/missions/" + id + "/units/" + unitId + "/slim", body, Object.class);
-      return ResponseEntity.ok(result);
-    } catch (BackendServiceException e) {
-      log.debug("Update unit (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.debug("UNEXPECTED ERROR in updateUnitAjax for mission {} unit {}", id, unitId, e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "update unit (ajax) for mission " + id + " unit " + unitId,
+        () -> {
+          Object result =
+              backendApiClient.put(
+                  "/api/v1/missions/" + id + "/units/" + unitId + "/slim", body, Object.class);
+          return ResponseEntity.ok(result);
+        });
   }
 
   /** AJAX endpoint for Paket 3C: deletes a unit via the Slim backend endpoint. */
@@ -1559,16 +1507,14 @@ public class MissionWriteController {
   @ResponseBody
   public ResponseEntity<Object> deleteUnitAjax(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID unitId) {
-    try {
-      backendApiClient.delete("/api/v1/missions/" + id + "/units/" + unitId + "/slim", Void.class);
-      return ResponseEntity.noContent().build();
-    } catch (BackendServiceException e) {
-      log.debug("Delete unit (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.debug("UNEXPECTED ERROR in deleteUnitAjax for mission {} unit {}", id, unitId, e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "delete unit (ajax) for mission " + id + " unit " + unitId,
+        () -> {
+          backendApiClient.delete(
+              "/api/v1/missions/" + id + "/units/" + unitId + "/slim", Void.class);
+          return ResponseEntity.noContent().build();
+        });
   }
 
   // --- Ablauf steps (procedure timeline) ---
@@ -1586,17 +1532,14 @@ public class MissionWriteController {
   @ResponseBody
   public ResponseEntity<Object> addStepAjax(
       @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
-    try {
-      Object result =
-          backendApiClient.post("/api/v1/missions/" + id + "/steps/slim", body, Object.class);
-      return ResponseEntity.ok(result);
-    } catch (BackendServiceException e) {
-      log.debug("Add step (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("UNEXPECTED ERROR in addStepAjax for mission {}", id, e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "add step (ajax) for mission " + id,
+        () -> {
+          Object result =
+              backendApiClient.post("/api/v1/missions/" + id + "/steps/slim", body, Object.class);
+          return ResponseEntity.ok(result);
+        });
   }
 
   /**
@@ -1613,18 +1556,15 @@ public class MissionWriteController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID stepId,
       @RequestBody Map<String, Object> body) {
-    try {
-      Object result =
-          backendApiClient.put(
-              "/api/v1/missions/" + id + "/steps/" + stepId + "/slim", body, Object.class);
-      return ResponseEntity.ok(result);
-    } catch (BackendServiceException e) {
-      log.debug("Update step (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.debug("UNEXPECTED ERROR in updateStepAjax for mission {} step {}", id, stepId, e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "update step (ajax) for mission " + id + " step " + stepId,
+        () -> {
+          Object result =
+              backendApiClient.put(
+                  "/api/v1/missions/" + id + "/steps/" + stepId + "/slim", body, Object.class);
+          return ResponseEntity.ok(result);
+        });
   }
 
   /**
@@ -1642,19 +1582,21 @@ public class MissionWriteController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID stepId,
       @RequestParam @NotNull Long stepsVersion) {
-    try {
-      Object result =
-          backendApiClient.delete(
-              "/api/v1/missions/" + id + "/steps/" + stepId + "/slim?stepsVersion=" + stepsVersion,
-              Object.class);
-      return ResponseEntity.ok(result);
-    } catch (BackendServiceException e) {
-      log.debug("Delete step (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.debug("UNEXPECTED ERROR in deleteStepAjax for mission {} step {}", id, stepId, e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "delete step (ajax) for mission " + id + " step " + stepId,
+        () -> {
+          Object result =
+              backendApiClient.delete(
+                  "/api/v1/missions/"
+                      + id
+                      + "/steps/"
+                      + stepId
+                      + "/slim?stepsVersion="
+                      + stepsVersion,
+                  Object.class);
+          return ResponseEntity.ok(result);
+        });
   }
 
   /**
@@ -1668,19 +1610,15 @@ public class MissionWriteController {
   @ResponseBody
   public ResponseEntity<Object> reorderStepsAjax(
       @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
-    try {
-      Object result =
-          backendApiClient.put(
-              "/api/v1/missions/" + id + "/steps/reorder/slim", body, Object.class);
-      return ResponseEntity.ok(result);
-    } catch (BackendServiceException e) {
-      log.debug(
-          "Reorder steps (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.debug("UNEXPECTED ERROR in reorderStepsAjax for mission {}", id, e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "reorder steps (ajax) for mission " + id,
+        () -> {
+          Object result =
+              backendApiClient.put(
+                  "/api/v1/missions/" + id + "/steps/reorder/slim", body, Object.class);
+          return ResponseEntity.ok(result);
+        });
   }
 
   /**
@@ -1701,18 +1639,15 @@ public class MissionWriteController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID stepId,
       @RequestBody Map<String, Object> body) {
-    try {
-      Object result =
-          backendApiClient.patch(
-              "/api/v1/missions/" + id + "/steps/" + stepId + "/done/slim", body, Object.class);
-      return ResponseEntity.ok(result);
-    } catch (BackendServiceException e) {
-      log.debug("Toggle step (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.debug("UNEXPECTED ERROR in toggleStepDoneAjax for mission {} step {}", id, stepId, e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "toggle step done (ajax) for mission " + id + " step " + stepId,
+        () -> {
+          Object result =
+              backendApiClient.patch(
+                  "/api/v1/missions/" + id + "/steps/" + stepId + "/done/slim", body, Object.class);
+          return ResponseEntity.ok(result);
+        });
   }
 
   // --- Mission goals (Ziele) ---
@@ -1730,18 +1665,15 @@ public class MissionWriteController {
   @ResponseBody
   public ResponseEntity<Object> addObjectiveAjax(
       @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
-    try {
-      Object result =
-          backendApiClient.post("/api/v1/missions/" + id + "/objectives/slim", body, Object.class);
-      return ResponseEntity.ok(result);
-    } catch (BackendServiceException e) {
-      log.debug(
-          "Add objective (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("UNEXPECTED ERROR in addObjectiveAjax for mission {}", id, e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "add objective (ajax) for mission " + id,
+        () -> {
+          Object result =
+              backendApiClient.post(
+                  "/api/v1/missions/" + id + "/objectives/slim", body, Object.class);
+          return ResponseEntity.ok(result);
+        });
   }
 
   /**
@@ -1760,25 +1692,17 @@ public class MissionWriteController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID objectiveId,
       @RequestBody Map<String, Object> body) {
-    try {
-      Object result =
-          backendApiClient.put(
-              "/api/v1/missions/" + id + "/objectives/" + objectiveId + "/slim",
-              body,
-              Object.class);
-      return ResponseEntity.ok(result);
-    } catch (BackendServiceException e) {
-      log.debug(
-          "Update objective (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.debug(
-          "UNEXPECTED ERROR in updateObjectiveAjax for mission {} objective {}",
-          id,
-          objectiveId,
-          e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "update objective (ajax) for mission " + id + " objective " + objectiveId,
+        () -> {
+          Object result =
+              backendApiClient.put(
+                  "/api/v1/missions/" + id + "/objectives/" + objectiveId + "/slim",
+                  body,
+                  Object.class);
+          return ResponseEntity.ok(result);
+        });
   }
 
   /**
@@ -1798,29 +1722,21 @@ public class MissionWriteController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID objectiveId,
       @RequestParam @NotNull Long objectivesVersion) {
-    try {
-      Object result =
-          backendApiClient.delete(
-              "/api/v1/missions/"
-                  + id
-                  + "/objectives/"
-                  + objectiveId
-                  + "/slim?objectivesVersion="
-                  + objectivesVersion,
-              Object.class);
-      return ResponseEntity.ok(result);
-    } catch (BackendServiceException e) {
-      log.debug(
-          "Delete objective (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.debug(
-          "UNEXPECTED ERROR in deleteObjectiveAjax for mission {} objective {}",
-          id,
-          objectiveId,
-          e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "delete objective (ajax) for mission " + id + " objective " + objectiveId,
+        () -> {
+          Object result =
+              backendApiClient.delete(
+                  "/api/v1/missions/"
+                      + id
+                      + "/objectives/"
+                      + objectiveId
+                      + "/slim?objectivesVersion="
+                      + objectivesVersion,
+                  Object.class);
+          return ResponseEntity.ok(result);
+        });
   }
 
   /**
@@ -1834,19 +1750,15 @@ public class MissionWriteController {
   @ResponseBody
   public ResponseEntity<Object> reorderObjectivesAjax(
       @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
-    try {
-      Object result =
-          backendApiClient.put(
-              "/api/v1/missions/" + id + "/objectives/reorder/slim", body, Object.class);
-      return ResponseEntity.ok(result);
-    } catch (BackendServiceException e) {
-      log.debug(
-          "Reorder objectives (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.debug("UNEXPECTED ERROR in reorderObjectivesAjax for mission {}", id, e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "reorder objectives (ajax) for mission " + id,
+        () -> {
+          Object result =
+              backendApiClient.put(
+                  "/api/v1/missions/" + id + "/objectives/reorder/slim", body, Object.class);
+          return ResponseEntity.ok(result);
+        });
   }
 
   /**
@@ -1861,23 +1773,20 @@ public class MissionWriteController {
       @PathVariable @NotNull UUID id,
       @RequestBody Map<String, Object> body,
       @AuthenticationPrincipal OidcUser principal) {
-    try {
-      // Relayed with the caller's token, like every other write. It used to go out on the
-      // anonymous client so the backend could take its guest-signup branch (jwt == null +
-      // guestName); that branch and that client are gone (ADR-0159). The row it created survives
-      // as an EXTERNAL participant — same shape, recorded by a member who can see the Einsatz.
-      Object result =
-          backendApiClient.post(
-              "/api/v1/missions/" + id + "/participants/slim", body, Object.class);
-      return ResponseEntity.ok(result);
-    } catch (BackendServiceException e) {
-      log.debug(
-          "Add participant (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("UNEXPECTED ERROR in addParticipantAjax for mission {}", id, e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "add participant (ajax) for mission " + id,
+        () -> {
+          // Relayed with the caller's token, like every other write. It used to go out on the
+          // anonymous client so the backend could take its guest-signup branch (jwt == null +
+          // guestName); that branch and that client are gone (ADR-0159). The row it created
+          // survives
+          // as an EXTERNAL participant — same shape, recorded by a member who can see the Einsatz.
+          Object result =
+              backendApiClient.post(
+                  "/api/v1/missions/" + id + "/participants/slim", body, Object.class);
+          return ResponseEntity.ok(result);
+        });
   }
 
   /**
@@ -1893,29 +1802,21 @@ public class MissionWriteController {
       @PathVariable @NotNull UUID participantId,
       @RequestBody Map<String, Object> body,
       @AuthenticationPrincipal OidcUser principal) {
-    try {
-      // Anonymous guests are allowed to edit their own guest participant entries
-      // (see backend MissionSecurityService#canAccessParticipant: guest entries
-      // with user == null are editable). Route via the public WebClient when no
-      // OIDC principal is present, mirroring addParticipantAjax.
-      Object result =
-          backendApiClient.put(
-              "/api/v1/missions/" + id + "/participants/" + participantId + "/slim",
-              body,
-              Object.class);
-      return ResponseEntity.ok(result);
-    } catch (BackendServiceException e) {
-      log.debug(
-          "Update participant (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.debug(
-          "UNEXPECTED ERROR in updateParticipantAjax for mission {} participant {}",
-          id,
-          participantId,
-          e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "update participant (ajax) for mission " + id + " participant " + participantId,
+        () -> {
+          // Anonymous guests are allowed to edit their own guest participant entries
+          // (see backend MissionSecurityService#canAccessParticipant: guest entries
+          // with user == null are editable). Route via the public WebClient when no
+          // OIDC principal is present, mirroring addParticipantAjax.
+          Object result =
+              backendApiClient.put(
+                  "/api/v1/missions/" + id + "/participants/" + participantId + "/slim",
+                  body,
+                  Object.class);
+          return ResponseEntity.ok(result);
+        });
   }
 
   /**
@@ -1930,22 +1831,14 @@ public class MissionWriteController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
       @AuthenticationPrincipal OidcUser principal) {
-    try {
-      backendApiClient.delete(
-          "/api/v1/missions/" + id + "/participants/" + participantId + "/slim", Void.class);
-      return ResponseEntity.noContent().build();
-    } catch (BackendServiceException e) {
-      log.debug(
-          "Delete participant (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.debug(
-          "UNEXPECTED ERROR in deleteParticipantAjax for mission {} participant {}",
-          id,
-          participantId,
-          e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "delete participant (ajax) for mission " + id + " participant " + participantId,
+        () -> {
+          backendApiClient.delete(
+              "/api/v1/missions/" + id + "/participants/" + participantId + "/slim", Void.class);
+          return ResponseEntity.noContent().build();
+        });
   }
 
   /**
@@ -1960,27 +1853,17 @@ public class MissionWriteController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
       @AuthenticationPrincipal OidcUser principal) {
-    try {
-      Object result =
-          backendApiClient.post(
-              "/api/v1/missions/" + id + "/participants/" + participantId + "/check-in/slim",
-              null,
-              Object.class);
-      return ResponseEntity.ok(result);
-    } catch (BackendServiceException e) {
-      log.debug(
-          "Check-in participant (AJAX) failed: status={}, msg={}",
-          e.getStatusCode(),
-          e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.debug(
-          "UNEXPECTED ERROR in checkInParticipantAjax for mission {} participant {}",
-          id,
-          participantId,
-          e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "check in participant (ajax) for mission " + id + " participant " + participantId,
+        () -> {
+          Object result =
+              backendApiClient.post(
+                  "/api/v1/missions/" + id + "/participants/" + participantId + "/check-in/slim",
+                  null,
+                  Object.class);
+          return ResponseEntity.ok(result);
+        });
   }
 
   /**
@@ -1995,27 +1878,17 @@ public class MissionWriteController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
       @AuthenticationPrincipal OidcUser principal) {
-    try {
-      Object result =
-          backendApiClient.post(
-              "/api/v1/missions/" + id + "/participants/" + participantId + "/check-out/slim",
-              null,
-              Object.class);
-      return ResponseEntity.ok(result);
-    } catch (BackendServiceException e) {
-      log.debug(
-          "Check-out participant (AJAX) failed: status={}, msg={}",
-          e.getStatusCode(),
-          e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.debug(
-          "UNEXPECTED ERROR in checkOutParticipantAjax for mission {} participant {}",
-          id,
-          participantId,
-          e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "check out participant (ajax) for mission " + id + " participant " + participantId,
+        () -> {
+          Object result =
+              backendApiClient.post(
+                  "/api/v1/missions/" + id + "/participants/" + participantId + "/check-out/slim",
+                  null,
+                  Object.class);
+          return ResponseEntity.ok(result);
+        });
   }
 
   /**
@@ -2030,18 +1903,15 @@ public class MissionWriteController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID unitId,
       @RequestBody Map<String, Object> body) {
-    try {
-      Object result =
-          backendApiClient.post(
-              "/api/v1/missions/" + id + "/units/" + unitId + "/crew/slim", body, Object.class);
-      return ResponseEntity.ok(result);
-    } catch (BackendServiceException e) {
-      log.debug("Add crew (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("UNEXPECTED ERROR in addCrewAjax for mission {} unit {}", id, unitId, e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "add crew (ajax) for mission " + id + " unit " + unitId,
+        () -> {
+          Object result =
+              backendApiClient.post(
+                  "/api/v1/missions/" + id + "/units/" + unitId + "/crew/slim", body, Object.class);
+          return ResponseEntity.ok(result);
+        });
   }
 
   /**
@@ -2057,25 +1927,17 @@ public class MissionWriteController {
       @PathVariable @NotNull UUID unitId,
       @PathVariable @NotNull UUID crewId,
       @RequestBody Map<String, Object> body) {
-    try {
-      Object result =
-          backendApiClient.put(
-              "/api/v1/missions/" + id + "/units/" + unitId + "/crew/" + crewId + "/slim",
-              body,
-              Object.class);
-      return ResponseEntity.ok(result);
-    } catch (BackendServiceException e) {
-      log.debug("Update crew (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.debug(
-          "UNEXPECTED ERROR in updateCrewAjax for mission {} unit {} crew {}",
-          id,
-          unitId,
-          crewId,
-          e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "update crew (ajax) for mission " + id + " unit " + unitId + " crew " + crewId,
+        () -> {
+          Object result =
+              backendApiClient.put(
+                  "/api/v1/missions/" + id + "/units/" + unitId + "/crew/" + crewId + "/slim",
+                  body,
+                  Object.class);
+          return ResponseEntity.ok(result);
+        });
   }
 
   /**
@@ -2090,22 +1952,15 @@ public class MissionWriteController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID unitId,
       @PathVariable @NotNull UUID crewId) {
-    try {
-      backendApiClient.delete(
-          "/api/v1/missions/" + id + "/units/" + unitId + "/crew/" + crewId + "/slim", Void.class);
-      return ResponseEntity.noContent().build();
-    } catch (BackendServiceException e) {
-      log.debug("Delete crew (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.debug(
-          "UNEXPECTED ERROR in deleteCrewAjax for mission {} unit {} crew {}",
-          id,
-          unitId,
-          crewId,
-          e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "delete crew (ajax) for mission " + id + " unit " + unitId + " crew " + crewId,
+        () -> {
+          backendApiClient.delete(
+              "/api/v1/missions/" + id + "/units/" + unitId + "/crew/" + crewId + "/slim",
+              Void.class);
+          return ResponseEntity.noContent().build();
+        });
   }
 
   /**

@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
@@ -736,16 +736,13 @@ public class OperationPageController {
   @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
   @ResponseBody
   public ResponseEntity<Object> createOperationAjax(@RequestBody OperationForm form) {
-    try {
-      backendApiClient.post("/api/v1/operations", form, Void.class);
-      return ResponseEntity.ok().build();
-    } catch (BackendServiceException e) {
-      log.debug("Create operation (ajax) failed: {}", e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Create operation (ajax) failed", e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "create operation (ajax)",
+        () -> {
+          backendApiClient.post("/api/v1/operations", form, Void.class);
+          return ResponseEntity.ok().build();
+        });
   }
 
   /**
@@ -770,21 +767,18 @@ public class OperationPageController {
   @ResponseBody
   public ResponseEntity<Object> updateOperationAjax(
       @PathVariable @NotNull UUID id, @RequestBody OperationForm form) {
-    try {
-      OperationDto updated =
-          backendApiClient.put("/api/v1/operations/" + id, form, OperationDto.class);
-      java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
-      result.put("version", updated.version());
-      result.put("name", updated.name());
-      result.put("status", updated.status());
-      return ResponseEntity.ok(result);
-    } catch (BackendServiceException e) {
-      log.debug("Update operation (ajax) failed for {}: {}", id, e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Update operation (ajax) failed for {}", id, e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "update operation (ajax) for " + id,
+        () -> {
+          OperationDto updated =
+              backendApiClient.put("/api/v1/operations/" + id, form, OperationDto.class);
+          java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
+          result.put("version", updated.version());
+          result.put("name", updated.name());
+          result.put("status", updated.status());
+          return ResponseEntity.ok(result);
+        });
   }
 
   /**
@@ -802,15 +796,12 @@ public class OperationPageController {
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   @ResponseBody
   public ResponseEntity<Object> deleteOperationAjax(@PathVariable @NotNull UUID id) {
-    try {
-      backendApiClient.delete("/api/v1/operations/" + id, Void.class);
-      return ResponseEntity.ok().build();
-    } catch (BackendServiceException e) {
-      log.debug("Delete operation (ajax) failed for {}: {}", id, e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Delete operation (ajax) failed for {}", id, e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "delete operation (ajax) for " + id,
+        () -> {
+          backendApiClient.delete("/api/v1/operations/" + id, Void.class);
+          return ResponseEntity.ok().build();
+        });
   }
 }

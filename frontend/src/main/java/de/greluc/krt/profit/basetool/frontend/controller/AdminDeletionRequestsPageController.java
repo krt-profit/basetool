@@ -19,12 +19,11 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.AdminDeletionRequestDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -34,7 +33,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -141,17 +139,14 @@ public class AdminDeletionRequestsPageController {
     body.put("grantHistoryErasure", false);
     body.put("note", text);
     body.put("version", request.get("version"));
-    try {
-      backendApiClient.post(
-          "/api/v1/admin/deletion-requests/" + id + "/decline", body, Object.class);
-      return ResponseEntity.ok().build();
-    } catch (BackendServiceException e) {
-      log.debug("Declining deletion request {} failed", id, e);
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Declining deletion request {} failed", id, e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+    return relay(
+        log,
+        "declining deletion request " + id,
+        () -> {
+          backendApiClient.post(
+              "/api/v1/admin/deletion-requests/" + id + "/decline", body, Object.class);
+          return ResponseEntity.ok().build();
+        });
   }
 
   /**
@@ -182,16 +177,13 @@ public class AdminDeletionRequestsPageController {
     // so the dialog no longer asks for one either. Collecting a justification and discarding it is
     // worse than not collecting it: the admin believes they have recorded their reasoning.
     // A refusal is the case where it survives, and /decline requires it.
-    try {
-      backendApiClient.post(
-          "/api/v1/admin/deletion-requests/" + id + "/execute", body, Object.class);
-      return ResponseEntity.ok().build();
-    } catch (BackendServiceException e) {
-      log.debug("Executing deletion request {} failed", id, e);
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Executing deletion request {} failed", id, e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+    return relay(
+        log,
+        "executing deletion request " + id,
+        () -> {
+          backendApiClient.post(
+              "/api/v1/admin/deletion-requests/" + id + "/execute", body, Object.class);
+          return ResponseEntity.ok().build();
+        });
   }
 }

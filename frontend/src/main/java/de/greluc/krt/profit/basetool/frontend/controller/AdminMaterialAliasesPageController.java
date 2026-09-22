@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
@@ -35,7 +35,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -257,26 +256,23 @@ public class AdminMaterialAliasesPageController {
   @ResponseBody
   @PostMapping(headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> createAjax(@RequestBody MaterialExternalAliasWriteRequest request) {
-    try {
-      MaterialExternalAliasWriteRequest body =
-          new MaterialExternalAliasWriteRequest(
-              request.materialId(),
-              request.sourceSystem(),
-              request.externalName(),
-              StringNormalization.trimToNull(request.externalKey()),
-              request.externalUuid(),
-              StringNormalization.trimToNull(request.externalCode()),
-              StringNormalization.trimToNull(request.note()),
-              null);
-      return ResponseEntity.ok(
-          backendApiClient.post(BACKEND_BASE, body, MaterialExternalAliasDto.class));
-    } catch (BackendServiceException e) {
-      log.debug("Create alias (ajax) failed", e);
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Create alias (ajax) failed", e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+    return relay(
+        log,
+        "create alias (ajax)",
+        () -> {
+          MaterialExternalAliasWriteRequest body =
+              new MaterialExternalAliasWriteRequest(
+                  request.materialId(),
+                  request.sourceSystem(),
+                  request.externalName(),
+                  StringNormalization.trimToNull(request.externalKey()),
+                  request.externalUuid(),
+                  StringNormalization.trimToNull(request.externalCode()),
+                  StringNormalization.trimToNull(request.note()),
+                  null);
+          return ResponseEntity.ok(
+              backendApiClient.post(BACKEND_BASE, body, MaterialExternalAliasDto.class));
+        });
   }
 
   /**
@@ -294,26 +290,23 @@ public class AdminMaterialAliasesPageController {
   @PostMapping(value = "/{id}", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> updateAjax(
       @PathVariable @NotNull UUID id, @RequestBody MaterialExternalAliasWriteRequest request) {
-    try {
-      MaterialExternalAliasWriteRequest body =
-          new MaterialExternalAliasWriteRequest(
-              request.materialId(),
-              request.sourceSystem(),
-              request.externalName(),
-              StringNormalization.trimToNull(request.externalKey()),
-              request.externalUuid(),
-              StringNormalization.trimToNull(request.externalCode()),
-              StringNormalization.trimToNull(request.note()),
-              request.version());
-      return ResponseEntity.ok(
-          backendApiClient.put(BACKEND_BASE + "/" + id, body, MaterialExternalAliasDto.class));
-    } catch (BackendServiceException e) {
-      log.debug("Update alias {} (ajax) failed", id, e);
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Update alias {} (ajax) failed", id, e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+    return relay(
+        log,
+        "update alias " + id + " (ajax)",
+        () -> {
+          MaterialExternalAliasWriteRequest body =
+              new MaterialExternalAliasWriteRequest(
+                  request.materialId(),
+                  request.sourceSystem(),
+                  request.externalName(),
+                  StringNormalization.trimToNull(request.externalKey()),
+                  request.externalUuid(),
+                  StringNormalization.trimToNull(request.externalCode()),
+                  StringNormalization.trimToNull(request.note()),
+                  request.version());
+          return ResponseEntity.ok(
+              backendApiClient.put(BACKEND_BASE + "/" + id, body, MaterialExternalAliasDto.class));
+        });
   }
 
   /**
@@ -326,15 +319,12 @@ public class AdminMaterialAliasesPageController {
   @ResponseBody
   @PostMapping(value = "/{id}/delete", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> deleteAjax(@PathVariable @NotNull UUID id) {
-    try {
-      backendApiClient.delete(BACKEND_BASE + "/" + id, Void.class);
-      return ResponseEntity.ok().build();
-    } catch (BackendServiceException e) {
-      log.debug("Delete alias {} (ajax) failed", id, e);
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Delete alias {} (ajax) failed", id, e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+    return relay(
+        log,
+        "delete alias " + id + " (ajax)",
+        () -> {
+          backendApiClient.delete(BACKEND_BASE + "/" + id, Void.class);
+          return ResponseEntity.ok().build();
+        });
   }
 }

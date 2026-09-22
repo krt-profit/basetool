@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BereichCreateRequest;
@@ -27,7 +27,6 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitNodeDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitParentUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrganisationsleitungCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.Comparator;
@@ -37,7 +36,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -185,18 +183,17 @@ public class AdminOrgStructurePageController {
   @ResponseBody
   @PostMapping(value = "/bereiche", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> createBereich(@RequestBody BereichCreateRequest request) {
-    try {
-      Object created = backendApiClient.post(BACKEND_BEREICHE, request, Object.class);
-      // A new Bereich appears in the cached /org-units/active-all-kinds picker, so evict the shared
-      // catalogue cache or that picker stays stale up to the TTL (REQ-DATA-007 eviction gate).
-      backendApiClient.evict(CacheDomain.ORG_UNIT);
-      return ResponseEntity.ok(created);
-    } catch (BackendServiceException e) {
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Create Bereich (ajax) failed", e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+    return relay(
+        log,
+        "create Bereich (ajax)",
+        () -> {
+          Object created = backendApiClient.post(BACKEND_BEREICHE, request, Object.class);
+          // A new Bereich appears in the cached /org-units/active-all-kinds picker, so evict the
+          // shared
+          // catalogue cache or that picker stays stale up to the TTL (REQ-DATA-007 eviction gate).
+          backendApiClient.evict(CacheDomain.ORG_UNIT);
+          return ResponseEntity.ok(created);
+        });
   }
 
   /**
@@ -209,17 +206,16 @@ public class AdminOrgStructurePageController {
   @PostMapping(value = "/organisationsleitung", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> createOrganisationsleitung(
       @RequestBody OrganisationsleitungCreateRequest request) {
-    try {
-      Object created = backendApiClient.post(BACKEND_OL, request, Object.class);
-      // The Organisationsleitung appears in the cached /org-units/active-all-kinds picker → evict.
-      backendApiClient.evict(CacheDomain.ORG_UNIT);
-      return ResponseEntity.ok(created);
-    } catch (BackendServiceException e) {
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Create Organisationsleitung (ajax) failed", e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+    return relay(
+        log,
+        "create Organisationsleitung (ajax)",
+        () -> {
+          Object created = backendApiClient.post(BACKEND_OL, request, Object.class);
+          // The Organisationsleitung appears in the cached /org-units/active-all-kinds picker →
+          // evict.
+          backendApiClient.evict(CacheDomain.ORG_UNIT);
+          return ResponseEntity.ok(created);
+        });
   }
 
   /**
@@ -234,20 +230,18 @@ public class AdminOrgStructurePageController {
   @PatchMapping(value = "/org-units/{id}/parent", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> setParent(
       @PathVariable @NotNull UUID id, @RequestBody OrgUnitParentUpdateRequest request) {
-    try {
-      Object updated =
-          backendApiClient.patch(
-              "/api/v1/org-hierarchy/org-units/" + id + "/parent", request, Object.class);
-      // Re-parenting changes the org-unit tree the cached /org-units/active-all-kinds picker
-      // renders
-      // (a unit can move under a different Bereich), so evict the shared catalogue cache.
-      backendApiClient.evict(CacheDomain.ORG_UNIT);
-      return ResponseEntity.ok(updated);
-    } catch (BackendServiceException e) {
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Set parent for org unit {} (ajax) failed", id, e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+    return relay(
+        log,
+        "set parent for org unit " + id + " (ajax)",
+        () -> {
+          Object updated =
+              backendApiClient.patch(
+                  "/api/v1/org-hierarchy/org-units/" + id + "/parent", request, Object.class);
+          // Re-parenting changes the org-unit tree the cached /org-units/active-all-kinds picker
+          // renders
+          // (a unit can move under a different Bereich), so evict the shared catalogue cache.
+          backendApiClient.evict(CacheDomain.ORG_UNIT);
+          return ResponseEntity.ok(updated);
+        });
   }
 }
