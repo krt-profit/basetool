@@ -12,13 +12,13 @@
 (function () {
     'use strict';
 
-    let i18n = window.materialboerseInventoryI18n || {};
+    const i18n = window.materialboerseInventoryI18n || {};
     if (!window.krtEvents || !window.krtMaterialRelease || !window.krtFetch) {
         return;
     }
 
     function setStatus(itemId, released) {
-        let chip = document.querySelector('[data-boerse-status-for="' + itemId + '"]');
+        const chip = document.querySelector('[data-boerse-status-for="' + itemId + '"]');
         if (!chip) {
             return;
         }
@@ -28,13 +28,13 @@
     }
 
     window.krtEvents.on('change', 'inv-boerse-toggle', function (el) {
-        let itemId = el.getAttribute('data-id');
+        const itemId = el.getAttribute('data-id');
         if (el.checked) {
             // Newly released: open the remark dialog pre-filled with this Lager item.
             window.krtMaterialRelease.open(
                 'lager',
                 {
-                    itemId: itemId,
+                    itemId,
                     material: el.getAttribute('data-material'),
                     // 'ITEM' for a game-item row (a stock-backed item offer, REQ-MARKET-014) — the
                     // modal then hides the quality fact; absent/null for a material row.
@@ -44,10 +44,10 @@
                     quantityType: el.getAttribute('data-quantity-type'),
                 },
                 {
-                    onDone: function () {
+                    onDone() {
                         setStatus(itemId, true);
                     },
-                    onCancel: function () {
+                    onCancel() {
                         el.checked = false;
                     },
                 },
@@ -73,7 +73,7 @@
                     successMessage: i18n.deactivated,
                     errorMessage: i18n.error,
                     serialize: 'materialboerse',
-                    onSuccess: function () {
+                    onSuccess() {
                         setStatus(itemId, false);
                         // REQ-FE-015 (ADR-0094): notify board viewers over the shared multiplexed
                         // /ws/sync `materialboard` room (was the retired materialboerse-presence.js).
@@ -81,7 +81,7 @@
                             window.krtLiveSync.sendChanged('materialboard', ['board']);
                         }
                     },
-                    onError: function () {
+                    onError() {
                         el.checked = true;
                     },
                 });

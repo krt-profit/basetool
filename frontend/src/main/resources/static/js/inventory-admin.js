@@ -47,10 +47,10 @@ const adminLager = /** @type {KrtInventoryApi} */ (window.krtInventory).createLa
     basePath: '/inventory/all',
     stackPerOwner: true,
     stackPersonalFlag: false,
-    refreshTable: function () {
+    refreshTable() {
         filterInventory();
     },
-    notifyInventoryChanged: function () {
+    notifyInventoryChanged() {
         broadcastInventoryAllChanged();
     },
 });
@@ -510,7 +510,7 @@ if (
         topic: 'inventory',
         sections: INVENTORY_ALL_SECTIONS,
         coalesceMs: 1500,
-        refresh: function () {
+        refresh() {
             filterInventory();
         },
     });
@@ -539,7 +539,7 @@ if (
         topic: 'orders',
         sections: INVENTORY_ALL_ORDER_SECTIONS,
         coalesceMs: 1500,
-        refresh: function () {
+        refresh() {
             filterInventory();
         },
     });
@@ -865,7 +865,7 @@ function submitUmbuchen(event) {
         ? window.krtHerkunft.collect('umbuchen')
         : { jobOrderReductions: null, missionReductions: null };
     const payload = {
-        amount: amount,
+        amount,
         type: 'TRANSFER',
         targetUserId: targetUserEl.value || null,
         targetLocationId: targetLocationEl.value || null,
@@ -883,11 +883,11 @@ function submitUmbuchen(event) {
         .write({
             method: 'POST',
             url: '/inventory/' + adminUmbuchenItemId + '/transfer',
-            payload: payload,
+            payload,
             successMessage: umbuchenI18n.success,
             errorMessage: umbuchenI18n.error,
             conflict: inventoryConflictI18n,
-            onSuccess: function () {
+            onSuccess() {
                 adminLager.closeUmbuchenModal();
                 filterInventory();
                 broadcastInventoryAllChanged();
@@ -944,7 +944,7 @@ function submitUmbuchen(event) {
                 url: '/inventory/all',
                 toast: false,
                 errorMessage: deleteBtn.getAttribute('data-error-failed') ?? undefined,
-                onSuccess: function () {
+                onSuccess() {
                     showInventoryToast('success', deleteBtn.getAttribute('data-success'));
                     filterInventory();
                     broadcastInventoryAllChanged();

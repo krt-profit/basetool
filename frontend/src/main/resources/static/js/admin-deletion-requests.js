@@ -198,7 +198,7 @@
                 payload: { note: text, version: current.version },
                 successMessage: i18n.declined,
                 errorMessage: i18n.error,
-                onSuccess: function () {
+                onSuccess() {
                     closeModal('decline-modal');
                     return refresh();
                 },
@@ -227,7 +227,7 @@
                 },
                 successMessage: i18n.executed,
                 errorMessage: i18n.error,
-                onSuccess: function () {
+                onSuccess() {
                     closeModal('execute-modal');
                     return refresh();
                 },

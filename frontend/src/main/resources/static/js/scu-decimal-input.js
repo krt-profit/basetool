@@ -308,5 +308,5 @@
     document.addEventListener('change', onCommit, true);
     document.addEventListener('submit', canonicaliseForm, true);
 
-    root.krtScuInput = { normalize: normalize, parse: parse, round: round };
+    root.krtScuInput = { normalize, parse, round };
 })(window);

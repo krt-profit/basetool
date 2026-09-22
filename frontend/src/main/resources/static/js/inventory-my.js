@@ -48,16 +48,16 @@ const myLager = /** @type {KrtInventoryApi} */ (window.krtInventory).createLager
     basePath: '/inventory/my',
     stackPerOwner: false,
     stackPersonalFlag: true,
-    refreshTable: function () {
+    refreshTable() {
         filterMyInventory();
     },
-    notifyInventoryChanged: function () {
+    notifyInventoryChanged() {
         broadcastInventoryChanged();
     },
     // Reflect the current bulk selection on the freshly injected checkboxes (REQ-INV-034): a stack
     // expanded after "Alle markieren" (or after ticking others) must come up already checked, and
     // the count/group state must stay consistent.
-    onStackEntriesLoaded: function (content) {
+    onStackEntriesLoaded(content) {
         applyBulkSelectionToLoaded(content);
         updateBulkCheckoutState();
     },
@@ -345,7 +345,7 @@ async function executeBulkCheckout() {
         toast: false,
         errorMessage: bulkI18n.errorFailed,
         conflict: inventoryConflictI18n,
-        onSuccess: function () {
+        onSuccess() {
             // Use the working global toast (the page-local showInventoryToast targets a #toast
             // element that does not exist) so the count-substituted confirmation actually shows —
             // the single book-out + the krtFetch error path already use this same toast.
@@ -589,16 +589,16 @@ function submitBulkRebook(event) {
             url: '/inventory/bulk-rebook',
             payload: {
                 itemIds: ids,
-                mode: mode,
-                targetUserId: targetUserId,
-                targetLocationId: targetLocationId,
+                mode,
+                targetUserId,
+                targetLocationId,
                 targetOwningOrgUnitId: orgUnitId,
                 mergeStock: !!(mergeCheckbox && mergeCheckbox.checked),
             },
             toast: false,
             errorMessage: bulkRebookI18n.errorFailed,
             conflict: inventoryConflictI18n,
-            onSuccess: function (body) {
+            onSuccess(body) {
                 closeBulkRebookModal();
                 reportBulkRebookOutcome(body);
                 // filterMyInventory() re-swaps the grouped table and clears the bulk selection (set,
@@ -1164,7 +1164,7 @@ if (
         topic: 'inventory',
         sections: INVENTORY_MY_SECTIONS,
         coalesceMs: 1500,
-        refresh: function () {
+        refresh() {
             filterMyInventory();
         },
     });
@@ -1193,7 +1193,7 @@ if (
         topic: 'orders',
         sections: INVENTORY_MY_ORDER_SECTIONS,
         coalesceMs: 1500,
-        refresh: function () {
+        refresh() {
             filterMyInventory();
         },
     });
@@ -1506,10 +1506,10 @@ function submitUmbuchen(event) {
                 ? orgSelect.value || null
                 : null;
         payload = {
-            amount: amount,
-            version: version,
+            amount,
+            version,
             targetOwningOrgUnitId: orgUnitId,
-            mergeStock: mergeStock,
+            mergeStock,
         };
     } else {
         // Variante C (REQ-INV-027): a transfer carries its reduced tags onto the moved row. An
@@ -1525,13 +1525,13 @@ function submitUmbuchen(event) {
             : { jobOrderReductions: null, missionReductions: null };
         url = '/inventory/' + umbuchenItemId + '/transfer';
         payload = {
-            amount: amount,
+            amount,
             type: 'TRANSFER',
             targetUserId: myFieldValue('umbuchenTargetUserId') || null,
             targetLocationId: myFieldValue('umbuchenTargetLocationId') || null,
             targetOwningOrgUnitId: myFieldValue('umbuchenTargetOwningOrgUnitId') || null,
-            version: version,
-            mergeStock: mergeStock,
+            version,
+            mergeStock,
             jobOrderReductions: reductions.jobOrderReductions,
             missionReductions: reductions.missionReductions,
         };
@@ -1545,12 +1545,12 @@ function submitUmbuchen(event) {
     window.krtFetch
         .write({
             method: 'POST',
-            url: url,
-            payload: payload,
+            url,
+            payload,
             successMessage: umbuchenI18n.success,
             errorMessage: umbuchenI18n.error,
             conflict: inventoryConflictI18n,
-            onSuccess: function () {
+            onSuccess() {
                 myLager.closeUmbuchenModal();
                 filterMyInventory();
                 broadcastInventoryChanged();
@@ -1635,13 +1635,13 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
 // The Umbuchen form is a stable top-level element (outside the swapped table container); its submit
 // listener (bound once) survives the grouped-table re-swaps and runs after scu-decimal-input.js
 // canonicalises/validates the amount fields in the capture phase.
-let umbuchenFormEl = document.getElementById('umbuchenForm');
+const umbuchenFormEl = document.getElementById('umbuchenForm');
 if (umbuchenFormEl) {
     umbuchenFormEl.addEventListener('submit', submitUmbuchen);
 }
 // The Massen-Umbuchen form is a stable top-level element too, so one bound submit listener survives
 // the grouped-table re-swaps. It carries no amount input, so no scu-decimal capture phase applies.
-let bulkRebookFormEl = document.getElementById('bulkRebookForm');
+const bulkRebookFormEl = document.getElementById('bulkRebookForm');
 if (bulkRebookFormEl) {
     bulkRebookFormEl.addEventListener('submit', submitBulkRebook);
 }

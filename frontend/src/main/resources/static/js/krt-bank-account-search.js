@@ -62,7 +62,7 @@
         const accountNo = row.accountNo || '';
         const name = row.name || '';
         const label = accountNo && name ? accountNo + ' — ' + name : accountNo || name || row.id;
-        return { value: row.id, label: label };
+        return { value: row.id, label };
     }
 
     // Fetches the matching accounts for `query` from the account-search proxy and maps them to

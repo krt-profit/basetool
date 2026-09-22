@@ -136,7 +136,7 @@
             const url =
                 '/admin/special-commands' +
                 (includeInactive.checked ? '?includeInactive=true' : '');
-            window.krtFetch.swap({ url: url, container: '#sc-results', history: true });
+            window.krtFetch.swap({ url, container: '#sc-results', history: true });
         });
 
         if (/[?&]includeInactive=/.test(window.location.search)) {
@@ -167,7 +167,7 @@
         const url =
             '/admin/special-commands' +
             (includeInactive && includeInactive.checked ? '?includeInactive=true' : '');
-        window.krtFetch.swap({ url: url, container: '#sc-results', history: false });
+        window.krtFetch.swap({ url, container: '#sc-results', history: false });
     }
 
     // FormData POST to an SK AJAX twin (keeps the @ModelAttribute / @RequestParam binding) with
@@ -182,10 +182,10 @@
     function scWrite(theForm, successMessage, onSuccess) {
         window.krtFetch.submitForm({
             form: theForm,
-            successMessage: successMessage,
+            successMessage,
             errorMessage: SC_MSG.error,
             conflict: SC_CONFLICT,
-            onSuccess: function () {
+            onSuccess() {
                 if (typeof onSuccess === 'function') {
                     onSuccess();
                 }

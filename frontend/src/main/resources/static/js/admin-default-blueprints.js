@@ -383,7 +383,7 @@
                 submitter: confirmBtn,
                 successMessage: i18n.removed,
                 errorMessage: i18n.removeError,
-                onSuccess: function () {
+                onSuccess() {
                     pendingForm = null;
                     closeDeleteModal();
                     return refreshList();

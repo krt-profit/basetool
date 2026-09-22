@@ -223,11 +223,11 @@
             .write({
                 method: 'POST',
                 url: window.safeSameOriginUrl(action, action),
-                payload: payload,
+                payload,
                 successMessage: isUpdate ? i18n.updated : i18n.created,
                 errorMessage: isUpdate ? i18n.errorUpdate : i18n.errorCreate,
                 conflict: conflictObj(),
-                onSuccess: function () {
+                onSuccess() {
                     closeModal();
                     reswapResults();
                 },
@@ -256,7 +256,7 @@
                 successMessage: i18n.deleted,
                 errorMessage: i18n.errorDelete,
                 conflict: conflictObj(),
-                onSuccess: function () {
+                onSuccess() {
                     closeDelete();
                     reswapResults();
                 },
@@ -289,7 +289,7 @@
             }
             const params = new URLSearchParams(new FormData(formEl)).toString();
             const url = formEl.getAttribute('action') + (params ? '?' + params : '');
-            window.krtFetch.swap({ url: url, container: '#pi-results', history: true });
+            window.krtFetch.swap({ url, container: '#pi-results', history: true });
         }
         document.addEventListener('submit', function (e) {
             if (!e.target.classList || !e.target.classList.contains('krt-pi-filter')) {
@@ -358,7 +358,7 @@
 
     function openCreate(btn) {
         if (!modal || !form) return;
-        let i18n = window.krtPersonalInventoryI18n || {};
+        const i18n = window.krtPersonalInventoryI18n || {};
         if (titleEl && i18n.createTitle) titleEl.textContent = i18n.createTitle;
         form.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
         clearForm();
@@ -367,7 +367,7 @@
 
     function openEdit(btn) {
         if (!modal || !form) return;
-        let i18n = window.krtPersonalInventoryI18n || {};
+        const i18n = window.krtPersonalInventoryI18n || {};
         if (titleEl && i18n.editTitle) titleEl.textContent = i18n.editTitle;
         form.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
         setField('id', btn.getAttribute('data-id'));
@@ -392,8 +392,8 @@
             btn.getAttribute('data-action'),
             deleteForm.action,
         );
-        let msgEl = $('krt-pi-delete-message');
-        let name = btn.getAttribute('data-name');
+        const msgEl = $('krt-pi-delete-message');
+        const name = btn.getAttribute('data-name');
         if (msgEl && name) {
             msgEl.textContent =
                 window.krtPersonalInventoryI18n && window.krtPersonalInventoryI18n.confirmBody
@@ -409,7 +409,7 @@
 
     function setField(name, value) {
         if (!form) return;
-        let el = form.querySelector('[name="' + name + '"]');
+        const el = form.querySelector('[name="' + name + '"]');
         if (el) el.value = value == null ? '' : value;
     }
 
@@ -430,9 +430,9 @@
 
     function runSearch() {
         if (!searchInput || !resultsEl) return;
-        let q = searchInput.value || '';
-        let endpoints = window.krtPersonalInventoryEndpoints || {};
-        let url =
+        const q = searchInput.value || '';
+        const endpoints = window.krtPersonalInventoryEndpoints || {};
+        const url =
             (endpoints.uexSearch || '/personal-inventory/uex-search') +
             '?q=' +
             encodeURIComponent(q) +
@@ -464,7 +464,7 @@
         }
         let html = '';
         items.forEach(function (it) {
-            let typeClass = it.type === 'CITY' ? 'krt-pi-loc-city' : 'krt-pi-loc-station';
+            const typeClass = it.type === 'CITY' ? 'krt-pi-loc-city' : 'krt-pi-loc-station';
             html +=
                 '<button type="button" class="krt-pi-typeahead-item" ' +
                 'data-uex-id="' +
@@ -522,7 +522,7 @@
      */
     function sanitizeQuantity(input) {
         if (!input) return;
-        let raw = input.value || '';
+        const raw = input.value || '';
         let digitsOnly = raw.replace(/[^0-9]/g, '');
         if (digitsOnly === '') {
             if (raw !== '') input.value = '';

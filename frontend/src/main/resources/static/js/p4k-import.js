@@ -224,12 +224,12 @@
                 formData: fd,
                 submitter: uploadBtn,
                 toast: false,
-                onError: function () {
+                onError() {
                     reported = true;
                     toastError();
                     return true;
                 },
-                onNetworkError: function () {
+                onNetworkError() {
                     reported = true;
                     toastError();
                     return true;
@@ -523,15 +523,15 @@
         window.krtFetch
             .write({
                 method: 'POST',
-                url: url,
+                url,
                 submitter: applyConfirmBtn,
                 toast: false,
-                onError: function () {
+                onError() {
                     reported = true;
                     toastError();
                     return true;
                 },
-                onNetworkError: function () {
+                onNetworkError() {
                     reported = true;
                     toastError();
                     return true;

@@ -80,7 +80,7 @@ function wireToggle(selector, idAttribute, urlFor, bodyFor, labels) {
                 successMessage: labels.saved,
                 errorMessage: labels.error,
                 conflict: SAVE_CONFLICT,
-                onError: function (status) {
+                onError(status) {
                     revert();
                     if (status === 409) {
                         return false;
@@ -88,7 +88,7 @@ function wireToggle(selector, idAttribute, urlFor, bodyFor, labels) {
                     if (window.showFrontendErrorToast) window.showFrontendErrorToast(labels.error);
                     return true;
                 },
-                onNetworkError: function () {
+                onNetworkError() {
                     // krtFetch then shows labels.error as its default network-error toast.
                     revert();
                     return false;
@@ -184,11 +184,11 @@ document.addEventListener('DOMContentLoaded', function () {
             .write({
                 method: 'POST',
                 url: settingsForm.getAttribute('action'),
-                payload: payload,
+                payload,
                 successMessage: SAVE_SUCCESS,
                 errorMessage: SAVE_ERROR,
                 conflict: SAVE_CONFLICT,
-                onSuccess: function (body) {
+                onSuccess(body) {
                     if (!body) {
                         return;
                     }

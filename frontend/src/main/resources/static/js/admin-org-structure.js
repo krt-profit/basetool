@@ -50,17 +50,17 @@ const ORG_STRUCTURE_CHART_SECTION = 'chart';
     const i18n = readMessages();
 
     const orgStructureSeam = window.krtFetch.sectionWrite({
-        dict: function () {
+        dict() {
             return { 'admin.orgStructure.refresh.error': i18n.refreshError };
         },
         keys: { refreshErrorKey: 'admin.orgStructure.refresh.error' },
         sections: ORG_STRUCTURE_SECTIONS,
-        pageUrl: function () {
+        pageUrl() {
             return '/admin/org-structure';
         },
         // Peers re-render whichever of the three sections their own page actually shows: the two
         // editor sections here, the tree on /org-chart.
-        broadcast: function (keys) {
+        broadcast(keys) {
             if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
                 window.krtLiveSync.sendChanged(
                     'org-structure',
@@ -92,14 +92,14 @@ const ORG_STRUCTURE_CHART_SECTION = 'chart';
             // Global room: the longer coalesce window (#1125) flattens the re-fetch herd.
             coalesceMs: 1500,
             // broadcast:false — applying a peer's signal must never echo it back into a loop.
-            refresh: function (keys) {
+            refresh(keys) {
                 orgStructureSeam.refresh(keys, { broadcast: false });
             },
             // Never swap a half-filled create form out from under the admin. The generic busy test
             // only catches a FOCUSED container, but an admin can type a name, tab away to pick a
             // department and still have unsaved text here — so treat any non-empty create input as
             // busy and hold the section behind the "updates available" pill instead.
-            busyTest: function (sectionKey) {
+            busyTest(sectionKey) {
                 if (sectionKey !== 'forms') {
                     return false;
                 }
@@ -197,7 +197,7 @@ const ORG_STRUCTURE_CHART_SECTION = 'chart';
             // Serialize per org-unit + read the row version lazily so a rapid second parent
             // change on the same unit queues behind the first and ships the fresh version.
             serialize: 'org-unit:' + id,
-            payload: function () {
+            payload() {
                 const version = row.getAttribute('data-version');
                 return {
                     parentOrgUnitId: emptyToNull(/** @type {HTMLSelectElement} */ (select).value),

@@ -127,7 +127,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 successMessage: LOCATION_MSG.success,
                 errorMessage: LOCATION_MSG.error,
                 conflict: LOCATION_CONFLICT,
-                onSuccess: function (updated) {
+                onSuccess(updated) {
                     patchRow(row, updated);
                 },
             })

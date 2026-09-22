@@ -118,7 +118,7 @@ function crossPublishToParentOperation(keys) {
 }
 
 const missionSeam = window.krtFetch.sectionWrite({
-    dict: function () {
+    dict() {
         return window.MISSION_SUBRES_I18N || {};
     },
     keys: {
@@ -141,14 +141,14 @@ const missionSeam = window.krtFetch.sectionWrite({
         refreshErrorKey: 'mission.section.refresh.error',
     },
     sections: MISSION_SECTIONS,
-    pageUrl: function () {
+    pageUrl() {
         return window.missionId ? '/missions/' + window.missionId : null;
     },
     // Live multi-user sync (REQ-FE-010): tell other users viewing this mission that these
     // sections just changed, so their views re-fetch the same fragments in place. Suppressed
     // when this refresh is itself the application of a peer's signal (opts.broadcast === false),
     // otherwise the inbound change would echo straight back into a loop.
-    broadcast: function (keys) {
+    broadcast(keys) {
         if (window.missionPresence && typeof window.missionPresence.sendChanged === 'function') {
             window.missionPresence.sendChanged(keys);
         }
@@ -306,14 +306,14 @@ document.addEventListener('krt:swapped', function (ev) {
 window.krtLiveSync.createReceiver({
     sections: MISSION_SECTIONS,
     events: { changed: 'krt:mission-changed', resync: 'krt:mission-resync' },
-    refresh: function (keys) {
+    refresh(keys) {
         if (window.krtRefreshMissionSection) {
             window.krtRefreshMissionSection(keys, { broadcast: false });
         }
     },
     pill: {
         id: 'mission-livesync-pill',
-        label: function () {
+        label() {
             const dict = window.MISSION_LIVESYNC_I18N || {};
             return dict['mission.livesync.updates_available'] != null &&
                 dict['mission.livesync.updates_available'] !== ''
@@ -375,8 +375,8 @@ window.krtLiveSync.createReceiver({
         writeStep({
             method: 'PATCH',
             url: '/missions/' + mid() + '/steps/' + sid + '/done/ajax',
-            payload: function () {
-                return { done: done, stepsVersion: stepsVersion() };
+            payload() {
+                return { done, stepsVersion: stepsVersion() };
             },
         });
     }
@@ -389,8 +389,8 @@ window.krtLiveSync.createReceiver({
         writeStep({
             method: 'POST',
             url: '/missions/' + mid() + '/steps/ajax',
-            payload: function () {
-                return { title: title, meta: null, stepsVersion: stepsVersion() };
+            payload() {
+                return { title, meta: null, stepsVersion: stepsVersion() };
             },
         });
     }
@@ -411,8 +411,8 @@ window.krtLiveSync.createReceiver({
         writeStep({
             method: 'PUT',
             url: '/missions/' + mid() + '/steps/' + sid + '/ajax',
-            payload: function () {
-                return { title: title, meta: meta, stepsVersion: stepsVersion() };
+            payload() {
+                return { title, meta, stepsVersion: stepsVersion() };
             },
         });
     }
@@ -443,7 +443,7 @@ window.krtLiveSync.createReceiver({
         }
         writeStep({
             method: 'DELETE',
-            url: function () {
+            url() {
                 return (
                     '/missions/' + mid() + '/steps/' + sid + '/ajax?stepsVersion=' + stepsVersion()
                 );
@@ -457,7 +457,7 @@ window.krtLiveSync.createReceiver({
         writeStep({
             method: 'PUT',
             url: '/missions/' + mid() + '/steps/reorder/ajax',
-            payload: function () {
+            payload() {
                 return { stepIds: order, stepsVersion: stepsVersion() };
             },
         });
@@ -634,8 +634,8 @@ window.krtLiveSync.createReceiver({
         writeObjective({
             method: 'POST',
             url: '/missions/' + mid() + '/objectives/ajax',
-            payload: function () {
-                return { title: title, kind: 'PRIMARY', objectivesVersion: objectivesVersion() };
+            payload() {
+                return { title, kind: 'PRIMARY', objectivesVersion: objectivesVersion() };
             },
         });
     }
@@ -656,8 +656,8 @@ window.krtLiveSync.createReceiver({
         writeObjective({
             method: 'PUT',
             url: '/missions/' + mid() + '/objectives/' + oid + '/ajax',
-            payload: function () {
-                return { title: title, kind: kind, objectivesVersion: objectivesVersion() };
+            payload() {
+                return { title, kind, objectivesVersion: objectivesVersion() };
             },
         });
     }
@@ -688,7 +688,7 @@ window.krtLiveSync.createReceiver({
         }
         writeObjective({
             method: 'DELETE',
-            url: function () {
+            url() {
                 return (
                     '/missions/' +
                     mid() +
@@ -707,7 +707,7 @@ window.krtLiveSync.createReceiver({
         writeObjective({
             method: 'PUT',
             url: '/missions/' + mid() + '/objectives/reorder/ajax',
-            payload: function () {
+            payload() {
                 return { objectiveIds: order, objectivesVersion: objectivesVersion() };
             },
         });
@@ -929,7 +929,7 @@ window.krtLiveSync.createReceiver({
             if (!title) {
                 return; // a blank title means an empty row — drop it
             }
-            const entry = { title: title };
+            const entry = { title };
             if (extraKey === 'kind') {
                 const kind = row.querySelector('.ae-kind');
                 entry.kind = kind ? kind.value : 'PRIMARY';
@@ -1325,7 +1325,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
                 const result = await window.krtMissionWrite({
                     method: 'PUT',
-                    url: url,
+                    url,
                     payload: { frequencyTypeId: typeId, value: parsed },
                     sectionKey: 'frequency',
                 });
@@ -1491,14 +1491,14 @@ document.addEventListener('DOMContentLoaded', function () {
             const fid = idInput.value;
             const isEdit = !!fid;
             const payload = isEdit
-                ? { name: name, value: parsed, version: Number(versionInput.value) }
-                : { name: name, value: parsed };
+                ? { name, value: parsed, version: Number(versionInput.value) }
+                : { name, value: parsed };
             const result = await window.krtMissionWrite({
                 method: isEdit ? 'PUT' : 'POST',
                 url: isEdit
                     ? '/missions/' + mid() + '/frequencies/custom/' + fid + '/ajax'
                     : '/missions/' + mid() + '/frequencies/custom/ajax',
-                payload: payload,
+                payload,
                 sectionKey: 'frequency',
             });
             if (result.ok) {
@@ -1711,7 +1711,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const res = await window.krtMissionWrite({
                     method: 'POST',
                     url: '/missions/' + window.missionId + '/units/ajax',
-                    payload: payload,
+                    payload,
                     sectionKey: 'unit',
                 });
                 if (res.ok) {
@@ -1749,7 +1749,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const res = await window.krtMissionWrite({
                     method: 'PUT',
                     url: '/missions/' + window.missionId + '/units/' + unitId + '/ajax',
-                    payload: payload,
+                    payload,
                     sectionKey: 'unit',
                 });
                 if (res.ok) {
@@ -1822,7 +1822,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const res = await window.krtMissionWrite({
                     method: 'POST',
                     url: '/missions/' + window.missionId + '/participants/ajax',
-                    payload: payload,
+                    payload,
                     sectionKey: 'participant',
                 });
                 if (res.ok) {
@@ -1861,7 +1861,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const res = await window.krtMissionWrite({
                     method: 'PUT',
                     url: '/missions/' + window.missionId + '/participants/' + pId + '/ajax',
-                    payload: payload,
+                    payload,
                     sectionKey: 'participant',
                 });
                 if (res.ok) {
@@ -2044,7 +2044,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const res = await window.krtMissionWrite({
                     method: 'PUT',
                     url: ajaxUrl,
-                    payload: payload,
+                    payload,
                     sectionKey: 'crew',
                 });
                 if (res.ok) {
@@ -2300,7 +2300,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const res = await window.krtMissionWrite({
             method: 'PUT',
             url: '/missions/' + window.missionId + '/party-lead/ajax',
-            payload: function () {
+            payload() {
                 return {
                     userId: submittedUserId,
                     guestName: submittedGuestName,
@@ -2407,16 +2407,16 @@ async function saveActualTimeInPlace(field, nowDate) {
         // queued schedule writes ('Jetzt' on Beginn then Ende, or a double-click) each pick up the
         // version the previous one bumped via its onSuccess writeback below. A static payload would
         // bake in the pre-bump version and the second write would self-409 into the reload-confirm.
-        payload: function () {
+        payload() {
             return {
-                field: field,
+                field,
                 value: nowDate.toISOString(),
                 version: Number(versionInput ? versionInput.value : version),
             };
         },
         sectionKey: 'schedule',
         toast: false,
-        onSuccess: function (dto) {
+        onSuccess(dto) {
             // actual-time PATCHes /schedule, so the schedule version (and the top-level version)
             // bump — write them back so a follow-up schedule edit / actual-time set does not 409.
             if (dto && dto.scheduleVersion != null && versionInput) {
@@ -2492,11 +2492,11 @@ async function changeMissionOwner() {
         await window.krtMissionWrite({
             method: 'PUT',
             url: `/missions/${cleanMissionId}/owner/ajax`,
-            payload: function () {
+            payload() {
                 return { userId: cleanUserId, version: currentOwnershipVersion() };
             },
             sectionKey: 'owner',
-            onSuccess: function (dto) {
+            onSuccess(dto) {
                 // Write the bumped ownershipVersion straight back from the response before the chain
                 // releases the next queued write; the mgmt refetch below repaints it too, but later.
                 if (dto && dto.ownershipVersion != null) {
@@ -2589,11 +2589,11 @@ async function changeMissionOwningOrgUnit() {
         await window.krtMissionWrite({
             method: 'PUT',
             url: `/missions/${cleanMissionId}/owning-org-unit/ajax`,
-            payload: function () {
-                return { owningOrgUnitId: owningOrgUnitId, version: currentOwningOrgUnitVersion() };
+            payload() {
+                return { owningOrgUnitId, version: currentOwningOrgUnitVersion() };
             },
             sectionKey: 'owningOrgUnit',
-            onSuccess: function (dto) {
+            onSuccess(dto) {
                 // Write the bumped owningOrgUnitVersion straight back from the response DTO before
                 // the serialized section:owningOrgUnit chain releases the next queued write, so a
                 // rapid back-to-back reassignment reads the fresh version instead of self-409ing on
@@ -2709,7 +2709,7 @@ async function updatePayoutPreference(selectElement) {
     // patch — a single preference toggle changes no list structure, so no fragment swap.
     const result = await window.krtFetch.write({
         method: 'POST',
-        url: url,
+        url,
         payload: { preference: value },
         // Join the participant section's serial chain (#1145): check-in/out and the participant edit
         // form all serialize on 'section:participant' because they bump and re-sync the SAME
@@ -3265,13 +3265,13 @@ if (document.readyState === 'loading') {
         // construction and the 403-refresh-retry are inherited from krtFetch (REQ-FE-001), and the
         // captured submit button is the double-submit guard (replacing the old inFlight boolean).
         await window.krtFetch.submitForm({
-            form: form,
+            form,
             url: form.action,
             serialize: 'section:schedule',
             successMessage: SAVED,
             errorMessage: FAILED,
             submitter: document.querySelector('button[type="submit"][form="mission-form"]'),
-            onError: function (status, body) {
+            onError(status, body) {
                 if (status === 422) {
                     renderFieldErrors(body || {});
                     return true;
@@ -3282,7 +3282,7 @@ if (document.readyState === 'loading') {
                 }
                 return false; // let krtFetch surface the generic error toast
             },
-            onSuccess: function (body) {
+            onSuccess(body) {
                 writeVersions(body);
                 clearFieldErrors();
                 // Re-render the overview pane (name / status / schedule / flags mirror the edited
@@ -3430,7 +3430,7 @@ if (document.readyState === 'loading') {
             await window.krtMissionWrite({
                 method: 'POST',
                 url: '/missions/' + window.missionId + '/units/' + targetUnitId + '/crew/ajax',
-                payload: { participantId: participantId, jobTypeIds: [] },
+                payload: { participantId, jobTypeIds: [] },
                 sectionKey: 'crew',
             });
             // Re-render regardless of the add outcome: after a successful delete the server

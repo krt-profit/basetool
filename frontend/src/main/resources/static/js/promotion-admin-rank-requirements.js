@@ -128,11 +128,11 @@ function apiCall(url, method, body) {
     }
     return window.krtFetch
         .write({
-            method: method,
-            url: url,
+            method,
+            url,
             payload: body || undefined,
             toast: false,
-            onError: function (status) {
+            onError(status) {
                 if (status === 409) {
                     toastError(MSG_CONFLICT);
                     arRefresh();
@@ -141,7 +141,7 @@ function apiCall(url, method, body) {
                 }
                 return true;
             },
-            onNetworkError: function () {
+            onNetworkError() {
                 toastError(MSG_ERROR);
                 return true;
             },

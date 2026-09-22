@@ -79,7 +79,7 @@
 
     function openModal(trigger) {
         const action = trigger.getAttribute('data-leitung-open');
-        modalContext = { action: action, unitId: trigger.getAttribute('data-unit-id') };
+        modalContext = { action, unitId: trigger.getAttribute('data-unit-id') };
         if (modalUnit) {
             modalUnit.textContent = trigger.getAttribute('data-unit-name') || '';
         }
@@ -144,7 +144,7 @@
                     modalContext.unitId +
                     '/members/ajax',
                 method: 'POST',
-                payload: { userId: userId },
+                payload: { userId },
                 success: i18n.saved,
             });
         } else if (modalContext.action === 'add-bereich') {
@@ -155,7 +155,7 @@
             write({
                 url: '/organisation/leitung/bereiche/' + modalContext.unitId + '/members/ajax',
                 method: 'POST',
-                payload: { userId: userId, role: role },
+                payload: { userId, role },
                 success: i18n.saved,
             });
         }
@@ -238,7 +238,7 @@
         write({
             url: '/organisation/leitung/squadrons/' + unitId + '/ranks/' + userId + '/ajax',
             method: 'PUT',
-            payload: payload,
+            payload,
             success: i18n.saved,
         });
     }
@@ -254,7 +254,7 @@
         write({
             url: '/organisation/leitung/squadrons/' + unitId + '/kommando-groups/ajax',
             method: 'POST',
-            payload: { name: name },
+            payload: { name },
             success: i18n.saved,
         });
     }
@@ -276,7 +276,7 @@
                 '/ajax',
             method: 'PUT',
             payload: {
-                name: name,
+                name,
                 sortIndex: Number(card.getAttribute('data-group-sort')),
                 version: Number(card.getAttribute('data-group-version')),
             },

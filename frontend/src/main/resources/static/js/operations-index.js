@@ -97,7 +97,7 @@ function reloadOperationsList() {
                     successMessage: OPS_MSG.createSuccess,
                     errorMessage: OPS_MSG.createError,
                     conflict: opsConflictStrings(),
-                    onSuccess: function () {
+                    onSuccess() {
                         closeOperationModal('create-operation-modal');
                         createForm.reset();
                         reloadOperationsList();
@@ -124,7 +124,7 @@ function reloadOperationsList() {
                     successMessage: OPS_MSG.deleteSuccess,
                     errorMessage: OPS_MSG.deleteError,
                     conflict: opsConflictStrings(),
-                    onSuccess: function () {
+                    onSuccess() {
                         closeOperationModal('delete-operation-modal');
                         reloadOperationsList();
                     },

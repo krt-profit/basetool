@@ -67,10 +67,10 @@
     function memberWrite(theForm, successMessage, onSuccess) {
         window.krtFetch.submitForm({
             form: theForm,
-            successMessage: successMessage,
+            successMessage,
             errorMessage: MEMBER_MSG.error,
             conflict: MEMBER_CONFLICT,
-            onSuccess: function () {
+            onSuccess() {
                 if (typeof onSuccess === 'function') {
                     onSuccess();
                 }

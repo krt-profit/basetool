@@ -83,7 +83,7 @@ document.addEventListener('DOMContentLoaded', function () {
             url: form.getAttribute('action') + '?action=' + encodeURIComponent(action),
             successMessage: MSG_SAVED,
             errorMessage: MSG_ERROR,
-            onSuccess: function () {
+            onSuccess() {
                 patchOverrideGroup(form, action);
             },
         });
@@ -97,7 +97,7 @@ document.addEventListener('DOMContentLoaded', function () {
             url: form.getAttribute('action'),
             successMessage: MSG_SAVED,
             errorMessage: MSG_ERROR,
-            onSuccess: function () {
+            onSuccess() {
                 if (!btn) {
                     return;
                 }

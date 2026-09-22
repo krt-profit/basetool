@@ -92,18 +92,18 @@ function refineryStoreModalOpen() {
     // serialize the dynamic goods/store editors as FormData), so the `keys` dictionary carries just
     // the refresh-error entry, like the orders-queue seam.
     refinerySeam = window.krtFetch.sectionWrite({
-        dict: function () {
+        dict() {
             return {
                 'refineryorder.section.refresh.error': REFINERY_DETAIL_MSG.sectionRefreshError,
             };
         },
         keys: { refreshErrorKey: 'refineryorder.section.refresh.error' },
         sections: REFINERY_ORDER_SECTIONS,
-        pageUrl: function () {
+        pageUrl() {
             return window.refineryOrderId ? '/refinery-orders/' + window.refineryOrderId : null;
         },
         // Tell other users viewing this refinery order that these sections changed (REQ-FE-015).
-        broadcast: function (keys) {
+        broadcast(keys) {
             const topic = refineryTopic();
             if (
                 topic &&
@@ -121,7 +121,7 @@ function refineryStoreModalOpen() {
         window.krtLiveSync.createReceiver({
             topic: refineryTopic(),
             sections: REFINERY_ORDER_SECTIONS,
-            refresh: function (keys) {
+            refresh(keys) {
                 // The receiver is created after the seam is assigned, so this can only be
                 // null if wiring order ever changes — fail soft rather than throw in a
                 // peer-message callback.
@@ -130,11 +130,11 @@ function refineryStoreModalOpen() {
             // The receiver's default busy test only recognises .krt-modal-overlay dialogs; the
             // Einlagern dialog is an older .modal, so without this a peer's save would yank the
             // half-filled store form out from under the user. Held-back sections raise the pill.
-            busyTest: function () {
+            busyTest() {
                 return refineryStoreModalOpen();
             },
             pill: {
-                label: function () {
+                label() {
                     return REFINERY_DETAIL_MSG.livesyncUpdates;
                 },
             },
@@ -180,7 +180,7 @@ function _submitRefinery(options) {
         return true;
     }
     window.krtFetch.submitForm({
-        form: form,
+        form,
         submitter: options.submitter,
         serialize: 'refinery-order:' + window.refineryOrderId,
         toast: options.successMessage !== undefined,
@@ -200,7 +200,7 @@ function calcScu(index) {
         document.getElementById('outputQuantityScu_' + index)
     );
     if (unitInput && scuInput) {
-        let valStr = unitInput.value.replace(/\./g, '').replace(',', '.');
+        const valStr = unitInput.value.replace(/\./g, '').replace(',', '.');
         const val = parseInt(valStr);
         if (!isNaN(val)) {
             const scu = val / 100.0;
@@ -865,11 +865,11 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
 // changes them too — and the fresh `order` fragment carries the new optimistic-lock version.
 function submitRefineryMainForm(form, submitter) {
     _submitRefinery({
-        form: form,
-        submitter: submitter,
+        form,
+        submitter,
         successMessage: REFINERY_DETAIL_MSG.updateSuccess,
         errorMessage: MSG_REFINERY_UPDATE_FAILED,
-        onSuccess: function () {
+        onSuccess() {
             if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
             return refinerySeam ? refinerySeam.refresh(['order', 'store']) : undefined;
         },
@@ -889,15 +889,15 @@ function submitRefineryStoreForm(form, submitter) {
     // the selects are gone by the time the cross-publish below runs.
     const jobOrderIds = refineryStoreJobOrderIds(form);
     _submitRefinery({
-        form: form,
-        submitter: submitter,
+        form,
+        submitter,
         successMessage: REFINERY_DETAIL_MSG.storeSuccess,
         errorMessage: MSG_REFINERY_STORE_FAILED,
-        onFailure: function () {
+        onFailure() {
             if (btn) btn.disabled = false;
             if (btnLabel && originalLabel != null) btnLabel.textContent = originalLabel;
         },
-        onSuccess: function () {
+        onSuccess() {
             closeStoreModal(); // also resets the unsaved-changes guard
             crossPublishStoredStock(jobOrderIds);
             return refinerySeam ? refinerySeam.refresh(['order', 'store']) : undefined;
@@ -920,10 +920,10 @@ async function submitRefineryCancelForm(form, submitter) {
         if (!ok) return;
     }
     _submitRefinery({
-        form: form,
-        submitter: submitter,
+        form,
+        submitter,
         errorMessage: MSG_REFINERY_CANCEL_FAILED,
-        onSuccess: function (body) {
+        onSuccess(body) {
             if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
             if (refinerySeam) refinerySeam.notify(['order', 'store']);
             if (body && body.targetUrl) window.location.assign(body.targetUrl);

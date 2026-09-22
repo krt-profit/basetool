@@ -410,13 +410,13 @@
             } else if (current === sys) {
                 count++;
             } else {
-                out.push({ name: current, count: count });
+                out.push({ name: current, count });
                 current = sys;
                 count = 1;
             }
         }
         if (current !== null) {
-            out.push({ name: current, count: count });
+            out.push({ name: current, count });
         }
         return out;
     }

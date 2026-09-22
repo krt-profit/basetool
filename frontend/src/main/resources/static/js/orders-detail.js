@@ -79,7 +79,7 @@ const ORDER_SECTIONS = {
         return; // no-JS / no-foundation: the classic forms + the bespoke swaps below run unchanged.
     }
     const orderSeam = window.krtFetch.sectionWrite({
-        dict: function () {
+        dict() {
             return {
                 'orders.section.refresh.error':
                     typeof KRT_ORDER_SECTION_REFRESH_ERROR !== 'undefined'
@@ -89,11 +89,11 @@ const ORDER_SECTIONS = {
         },
         keys: { refreshErrorKey: 'orders.section.refresh.error' },
         sections: ORDER_SECTIONS,
-        pageUrl: function () {
+        pageUrl() {
             return window.orderId ? '/orders/' + window.orderId : null;
         },
         // Tell other users viewing THIS order that these sections changed (REQ-FE-015).
-        broadcast: function (keys) {
+        broadcast(keys) {
             if (
                 window.orderId &&
                 window.krtLiveSync &&
@@ -118,13 +118,13 @@ const ORDER_SECTIONS = {
         window.krtLiveSync.createReceiver({
             topic: 'order:' + window.orderId,
             sections: ORDER_SECTIONS,
-            refresh: function (keys) {
+            refresh(keys) {
                 if (window.krtRefreshOrderSection) {
                     window.krtRefreshOrderSection(keys, { broadcast: false });
                 }
             },
             pill: {
-                label: function () {
+                label() {
                     return typeof KRT_ORDER_LIVESYNC_UPDATES !== 'undefined'
                         ? KRT_ORDER_LIVESYNC_UPDATES
                         : undefined;
@@ -165,8 +165,8 @@ function _serializeHandoverForm() {
                       : NaN;
             if (!inventoryItemId || !(amount > 0)) return;
             items.push({
-                inventoryItemId: inventoryItemId,
-                amount: amount,
+                inventoryItemId,
+                amount,
                 missionReductions: _collectHandoverMissionReductions(row),
             });
         });
@@ -174,7 +174,7 @@ function _serializeHandoverForm() {
         handoverTime: (document.getElementById('handoverTime') || {}).value || '',
         recipientHandle: (document.getElementById('recipientHandle') || {}).value || '',
         recipientSquadron: (document.getElementById('recipientSquadron') || {}).value || '',
-        items: items,
+        items,
     };
 }
 
@@ -187,12 +187,12 @@ function _serializeItemHandoverForm() {
         const jobOrderItemId = idInput ? idInput.value : '';
         const amount = amtInput ? parseInt(amtInput.value, 10) : NaN;
         if (!jobOrderItemId || !(amount > 0)) return;
-        entries.push({ jobOrderItemId: jobOrderItemId, amount: amount });
+        entries.push({ jobOrderItemId, amount });
     });
     return {
         handoverTime: (document.getElementById('itemHandoverTime') || {}).value || '',
         recipientHandle: (document.getElementById('itemRecipientHandle') || {}).value || '',
-        entries: entries,
+        entries,
     };
 }
 
@@ -223,7 +223,7 @@ async function openHandoverModal() {
     if (!isInventoryCached) {
         try {
             const materials = document.querySelectorAll('.material-row[data-material-id]');
-            let promises = Array.from(materials).map((row) => {
+            const promises = Array.from(materials).map((row) => {
                 const orderId = row.dataset.orderId;
                 const matId = row.dataset.materialId;
                 if (orderId && matId) {
@@ -557,10 +557,10 @@ document.addEventListener('DOMContentLoaded', () => {
             await krtOrderWrite({
                 method: 'POST',
                 url: '/orders/' + orderId + '/handovers',
-                payload: payload,
+                payload,
                 toast: false,
                 errorMessage: MSG_HANDOVER_FAILED,
-                onSuccess: function (order) {
+                onSuccess(order) {
                     // Patch the edit-modal @Version (the handover may auto-complete + bump it);
                     // the status select gets its fresh version from the header swap below.
                     const editVer = document.querySelector('#edit-modal input[name="version"]');
@@ -607,10 +607,10 @@ document.addEventListener('DOMContentLoaded', () => {
             await krtOrderWrite({
                 method: 'POST',
                 url: '/orders/' + orderId + '/item-handovers',
-                payload: payload,
+                payload,
                 toast: false,
                 errorMessage: MSG_HANDOVER_FAILED,
-                onSuccess: function (order) {
+                onSuccess(order) {
                     const editVer = document.querySelector('#edit-modal input[name="version"]');
                     if (editVer && order && order.version != null) editVer.value = order.version;
                     const modal = document.getElementById('item-handover-modal');
@@ -903,9 +903,9 @@ function _serializeEditForm() {
                   : NaN;
         if (!materialId || !(amount > 0)) return;
         materials.push({
-            materialId: materialId,
+            materialId,
             minQuality: qualSel && qualSel.value ? parseInt(qualSel.value, 10) : null,
-            amount: amount,
+            amount,
         });
     });
     const versionInput = document.querySelector('#edit-modal input[name="version"]');
@@ -914,7 +914,7 @@ function _serializeEditForm() {
         handle: (document.getElementById('handle') || {}).value || '',
         comment: (document.getElementById('edit-comment') || {}).value || '',
         version: versionInput ? parseInt(versionInput.value, 10) : null,
-        materials: materials,
+        materials,
     };
 }
 (function () {
@@ -941,10 +941,10 @@ function _serializeEditForm() {
         await krtOrderWrite({
             method: 'POST',
             url: updateUrl,
-            payload: payload,
+            payload,
             toast: false,
             errorMessage: MSG_UPDATE_ERROR,
-            onSuccess: function (dto) {
+            onSuccess(dto) {
                 const editVer = document.querySelector('#edit-modal input[name="version"]');
                 if (editVer && dto && dto.version != null) editVer.value = dto.version;
                 const modal = document.getElementById('edit-modal');
@@ -986,7 +986,7 @@ function _refreshMaterialsSection(orderId, broadcastOpts) {
         return Promise.resolve(false);
     return window.krtFetch.swap({
         url: '/orders/' + orderId,
-        container: container,
+        container,
         fragmentValue: mat ? 'materials' : 'aggregated',
         history: false,
         preserveScroll: true,
@@ -1008,7 +1008,7 @@ function _swapOrderSection(orderId, containerId, fragmentValue, broadcastOpts) {
     return window.krtFetch.swap({
         url: '/orders/' + orderId,
         container: c,
-        fragmentValue: fragmentValue,
+        fragmentValue,
         history: false,
         preserveScroll: true,
     });
@@ -1027,7 +1027,7 @@ async function unlinkInventoryItem(btn) {
         url: '/orders/' + orderId + '/inventory/' + invId + '/unlink/ajax',
         toast: false,
         errorMessage: MSG_INVENTORY_UNLINK_ERROR,
-        onSuccess: function (data) {
+        onSuccess(data) {
             if (data && data.version != null) {
                 const sel = document.getElementById('status-select');
                 if (sel) sel.dataset.version = data.version;
@@ -1121,14 +1121,14 @@ function submitClaim() {
         method: 'POST',
         url: '/orders/' + orderId + '/claims',
         payload: {
-            materialId: materialId,
+            materialId,
             qualityRequirement: quality,
             claimingOrgUnitId: squadronId,
-            amount: amount,
+            amount,
         },
         toast: false,
         errorMessage: MSG_CLAIM_ERROR,
-        onSuccess: function () {
+        onSuccess() {
             document.getElementById('claim-modal').style.display = 'none';
             showFrontendSuccessToast(MSG_CLAIM_SUCCESS);
             _refreshMaterialsSection();
@@ -1147,7 +1147,7 @@ function withdrawClaimAction() {
         url: '/orders/' + orderId + '/claims/' + claimId + '/withdraw',
         toast: false,
         errorMessage: MSG_CLAIM_ERROR,
-        onSuccess: function () {
+        onSuccess() {
             document.getElementById('claim-modal').style.display = 'none';
             showFrontendSuccessToast(MSG_CLAIM_WITHDRAW_SUCCESS);
             _refreshMaterialsSection();
@@ -1221,12 +1221,12 @@ function _doStatusUpdate(orderId, status, selectElement) {
     krtOrderWrite({
         method: 'POST',
         url: '/orders/' + orderId + '/status',
-        payload: function () {
-            return { status: status, version: _orderVersion() };
+        payload() {
+            return { status, version: _orderVersion() };
         },
         toast: false,
         errorMessage: MSG_STATUS_ERROR,
-        onSuccess: function (data) {
+        onSuccess(data) {
             // Patch ONLY the two elements carrying the ORDER @Version — the status select (next
             // status change) and the edit-modal hidden input (next edit save). The assignee
             // edges carry their own per-edge version and must NOT be overwritten here.
@@ -1285,12 +1285,12 @@ function _toggleBlueprintCounting(checkbox) {
     krtOrderWrite({
         method: 'POST',
         url: '/orders/' + orderId + '/blueprint-variant-counting',
-        payload: function () {
+        payload() {
             return { countBlueprintsWithVariants: desired, version: _orderVersion() };
         },
         toast: false,
         errorMessage: MSG_BP_COUNTING_ERROR,
-        onSuccess: function (data) {
+        onSuccess(data) {
             if (data && data.version != null) {
                 const sel = document.getElementById('status-select');
                 if (sel) sel.dataset.version = data.version;
@@ -1517,8 +1517,8 @@ async function previewHandoverReport(btn) {
     const payload = {
         jobOrderNumber: orderNumber,
         handoverTime: handoverTimeIso,
-        recipientHandle: recipientHandle,
-        items: items,
+        recipientHandle,
+        items,
     };
     if (!window.krtFetch) return;
     // A read-only POST (renders a PDF, stores nothing) — routed through krtFetch.write so it carries
@@ -1527,12 +1527,12 @@ async function previewHandoverReport(btn) {
     const result = await window.krtFetch.write({
         method: 'POST',
         url: '/api/v1/orders/' + encodeURIComponent(orderId) + '/handovers/report/preview',
-        payload: payload,
+        payload,
         accept: 'application/pdf, application/problem+json',
         responseType: 'blob',
         toast: false,
         errorMessage: MSG_HANDOVER_REPORT_ERROR,
-        onError: function () {
+        onError() {
             showFrontendErrorToast(MSG_HANDOVER_REPORT_ERROR);
             return true;
         },
@@ -1583,7 +1583,7 @@ async function toggleInventory(row) {
     /** @type {string} */
     let unlinkCell;
 
-    let nextRow = row.nextElementSibling;
+    const nextRow = row.nextElementSibling;
     if (nextRow && nextRow.classList.contains('inventory-details-row')) {
         nextRow.remove();
         return;
@@ -1928,7 +1928,7 @@ function openProductionModal(button) {
             return;
         }
         byMaterialId.set(materialId, {
-            materialId: materialId,
+            materialId,
             materialName: li.getAttribute('data-material-name') || '',
             quantityType: li.getAttribute('data-quantity-type') || 'SCU',
             requiredTotals: [requiredTotal],
@@ -1977,7 +1977,7 @@ function openProductionModal(button) {
                             ownerName: it.user ? it.user.effectiveName : '-',
                             location: it.location ? it.location.name : '-',
                             quality: it.quality != null ? it.quality : '-',
-                            slice: slice,
+                            slice,
                             stock: it.amount != null ? it.amount : 0,
                             version: it.version,
                         };
@@ -2198,7 +2198,7 @@ function _prodCollectBookIn() {
             orgUnitWrapper && !orgUnitWrapper.hidden && orgUnitEl && orgUnitEl.value
                 ? orgUnitEl.value
                 : null,
-        personal: personal,
+        personal,
         allocateToOrder: personal ? false : !!(allocateCb && allocateCb.checked),
     };
 }
@@ -2335,13 +2335,13 @@ function bookProduction() {
         payload: {
             amount: k,
             version: _prodContext.version ? parseInt(_prodContext.version, 10) : null,
-            consumption: consumption,
-            skippedMaterialIds: skippedMaterialIds,
-            bookIn: bookIn,
+            consumption,
+            skippedMaterialIds,
+            bookIn,
         },
         toast: false,
         errorMessage: PRODUCTION_I18N.allocError,
-        onSuccess: function () {
+        onSuccess() {
             const modal = document.getElementById('production-modal');
             if (modal) {
                 modal.classList.remove('krtm-modal-open');
@@ -2496,13 +2496,13 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         if (!window.krtFetch) return false;
         const errorMsg = opts.errorMsg || I18N_NOTE_ERROR;
         const common = {
-            method: method,
-            url: url,
+            method,
+            url,
             // The endpoints answer the re-rendered section as an HTML fragment.
             accept: 'text/html',
             toast: false,
             errorMessage: errorMsg,
-            onSuccess: function (html) {
+            onSuccess(html) {
                 const sec = document.getElementById('assignees-section');
                 if (sec && typeof html === 'string') {
                     // Same-origin Thymeleaf fragment (orders-detail :: assigneesSection).
@@ -2524,7 +2524,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
                     window.krtNotifyOrderChanged(['assignees']);
                 }
             },
-            onError: function (status, _body, response) {
+            onError(status, _body, response) {
                 if (status === 409) {
                     window.krtFetch.handleProblem(
                         response,
@@ -2556,7 +2556,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         const orderId = oaOrderId();
         if (!userId || !orderId) return;
         oaSend('POST', '/orders/' + orderId + '/assignees', {
-            form: new URLSearchParams({ userId: userId }),
+            form: new URLSearchParams({ userId }),
             successMsg: I18N_ADDED,
             errorMsg: I18N_ADD_ERROR,
         });
@@ -2596,7 +2596,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         const note = document.getElementById('assignee-note-text').value;
         const orderId = oaOrderId();
         if (!userId || !orderId) return;
-        const payload = { note: note, version: version ? parseInt(version, 10) : null };
+        const payload = { note, version: version ? parseInt(version, 10) : null };
         oaSend('PUT', '/orders/' + orderId + '/assignees/' + userId + '/note', {
             json: payload,
             successMsg: I18N_NOTE_SAVED,

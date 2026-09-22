@@ -55,7 +55,7 @@ const MEMBERS_SECTIONS = {
         // Global room: the longer coalesce window (#1125) flattens the re-fetch herd — a manual
         // Keycloak sync pokes the room once but every open roster reacts.
         coalesceMs: 1500,
-        refresh: function () {
+        refresh() {
             // Exposed by the members.html bootstrap block; re-swaps the results fragment for the
             // viewer's own current filter + page (history:false), keeping pagination coherent.
             if (typeof window.krtRefreshMembersResults === 'function') {

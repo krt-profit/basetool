@@ -59,7 +59,7 @@ if (announcementForm && window.krtFetch) {
             method: 'POST',
             url: '/announcement/read?id=' + encodeURIComponent(announcementId),
             toast: false,
-            onSuccess: function () {
+            onSuccess() {
                 announcementForm.remove();
             },
         });

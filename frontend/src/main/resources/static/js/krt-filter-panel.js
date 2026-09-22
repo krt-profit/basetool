@@ -236,7 +236,7 @@
          * @param {string} panelId the panel's element id
          * @param {() => number} counter returns the number of active filters
          */
-        registerCounter: function (panelId, counter) {
+        registerCounter(panelId, counter) {
             counters.set(panelId, counter);
         },
 
@@ -246,7 +246,7 @@
          *
          * @param {string} [panelId] a single panel, or every panel when omitted
          */
-        refresh: function (panelId) {
+        refresh(panelId) {
             if (panelId) {
                 const one = document.getElementById(panelId);
                 if (one) updateBadge(one);

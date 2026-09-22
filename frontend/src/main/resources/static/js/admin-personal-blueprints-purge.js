@@ -50,10 +50,10 @@
         }
         window.krtFetch
             .submitForm({
-                form: form,
+                form,
                 toast: false,
                 errorMessage: form.getAttribute('data-purge-error') || '',
-                onSuccess: function (body) {
+                onSuccess(body) {
                     const count = body && body.deleted != null ? body.deleted : 0;
                     if (typeof window.showFrontendSuccessToast === 'function') {
                         const tpl = form.getAttribute('data-purge-success') || '{0}';

@@ -134,8 +134,8 @@ function runNoteUpdate(btn, id, noteValue) {
         },
         successMessage: isEmpty ? noteI18n.removed : noteI18n.saved,
         errorMessage: noteI18n.generic,
-        conflict: conflict,
-        onSuccess: function (updated) {
+        conflict,
+        onSuccess(updated) {
             closeNoteModal();
             // FRONTEND DOM VERSION SYNC (CLAUDE.md): propagate the incremented version to every
             // data-version control in the leaf row (note + book-out buttons, the two association
@@ -183,7 +183,7 @@ function runNoteUpdate(btn, id, noteValue) {
                 window.krtNotifyInventoryChanged();
             }
         },
-        onError: function (status) {
+        onError(status) {
             if (status === 409) {
                 // krtFetch: conflict confirm for OPTIMISTIC_LOCK, the domain detail otherwise.
                 return false;

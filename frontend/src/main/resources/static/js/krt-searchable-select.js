@@ -119,7 +119,7 @@
      */
     function makeItem(value, label, extra, data) {
         const terms = extra && extra.trim() ? label + ' ' + extra.trim() : label;
-        return { value: value, label: label, search: terms.toLowerCase(), data: data };
+        return { value, label, search: terms.toLowerCase(), data };
     }
 
     /**
@@ -864,7 +864,7 @@
 
         // Expose a tiny controller on both the hidden input (what `getElementById` returns) and the
         // wrapper, so page code can drive the value without reaching into the internals.
-        const controller = { setValue: setValue };
+        const controller = { setValue };
         hidden.krtCombobox = controller;
         wrapper.krtCombobox = controller;
     }

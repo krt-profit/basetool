@@ -76,7 +76,7 @@
             // other clients (re)appears — a presence frame sent before this ack is dropped by the
             // server, so this is where a focus that raced the ack, or one held across a reconnect,
             // is replayed.
-            onSubscribed: function () {
+            onSubscribed() {
                 if (self.activeSection) {
                     self._sendPresence('focus', self.activeSection);
                     self._ensureHeartbeat();
@@ -85,13 +85,13 @@
             // Fired only on a RE-subscribe after a dropped socket: 'changed' signals may have been
             // missed while offline, so ask the page to resync every visible section. The initial
             // subscribe is already fresh, so it never triggers a resync.
-            onResync: function () {
+            onResync() {
                 document.dispatchEvent(new CustomEvent('krt:mission-resync'));
             },
             // A peer mutated the mission. Hand the affected section keys to the page, which re-fetches
             // those fragments in place (guarded against yanking a section the local user is actively
             // editing). No mission data rides on the socket — only keys.
-            onChanged: function (sections) {
+            onChanged(sections) {
                 document.dispatchEvent(
                     new CustomEvent('krt:mission-changed', {
                         detail: { sections: Array.isArray(sections) ? sections : [] },
@@ -99,7 +99,7 @@
                 );
             },
             // Inbound editor-presence snapshot for this room: render who else is editing which section.
-            onPresence: function (sections) {
+            onPresence(sections) {
                 self.lastState = sections || {};
                 self._render();
             },

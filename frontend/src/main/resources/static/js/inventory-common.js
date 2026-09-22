@@ -798,8 +798,8 @@
                 : { jobOrderReductions: null, missionReductions: null };
             // Ausbuchen only discards or sells — the transfer-only fields stay null.
             const payload = {
-                amount: amount,
-                type: type,
+                amount,
+                type,
                 terminal: type === 'SELL' && terminalEl ? terminalEl.value || null : null,
                 sellAmount:
                     type === 'SELL' && sellAmountEl && sellAmountEl.value !== ''
@@ -820,11 +820,11 @@
                 .write({
                     method: 'POST',
                     url: '/inventory/' + itemId + '/transfer',
-                    payload: payload,
+                    payload,
                     successMessage: bookOutI18n.success,
                     errorMessage: bookOutI18n.error,
                     conflict: inventoryConflictI18n,
-                    onSuccess: function () {
+                    onSuccess() {
                         closeBookOutModal();
                         cfg.refreshTable();
                         cfg.notifyInventoryChanged();
@@ -1142,7 +1142,7 @@
         async function assocSend(entryId, method, body, split, pop) {
             if (!window.krtFetch) return;
             await window.krtFetch.write({
-                method: method,
+                method,
                 url: '/inventory/' + encodeURIComponent(entryId ?? '') + '/allocation',
                 payload: body,
                 bodyOnDelete: true,
@@ -1151,7 +1151,7 @@
                 conflict: Object.assign({}, inventoryConflictI18n, {
                     reloadDetailFallback: assocI18n.conflict,
                 }),
-                onSuccess: function (dto) {
+                onSuccess(dto) {
                     if (dto && typeof dto === 'object') assocRerender(split, dto);
                     pop.classList.add('krtm-hidden');
                     cfg.notifyInventoryChanged();
@@ -1160,7 +1160,7 @@
                         broadcastOrdersChanged([body.targetId]);
                     }
                 },
-                onError: function (status) {
+                onError(status) {
                     if (status === 422) {
                         if (typeof window.showFrontendErrorToast === 'function') {
                             window.showFrontendErrorToast(assocI18n.overallocated);
@@ -1216,7 +1216,7 @@
                 // Read the entry version at SEND time, not click time (REQ-FE-003): a queued second
                 // edit of the same entry picks up the version the first one synced onto the split.
                 const version = parseInt(split.getAttribute('data-version') ?? '', 10);
-                const body = { field: field, targetId: targetId, amount: amount, version: version };
+                const body = { field, targetId, amount, version };
                 return assocSend(entryId, method, body, split, pop);
             };
             if (window.krtFetch && typeof window.krtFetch.serialize === 'function') {
@@ -1236,7 +1236,7 @@
             const pop = /** @type {HTMLElement | null} */ (
                 split ? split.querySelector('[data-assoc-pop]') : null
             );
-            return split && pop ? { split: split, pop: pop } : null;
+            return split && pop ? { split, pop } : null;
         }
 
         /**
@@ -1423,17 +1423,17 @@
         }
 
         return {
-            lagerIsItemsView: lagerIsItemsView,
-            restoreExpandedTree: restoreExpandedTree,
-            collectLeafOrderIds: collectLeafOrderIds,
-            broadcastOrdersChanged: broadcastOrdersChanged,
-            broadcastBoardChanged: broadcastBoardChanged,
-            closeUmbuchenModal: closeUmbuchenModal,
-            setUmbuchenCurrentOwningOrgUnit: setUmbuchenCurrentOwningOrgUnit,
-            refreshUmbuchenTransferOrgUnitPicker: refreshUmbuchenTransferOrgUnitPicker,
-            bind: bind,
+            lagerIsItemsView,
+            restoreExpandedTree,
+            collectLeafOrderIds,
+            broadcastOrdersChanged,
+            broadcastBoardChanged,
+            closeUmbuchenModal,
+            setUmbuchenCurrentOwningOrgUnit,
+            refreshUmbuchenTransferOrgUnitPicker,
+            bind,
         };
     }
 
-    window.krtInventory = { createLager: createLager };
+    window.krtInventory = { createLager };
 })();

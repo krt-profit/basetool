@@ -668,7 +668,7 @@ document.addEventListener('DOMContentLoaded', function () {
             // Global room: coalesce like the order queue does, so a burst of order writes does not
             // trigger a refetch herd across every viewer.
             coalesceMs: 1500,
-            refresh: function () {
+            refresh() {
                 window.krtFetch.swap({
                     url: window.location.pathname,
                     container: '#orders-material-demand-results',
@@ -681,7 +681,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
             },
             pill: {
-                label: function () {
+                label() {
                     return typeof KRT_DEMAND_LIVESYNC_UPDATES !== 'undefined'
                         ? KRT_DEMAND_LIVESYNC_UPDATES
                         : undefined;
