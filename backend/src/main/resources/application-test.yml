@@ -37,6 +37,11 @@ spring:
     properties:
       hibernate:
         default_batch_fetch_size: 100
+        # Same as the base config (REQ-DATA-003): a paged query that fetch-joins a collection
+        # fails instead of silently paginating in memory (HHH90003004). Pinned here as well so the
+        # test profile keeps the gate even if the base value is ever relaxed.
+        query:
+          fail_on_pagination_over_collection_fetch: true
     hibernate:
       # `validate` so the test schema produced by Flyway has to match the entity
       # annotations exactly — the same contract as prod (application-prod.yml).

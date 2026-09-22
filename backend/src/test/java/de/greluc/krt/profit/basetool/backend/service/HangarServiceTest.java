@@ -246,7 +246,7 @@ class HangarServiceTest {
         new de.greluc.krt.profit.basetool.backend.model.Squadron();
     resolved.setId(pickedOrgUnitId);
 
-    org.mockito.Mockito.when(userRepository.findById(userId))
+    org.mockito.Mockito.when(userRepository.findPlainById(userId))
         .thenReturn(java.util.Optional.of(user));
     org.mockito.Mockito.when(shipTypeRepository.findById(shipTypeId))
         .thenReturn(java.util.Optional.of(shipType));
@@ -281,7 +281,7 @@ class HangarServiceTest {
         new de.greluc.krt.profit.basetool.backend.model.ShipType();
     shipType.setId(shipTypeId);
 
-    org.mockito.Mockito.when(userRepository.findById(userId))
+    org.mockito.Mockito.when(userRepository.findPlainById(userId))
         .thenReturn(java.util.Optional.of(user));
     org.mockito.Mockito.when(shipTypeRepository.findById(shipTypeId))
         .thenReturn(java.util.Optional.of(shipType));

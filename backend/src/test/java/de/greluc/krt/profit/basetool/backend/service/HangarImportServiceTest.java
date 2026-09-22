@@ -119,10 +119,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(json);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(type135c, typeZeus));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, type135c.getId())).thenReturn(0L);
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, typeZeus.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -159,9 +157,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(json);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(type135c));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, type135c.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -197,9 +194,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(json);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, type.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -234,9 +230,10 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(json);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, type.getId())).thenReturn(1L);
+    when(shipRepository.countShipsPerTypeByOwnerId(userId))
+        .thenReturn(List.of(typeCount(type.getId(), 1L)));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -271,9 +268,10 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(json);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, type.getId())).thenReturn(3L);
+    when(shipRepository.countShipsPerTypeByOwnerId(userId))
+        .thenReturn(List.of(typeCount(type.getId(), 3L)));
 
     // When
     FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
@@ -307,9 +305,10 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(json);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, type.getId())).thenReturn(5L);
+    when(shipRepository.countShipsPerTypeByOwnerId(userId))
+        .thenReturn(List.of(typeCount(type.getId(), 5L)));
 
     // When
     FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
@@ -348,12 +347,12 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(json);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(typeA, typeB));
     // Hangar: 2× vulture (JSON only has 1 → surplus, no creation), 1× aurora mr (JSON has 3 → 2
     // more)
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, typeA.getId())).thenReturn(2L);
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, typeB.getId())).thenReturn(1L);
+    when(shipRepository.countShipsPerTypeByOwnerId(userId))
+        .thenReturn(List.of(typeCount(typeA.getId(), 2L), typeCount(typeB.getId(), 1L)));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -364,6 +363,10 @@ class HangarImportServiceTest {
     // vulture (1 in JSON) is "already sufficient" → counted in duplicateCount
     assertThat(result.duplicateCount()).isEqualTo(1);
     verify(shipRepository, times(2)).save(any(Ship.class));
+    // BE-PERF-15 (REQ-DATA-003): both types' hangar counts come from ONE grouped query, and the
+    // importer's owning org unit is resolved once for both created ships, not once per ship.
+    verify(shipRepository, times(1)).countShipsPerTypeByOwnerId(userId);
+    verify(ownerScopeService, times(1)).resolveOrgUnitForPickerOutputNullable(any(), any());
   }
 
   // -------------------------------------------------------------------------
@@ -385,9 +388,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(json);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, type.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -418,9 +420,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(json);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, type.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -452,9 +453,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(json);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, type.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -485,9 +485,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(json);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(wolf));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, wolf.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -517,9 +516,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(json);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(wolf));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, wolf.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -555,9 +553,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(json);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(wolf));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, wolf.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -588,9 +585,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(json);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(cyclone));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, cyclone.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -623,7 +619,7 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(json);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of());
 
     // When
@@ -657,9 +653,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(json);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(blank, real));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, real.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -700,9 +695,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(json);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(hercules, c2Hercules));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, hercules.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -738,10 +732,9 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(json);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll())
         .thenReturn(List.of(mkICl, mkIEs, mkILn, mkILx, mkIMr, mkIIPlain));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, mkIMr.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -778,9 +771,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(json);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(plain, pirate, valiant));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, pirate.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -821,9 +813,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(json);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(ursa, ursaFortuna, ursaMedivac));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, ursa.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -862,7 +853,7 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(json);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(mkI, heartseeker, mkII));
 
     // When
@@ -897,7 +888,7 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(json);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(foo, bar));
 
     // When
@@ -934,9 +925,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(json);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(plain, pirate, valiant));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, plain.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -993,7 +983,7 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(json);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.empty());
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.empty());
 
     // When / Then
     assertThrows(NotFoundException.class, () -> hangarImportService.importShips(userId, file));
@@ -1033,9 +1023,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(shiplistJson);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(polaris));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, polaris.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -1073,9 +1062,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(shiplistJson);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, type.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -1115,9 +1103,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(shiplistJson);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, type.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -1157,9 +1144,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(shiplistJson);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, type.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -1200,9 +1186,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(shiplistJson);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, type.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -1254,9 +1239,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(shiplistJson);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, type.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -1291,9 +1275,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(fleetviewJson);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, type.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -1356,7 +1339,7 @@ class HangarImportServiceTest {
     user.setId(userId);
     MockMultipartFile file = multipartFile("[]");
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of());
 
     // When
@@ -1403,11 +1386,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(shiplistJson);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(hercules, ursa, polaris));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, hercules.getId())).thenReturn(0L);
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, ursa.getId())).thenReturn(0L);
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, polaris.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -1453,10 +1433,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(starjumpJson);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(perseus, galaxy));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, perseus.getId())).thenReturn(0L);
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, galaxy.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -1494,9 +1472,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(starjumpJson);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(zeus));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, zeus.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -1530,9 +1507,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(starjumpJson);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(ship));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, ship.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -1573,9 +1549,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(starjumpJson);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(perseus, decoy));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, perseus.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -1611,7 +1586,7 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(starjumpJson);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of());
 
     // When
@@ -1643,7 +1618,7 @@ class HangarImportServiceTest {
             { "type": "starjumpFleetviewer", "version": 1, "canvasItems": [] }
             """);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of());
 
     // When
@@ -1694,9 +1669,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(fleetyardsJson);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(spirit));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, spirit.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -1736,9 +1710,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(fleetyardsJson);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(galaxy));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, galaxy.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -1777,9 +1750,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(fleetyardsJson);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(galaxy));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, galaxy.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -1818,9 +1790,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(fleetyardsJson);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(galaxy));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, galaxy.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -1867,11 +1838,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(fleetyardsJson);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(galaxy, hercules, perseus));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, galaxy.getId())).thenReturn(0L);
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, hercules.getId())).thenReturn(0L);
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, perseus.getId())).thenReturn(0L);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -1935,9 +1903,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(json);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, type.getId())).thenReturn(0L);
     when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(any(), any())).thenReturn(null);
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -1975,9 +1942,8 @@ class HangarImportServiceTest {
         """;
     MockMultipartFile file = multipartFile(json);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
-    when(shipRepository.countByOwnerIdAndShipTypeId(userId, type.getId())).thenReturn(0L);
     when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(any(), any()))
         .thenThrow(new BadRequestException("multi-membership importer needs a picker"));
 
@@ -1989,5 +1955,20 @@ class HangarImportServiceTest {
   private static MockMultipartFile multipartFile(String json) {
     return new MockMultipartFile(
         "file", "fleetview.json", "application/json", json.getBytes(StandardCharsets.UTF_8));
+  }
+
+  /** A grouped-count row of {@code ShipRepository.countShipsPerTypeByOwnerId}. */
+  private static ShipRepository.ShipTypeCount typeCount(UUID shipTypeId, long count) {
+    return new ShipRepository.ShipTypeCount() {
+      @Override
+      public UUID getShipTypeId() {
+        return shipTypeId;
+      }
+
+      @Override
+      public long getShipCount() {
+        return count;
+      }
+    };
   }
 }

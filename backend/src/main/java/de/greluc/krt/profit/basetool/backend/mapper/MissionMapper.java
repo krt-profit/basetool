@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.model.MissionStep;
 import de.greluc.krt.profit.basetool.backend.model.MissionUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.FrequencyTypeDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobTypeDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionCrewDto;
@@ -46,8 +47,10 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MissionUnitDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitReferenceDto;
 import de.greluc.krt.profit.basetool.backend.support.MissionViewerAccess;
 import org.jetbrains.annotations.Nullable;
+import org.mapstruct.BeforeMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.TargetType;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /** MapStruct mapper between Mission entities and DTOs. */
@@ -65,6 +68,44 @@ public abstract class MissionMapper {
   // (MissionViewerAccessService) is what wires AuthHelperService + MissionSecurityService, so the
   // mapper -> service edge that closed the mapper <-> service package cycle is gone.
   @Autowired protected MissionViewerAccess missionViewerAccess;
+
+  /**
+   * The same {@link UserMapper} the generated subclass delegates the roster's {@code UserDto}s to,
+   * injected a second time under its own name so {@link #primeRosterUsers(Mission, Class)} can seed
+   * its request memo before the nested mapping starts.
+   */
+  @Autowired protected UserMapper rosterUserMapper;
+
+  /**
+   * Seeds the {@link UserMapper} request memo for every user the full mission DTO embeds as a
+   * {@code UserDto} — each participant's user and each assigned unit's ship owner — in two queries,
+   * before MapStruct maps them one by one (REQ-DATA-003). Without it, each embedded user cost up to
+   * three queries (its Staffel memberships and two squadron loads), so a 30-participant mission
+   * detail issued roughly ninety statements for the roster alone.
+   *
+   * <p>Runs only for the full {@link MissionDto}: the list row and the reference DTO embed no
+   * {@code UserDto}, and touching the lazy {@code participants} / {@code assignedUnits} collections
+   * there would itself be a query per row.
+   *
+   * @param mission the mission about to be mapped; {@code null} is ignored.
+   * @param targetType the DTO type the current mapping method produces.
+   */
+  @BeforeMapping
+  protected void primeRosterUsers(@Nullable Mission mission, @TargetType Class<?> targetType) {
+    if (mission == null || targetType != MissionDto.class) {
+      return;
+    }
+    java.util.List<User> users = new java.util.ArrayList<>();
+    for (MissionParticipant participant : mission.getParticipants()) {
+      users.add(participant.getUser());
+    }
+    for (MissionUnit unit : mission.getAssignedUnits()) {
+      if (unit.getShip() != null) {
+        users.add(unit.getShip().getOwner());
+      }
+    }
+    rosterUserMapper.primeStaffelMemberships(users);
+  }
 
   /**
    * Full {@link Mission} -&gt; DTO mapping. The five {@code resolve*} expressions are applied on

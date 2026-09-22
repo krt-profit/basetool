@@ -1,12 +1,12 @@
 # ===================================================================
 # Production Configuration for Backend
 #
-# JVM Tuning Recommendations (apply via JAVA_TOOL_OPTIONS in Docker):
-#   -XX:+UseContainerSupport
-#   -XX:MaxRAMPercentage=75.0
-#   -XX:InitialRAMPercentage=50.0
-#   -XX:+HeapDumpOnOutOfMemoryError
-#   -XX:HeapDumpPath=/tmp/heapdump.hprof
+# JVM flags are NOT set here. They live in the backend service's JAVA_TOOL_OPTIONS in
+# docker-compose.yml (the Quadlet units are generated from it), which is the only source of truth:
+# -XX:+UseContainerSupport -XX:+UseG1GC -XX:+UseCompactObjectHeaders -XX:MaxRAMPercentage=57.0
+# -XX:InitialRAMPercentage=35.0, with the heap-budget rationale next to it (REQ-OPS-028, ADR-0175).
+# Corrected 2026-09-22: this header used to recommend MaxRAMPercentage=75, InitialRAMPercentage=50
+# and a heap dump to /tmp -- values production does not run.
 # ===================================================================
 spring:
   datasource:

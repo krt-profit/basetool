@@ -254,4 +254,90 @@ class UserMapperTest {
     verify(membershipRepository, times(4))
         .findAllByIdUserIdAndKind(user.getId(), OrgUnitKind.SQUADRON);
   }
+
+  @Test
+  void toDto_withinRequest_resolvesSquadronEntitiesOncePerUser() {
+    // BE-PERF-01 (a): squadron and squadrons both read the resolved Staffeln; within a request the
+    // second read comes from the memo, so the Staffel entities are loaded once, not twice.
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setUsername("dualMemo");
+    UUID alphaId = UUID.randomUUID();
+    UUID bravoId = UUID.randomUUID();
+    when(membershipRepository.findAllByIdUserIdAndKind(user.getId(), OrgUnitKind.SQUADRON))
+        .thenReturn(List.of(staffelRow(user.getId(), bravoId), staffelRow(user.getId(), alphaId)));
+    when(orgUnitRepository.findAllById(any()))
+        .thenReturn(
+            List.of(
+                (OrgUnit) squadron(bravoId, "Bravo", "BRV"), squadron(alphaId, "Alpha", "ALP")));
+
+    RequestContextHolder.setRequestAttributes(
+        new ServletRequestAttributes(new MockHttpServletRequest()));
+    UserDto dto;
+    try {
+      dto = mapper.toDto(user);
+    } finally {
+      RequestContextHolder.resetRequestAttributes();
+    }
+
+    assertEquals(alphaId, dto.squadron().id());
+    assertEquals(List.of("Alpha", "Bravo"), dto.squadrons().stream().map(s -> s.name()).toList());
+    verify(orgUnitRepository, times(1)).findAllById(any());
+  }
+
+  @Test
+  void primeStaffelMemberships_seedsWholePageInTwoQueries() {
+    // BE-PERF-01 (b): the primer loads every user's Staffel rows in one batch query and every
+    // referenced Staffel in one findAllById; the per-user toDto calls then issue no query at all,
+    // and a user without any Staffel is seeded as such rather than re-queried.
+    User dual = new User();
+    dual.setId(UUID.randomUUID());
+    dual.setUsername("dual");
+    User none = new User();
+    none.setId(UUID.randomUUID());
+    none.setUsername("none");
+    UUID alphaId = UUID.randomUUID();
+    UUID bravoId = UUID.randomUUID();
+    OrgUnitMembership logisticianRow = staffelRow(dual.getId(), bravoId);
+    logisticianRow.setLogistician(true);
+    when(membershipRepository.findAllByIdUserIdInAndKindIn(any(), any()))
+        .thenReturn(List.of(logisticianRow, staffelRow(dual.getId(), alphaId)));
+    when(orgUnitRepository.findAllById(any()))
+        .thenReturn(
+            List.of(
+                (OrgUnit) squadron(bravoId, "Bravo", "BRV"), squadron(alphaId, "Alpha", "ALP")));
+
+    RequestContextHolder.setRequestAttributes(
+        new ServletRequestAttributes(new MockHttpServletRequest()));
+    UserDto dualDto;
+    UserDto noneDto;
+    try {
+      mapper.primeStaffelMemberships(List.of(dual, none));
+      mapper.primeStaffelMemberships(List.of(dual, none)); // idempotent: no second batch
+      dualDto = mapper.toDto(dual);
+      noneDto = mapper.toDto(none);
+    } finally {
+      RequestContextHolder.resetRequestAttributes();
+    }
+
+    assertEquals(alphaId, dualDto.squadron().id());
+    assertEquals(2, dualDto.squadrons().size());
+    assertTrue(dualDto.isLogistician());
+    assertNull(noneDto.squadron());
+    assertTrue(noneDto.squadrons().isEmpty());
+    verify(membershipRepository, times(1)).findAllByIdUserIdInAndKindIn(any(), any());
+    verify(orgUnitRepository, times(1)).findAllById(any());
+    verify(membershipRepository, times(0)).findAllByIdUserIdAndKind(any(), any());
+  }
+
+  @Test
+  void primeStaffelMemberships_outsideRequest_isNoOp() {
+    // Without a request scope there is no memo to seed; the primer must not query at all.
+    User user = new User();
+    user.setId(UUID.randomUUID());
+
+    mapper.primeStaffelMemberships(List.of(user));
+
+    verify(membershipRepository, times(0)).findAllByIdUserIdInAndKindIn(any(), any());
+  }
 }

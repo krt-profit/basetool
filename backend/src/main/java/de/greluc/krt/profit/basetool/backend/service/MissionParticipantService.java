@@ -207,7 +207,7 @@ public class MissionParticipantService {
     if (effectiveUserId != null) {
       User user =
           userRepository
-              .findById(effectiveUserId)
+              .findPlainById(effectiveUserId)
               .orElseThrow(() -> new NotFoundException("User not found"));
       participant.setUser(user);
       // Registered users carry every org unit they belong to at participate-time (their Staffel
@@ -717,7 +717,7 @@ public class MissionParticipantService {
     if (userId != null) {
       User user =
           userRepository
-              .findById(userId)
+              .findPlainById(userId)
               .orElseThrow(() -> new NotFoundException("User not found"));
       mission.setPartyLeadUser(user);
       mission.setPartyLeadGuestName(null);
@@ -756,7 +756,9 @@ public class MissionParticipantService {
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
     User user =
-        userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+        userRepository
+            .findPlainById(userId)
+            .orElseThrow(() -> new NotFoundException("User not found"));
     mission.getManagers().add(user);
     auditService.record(
         AuditEventType.MISSION_MANAGER_ADDED, mission.getId(), mission.getName(), userId, null);

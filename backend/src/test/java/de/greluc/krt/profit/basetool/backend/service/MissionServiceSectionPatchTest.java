@@ -411,7 +411,7 @@ class MissionServiceSectionPatchTest {
     ownership.setVersion(3L);
 
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
-    when(userRepository.findById(newOwnerId)).thenReturn(Optional.of(newOwner));
+    when(userRepository.findPlainById(newOwnerId)).thenReturn(Optional.of(newOwner));
     when(missionOwnershipRepository.findByMissionId(missionId)).thenReturn(Optional.of(ownership));
     when(missionOwnershipRepository.saveAndFlush(any(MissionOwnership.class)))
         .thenAnswer(inv -> flushOwnership(inv.getArgument(0)));
@@ -457,7 +457,7 @@ class MissionServiceSectionPatchTest {
     java.util.List<UUID> ownerAtEachFlush = new java.util.ArrayList<>();
 
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
-    when(userRepository.findById(newOwnerId)).thenReturn(Optional.of(newOwner));
+    when(userRepository.findPlainById(newOwnerId)).thenReturn(Optional.of(newOwner));
     when(missionOwnershipRepository.findByMissionId(missionId)).thenReturn(Optional.empty());
     when(missionOwnershipRepository.saveAndFlush(any(MissionOwnership.class)))
         .thenAnswer(
@@ -482,7 +482,7 @@ class MissionServiceSectionPatchTest {
     newOwner.setId(newOwnerId);
 
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
-    when(userRepository.findById(newOwnerId)).thenReturn(Optional.of(newOwner));
+    when(userRepository.findPlainById(newOwnerId)).thenReturn(Optional.of(newOwner));
     when(missionOwnershipRepository.findByMissionId(missionId)).thenReturn(Optional.empty());
 
     assertThrows(
@@ -503,7 +503,7 @@ class MissionServiceSectionPatchTest {
     ownership.setVersion(3L);
 
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
-    when(userRepository.findById(newOwnerId)).thenReturn(Optional.of(newOwner));
+    when(userRepository.findPlainById(newOwnerId)).thenReturn(Optional.of(newOwner));
     when(missionOwnershipRepository.findByMissionId(missionId)).thenReturn(Optional.of(ownership));
 
     assertThrows(
@@ -618,7 +618,7 @@ class MissionServiceSectionPatchTest {
     // A pre-existing guest handle must be cleared when a registered user is linked.
     existing.setPartyLeadGuestName("Old Guest Lead");
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(missionRepository.save(any(Mission.class))).thenAnswer(inv -> inv.getArgument(0));
 
     Mission result = missionService.setPartyLead(missionId, userId, null, 0L);
@@ -664,7 +664,7 @@ class MissionServiceSectionPatchTest {
     User user = new User();
     user.setId(userId);
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(missionRepository.save(any(Mission.class))).thenAnswer(inv -> inv.getArgument(0));
 
     Mission result = missionService.setPartyLead(missionId, userId, null, 0L);
@@ -694,7 +694,7 @@ class MissionServiceSectionPatchTest {
   void setPartyLead_shouldThrow404_whenReferencedUserUnknown() {
     UUID userId = UUID.randomUUID();
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
-    when(userRepository.findById(userId)).thenReturn(Optional.empty());
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.empty());
 
     assertThrows(
         NotFoundException.class, () -> missionService.setPartyLead(missionId, userId, null, 0L));
