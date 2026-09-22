@@ -38,6 +38,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -144,7 +145,12 @@ public class ActingMemberFilter extends OncePerRequestFilter {
       @NotNull FilterChain filterChain)
       throws ServletException, IOException {
     String onBehalfOf = request.getHeader(ActingMemberHeader.ON_BEHALF_OF_HEADER);
-    if (onBehalfOf == null || onBehalfOf.isBlank()) {
+    // No header, no acting member: the request continues under the caller's OWN identity, which
+    // every later filter and @PreAuthorize still checks. One named predicate rather than an inline
+    // `== null || isBlank()`: the early exit is a single guard, and CodeQL's
+    // java/user-controlled-bypass could not see that the `null` half of a short-circuit OR also
+    // returns here, so it read the lookup below as skippable (alert #1125).
+    if (isAbsent(onBehalfOf)) {
       filterChain.doFilter(request, response);
       return;
     }
@@ -221,6 +227,19 @@ public class ActingMemberFilter extends OncePerRequestFilter {
       // would attribute the NEXT request on it to them.
       SecurityContextHolder.setContext(original);
     }
+  }
+
+  /**
+   * Whether the request names no acting member at all.
+   *
+   * <p>Absent and blank are the same answer on purpose: a blank value names nobody, so it is
+   * treated as no header rather than refused as a malformed subject.
+   *
+   * @param onBehalfOf the raw on-behalf-of header value, {@code null} when the header is missing
+   * @return {@code true} when the header is missing, empty or whitespace only
+   */
+  private static boolean isAbsent(@Nullable String onBehalfOf) {
+    return onBehalfOf == null || onBehalfOf.isBlank();
   }
 
   /**

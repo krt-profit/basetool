@@ -73,6 +73,11 @@ dependencies {
   compileOnly(libs.keycloak.services)
   compileOnly(libs.keycloak.core)
   compileOnly(libs.jetbrains.annotations)
+  // netty 4.1.x floor for the netty that keycloak-services drags in through Quarkus -- the catalog
+  // entry `netty41` carries the CVEs and the removal condition. A platform on compileOnly (and on
+  // testImplementation below) adds version constraints only: nothing reaches the provider JAR, its
+  // runtimeClasspath or its SBOM, and the Keycloak container keeps running its own netty.
+  compileOnly(platform(libs.netty41.bom))
 
   // FindSecBugs: security-focused SpotBugs detectors, wired into spotbugsMain below. A build-time
   // plugin configuration only -- nothing here reaches the provider JAR or its (empty) SBOM.
@@ -103,6 +108,7 @@ dependencies {
   testImplementation(libs.keycloak.server.spi.private)
   testImplementation(libs.keycloak.services)
   testImplementation(libs.keycloak.core)
+  testImplementation(platform(libs.netty41.bom))
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
