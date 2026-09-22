@@ -291,6 +291,20 @@ groups:
       # upstream outage; this one firing alone is the silent-degradation case. The counter is
       # registered lazily on the first error, so all three legs are absent (not zero) until one
       # occurs and the rule cannot fire on a healthy deployment.
+      # (2026-09-22, ADR-0195) What this rule MEANS narrowed, while its expression stayed put. The
+      # sweep no longer stands down just because a kind pass could not vouch for its own census: a
+      # complete residual /api/items census vouches for the kind passes it contains, because the
+      # kind endpoints are filtered views over the very pool it enumerates. So "incomplete walk"
+      # and "sweep stood down" are now two different states and this rule only ever saw the first;
+      # ScWikiOrphanSweepStandingDown below is the one that means orphan detection stopped.
+      #
+      # The expression is deliberately unchanged: an incomplete walk is still an upstream contract
+      # problem worth knowing about, whatever the sweep then does. But it now has a KNOWN PERMANENT
+      # FLOOR — /api/vehicle-items ties on a non-unique sort key and is incomplete on every run,
+      # measured, with every client-side remedy tried and rejected in ADR-0195 — so this rule is
+      # expected to be firing continuously until upstream fixes its paginator. Retuning or routing
+      # it is a separate decision that has not been taken; do not silence it by weakening the
+      # census, which is the one thing that would hide a real drift.
       - alert: ScWikiCensusIncompleteStreak
         expr: |
           sum(increase(basetool_external_fetch_errors_total{source="scwiki"}[24h])) > 0
@@ -302,8 +316,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "SC-Wiki page walk incomplete on three consecutive days (orphan sweep standing down)"
-          description: "Every one of the last three daily SC-Wiki syncs recorded a fetch/census error, so the page walk was flagged INCOMPLETE and the scwiki_deleted orphan sweep refused to run on all of them — rows the Wiki has actually dropped are no longer being tombstoned, while the sync keeps reporting success. Grep the backend log for 'INCOMPLETE' / 'Skipping the … scwiki_deleted sweep' to see which check fails: a genuinely broken upstream also trips ExternalFetchErrors, whereas this alert alone points at a pagination-contract drift (rows repeating across pages, the distinct rows falling short of meta.total, meta.last_page renamed, or the announced page count growing mid-walk). Note which side the numbers fall on: a SURPLUS over meta.total is deliberately not a census failure (ADR-0147), so it is not what is firing this."
+          summary: "SC-Wiki page walk incomplete on three consecutive days"
+          description: "Every one of the last three daily SC-Wiki syncs recorded a fetch/census error, so at least one page walk was flagged INCOMPLETE. This does NOT by itself mean the scwiki_deleted sweep stood down: since ADR-0195 a complete residual /api/items census vouches for the kind passes it contains, so an incomplete kind walk can fire this alert while the sweep still runs — ScWikiOrphanSweepStandingDown is the alert that means orphan detection actually stopped. KNOWN STANDING CAUSE: /api/vehicle-items orders on a non-unique key, so rows tie across a page boundary and that walk is incomplete on every single run, with no client-side fix available (sort= is not applied to the paginated query, page[size] is capped at 200, and unioning walks at two page sizes still falls short — all re-measured 2026-09-22, see ADR-0195). Until upstream gives its paginator a unique tiebreaker this alert has a permanent floor; treat a change in WHICH endpoint fails as the signal. Grep the backend log for 'INCOMPLETE' to see which walk it was: a genuinely broken upstream also trips ExternalFetchErrors, whereas this alert alone points at a pagination-contract drift (rows repeating across pages, the distinct rows falling short of meta.total, meta.last_page renamed, or the announced page count growing mid-walk). A SURPLUS over meta.total is deliberately not a census failure (ADR-0147), so it is never what is firing this."
 
       # (2026-09-02 log triage) The direct reading of the same failure. Where
       # ScWikiCensusIncompleteStreak infers a standing-down sweep from fetch errors, this counts the
@@ -326,7 +340,7 @@ groups:
           severity: warning
         annotations:
           summary: "SC-Wiki orphan sweep has stood down on three incomplete runs in 72h"
-          description: "The cross-kind scwiki_deleted sweep refused to run on at least three syncs in 72h because a kind pass came back an incomplete census. The refusal is correct — sweeping a half-walked feed would soft-delete every row that was merely never fetched — but rows the Wiki has actually dropped are not being tombstoned while the sync keeps reporting success. Grep the backend log for 'Skipping cross-kind orphan sweep (reason=incomplete' and for the census WARNs above it to see which kind endpoint failed to enumerate. reason=not_modified is a healthy fully-cached run and is deliberately not matched here."
+          description: "The cross-kind scwiki_deleted sweep refused to run on at least three syncs in 72h because the census could not be vouched for. The refusal is correct — sweeping a half-walked feed would soft-delete every row that was merely never fetched — but rows the Wiki has actually dropped are not being tombstoned while the sync keeps reporting success. Since ADR-0195 an incomplete KIND pass alone no longer causes this: it fires only when the residual /api/items pass could not vouch for its own census, or when a kind pass was served a row that residual census does not contain (logged as 'the kind endpoints are not a subset of the item pool after all'). Both are new upstream shapes rather than the long-standing /api/vehicle-items tie — so unlike ScWikiCensusIncompleteStreak, this one firing is always worth reading. Grep the backend log for 'Skipping cross-kind orphan sweep (reason=incomplete' and the census WARNs above it. reason=not_modified is a healthy fully-cached run and is deliberately not matched here."
 
       # (#1041 item 3) All-jobs staleness. UserSyncStale/ExternalSyncStale covered only user_sync and
       # the two catalogue syncs; the daily notification-retention purge and the hourly default-

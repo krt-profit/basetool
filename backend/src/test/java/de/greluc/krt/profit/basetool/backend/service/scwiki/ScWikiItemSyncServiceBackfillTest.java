@@ -384,6 +384,90 @@ class ScWikiItemSyncServiceBackfillTest {
     assertEquals(1.0, sweepSkips(MetricNames.SWEEP_SKIP_INCOMPLETE));
   }
 
+  @Test
+  void
+      backfill_runsOrphanSweep_whenAKindPassIsIncomplete_butTheResidualCensusCoversEveryRowItSaw() {
+    // The live shape this rule exists for (ADR-0195): /api/vehicle-items comes back INCOMPLETE on
+    // EVERY run, because its paginator orders on a non-unique key and rows tie across a page
+    // boundary — an upstream defect with no client-side remedy. Under the strict gate that stood
+    // the item sweep down permanently. The residual /api/items pass walks the same pool and CAN
+    // vouch for it, so the rows the kind pass missed are accounted for and the census stands.
+    ScWikiItemDto scope = itemDto(UUID.randomUUID(), "Scope");
+    ScWikiItemDto rifle = itemDto(UUID.randomUUID(), "Rifle");
+    ScWikiItemDto cannon = itemDto(UUID.randomUUID(), "Cannon");
+    ScWikiItemDto cooler = itemDto(UUID.randomUUID(), "Cooler");
+    ScWikiItemDto helmet = itemDto(UUID.randomUUID(), "Helmet");
+    ScWikiItemDto jacket = itemDto(UUID.randomUUID(), "Jacket");
+    ScWikiItemDto ration = itemDto(UUID.randomUUID(), "Ration");
+    ScWikiItemDto crate = itemDto(UUID.randomUUID(), "Crate");
+    stubPass(WEAPON_ATTACHMENTS, scope);
+    stubPass(WEAPONS, rifle);
+    stubPass(VEHICLE_WEAPONS, cannon);
+    stubPartialPass(VEHICLE_ITEMS, cooler);
+    stubPass(ARMOR, helmet);
+    stubPass(CLOTHES, jacket);
+    stubPass(FOOD, ration);
+    stubPassRows(ITEMS, scope, rifle, cannon, cooler, helmet, jacket, ration, crate);
+    when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
+
+    service.syncItems();
+
+    verify(gameItemRepository).markScwikiDeletedExcept(any(), any());
+    // A run that actually swept registers no stand-down counter at all — absent, not zero.
+    assertNull(meterRegistry.find(MetricNames.CATALOGUE_ORPHAN_SWEEP_SKIPPED).counter());
+  }
+
+  @Test
+  void backfill_skipsOrphanSweep_whenAnIncompleteKindPassSawARowOutsideTheResidualPool() {
+    // The relaxation above is VERIFIED, not assumed. A kind endpoint serving a row that
+    // /api/items does not list means the pool is not a superset after all, so the residual census
+    // cannot answer for that kind and the strict gate decides. Sweeping here would tombstone the
+    // rows the incomplete walk never fetched — the unrecoverable direction.
+    ScWikiItemDto scope = itemDto(UUID.randomUUID(), "Scope");
+    ScWikiItemDto rifle = itemDto(UUID.randomUUID(), "Rifle");
+    ScWikiItemDto cannon = itemDto(UUID.randomUUID(), "Cannon");
+    ScWikiItemDto cooler = itemDto(UUID.randomUUID(), "Cooler");
+    ScWikiItemDto helmet = itemDto(UUID.randomUUID(), "Helmet");
+    ScWikiItemDto jacket = itemDto(UUID.randomUUID(), "Jacket");
+    ScWikiItemDto ration = itemDto(UUID.randomUUID(), "Ration");
+    ScWikiItemDto crate = itemDto(UUID.randomUUID(), "Crate");
+    stubPass(WEAPON_ATTACHMENTS, scope);
+    stubPass(WEAPONS, rifle);
+    stubPass(VEHICLE_WEAPONS, cannon);
+    stubPartialPass(VEHICLE_ITEMS, cooler);
+    stubPass(ARMOR, helmet);
+    stubPass(CLOTHES, jacket);
+    stubPass(FOOD, ration);
+    // Same pool as the test above, minus `cooler` — the one row the incomplete kind pass saw.
+    stubPassRows(ITEMS, scope, rifle, cannon, helmet, jacket, ration, crate);
+    when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
+
+    service.syncItems();
+
+    verify(gameItemRepository, never()).markScwikiDeletedExcept(any(), any());
+    assertEquals(1.0, sweepSkips(MetricNames.SWEEP_SKIP_INCOMPLETE));
+  }
+
+  @Test
+  void backfill_skipsOrphanSweep_whenTheResidualPassItselfCannotVouchForItsCensus() {
+    // Every kind pass is clean, but /api/items came back INCOMPLETE — so there is no complete pool
+    // to fall back on and nothing may be tombstoned, however healthy the kind passes look.
+    stubPass(WEAPON_ATTACHMENTS, itemDto(UUID.randomUUID(), "Scope"));
+    stubPass(WEAPONS, itemDto(UUID.randomUUID(), "Rifle"));
+    stubPass(VEHICLE_WEAPONS, itemDto(UUID.randomUUID(), "Cannon"));
+    stubPass(VEHICLE_ITEMS, itemDto(UUID.randomUUID(), "Cooler"));
+    stubPass(ARMOR, itemDto(UUID.randomUUID(), "Helmet"));
+    stubPass(CLOTHES, itemDto(UUID.randomUUID(), "Jacket"));
+    stubPass(FOOD, itemDto(UUID.randomUUID(), "Ration"));
+    stubPartialPass(ITEMS, itemDto(UUID.randomUUID(), "Crate"));
+    when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
+
+    service.syncItems();
+
+    verify(gameItemRepository, never()).markScwikiDeletedExcept(any(), any());
+    assertEquals(1.0, sweepSkips(MetricNames.SWEEP_SKIP_INCOMPLETE));
+  }
+
   /**
    * Reads the orphan-sweep stand-down counter for one reason.
    *
@@ -537,6 +621,34 @@ class ScWikiItemSyncServiceBackfillTest {
     lenient()
         .when(scWikiClient.fetchAllPagesResult(eq(endpoint), any(), any(), any(), any()))
         .thenReturn(ScWikiClient.FetchResult.of(List.of(row)));
+  }
+
+  /**
+   * Stubs one endpoint to return several rows as a <em>complete</em> census. Used for the residual
+   * {@code /api/items} pass, which has to enumerate the whole pool for the sweep-gating tests to
+   * mean anything.
+   *
+   * @param endpoint the endpoint to stub
+   * @param rows the rows the pass returns, in order
+   */
+  private void stubPassRows(String endpoint, ScWikiItemDto... rows) {
+    lenient()
+        .when(scWikiClient.fetchAllPagesResult(eq(endpoint), any(), any(), any(), any()))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(rows)));
+  }
+
+  /**
+   * Stubs one endpoint to return rows the page walk could <em>not</em> vouch for — the {@code
+   * FetchResult.partial} shape a repeated row or a shortfall against {@code meta.total} produces
+   * (ADR-0147). The rows are still ingested; only the census claim is withheld.
+   *
+   * @param endpoint the endpoint to stub
+   * @param rows the rows the incomplete walk managed to accumulate
+   */
+  private void stubPartialPass(String endpoint, ScWikiItemDto... rows) {
+    lenient()
+        .when(scWikiClient.fetchAllPagesResult(eq(endpoint), any(), any(), any(), any()))
+        .thenReturn(ScWikiClient.FetchResult.partial(List.of(rows)));
   }
 
   /**
