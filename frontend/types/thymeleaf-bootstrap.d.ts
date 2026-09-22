@@ -458,6 +458,8 @@ declare const MSG_RFC_IMPORT_FAILED: string;
 /** Injected by the page bootstrap (declared in refinery-orders-create.html). */
 declare const MSG_RFC_MATERIAL_INVALID: string;
 /** Injected by the page bootstrap (declared in refinery-orders-create.html). */
+declare const MSG_RFC_MISSION_PARTICIPANT_REQUIRED: string;
+/** Injected by the page bootstrap (declared in refinery-orders-create.html). */
 declare const REFINERY_HANDOFF_ID: string | null;
 
 // --- consumed by: refinery-orders-create.js, refinery-orders-details.js

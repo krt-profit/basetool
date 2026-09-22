@@ -80,6 +80,13 @@ public class BackendServiceException extends RuntimeException {
    */
   public static final String CODE_NO_ROLE = "NO_ROLE";
 
+  /**
+   * Problem code of the {@code 400} the backend answers when a refinery order is linked to a
+   * mission its owner does not take part in (REQ-SEC-042). The refinery create and edit handlers
+   * branch on it to name the mission field instead of their generic failure message.
+   */
+  public static final String CODE_MISSION_PARTICIPANT_REQUIRED = "MISSION_PARTICIPANT_REQUIRED";
+
   private final int statusCode;
   private final @NotNull String problemCode;
   private final @Nullable String correlationId;

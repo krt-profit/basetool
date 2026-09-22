@@ -59,7 +59,7 @@ import org.springframework.http.HttpStatus;
  * other {@code AppException} for consistency, even though that dedicated handler does not consult
  * it.
  *
- * <p>The permits-list below is exhaustive over the {@code exception} package — all eleven
+ * <p>The permits-list below is exhaustive over the {@code exception} package — all twelve
  * subclasses live here, so the seal is well-formed with zero external subclasses (verified,
  * ADR-0047: no package-cycle risk since {@code exception} already depends only on {@code support} /
  * the JDK / Spring framework types).
@@ -71,6 +71,7 @@ public abstract sealed class AppException extends RuntimeException
         DuplicateEntityException,
         EntityInUseException,
         ExternalServiceException,
+        MissionParticipantRequiredException,
         NotFoundException,
         OverAllocationException,
         OwnerOrgUnitRequiredException,

@@ -28,15 +28,18 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.exception.MissionParticipantRequiredException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.City;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialType;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
+import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.RefineryGood;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
@@ -49,6 +52,7 @@ import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefiningMethodRepository;
@@ -106,6 +110,7 @@ class RefineryOrderServiceLifecycleTest {
   @Mock private UserRepository userRepository;
   @Mock private LocationRepository locationRepository;
   @Mock private MissionRepository missionRepository;
+  @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private RefiningMethodRepository refiningMethodRepository;
   @Mock private MaterialRepository materialRepository;
   @Mock private InventoryItemRepository inventoryItemRepository;
@@ -468,6 +473,49 @@ class RefineryOrderServiceLifecycleTest {
     }
 
     @Test
+    void missionLinked_ownerIsParticipant_isAccepted() {
+      stubUserAndLocation();
+      Mission mission = new Mission();
+      mission.setId(MISSION_ID);
+      when(missionRepository.findById(MISSION_ID)).thenReturn(Optional.of(mission));
+      when(missionParticipantRepository.findByMissionIdAndUserId(MISSION_ID, OWNER_ID))
+          .thenReturn(Optional.of(new MissionParticipant()));
+      when(refineryOrderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      Mission missionRef = new Mission();
+      missionRef.setId(MISSION_ID);
+      RefineryOrder incoming = freshOrderWithLocation();
+      incoming.setMission(missionRef);
+
+      RefineryOrder result = service.createRefineryOrder(OWNER_ID, incoming, null);
+      assertSame(mission, result.getMission());
+    }
+
+    @Test
+    void missionLinked_ownerNotParticipant_isRejectedWithoutSave() {
+      // REQ-SEC-042: the link feeds the operation payout, so an owner who is not on the mission
+      // may not attach an order to it — whoever the caller is.
+      stubUserAndLocation();
+      Mission mission = new Mission();
+      mission.setId(MISSION_ID);
+      when(missionRepository.findById(MISSION_ID)).thenReturn(Optional.of(mission));
+      when(missionParticipantRepository.findByMissionIdAndUserId(MISSION_ID, OWNER_ID))
+          .thenReturn(Optional.empty());
+
+      Mission missionRef = new Mission();
+      missionRef.setId(MISSION_ID);
+      RefineryOrder incoming = freshOrderWithLocation();
+      incoming.setMission(missionRef);
+
+      MissionParticipantRequiredException ex =
+          assertThrows(
+              MissionParticipantRequiredException.class,
+              () -> service.createRefineryOrder(OWNER_ID, incoming, null));
+      assertEquals("MISSION_PARTICIPANT_REQUIRED", ex.code());
+      verify(refineryOrderRepository, never()).save(any());
+    }
+
+    @Test
     void missionNull_setsOrderMissionToNull() {
       stubUserAndLocation();
       when(refineryOrderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -814,6 +862,74 @@ class RefineryOrderServiceLifecycleTest {
 
       service.updateRefineryOrder(OWNER_ID, ORDER_ID, incoming, false);
       assertNull(existing.getMission());
+      verifyNoInteractions(missionParticipantRepository);
+    }
+
+    @Test
+    void missionChanged_ownerIsParticipant_isAccepted() {
+      RefineryOrder existing = newSavedOrder();
+      Mission mission = new Mission();
+      mission.setId(MISSION_ID);
+      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(missionRepository.findById(MISSION_ID)).thenReturn(Optional.of(mission));
+      when(missionParticipantRepository.findByMissionIdAndUserId(MISSION_ID, OWNER_ID))
+          .thenReturn(Optional.of(new MissionParticipant()));
+      when(refineryOrderRepository.save(existing)).thenReturn(existing);
+
+      Mission missionRef = new Mission();
+      missionRef.setId(MISSION_ID);
+      RefineryOrder incoming = new RefineryOrder();
+      incoming.setMission(missionRef);
+
+      service.updateRefineryOrder(OWNER_ID, ORDER_ID, incoming, false);
+      assertSame(mission, existing.getMission());
+    }
+
+    @Test
+    void missionChanged_ownerNotParticipant_isRejectedEvenForALogistician() {
+      // The rule binds the order's OWNER, not the caller: a logistician editing someone else's
+      // order cannot attach it to a mission that owner is not on (no manager exception).
+      RefineryOrder existing = newSavedOrder();
+      Mission mission = new Mission();
+      mission.setId(MISSION_ID);
+      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(missionRepository.findById(MISSION_ID)).thenReturn(Optional.of(mission));
+      when(missionParticipantRepository.findByMissionIdAndUserId(MISSION_ID, OWNER_ID))
+          .thenReturn(Optional.empty());
+
+      Mission missionRef = new Mission();
+      missionRef.setId(MISSION_ID);
+      RefineryOrder incoming = new RefineryOrder();
+      incoming.setMission(missionRef);
+
+      assertThrows(
+          MissionParticipantRequiredException.class,
+          () -> service.updateRefineryOrder(OTHER_USER_ID, ORDER_ID, incoming, true));
+      assertNull(existing.getMission());
+      verify(refineryOrderRepository, never()).save(any());
+    }
+
+    @Test
+    void missionUnchanged_isNotRechecked() {
+      // A link that predates the rule — or an owner who has since left the mission — must not
+      // block an ordinary edit of the order's other fields.
+      RefineryOrder existing = newSavedOrder();
+      Mission linked = new Mission();
+      linked.setId(MISSION_ID);
+      existing.setMission(linked);
+      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.save(existing)).thenReturn(existing);
+
+      Mission missionRef = new Mission();
+      missionRef.setId(MISSION_ID);
+      RefineryOrder incoming = new RefineryOrder();
+      incoming.setMission(missionRef);
+
+      service.updateRefineryOrder(OWNER_ID, ORDER_ID, incoming, false);
+
+      assertSame(linked, existing.getMission());
+      verifyNoInteractions(missionParticipantRepository);
+      verify(missionRepository, never()).findById(any());
     }
 
     @Test

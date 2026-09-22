@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.backend.model.*;
@@ -74,6 +75,8 @@ class RefineryOrderTest {
   @Autowired private SpaceStationRepository spaceStationRepository;
 
   @Autowired private MissionRepository missionRepository;
+
+  @Autowired private MissionParticipantRepository missionParticipantRepository;
 
   @Autowired private RefiningMethodRepository refiningMethodRepository;
 
@@ -132,6 +135,13 @@ class RefineryOrderTest {
     mission.setOwningOrgUnit(iridium);
     mission.setName("Mining Op");
     missionRepository.save(mission);
+
+    // REQ-SEC-042: an order may only be linked to a mission its owner takes part in, so the owner
+    // of the mission-linked order below is signed up for it. adminUser deliberately is not.
+    MissionParticipant participation = new MissionParticipant();
+    participation.setMission(mission);
+    participation.setUser(user1);
+    missionParticipantRepository.save(participation);
 
     dinyx = new RefiningMethod();
     dinyx.setName("Dinyx Solvation");
@@ -280,6 +290,45 @@ class RefineryOrderTest {
     assertEquals(
         de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus.CANCELED,
         refineryOrderRepository.findById(saved.getId()).get().getStatus());
+  }
+
+  @Test
+  void createLinkedToAMissionTheOwnerIsNotOn_isRejectedWithItsOwnCode() throws Exception {
+    // REQ-SEC-042: the mission link feeds the operation payout, so the owner must be a participant.
+    // adminUser shares the mission's Staffel but never signed up, and nothing may be persisted.
+    RefineryOrder order = new RefineryOrder();
+    order.setOwningOrgUnit(iridium);
+    order.setLocation(station);
+    order.setStartedAt(Instant.now());
+    order.setDurationMinutes(120L);
+    order.setRefiningMethod(dinyx);
+    order.setMission(mission);
+    RefineryGood good = new RefineryGood();
+    good.setInputMaterial(quantanium);
+    good.setInputQuantity(32);
+    good.setOutputMaterial(quantanium);
+    good.setOutputQuantity(32);
+    good.setQuality(100);
+    order.setGoods(new HashSet<>(Set.of(good)));
+    long before = refineryOrderRepository.count();
+
+    mockMvc
+        .perform(
+            post("/api/v1/refinery-orders")
+                .with(
+                    jwt()
+                        .jwt(builder -> builder.subject(adminUser.getId().toString()))
+                        .authorities(
+                            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                            new SimpleGrantedAuthority("MISSION_READ"),
+                            new SimpleGrantedAuthority("REFINERY_READ"),
+                            new SimpleGrantedAuthority("REFINERY_WRITE")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(order)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("MISSION_PARTICIPANT_REQUIRED"));
+
+    assertEquals(before, refineryOrderRepository.count());
   }
 
   @Test

@@ -174,6 +174,10 @@ class RefineryOrderTenancyE2eTest {
     // auto-stamps and may create a non-internal mission) with an A-owned refinery order linked.
     bacMissionId =
         seeder.createMission(MEMBER_USER, MEMBER_PASSWORD, "E2E Refinery BAC Mission", false);
+    // REQ-SEC-042: an order may only be linked to a mission its owner takes part in, so the admin
+    // who owns the BAC order is signed up by the mission's creator first.
+    seeder.addRegisteredParticipant(
+        MEMBER_USER, MEMBER_PASSWORD, bacMissionId, seeder.getUserId(ADMIN_USER, ADMIN_PASSWORD));
     bacOrderId =
         seeder.createRefineryOrder(
             ADMIN_USER, ADMIN_PASSWORD, hubLocationId, materialId, IRIDIUM_ID, bacMissionId);
