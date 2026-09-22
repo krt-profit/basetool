@@ -251,6 +251,15 @@
   # arrives as journal entries, and the default 10000 messages per 30s per service is a bound the
   # edge alone can reach during a crawl -- at which point journald DROPS them and says so once, in
   # a line nobody reads. A dropped access-log line is a client address that never reaches Loki.
+  #
+  # And it is BOUNDED, in time as well as in size (OPS-PRIV-01, 2026-09-22). Under `LogDriver=journald`
+  # the edge's access log -- every client address -- lives in THIS journal before Alloy ships it, so
+  # the journal is a second store of the IP-bearing data REQ-OBS-010 allows for 31 days. Loki's
+  # compactor enforces those 31 days on its copy; journald enforced nothing on this one: it keeps
+  # entries until its size cap forces rotation, which at a quiet week is far longer than 31 days.
+  # MaxRetentionSec= deletes older entries whatever the size; SystemMaxUse= is stated rather than left
+  # to journald's 10 %-of-the-filesystem default, so the disk budget is a reviewed number. If the cap
+  # binds first, entries go sooner than 31 days, which is still inside the approved retention.
   ansible.builtin.copy:
     dest: /etc/systemd/journald.conf.d/50-basetool.conf
     owner: root
@@ -262,6 +271,9 @@
       Storage=persistent
       RateLimitIntervalSec=30s
       RateLimitBurst=100000
+      # REQ-OBS-010: the IP-bearing edge log is in here too, and 31 days is its approved retention.
+      MaxRetentionSec={{ basetool_host_journal_max_retention }}
+      SystemMaxUse={{ basetool_host_journal_max_use }}
   notify: Reload systemd-journald
 
 # --- alloy ------------------------------------------------------------------------------------

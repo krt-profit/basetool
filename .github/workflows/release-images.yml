@@ -1268,20 +1268,14 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up JDK 25 (Temurin)
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
-        with:
-          distribution: temurin
-          java-version: '25'
-
       # `cache-disabled`, not `cache-read-only`: this JAR is signed and shipped to the production
       # Keycloak, and a release artifact should not be assembled from a cache any earlier run could
       # have written (zizmor `cache-poisoning`). The dependency download costs well under a minute
       # for one small module.
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+      - name: Set up JDK 25 and Gradle
+        uses: ./.github/actions/setup-jdk-gradle
         with:
-          cache-disabled: true
+          cache-disabled: 'true'
 
       # Plain library JAR (compileOnly Keycloak SPIs, Java-21 bytecode via
       # `--release 21` in keycloak-spi/build.gradle.kts). `:keycloak-spi:jar` runs

@@ -171,7 +171,7 @@ Playwright-Java drives the real frontend through a browser. The suite lives in t
 ./gradlew :frontend:e2eTest -Pe2e.browser=firefox        # engine: chromium (default), firefox, webkit
 ```
 
-By default the suite builds the app images, brings up an ephemeral stack with throwaway credentials, seeds the minimal data, runs and tears down. Set `E2E_BASE_URL` to point at an already-running deployment instead. CI runs a Chromium/Firefox/WebKit matrix — see [`e2e.yml`](.github/workflows/e2e.yml) and the per-flow use cases under [`docs/e2e-test/`](docs/e2e-test/README.md).
+By default the suite builds the app images, brings up an ephemeral stack with throwaway credentials, seeds the minimal data, runs and tears down. Set `E2E_BASE_URL` to point at an already-running deployment instead. CI runs a Chromium/Firefox/WebKit matrix — see [`e2e.yml`](.github/workflows/e2e.yml) and the per-flow use cases under [`docs/e2e-test/`](docs/e2e-test/README.md). There the images are built once per run and loaded into every matrix cell (`-Pe2e.prebuilt=true` boots them with `--no-build`), and `-Pe2e.browser` makes `playwrightInstall` fetch only that engine.
 
 ---
 

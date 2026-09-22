@@ -1417,12 +1417,19 @@ services:
     # and add the keystore bind mount. Kept off the shared template on purpose so the keystore stays
     # a prod-only requirement and `keycloak-dev` (run keystore-free in the deps-only dev flow) is
     # unaffected.
+    #
+    # Two differences from the template, both since 2026-09-22 (OPS-SEC-04):
+    #   * NO realm-export.json. Production runs `start` without `--import-realm`, so the file was
+    #     never read -- it was only a writable view of an operator secret inside the one container
+    #     whose job is authentication. The dev and e2e stacks import it and keep the template's line.
+    #   * `:ro` on the theme and the provider directory. Both are written by the deployer on the host
+    #     and only ever read by Keycloak; scripts/generate-quadlet.py now refuses any config-tree
+    #     mount without `:ro`.
     volumes:
-      - ./keycloak-theme/krt-theme:/opt/keycloak/themes/krt-theme
-      - ./realm-export.json:/opt/keycloak/data/import/realm-export.json
+      - ./keycloak-theme/krt-theme:/opt/keycloak/themes/krt-theme:ro
       # Custom Keycloak provider JARs — see the x-keycloak template note. Re-listed
       # here because a service-level `volumes:` replaces the merged template value.
-      - /var/iri/code/keycloak/providers:/opt/keycloak/providers
+      - /var/iri/code/keycloak/providers:/opt/keycloak/providers:ro
       - /var/iri/keycloak/log:/var/log/keycloak
       - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
     depends_on:

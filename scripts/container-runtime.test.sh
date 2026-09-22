@@ -711,6 +711,52 @@ expect_out "a volume that does not exist is reported, not assumed present" podma
 expect_out "...and one that does" podman 'rt_volume_exists edge-certs; echo "rc=$?"' 'rc=0'
 
 say ""
+say "== the helper and drill image is db-backend's own digest pin (OPS-SEC-03) =="
+# backup.sh and restore-drill.sh named `docker.io/library/postgres:18-alpine` by TAG: resolved at
+# pull time, and a second pin Dependabot never touches. The unit already carries the digest.
+mkdir -p "${WORK}/units" "${WORK}/bundle"
+printf '[Container]\nImage=docker.io/postgres:18-alpine@sha256:%s\nContainerName=db-backend\n' \
+  "$(printf 'd%.0s' $(seq 1 64))" > "${WORK}/units/db-backend.container"
+printf '[Container]\nImage=docker.io/postgres:18-alpine@sha256:%s\n' \
+  "$(printf 'b%.0s' $(seq 1 64))" > "${WORK}/bundle/db-backend.container"
+expect_out "the installed unit's Image= is read, digest and all" podman \
+  'rt_unit_image db-backend '"${WORK}"'/bundle' \
+  'docker.io/postgres:18-alpine@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd'
+expect_out "the bundle copy is the fallback when the installed unit is not there" podman \
+  'RT_UNIT_DIR='"${WORK}"'/nowhere rt_unit_image db-backend '"${WORK}"'/bundle' \
+  'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+expect_out "no unit anywhere is a non-zero answer, not an empty image name" podman \
+  'RT_UNIT_DIR='"${WORK}"'/nowhere rt_unit_image db-backend '"${WORK}"'/nowhere; echo "rc=$?"' \
+  'rc=1'
+# The real unit, so the helper keeps working the day the generator changes the line's shape.
+expect_out "the generated db-backend unit carries a digest the backup can use" podman \
+  'RT_UNIT_DIR='"${HERE}"'/../quadlet/systemd rt_unit_image db-backend' \
+  '@sha256:'
+
+say ""
+say "== the weekly TSDB snapshot is asked from inside prometheus (OPS-SEC-02) =="
+# It used to be `podman run curlimages/curl:8.11.1 -u grafana:<password> ...`: a short image name
+# rootless podman refuses without a TTY, and the password in the argv of a process every account on
+# the host can read through /proc.
+expect_call "the snapshot is requested through exec into prometheus" podman \
+  'rt_prometheus_snapshot' 'exec prometheus sh -c'
+expect_call "...reading the password from the container's own mounted secret" podman \
+  'rt_prometheus_snapshot' '/etc/prometheus/secrets/web_password'
+expect_call "...and POSTing to the admin API on loopback" podman \
+  'rt_prometheus_snapshot' 'http://127.0.0.1:9090/api/v1/admin/tsdb/snapshot'
+expect_no_call "no helper container is started for it" podman \
+  'rt_prometheus_snapshot' 'run --rm'
+expect_no_call "...and no curl image is named at all" podman \
+  'rt_prometheus_snapshot' 'curlimages'
+expect_call "the snapshot is removed inside the container that owns the TSDB" podman \
+  'rt_prometheus_snapshot_remove 20260927T041500Z-7a1b2c3d4e5f' \
+  'exec prometheus rm -rf /prometheus/snapshots/20260927T041500Z-7a1b2c3d4e5f'
+expect_out "a name that could leave the snapshot directory is refused before it reaches rm" podman \
+  'rt_prometheus_snapshot_remove "../../etc"; echo "rc=$?"' 'rc=1'
+expect_no_call "...and nothing is run for it" podman \
+  'rt_prometheus_snapshot_remove "../x"' 'rm -rf'
+
+say ""
 say "== the quiesce: a pause, not a release =="
 expect_call "docker stops the writers with the configured timeout" docker \
   'RT_STOP_TIMEOUT=30 rt_service_stop frontend backend ingest' 'stop -t 30 frontend backend ingest'

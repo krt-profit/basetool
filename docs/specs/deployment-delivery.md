@@ -544,6 +544,24 @@ to face the internet.
 both directions: a container that should be read-only and is not, and `keycloak` becoming read-only
 without this record being updated.
 
+**The config tree is mounted read-only, everywhere** (since 2026-09-22). `/var/iri/code` is what the
+deployer rewrites from the signed config bundle on every release; a container that can write into it
+can change what the next release applies. `keycloak` mounted its theme, its provider directory and
+`realm-export.json` writable until then. The realm export is no longer mounted into the production
+container at all — production runs `start` without `--import-realm`, so the file was never read — and
+`generate-quadlet.py` refuses any bind mount from the config tree without `:ro`.
+
+**The data networks carry no egress** (since 2026-09-22, ADR-0162 as extended). `net-db-backend`,
+`net-db-keycloak` and the three `net-redis-*` networks are `Internal=true` in the Quadlet units, so
+`db-backend`, `db-keycloak` and `redis` — which are on nothing else — have no outbound path. The
+compose file keeps them non-internal because the local `-dev` twins publish their ports there.
+
+**A container gets its stop grace** (since 2026-09-22). `stop_grace_period` becomes both
+`[Container] StopTimeout=` (what `podman rm -f` waits before `SIGKILL`) and `[Service]
+TimeoutStopSec=` fifteen seconds longer; until then only the second was generated and podman killed
+every container after its 10 s default, cutting off the JVMs' graceful shutdown, the dskit drains and
+PostgreSQL's clean shutdown.
+
 **Acceptance**
 
 - [ ] Every `prod`-profile service in `docker-compose.yml` (backend, frontend, ingest, keycloak,
@@ -556,6 +574,13 @@ without this record being updated.
   `PidsLimit=` and `ReadOnly=true`; only `acme` adds a capability (`CHOWN`); `db-backend`,
   `db-keycloak` and `redis` run with `User=`/`Group=` 70, 70 and 999. `check-conformance.py`'s
   `containers-unprivileged` and `containers-read-only` assert the running host.
+- [ ] Every `Volume=` whose source is under `/var/iri/code` ends in `:ro`, and the production
+  `keycloak` unit mounts no `realm-export.json` (`generate-quadlet.py` refuses the first,
+  `generate-quadlet.test.sh` asserts both).
+- [ ] `net-db-backend`, `net-db-keycloak`, `net-redis-backend`, `net-redis-frontend` and
+  `net-redis-ingest` are `Internal=true`; no unit whose every network is internal publishes a port or
+  aliases the host gateway (`generate-quadlet.py` refuses it).
+- [ ] Every unit with a `TimeoutStopSec=` carries a `StopTimeout=` fifteen seconds below it.
 - [ ] An image bump for any of these services is only promoted after the new image has been
   booted under its unit's hardening once (clean start + healthcheck).
 
@@ -825,7 +850,8 @@ were `712 × (ssl_client) Z`.
 **Acceptance**
 
 - [ ] `backend`, `frontend` and `ingest` (via their `x-*` compose templates) **and `grafana`** set
-  `init: true`, which the generator carries into the units as `PodmanArgs=--init`; a prod container
+  `init: true`, which the generator carries into the units as Quadlet's `RunInit=true` (a
+  `PodmanArgs=--init` until 2026-09-22); a prod container
   that runs a wget-HTTPS healthcheck with a bare runtime as PID 1 is a regression.
 - [ ] A long-lived (>17 h) app container's `pids` count stays flat instead of climbing ≈1 per 30 s
   healthcheck — no `<defunct>` `ssl_client` accumulation (spot-check: `docker exec <svc> sh -c 'cut
@@ -855,7 +881,7 @@ time; (3) `ContainerPidsHigh` as the runtime backstop for a task leak from any *
 
 **Enforced by:** `docker-compose.yml` (`x-backend` / `x-frontend` / `x-ingest` templates, `init:
 true`) · `docker-compose.monitoring.yml` (`x-mon-base` anchor, `init: true`) ·
-`.github/scripts/check_pid1_reaping.py` (wired into the `pid1-reaping` job of
+`.github/scripts/check_pid1_reaping.py` (wired into the `pid1-reaping` check of
 [`repo-lint.yml`](../../.github/workflows/repo-lint.yml), with a self-test that keeps it from
 passing vacuously) · verification recipe in the `x-backend` service comment
 
@@ -1471,10 +1497,12 @@ to the shared group and restores the defect exactly.
   second one beside it.
 - [ ] `concurrency.group` contains `jobs.e2e.if` verbatim, and CI fails when it stops doing so; the
   checker self-tests against a known-drifted workflow first, so it cannot pass vacuously.
+- [ ] The `build-stack` job, which builds the E2E images once per run for all matrix cells (since
+  2026-09-22), carries the same gate expression, so a run whose gate is false builds nothing.
 
-**Enforced by:** `.github/workflows/e2e.yml` (`concurrency.group`, `jobs.e2e.if`) ·
-`.github/scripts/check_e2e_gate_mirror.py` · `.github/workflows/repo-lint.yml`
-(`e2e-gate-mirror`) · **Decision:** [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md)
+**Enforced by:** `.github/workflows/e2e.yml` (`concurrency.group`, `jobs.e2e.if`,
+`jobs.build-stack.if`) · `.github/scripts/check_e2e_gate_mirror.py` ·
+`.github/workflows/repo-lint.yml` (`Repository gates` → `e2e-gate-mirror / …`) · **Decision:** [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md)
 
 ## Out of scope
 
@@ -1679,6 +1707,44 @@ reads an empty value as *no explicit config* and falls back to the classpath `lo
 `-XX:ArchiveClassesAtExit` `RUN` in each) · **Related:** REQ-OPS-030 (the training run this cleans up
 after, and the same silent-degradation failure class), REQ-OPS-014 (the runtime posture the fixed
 UID/GID serves)
+
+### REQ-OPS-032 — The host applies security updates unattended, and says when it has not
+
+The production host installs **security advisories** without a person, daily, and reports whether it
+did (OPS-SEC-01, 2026-09-22). Until then nothing on the Rocky host patched it: the retired Ubuntu
+host had unattended-upgrades and the bootstrap role had no successor, so the kernel, openssh,
+haproxy, glibc and the host-native `node_exporter` and `alloy` were fixed only when somebody ran
+`dnf upgrade` by hand.
+
+- **`dnf-automatic`, `upgrade_type = security`, `apply_updates = yes`, `reboot = never`**, configured
+  as a whole file by the bootstrap role (`tasks/45-updates.yml`). A feature update is never applied
+  unattended.
+- **The container runtime is excluded** — `podman`, `crun`, `conmon`, `netavark`, `aardvark-dns`,
+  `containers-common` and `passt` (pasta) — by the owner's decision of 2026-09-22: they change how
+  every container starts, and they move on a tested maintenance, testing host first.
+- **The window is 07:00 host-local plus up to 15 minutes**, clear of the backup (04:15, up to an hour),
+  the restore drill (Sunday 05:30), the weekly cleanup (Saturday 02:00 UTC) and the certificate
+  collector (03:40).
+- **A reboot is an owner decision**, never automatic. The host reports that one is due instead:
+  `scripts/host-updates-metrics.sh` writes `basetool_host_reboot_required` from `needs-restarting -r`,
+  run from `dnf-automatic.service`'s `ExecStopPost=` and again at boot.
+- **Every run records itself**: the same script writes the run's timestamp and outcome from systemd's
+  `$SERVICE_RESULT`. `HostSecurityUpdatesFailing`, `HostSecurityUpdatesStale` and
+  `HostRebootRequired` read them (REQ-OBS-011).
+
+**Acceptance**
+
+- [ ] `check-conformance.py --only security-updates-enabled` passes against the host: the timer is
+  enabled and active, the configuration is security-only and applies, and `podman` is excluded.
+- [ ] `host-updates-metrics.test.sh` passes: a run is recorded by the run, a boot refresh keeps it,
+  and a reboot state that cannot be read is left out rather than written as `0`.
+- [ ] `ops_audit_2026_09_alerts_test.yml` passes: each of the three alerts fires and stays silent where
+  it must.
+
+**Enforced by:** `ansible/roles/basetool_host/tasks/45-updates.yml` ·
+`scripts/host-updates-metrics.sh` · `scripts/iri-host-updates-metrics.service` ·
+`monitoring/prometheus/alerts/infrastructure.yml` · `scripts/check-conformance.py` · **Decision:**
+[ADR-0199](../adr/0199-the-host-applies-security-updates-unattended-with-the-container-runtime-excluded.md)
 
 ## Open questions
 

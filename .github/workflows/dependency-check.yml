@@ -4,7 +4,8 @@ name: Dependency Check
 # emits SARIF that GitHub aggregates under the repository's Security tab.
 #
 # Trigger model:
-#   - weekly cron (Monday 06:00 UTC) catches CVEs published after the last PR
+#   - weekly cron (Monday, scheduled 05:23 UTC -- GitHub starts it hours later; the September
+#     2026 runs of the old 06:00 began 11:28-12:35 UTC) catches CVEs published after the last PR
 #   - workflow_dispatch lets a maintainer force a fresh scan on demand
 #   - push to main that touches dependency declarations triggers an
 #     immediate scan so newly-introduced libraries get a same-day verdict
@@ -24,7 +25,7 @@ name: Dependency Check
 # because they share an IP pool with every other CI job on github.com.
 on:
   schedule:
-    - cron: '0 6 * * 1'
+    - cron: '23 5 * * 1'
   workflow_dispatch:
   push:
     branches: [main]
@@ -57,16 +58,28 @@ concurrency:
   group: dep-check-${{ github.ref }}
   cancel-in-progress: false
 
-permissions:
-  contents: read
-  security-events: write
+permissions: {}
 
 jobs:
   owasp:
     name: OWASP Dependency-Check
     runs-on: ubuntu-latest
-    # 150 since 2026-09-14, and the history matters because this number has been wrong in both
-    # directions. It was raised to 120 on 2026-09-04 on a WRONG diagnosis - runs dying at the
+    permissions:
+      contents: read
+      security-events: write   # the SARIF upload
+      issues: write            # the rolling issue a failed scheduled run opens or updates
+    # 75 since 2026-09-22, and the Gradle step inside carries its own 60 (audit item CI-02). The
+    # split is the fix, not the number: with the ceiling on the JOB, a scan that ran out of time was
+    # cancelled, and a cancelled job runs no later step -- so no SARIF check, no report artifact, no
+    # cache save, nothing that said why. With the ceiling on the STEP, the Gradle step fails at 60,
+    # every step after it still runs, and the job's own 75 is only the backstop for those. The cold
+    # rebuild measured 31-38 minutes (below), so 60 is headroom for it, not a budget.
+    #
+    # The history, because this number has been wrong in both directions. 150 from 2026-09-14 to
+    # 2026-09-22 bought nothing: the 2026-09-21 weekly run was still cancelled at exactly 150
+    # minutes, with no verdict and nothing saved.
+    #
+    # Before that: it was raised to 120 on 2026-09-04 on a WRONG diagnosis - runs dying at the
     # ceiling were read as slow cold starts when they were stalled on unbounded outbound HTTP reads
     # - and returned to 60 the next day once those reads were bounded (see `setReadTimeout` /
     # `setConnectionTimeout` in the root `build.gradle.kts`). That reasoning was right at the time.
@@ -80,8 +93,10 @@ jobs:
     #
     # A cold rebuild should be rare: it only happens when the NVD cache is missing, which on
     # 2026-09-10 was caused by CodeQL's per-run dependency caches evicting it under GitHub's 10 GB
-    # cap (fixed in `codeql.yml`). A WARM run is still under a minute, so this number is only ever
-    # reached by the once-per-eviction rebuild. If warm runs start approaching it, that is a real
+    # cap (corrected 2026-09-22: this said "fixed in `codeql.yml`", but that file's setting never
+    # took effect while CodeQL ran as default setup; `cache-janitor.yml` now prunes those caches,
+    # and the NVD cache is saved by its own step below). A WARM run is still under a minute, so
+    # this number is only ever reached by the once-per-eviction rebuild. If warm runs start approaching it, that is a real
     # signal and not something to raise again.
     #
     # This comment claimed "150 since 2026-09-11" for three days while the value below still read
@@ -103,7 +118,7 @@ jobs:
     # keys" and rebuilt from zero. That is a real cost - it is the difference between a ~1-minute
     # and a ~14-minute scan - but it is a nuisance, not the reason runs were dying, and it resolves
     # itself as soon as one `main` run completes and saves the dataset under the default branch.
-    timeout-minutes: 150
+    timeout-minutes: 75
 
     steps:
       - name: Checkout
@@ -111,18 +126,12 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up JDK 25 (Temurin)
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+      # Governs the GRADLE caches only (wrapper, dependencies). The NVD dataset has its own
+      # restore/save pair below, and that pair is where the "PRs never write it" rule lives -- this
+      # comment used to sit here and describe the NVD cache, which this input never touched.
+      - name: Set up JDK 25 and Gradle
+        uses: ./.github/actions/setup-jdk-gradle
         with:
-          distribution: temurin
-          java-version: '25'
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
-        with:
-          # PRs restore the weekly-warmed NVD DB read-only (never write the
-          # shared cache from a PR branch); scheduled / main runs keep
-          # re-warming it.
           cache-read-only: ${{ github.event_name == 'pull_request' }}
 
       # The cache key rotates weekly to match the Monday cron and the
@@ -142,16 +151,21 @@ jobs:
         shell: bash
         run: echo "week=$(date -u +'%G-W%V')" >> "$GITHUB_OUTPUT"
 
-      - name: Cache NVD feed
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # RESTORE and SAVE are two steps since 2026-09-22 (audit item CI-02). The single
+      # `actions/cache` step saved in its post-step, which runs only when the job is not cancelled
+      # and saves whatever is on disk -- so a scan killed at the ceiling saved nothing, and the next
+      # run started cold into the same ceiling: eight of nine weekly runs from 2026-07-27 to
+      # 2026-09-21 ended without a verdict that way. The save below runs only when the scan got as
+      # far as writing its SARIF, i.e. when the H2 database it would store is complete; a partial
+      # database is never cached, because a corrupt cache is worse than none (run 25933803540).
+      - name: Restore NVD feed
+        id: nvd-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.gradle/dependency-check-data
           key: nvd-feed-v1-${{ runner.os }}-${{ steps.cache-key.outputs.week }}
           restore-keys: |
             nvd-feed-v1-${{ runner.os }}-
-
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
 
       # `--no-parallel` is REQUIRED for this one Gradle invocation — do not
       # remove it. Gradle 9 enforces an exclusive lock on every Configuration
@@ -176,7 +190,10 @@ jobs:
       # `./gradlew dependencyCheckAggregate --parallel` reproduces it locally
       # with no dataset download. The flag scopes the workaround to this CI
       # step only, so day-to-day developer builds keep their parallel speedup.
+      #
+      # The step's own ceiling is what lets everything after it run; see the job's comment.
       - name: Run dependencyCheckAggregate
+        timeout-minutes: 60
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: |
@@ -221,3 +238,47 @@ jobs:
           path: build/reports/dependency-check/
           retention-days: 30
           if-no-files-found: ignore
+
+      # Saved only when (1) the scan got far enough to write its SARIF -- the H2 database is then
+      # complete, whether or not the verdict was a failure at CVSS >= 7 -- (2) this is not a pull
+      # request, whose cache would be scoped to its own ref and read by nothing else, and (3) the
+      # exact week key was not already restored, since a key is immutable once written.
+      - name: Save NVD feed
+        if: >-
+          always() && steps.sarif.outputs.exists == 'true' &&
+          github.event_name != 'pull_request' &&
+          steps.nvd-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.gradle/dependency-check-data
+          key: nvd-feed-v1-${{ runner.os }}-${{ steps.cache-key.outputs.week }}
+
+      # A failed WEEKLY run used to be a red X on a scheduled run nobody watches: the last verdict
+      # before 2026-09-22 was from 2026-07-20. It now opens -- or, if one is already open, comments
+      # on -- a single rolling issue, and says which of the two failures it was: a finding (the
+      # scan finished and failed the CVSS gate) or no verdict at all (it did not finish). Pull
+      # request and push runs report on their own run page; only the unattended one needs this.
+      - name: Open or update the failed-scan issue
+        if: (failure() || cancelled()) && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          HAS_SARIF: ${{ steps.sarif.outputs.exists }}
+        run: |
+          set -euo pipefail
+          title="Weekly OWASP Dependency-Check failed"
+          if [ "$HAS_SARIF" = "true" ]; then
+            what="The scan **finished** and failed the \`failBuildOnCVSS = 7.0\` gate: at least one dependency carries a CVE at CVSS >= 7. The SARIF is in the Security tab (category \`owasp-dependency-check\`) and the HTML report is in the run's artifact. Fix with an upgrade, or a documented, dated suppression in \`config/owasp/dependency-check-suppressions.xml\`."
+          else
+            what="The scan produced **no verdict** (no SARIF): it failed or ran out of time before finishing. Check the NVD step's log. A cold NVD rebuild takes 31-38 minutes; if the log stops after \"Checking for updates and analyzing dependencies\", the NVD cache was missing."
+          fi
+          body="$(printf '%s\n\n%s\n\nRun: %s\n' "$(date -u +%Y-%m-%d)" "$what" "$RUN_URL")"
+          number="$(gh issue list --repo "$REPO" --state open --search "\"${title}\" in:title" \
+                      --json number,title --jq ".[] | select(.title == \"${title}\") | .number" | head -n 1)"
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --repo "$REPO" --body "$body"
+            echo "commented on #${number}"
+          else
+            gh issue create --repo "$REPO" --title "$title" --label SEC --body "$body"
+          fi

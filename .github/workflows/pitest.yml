@@ -9,18 +9,22 @@ name: Mutation Testing
 # Deliberately NOT a PR check and NOT blocking:
 #   - A full mutation run is O(minutes) per service and far too slow for the PR
 #     path (that is why `pitest` is not wired into `check`).
-#   - Per the build-script note, some service tests rely on a Spring context
-#     that PIT's isolated minion JVMs do not start, so the first runs may have
-#     red sub-targets. This workflow surfaces the HTML report as a trend signal
-#     to triage (move offending tests to *IntegrationTest naming or
-#     excludedTestClasses, then tighten the thresholds) — it does not gate
-#     merges. Hence continue-on-error + always-upload.
+#   - A weak mutation score is a trend signal to triage, not a merge gate:
+#     the HTML report is uploaded regardless and the PIT step is
+#     continue-on-error. A run that produced NO result is different and fails
+#     the job (see "Fail when PIT produced no result"): that is how the backend
+#     sat on PitHelpError for eight weeks behind a green check (audit item
+#     CI-03; the cause was the missing `test` profile in PIT's minions, see the
+#     root build.gradle.kts).
 #
-# Schedule offset from the other crons (dep-check Mon, codeql Tue, e2e nightly).
+# Schedule offset from the other crons (dep-check Mon, codeql Tue, e2e daily).
 
 on:
   schedule:
-    - cron: '0 2 * * 3' # weekly, Wednesday 02:00 UTC
+    # Weekly on Wednesday, scheduled 01:47 UTC (off the full hour). GitHub starts it hours late --
+    # the recent runs of the old 02:00 schedule began 02:47-06:55 UTC -- so it is "Wednesday
+    # morning", not a time (audit item CI-16).
+    - cron: '47 1 * * 3'
   workflow_dispatch:
 
 concurrency:
@@ -34,7 +38,14 @@ jobs:
   pitest:
     name: PIT (${{ matrix.module }})
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    # 60, down from 90 (audit item CI-03). The first backend run that completed -- coverage over
+    # 232 test classes, then 9 547 mutations in 214 units, Spring contexts and Testcontainers
+    # included -- took 30 minutes on a workstation with PIT's `threads = 4` on 2026-09-22
+    # (`BUILD SUCCESSFUL in 30m 11s`, 66 % killed); the frontend takes two. A 4-vCPU runner is not
+    # faster than that, so the audit's proposed 20 would kill every run; 60 leaves room for a slower
+    # runner without letting a hung minion hold one for an hour and a half. Re-derive it from the
+    # first few CI durations.
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -46,25 +57,50 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up JDK 25 (Temurin)
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+      - name: Set up JDK 25 and Gradle
+        uses: ./.github/actions/setup-jdk-gradle
         with:
-          distribution: temurin
-          java-version: '25'
+          cache-read-only: 'true'
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
-        with:
-          cache-read-only: true
-
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
-
-      # Non-blocking: a red sub-target is a trend signal to triage, not a merge
-      # gate (see the header). The report is uploaded regardless.
+      # Non-blocking for a LOW SCORE: a surviving mutant is a trend signal to triage, not a merge
+      # gate (see the header). The log is kept for the step below, which is what decides whether PIT
+      # produced a result at all.
       - name: Run PIT mutation analysis
+        id: pit
         continue-on-error: true
-        run: ./gradlew :${{ matrix.module }}:pitest --stacktrace
+        env:
+          MODULE: ${{ matrix.module }}
+        run: |
+          set -o pipefail
+          ./gradlew ":${MODULE}:pitest" --stacktrace 2>&1 | tee "${RUNNER_TEMP}/pitest.log"
+
+      # `continue-on-error` above made a BROKEN run indistinguishable from a weak one: for
+      # eight weeks up to 2026-09-16 the backend never got past PIT's coverage phase --
+      # `PitHelpError: 10 tests did not pass without mutation` -- produced no mutations.xml, and the
+      # job was green every Wednesday (audit item CI-03). This fails the job whenever PIT did not
+      # produce a result, while a run that finished with surviving mutants stays green.
+      - name: Fail when PIT produced no result
+        if: always()
+        env:
+          MODULE: ${{ matrix.module }}
+        run: |
+          set -euo pipefail
+          report="${MODULE}/build/reports/pitest/mutations.xml"
+          if grep -q "PitHelpError" "${RUNNER_TEMP}/pitest.log" 2>/dev/null; then
+            grep -m 5 -B 2 "PitHelpError" "${RUNNER_TEMP}/pitest.log" || true
+            echo "::error title=PIT (${MODULE})::PIT aborted with PitHelpError - the suite is not green under PIT, so no mutation was run"
+            exit 1
+          fi
+          if [ ! -s "$report" ]; then
+            echo "::error title=PIT (${MODULE})::no ${report} - PIT did not produce a result"
+            exit 1
+          fi
+          mutations="$(grep -c '<mutation ' "$report" || true)"
+          echo "PIT (${MODULE}): ${mutations} mutations in ${report}"
+          if [ "${mutations:-0}" -eq 0 ]; then
+            echo "::error title=PIT (${MODULE})::${report} lists no mutations"
+            exit 1
+          fi
 
       - name: Upload PIT report
         if: always()

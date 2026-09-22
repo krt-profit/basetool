@@ -42,14 +42,21 @@ BACKUP_ENV="${IRI_BACKUP_ENV:-/etc/iri/backup.env}"
 # volumes, the redis ACL and the keystore -- and each failure is a best-effort WARN by design, so
 # the backup went on to report success over a snapshot that was missing all of them. Precisely the
 # class the certificate-capture work was about, arriving through the registry instead.
-DRILL_IMAGE="${IRI_DRILL_IMAGE:-docker.io/library/postgres:18-alpine}"
+#
+# And PINNED BY DIGEST, since 2026-09-22 (OPS-SEC-03): read at runtime from db-backend's own unit
+# (`rt_unit_image`, after rt_detect), so the drill restores into exactly the PostgreSQL build
+# production runs -- which is the claim a restore drill makes -- rather than into whatever a floating
+# tag resolved to that Sunday. The tag is only the logged last resort.
+COMPOSE_DIR="${IRI_COMPOSE_DIR:-/var/iri/code}"
+DRILL_IMAGE_FALLBACK="docker.io/library/postgres:18-alpine"
+DRILL_IMAGE="${IRI_DRILL_IMAGE:-}"
 CONTAINER="iri-restore-drill"
 READY_TIMEOUT="${IRI_DRILL_READY_TIMEOUT:-60}"
 MIN_BACKEND_TABLES="${IRI_DRILL_MIN_BACKEND_TABLES:-20}"
 MIN_KEYCLOAK_TABLES="${IRI_DRILL_MIN_KEYCLOAK_TABLES:-20}"
 
 # Monitoring textfile metrics (epic #936). The drill writes its own outcome so Prometheus can alert
-# on drill failure, on any single non-restorable artifact, on staleness (>35d) AND on the metric
+# on drill failure, on any single non-restorable artifact, on staleness (>8d) AND on the metric
 # being absent (never ran) — the systemd failed-unit signal alone cannot tell "failed" from "never
 # ran". Per-artifact status (0=not restorable, 1=ok); the DB pair drives last-success, the monitoring
 # artifacts are reported independently so a missing Grafana/secrets artifact alerts on its own.
@@ -118,6 +125,14 @@ write_drill_metrics() {
 rt_detect
 rt_wait_for_startup
 log "container runtime: ${RT_BACKEND}"
+if [[ -z "${DRILL_IMAGE}" ]]; then
+  if DRILL_IMAGE="$(rt_unit_image db-backend "${COMPOSE_DIR}/quadlet/systemd")"; then
+    log "drill image: ${DRILL_IMAGE} (db-backend's own pin)"
+  else
+    DRILL_IMAGE="${DRILL_IMAGE_FALLBACK}"
+    log "WARN: no Image= readable in db-backend.container -- falling back to the unpinned ${DRILL_IMAGE}"
+  fi
+fi
 command -v restic >/dev/null 2>&1 || fail "restic not found (dnf install restic / apt install restic; ansible role: 10-packages.yml)"
 command -v rclone >/dev/null 2>&1 || fail "rclone not found (dnf install rclone / apt install rclone; ansible role: 10-packages.yml)"
 

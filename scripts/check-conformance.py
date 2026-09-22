@@ -59,9 +59,11 @@ import argparse
 import concurrent.futures
 import dataclasses
 import datetime as dt
+import io
 import ipaddress
 import json
 import os
+import re
 import shlex
 import urllib.parse
 import shutil
@@ -1805,6 +1807,160 @@ def check_edge_not_directly_reachable(ctx: Context) -> str:
     return f"refused on {len(addrs)} global address(es), on both 8080 and 8443"
 
 
+#: The two monitoring components that run as HOST packages rather than containers, the compose
+#: service whose image pin names the version the rest of the stack was tested against, and the
+#: local endpoint whose ``*_build_info`` reports what is actually running.
+HOST_EXPORTERS = {
+    "node-exporter": ("node_exporter_build_info", "http://127.0.0.1:9100/metrics"),
+    "alloy": ("alloy_build_info", "http://127.0.0.1:12345/metrics"),
+}
+
+#: The compose file the pins are read from, beside this script in the repository.
+COMPOSE_MONITORING = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "docker-compose.monitoring.yml")
+
+
+def _compose_pinned_version(service: str, path: str = COMPOSE_MONITORING) -> str | None:
+    """Read the version tag of one compose service's image, without a YAML parser.
+
+    The suite runs from a bare checkout with the standard library only, so the ``image:`` line
+    under the service's key is found textually. It is our own file, one service per two-space
+    indented key, and the image line is always within that block.
+
+    Args:
+        service: the compose service name.
+        path: the compose file.
+
+    Returns:
+        The tag with any leading ``v`` removed (``1.12.1``), or ``None`` when the service or its
+        image line cannot be found.
+    """
+    try:
+        lines = io.open(path, encoding="utf-8").read().splitlines()
+    except OSError:
+        return None
+    inside = False
+    for line in lines:
+        if line.startswith(f"  {service}:"):
+            inside = True
+            continue
+        if inside and line.startswith("  ") and not line.startswith("   ") and line.strip():
+            break  # the next service
+        if inside:
+            match = re.match(r"\s+image:\s*\S+?:v?([0-9][^@\s]*)", line)
+            if match:
+                return match.group(1)
+    return None
+
+
+def check_host_exporter_versions(ctx: Context) -> str:
+    """The host-native node_exporter and Alloy run the versions the compose file pins.
+
+    Both became HOST packages at the Podman cutover (arc42 §7.3), installed by the bootstrap role
+    with ``state: present`` -- so a host keeps whatever version it was provisioned with, and the
+    role never follows the compose pin that Dependabot moves. Nothing else compares the two: the
+    configuration the release ships (``config.alloy``, the scrape set, the dashboards) is written
+    and tested against the compose version, and a drift between that and the process actually
+    running shows up, if at all, as a component that half understands its own configuration.
+
+    A check rather than a pinned RPM version in the role (OPS-SEC-06, decided 2026-09-22): a pin in
+    the role is a second copy of the version that has to be moved by hand in step with the compose
+    pin, which is the drift source this deployment removed on purpose (defaults/main.yml), and it
+    would block the security updates dnf-automatic now applies to both packages. The check keeps the
+    compose file the one place a version is chosen and makes a disagreement loud.
+
+    Args:
+        ctx: the run context.
+
+    Returns:
+        A summary naming each component and the version it runs.
+
+    Raises:
+        Skip: when no host access is configured.
+        CheckFailed: when a component's version differs from the pin, or cannot be read at all.
+    """
+    problems, good = [], []
+    for service, (metric, url) in sorted(HOST_EXPORTERS.items()):
+        pinned = _compose_pinned_version(service)
+        if not pinned:
+            problems.append(f"{service}: no image pin found in docker-compose.monitoring.yml")
+            continue
+        line = ctx.runner.run(
+            f"curl -s --max-time 5 {url} 2>/dev/null | grep '^{metric}' | head -n 1 || true")
+        # Anchored on the label boundary: `goversion=` precedes `version=` in both exporters.
+        match = re.search(r'[{,]version="v?([^"]+)"', line)
+        if not match:
+            problems.append(
+                f"{service}: {metric} not readable from {url} -- the component is down or not "
+                "exporting its build info, so its version says nothing")
+            continue
+        running = match.group(1)
+        if running != pinned:
+            problems.append(
+                f"{service} runs {running}, the compose pin is {pinned} -- update the host package "
+                "(a tested maintenance) or the pin, so the configuration the release ships matches "
+                "the process that reads it")
+        else:
+            good.append(f"{service}={running}")
+    if problems:
+        raise CheckFailed("; ".join(problems))
+    return "host packages match the compose pins: " + ", ".join(good)
+
+
+def check_security_updates_enabled(ctx: Context) -> str:
+    """The host applies security updates unattended, and only security updates.
+
+    Until 2026-09-22 nothing on this host patched it: the bootstrap role installed no
+    ``dnf-automatic``, and the retired Ubuntu host's unattended-upgrades had no successor. A timer
+    that is installed but disabled, or a configuration that downloads without applying, looks from
+    outside exactly like a patched host -- which is why the check asks the timer AND the file.
+
+    Args:
+        ctx: the run context.
+
+    Returns:
+        A summary of the timer state and the configuration it found.
+
+    Raises:
+        Skip: when no host access is configured.
+        CheckFailed: when the timer is not enabled and active, when the configuration does not say
+            ``upgrade_type = security`` and ``apply_updates = yes``, or when the container runtime is
+            not excluded (REQ-OPS-032).
+    """
+    enabled = ctx.runner.run("systemctl is-enabled dnf-automatic.timer 2>/dev/null || true").strip()
+    active = ctx.runner.run("systemctl is-active dnf-automatic.timer 2>/dev/null || true").strip()
+    conf = ctx.runner.run(
+        "grep -E '^[[:space:]]*(upgrade_type|apply_updates|exclude)[[:space:]]*=' "
+        "/etc/dnf/automatic.conf 2>/dev/null || true")
+    settings: dict[str, str] = {}
+    for line in conf.splitlines():
+        if "=" in line:
+            key, value = line.split("=", 1)
+            settings[key.strip()] = value.strip()
+
+    problems = []
+    if enabled != "enabled" or active != "active":
+        problems.append(
+            f"dnf-automatic.timer is {enabled or 'absent'}/{active or 'unknown'}, expected "
+            "enabled/active -- the host receives no security updates")
+    if settings.get("upgrade_type") != "security":
+        problems.append(
+            f"upgrade_type is {settings.get('upgrade_type') or 'unset'}, expected security -- "
+            "unattended feature updates are not what REQ-OPS-032 allows")
+    if settings.get("apply_updates") not in ("yes", "true", "1"):
+        problems.append(
+            f"apply_updates is {settings.get('apply_updates') or 'unset'} -- updates would be "
+            "downloaded and never installed")
+    excluded = settings.get("exclude", "").split()
+    if "podman" not in excluded:
+        problems.append(
+            "the container runtime is not excluded -- podman and its companions must move on a "
+            "tested maintenance, not unattended")
+    if problems:
+        raise CheckFailed("; ".join(problems))
+    return f"dnf-automatic.timer {enabled}/{active}, security-only, runtime excluded"
+
+
 CHECKS: tuple[Check, ...] = (
     Check("vhost-reachable", "REQ-OPS-014", False, check_vhost_reachable),
     Check("certificate-valid", "REQ-OPS-026", False, check_certificate_valid),
@@ -1827,6 +1983,10 @@ CHECKS: tuple[Check, ...] = (
           check_env_reaches_the_units),
     Check("containers-read-only", "REQ-OPS-014 / ADR-0190", True,
           check_containers_read_only),
+    Check("host-exporter-versions", "REQ-OBS-005 / OPS-SEC-06", True,
+          check_host_exporter_versions),
+    Check("security-updates-enabled", "REQ-OPS-032", True,
+          check_security_updates_enabled),
 )
 
 

@@ -18,14 +18,16 @@ EnvironmentFile=/var/iri/code/env.d/loki.env
 Exec=-config.file=/etc/loki/loki-config.yml
 Memory=384M
 PidsLimit=512
-PodmanArgs=--oom-score-adj=500 --init
+RunInit=true
+PodmanArgs=--oom-score-adj=500
+StopTimeout=45
 
 [Service]
 Restart=always
 RestartSec=1
 RestartSteps=6
 RestartMaxDelaySec=60
-TimeoutStopSec=45
+TimeoutStopSec=60
 
 [Install]
 WantedBy=default.target

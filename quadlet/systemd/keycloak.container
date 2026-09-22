@@ -18,9 +18,8 @@ Network=net-db-keycloak.network
 Network=net-proxy-keycloak.network
 Network=net-backend-keycloak.network
 Network=net-monitoring-scrape.network
-Volume=/var/iri/code/keycloak-theme/krt-theme:/opt/keycloak/themes/krt-theme
-Volume=/var/iri/code/realm-export.json:/opt/keycloak/data/import/realm-export.json
-Volume=/var/iri/code/keycloak/providers:/opt/keycloak/providers
+Volume=/var/iri/code/keycloak-theme/krt-theme:/opt/keycloak/themes/krt-theme:ro
+Volume=/var/iri/code/keycloak/providers:/opt/keycloak/providers:ro
 Volume=/var/iri/keycloak/log:/var/log/keycloak
 Volume=/var/iri/secrets/keystore.p12:/run/secrets/keystore.p12:ro
 EnvironmentFile=/var/iri/code/env.d/keycloak.env
@@ -36,6 +35,7 @@ Memory=2560M
 PidsLimit=2048
 AddHost=alloy:host-gateway
 PodmanArgs=--cpus=3.0
+StopTimeout=30
 
 [Service]
 TimeoutStartSec=390
@@ -43,7 +43,7 @@ Restart=always
 RestartSec=1
 RestartSteps=6
 RestartMaxDelaySec=60
-TimeoutStopSec=30
+TimeoutStopSec=45
 
 [Install]
 WantedBy=default.target
