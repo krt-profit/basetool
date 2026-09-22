@@ -26,9 +26,14 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.concurrent.Executor;
+import org.apache.tomcat.util.threads.VirtualThreadExecutor;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.tomcat.TomcatWebServer;
+import org.springframework.boot.web.server.servlet.context.ServletWebServerApplicationContext;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
@@ -64,6 +69,9 @@ class ManagementPortIsolationTest {
   /** The dedicated management connector, internal-only in prod. */
   @Value("${local.management.port}")
   private int managementPort;
+
+  /** The running application context, whose embedded Tomcat the virtual-thread probe inspects. */
+  @Autowired private ServletWebServerApplicationContext webServerContext;
 
   // HTTP/1.1 explicitly: the JDK client defaults to HTTP/2, whose stream-capacity handling can
   // RST_STREAM against a freshly started Tomcat under full-suite load. These are one-shot probes.
@@ -157,5 +165,44 @@ class ManagementPortIsolationTest {
     assertThat(response.statusCode())
         .as("POST /actuator/loggers/** must still require ROLE_ADMIN on the management port")
         .isIn(401, 403);
+  }
+
+  /**
+   * Pins why {@code server.tomcat.threads.*} is deliberately not configured and why the "Spring
+   * Boot apps" dashboard reads {@code http_server_requests_active_seconds_gcount} instead of {@code
+   * tomcat_threads_busy_threads} (FE-PERF-07).
+   *
+   * <p>With {@code spring.threads.virtual.enabled=true} Spring Boot hands the connector an external
+   * {@link VirtualThreadExecutor}. Tomcat applies {@code maxThreads}/{@code minSpareThreads} only
+   * to its own internal executor and reports {@code -1} for every thread-pool gauge, so the
+   * settings were inert and the dashboard panel drew a flat {@code -1}. Should virtual threads ever
+   * be switched off, the executor assertion fails and the thread-pool settings become meaningful
+   * again.
+   *
+   * @throws Exception if a probe request fails to send
+   */
+  @Test
+  void theConnectorRunsOnVirtualThreadsSoOnlyTheActiveRequestGaugeMeasuresConcurrency()
+      throws Exception {
+    // Any request on the application connector starts an http.server.requests observation, which
+    // registers the long-task timer behind the active-requests gauge.
+    get(appPort, "/actuator/health");
+
+    String scrape = get(managementPort, "/actuator/prometheus").body();
+
+    Executor executor =
+        ((TomcatWebServer) webServerContext.getWebServer())
+            .getTomcat()
+            .getConnector()
+            .getProtocolHandler()
+            .getExecutor();
+    assertThat(executor)
+        .as(
+            "virtual threads hand the connector an external executor; Tomcat's pool settings are"
+                + " inert")
+        .isInstanceOf(VirtualThreadExecutor.class);
+    assertThat(scrape)
+        .as("the in-flight request gauge the dashboard's concurrency panel reads")
+        .contains("http_server_requests_active_seconds_gcount{");
   }
 }

@@ -1,23 +1,20 @@
 server:
   tomcat:
-    # Enable the Tomcat MBean registry so Micrometer's TomcatMetrics binder publishes
-    # tomcat_threads_* (busy/current/max) for the "Spring Boot apps" dashboard (epic #936).
-    mbeanregistry:
-      enabled: true
+    # No Tomcat MBean registry (FE-PERF-07, 2026-09-22). It was enabled only so TomcatMetrics could
+    # publish tomcat_threads_* for the "Spring Boot apps" dashboard (epic #936), but under virtual
+    # threads those gauges are always -1; the panel reads http_server_requests_active_seconds_gcount.
     relaxed-query-chars: "{,},[,]"
     relaxed-path-chars: "{,},[,]"
     # Connector-level limits made explicit (M-3 from the performance audit). With
-    # `spring.threads.virtual.enabled=true` Tomcat hands every request off to a
-    # virtual-thread executor, so `threads.max` mostly documents intent for the
-    # non-virtual fallback case (e.g. classpath without --enable-preview). The
+    # `spring.threads.virtual.enabled=true` Spring Boot gives the connector an external
+    # VirtualThreadExecutor, and Tomcat applies `threads.max` / `threads.min-spare` only to its
+    # own internal executor — so those keys were inert and were removed (FE-PERF-07, 2026-09-22;
+    # the tomcat_threads_* gauges read -1, ManagementPortIsolationTest pins the executor). The
     # NIO selector's accept queue (`accept-count`) and concurrent connection cap
     # (`max-connections`) however apply BEFORE the worker layer and are the real
     # gates under burst load — the Tomcat defaults (100 / 8192) used to drop
     # requests under spikes that the virtual-thread pool could otherwise have
     # absorbed. 200/10000 covers our public-internet exposure with headroom.
-    threads:
-      max: 200
-      min-spare: 10
     accept-count: 200
     max-connections: 10000
   # Audit finding H-8: behind nginx-proxy-manager the immediate peer for `request.getRemoteAddr()`
