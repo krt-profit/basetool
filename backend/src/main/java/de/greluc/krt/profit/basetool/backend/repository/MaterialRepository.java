@@ -256,4 +256,15 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
       """)
   Page<MaterialPriceOverviewDto> getMaterialPriceOverview(
       @Param("name") String name, Pageable pageable);
+
+  /**
+   * The UEX commodity id and local id of every material. One query for the whole table; the UEX
+   * syncs resolve every row of a run against the resulting map instead of looking the parent up per
+   * row (BE-PERF-09).
+   *
+   * @return one (UEX id, local id) row per Material that carries a UEX id
+   */
+  @Query(
+      "SELECT e.idCommodity AS uexId, e.id AS id FROM Material e WHERE e.idCommodity IS NOT NULL")
+  List<UexKeyRef> findUexCommodityRefs();
 }

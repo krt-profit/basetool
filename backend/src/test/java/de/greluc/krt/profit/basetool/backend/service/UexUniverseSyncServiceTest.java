@@ -54,6 +54,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -73,6 +74,9 @@ class UexUniverseSyncServiceTest {
   @Mock private TerminalRepository terminalRepository;
 
   @Mock private LocationRepository locationRepository;
+
+  /** A real chunk writer, so the rows are actually written through its callbacks (BE-PERF-09). */
+  @Spy private SyncChunkWriter chunkWriter = new SyncChunkWriter(new RecordingTransactionManager());
 
   @InjectMocks private UexUniverseSyncService service;
 

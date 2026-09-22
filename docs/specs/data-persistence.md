@@ -60,6 +60,17 @@ material bucket at its own quality floor in memory, instead of one `SUM` per mat
 one claim query per SK order. The single-order write paths keep the per-order queries (a bounded
 handful) via a shared resolver-parameterised projection.
 
+**Writes are batched** (BE-PERF-04, 2026-09-22). `hibernate.jdbc.batch_size=50`, the driver's
+`reWriteBatchedInserts` (a Hikari data-source property, so no URL change is needed), and
+`in_clause_parameter_padding`. A 100-recipient notification fan-out reaches the database as two
+batched statements, not a hundred (`NotificationFanOutBatchingTest`, which fails with batching off).
+Statements keep the order the persistence context queued them in: **`order_inserts` and
+`order_updates` stay off**. `order_updates` would change the order row locks are taken in, and
+`order_inserts` broke a real write path when it was tried — it regroups inserts using only the
+associations Hibernate knows, `org_unit_membership` names its org unit through a plain id in its
+embedded key, and the V95 kind trigger then refused memberships inserted ahead of the org unit
+created in the same flush (`HangarIntegrationTest`).
+
 A **request-constant verdict or lookup** consulted more than once per request (e.g. per row) must be
 memoised on the `HttpServletRequest` so it resolves once: `OwnerScopeService.canViewJobOrders()` and
 `currentMemberOrgUnitIds()` cache on a request attribute, and `UserMapper` memoises the per-user
@@ -141,7 +152,7 @@ identity is not hijacked by the duplicate; a single failing company does not abo
 batch; the abbreviation fallback still adopts a legacy short-named row; the `V162` dedup repoints
 child FKs and carries cross-source links onto the surviving canonical row.
 
-### REQ-DATA-005 — the UEX item sync isolates each item in its own transaction
+### REQ-DATA-005 — the UEX syncs isolate each row (or chunk) in its own transaction
 
 UEX assigns the **same in-game `uuid`** to several distinct item ids (a base item and its
 skins/variants — e.g. ids `879`/`5457`/`5458` all carry the MaxLift tractor-beam uuid). `game_item`
@@ -173,6 +184,35 @@ aggregate `sharedUuidDeclined` count on both the `Finished …` summary line and
 per-item `catch` keeps the run going past a failure so the remaining items still persist; an incoming
 uuid already owned by another row leaves the row's `external_uuid` null instead of throwing; and the
 run summary carries the `sharedUuidDeclined` count of such rows.
+
+**Extended to every UEX sync on 2026-09-22 (BE-PERF-09).** The item sync was the only one isolated;
+every other UEX sync held one read-write transaction around its HTTP fetch and all of its rows — the
+commodity sync around two fetches and the whole price matrix — so a pooled connection idled while
+UEX answered, each row paid up to three lookups plus an auto-flush of the growing context, and one
+row the database refused rolled the entire catalogue back. Now:
+
+- **No transaction spans an HTTP call.** Every UEX sync method is `Propagation.NOT_SUPPORTED`; the
+  fetch runs with no transaction open, and a bulk statement that needs one (an orphan sweep, the
+  stale-price sweep, an audit summary) gets its own.
+- **Rows are written by `SyncChunkWriter`**: chunks of 500, each in its own `REQUIRES_NEW`
+  transaction; a chunk that fails is rolled back and replayed row by row, so the refused row fails
+  alone and its siblings commit. Counts come from the per-row results, never from side effects,
+  because a replayed chunk runs its rows twice.
+- **The matrices resolve against preloaded id maps** (`UexMatrixLookups`): the commodity-price,
+  item-price and refinery-yield syncs read the parent, terminal and existing-row ids once per run —
+  one query each — and load a chunk's existing rows with one `findAllById`; the item sync reads its
+  manufacturer and ship-type ids the same way. The maps hold ids, never entities (the 2026-09-06
+  lesson: an entity does not survive its transaction), and a row created during the run is recorded
+  in them so a later chunk or a replay updates it instead of inserting a duplicate.
+- The small topology catalogues (cities, factions, planets, …, star systems, categories, vehicles)
+  keep their per-row lookups — each row needs its own entity for the update anyway, and the tables
+  are a few hundred rows — but write through the same chunk writer.
+
+**Acceptance** (`SyncChunkWriterTest`, `UexItemPriceSyncServiceTest`, `UexCommodityServiceTest`,
+`UexRefinerySyncServiceTest`, `UexItemSyncServiceTest`, `UexSyncNotModifiedTest`): one transaction
+per chunk on the happy path; a failing row rolls back alone while its siblings commit, in the chunk
+writer and in both price syncs; no per-row parent / terminal / existing-row lookup on the matrix
+paths; a pair repeated in the feed updates one row; the 304 and empty-feed paths are unchanged.
 
 ### REQ-DATA-017 — every hot predicate and foreign key has a covering index
 

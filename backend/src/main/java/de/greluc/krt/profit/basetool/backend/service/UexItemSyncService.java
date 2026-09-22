@@ -33,12 +33,15 @@ import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ManufacturerUexCompanyRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
+import de.greluc.krt.profit.basetool.backend.repository.UexKeyRef;
 import de.greluc.krt.profit.basetool.backend.support.LogSafe;
 import de.greluc.krt.profit.basetool.backend.support.UexValues;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -92,6 +95,12 @@ import org.springframework.web.util.UriUtils;
  * until the next healthy run re-upserted them (REQ-DATA-014). Orphans are reconciled on the next
  * run that fetches every category fresh.
  *
+ * <p><strong>No transaction across the fetches (BE-PERF-09).</strong> {@link #syncItems()} holds no
+ * transaction: every category is fetched with none open, the manufacturer and ship-type lookups are
+ * read once into id maps, each item commits in its own transaction below, and the orphan sweep runs
+ * in one of its own. Until 2026-09-22 the run was one read-write transaction around ~50 HTTP calls,
+ * pinning a pooled connection for the whole walk while every item opened a second one.
+ *
  * <p><strong>Per-item isolation (REQ-DATA-004).</strong> Each item is upserted in its own {@code
  * REQUIRES_NEW} transaction via {@link #upsertItemWithinTransaction(UexItemDto, UexCategory,
  * Instant)}, invoked through the {@link #self} proxy. UEX ships several distinct item ids sharing
@@ -132,6 +141,9 @@ public class UexItemSyncService {
    */
   private final ObjectProvider<UexItemSyncService> self;
 
+  /** Runs the preload read and the orphan sweep in transactions of their own (BE-PERF-09). */
+  private final SyncChunkWriter chunkWriter;
+
   /**
    * Runs the full UEX item sync: ensures the category reference table is fresh, then walks every
    * game-related category. Empty UEX responses short-circuit per category without wiping local
@@ -156,7 +168,7 @@ public class UexItemSyncService {
    *     nothing was upserted because the catalogue came back unchanged ({@code 304}) — the live UEX
    *     catalogue size
    */
-  @Transactional
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public int syncItems() {
     log.info("Starting synchronization of UEX items...");
     // final: the run id is captured at the start of the run but first used in the summary event at
@@ -172,6 +184,10 @@ public class UexItemSyncService {
     boolean anyCategoryUnchanged = false;
     int incompleteCategories = 0;
     Instant now = Instant.now();
+    // One query per lookup table for the whole run instead of up to three lookups per item
+    // (BE-PERF-09). Ids only: the map outlives the transaction that read it, and each per-item
+    // transaction turns an id back into a reference with getReferenceById.
+    ItemLookups lookups = chunkWriter.inNewTransaction(this::loadItemLookups);
 
     for (UexCategory category : categories) {
       if (!Boolean.TRUE.equals(category.getIsGameRelated())) {
@@ -215,7 +231,7 @@ public class UexItemSyncService {
       categoriesProcessed++;
       for (UexItemDto dto : dtos) {
         try {
-          GameItem item = self.getObject().upsertItemWithinTransaction(dto, category, now);
+          GameItem item = self.getObject().upsertItemWithinTransaction(dto, category, now, lookups);
           if (item != null) {
             itemsProcessed++;
             if (item.getCreatedAt() == null || item.getCreatedAt().equals(item.getUpdatedAt())) {
@@ -264,7 +280,10 @@ public class UexItemSyncService {
           seenUexItemIds.size(),
           incompleteCategories);
     } else {
-      marked = gameItemRepository.markUexDeletedExcept(seenUexItemIds, now);
+      // A bulk update needs a transaction, and the run no longer holds one (BE-PERF-09).
+      marked =
+          chunkWriter.inNewTransaction(
+              () -> gameItemRepository.markUexDeletedExcept(seenUexItemIds, now));
       if (marked > 0) {
         log.info("Marked {} game_item row(s) uex_deleted (no longer in UEX feed)", marked);
       }
@@ -341,6 +360,25 @@ public class UexItemSyncService {
   @Nullable
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public GameItem upsertItemWithinTransaction(UexItemDto dto, UexCategory category, Instant now) {
+    return upsertItemWithinTransaction(dto, category, now, null);
+  }
+
+  /**
+   * Same as {@link #upsertItemWithinTransaction(UexItemDto, UexCategory, Instant)}, resolving the
+   * manufacturer and the linked ship type from preloaded id maps rather than with a query each
+   * (BE-PERF-09). The sync run passes the maps it read once; {@code null} falls back to the per-row
+   * repository lookups.
+   *
+   * @param dto inbound UEX row
+   * @param category resolved category for kind derivation + FK
+   * @param now timestamp to stamp on the row
+   * @param lookups the run's preloaded id maps, or {@code null} for per-row lookups
+   * @return the persisted entity, or {@code null} if the DTO was unusable
+   */
+  @Nullable
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public GameItem upsertItemWithinTransaction(
+      UexItemDto dto, UexCategory category, Instant now, @Nullable ItemLookups lookups) {
     if (dto.id() == null || !StringUtils.hasText(dto.name())) {
       log.debug(
           "Skipping UEX item with missing id/name (id={}, uuid={}, name='{}')",
@@ -404,13 +442,13 @@ public class UexItemSyncService {
     // GENERIC just because UEX catalogues the same external_uuid under a Liveries category. New
     // rows start at GENERIC, so the merge leaves the freshly-derived kind intact.
     item.setKind(GameItemKind.mergeMoreSpecific(item.getKind(), deriveKind(category)));
-    item.setManufacturer(resolveManufacturer(dto));
+    item.setManufacturer(resolveManufacturer(dto, lookups));
     item.setUexItemId(dto.id());
     item.setUexSlug(dto.slug());
     item.setUexCategory(category);
     item.setUexCompanyId(dto.idCompany());
     item.setUexVehicleId(dto.idVehicle());
-    item.setLinkedShipType(resolveLinkedShipType(dto));
+    item.setLinkedShipType(resolveLinkedShipType(dto, lookups));
     item.setUexColor(dto.color());
     item.setUexColor2(dto.color2());
     item.setUexQuality(dto.quality());
@@ -467,11 +505,25 @@ public class UexItemSyncService {
    * — the row is still persisted; the FK stays NULL and the admin can fix it via {@code
    * /admin/material-aliases} once that surface is generalised (post-R2).
    *
+   * <p>With {@code lookups} both steps are map hits and the result is a {@code getReferenceById}
+   * proxy — no query at all.
+   *
    * @param dto inbound UEX row
+   * @param lookups the run's preloaded id maps, or {@code null} for per-row lookups
    * @return resolved manufacturer, or {@code null}
    */
   @Nullable
-  private Manufacturer resolveManufacturer(UexItemDto dto) {
+  private Manufacturer resolveManufacturer(UexItemDto dto, @Nullable ItemLookups lookups) {
+    if (lookups != null) {
+      UUID id = null;
+      if (dto.idCompany() != null && dto.idCompany() != 0) {
+        id = lookups.manufacturerByCompanyId().get(dto.idCompany());
+      }
+      if (id == null && StringUtils.hasText(dto.companyName())) {
+        id = lookups.manufacturerByLowerName().get(dto.companyName().toLowerCase(Locale.ROOT));
+      }
+      return id == null ? null : manufacturerRepository.getReferenceById(id);
+    }
     if (dto.idCompany() != null && dto.idCompany() != 0) {
       Optional<Manufacturer> byId =
           manufacturerAliasRepository.findManufacturerByUexCompanyId(dto.idCompany());
@@ -490,15 +542,59 @@ public class UexItemSyncService {
    * id_vehicle}).
    *
    * @param dto inbound UEX row
+   * @param lookups the run's preloaded id maps, or {@code null} for a per-row lookup
    * @return resolved ship type, or {@code null} if {@code id_vehicle} is 0 / unknown
    */
   @Nullable
-  private ShipType resolveLinkedShipType(UexItemDto dto) {
+  private ShipType resolveLinkedShipType(UexItemDto dto, @Nullable ItemLookups lookups) {
     if (dto.idVehicle() == null || dto.idVehicle() == 0) {
       return null;
     }
+    if (lookups != null) {
+      UUID id = lookups.shipTypeByVehicleId().get(dto.idVehicle());
+      return id == null ? null : shipTypeRepository.getReferenceById(id);
+    }
     return shipTypeRepository.findByUexVehicleId(dto.idVehicle()).orElse(null);
   }
+
+  /**
+   * Reads the item sync's three lookup maps, one query each: manufacturer id by UEX company id (the
+   * alias table), manufacturer id by lower-cased name, and ship-type id by UEX vehicle id.
+   *
+   * @return the lookups, holding ids only
+   */
+  @NotNull
+  ItemLookups loadItemLookups() {
+    Map<Integer, UUID> byCompany = new HashMap<>();
+    for (UexKeyRef ref : manufacturerAliasRepository.findCompanyRefs()) {
+      byCompany.putIfAbsent(ref.getUexId(), ref.getId());
+    }
+    Map<String, UUID> byName = new HashMap<>();
+    for (ManufacturerRepository.NameRef ref : manufacturerRepository.findNameRefs()) {
+      if (ref.getName() != null) {
+        byName.putIfAbsent(ref.getName().toLowerCase(Locale.ROOT), ref.getId());
+      }
+    }
+    Map<Integer, UUID> byVehicle = new HashMap<>();
+    for (UexKeyRef ref : shipTypeRepository.findUexVehicleRefs()) {
+      byVehicle.putIfAbsent(ref.getUexId(), ref.getId());
+    }
+    return new ItemLookups(byCompany, byName, byVehicle);
+  }
+
+  /**
+   * The item sync's preloaded id maps (BE-PERF-09). Ids only, so they serve every per-item
+   * transaction of the run; the manufacturer and ship-type catalogues are synced before the items
+   * and do not change during the item walk.
+   *
+   * @param manufacturerByCompanyId manufacturer id by UEX company id (every alias)
+   * @param manufacturerByLowerName manufacturer id by lower-cased name
+   * @param shipTypeByVehicleId ship-type id by UEX vehicle id
+   */
+  public record ItemLookups(
+      @NotNull Map<Integer, UUID> manufacturerByCompanyId,
+      @NotNull Map<String, UUID> manufacturerByLowerName,
+      @NotNull Map<Integer, UUID> shipTypeByVehicleId) {}
 
   /**
    * Maps the row's category to a {@link GameItemKind} per the §6.3.1 table. The decision is driven

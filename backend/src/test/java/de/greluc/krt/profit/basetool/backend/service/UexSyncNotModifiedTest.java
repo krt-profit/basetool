@@ -65,6 +65,9 @@ import org.slf4j.LoggerFactory;
 @ExtendWith(MockitoExtension.class)
 class UexSyncNotModifiedTest {
 
+  /** A real chunk writer over a recording transaction manager (BE-PERF-09). */
+  private final SyncChunkWriter writer = new SyncChunkWriter(new RecordingTransactionManager());
+
   @Mock private UexClient uexClient;
 
   @Mock private UexCategoryRepository uexCategoryRepository;
@@ -99,7 +102,7 @@ class UexSyncNotModifiedTest {
   void starSystems_unchangedFeed_logsInfoNotWarn_andTouchesNoRepository() {
     when(uexClient.getStarSystems()).thenReturn(unchanged());
     // Null repository: any local read or write on the 304 path would NPE instead of passing.
-    UexStarSystemService service = new UexStarSystemService(uexClient, null);
+    UexStarSystemService service = new UexStarSystemService(uexClient, null, writer);
 
     service.fetchAndProcessStarSystems();
 
@@ -111,7 +114,7 @@ class UexSyncNotModifiedTest {
     // The load-bearing case: syncVehicles() ends in a ship_type orphan sweep. Returning early on a
     // 304 is what keeps an unchanged catalogue from tombstoning rows it never re-enumerated.
     when(uexClient.getVehicles()).thenReturn(unchanged());
-    UexVehicleService service = new UexVehicleService(uexClient, null, null, null);
+    UexVehicleService service = new UexVehicleService(uexClient, null, null, null, writer);
 
     service.syncVehicles();
 
@@ -124,7 +127,7 @@ class UexSyncNotModifiedTest {
     // fetch instead of returning — so both branches have to be exercised together.
     when(uexClient.getCommodities()).thenReturn(unchanged());
     when(uexClient.getCommoditiesPricesAll()).thenReturn(unchanged());
-    UexCommodityService service = new UexCommodityService(uexClient, null, null, null);
+    UexCommodityService service = new UexCommodityService(uexClient, null, null, null, writer);
 
     service.fetchAndProcessCommoditiesPrices();
 
@@ -149,7 +152,8 @@ class UexSyncNotModifiedTest {
     UexCategory persisted = new UexCategory();
     when(uexClient.getCategories()).thenReturn(unchanged());
     when(uexCategoryRepository.findAll()).thenReturn(List.of(persisted));
-    UexCategoryRefService service = new UexCategoryRefService(uexClient, uexCategoryRepository);
+    UexCategoryRefService service =
+        new UexCategoryRefService(uexClient, uexCategoryRepository, writer);
 
     List<UexCategory> result = service.syncCategories();
 
@@ -165,7 +169,7 @@ class UexSyncNotModifiedTest {
     properties.setItemPriceSyncEnabled(true);
     when(uexClient.getItemPrices()).thenReturn(unchanged());
     UexItemPriceSyncService service =
-        new UexItemPriceSyncService(uexClient, properties, null, null, null, null);
+        new UexItemPriceSyncService(uexClient, properties, null, null, null, writer);
 
     service.syncItemPrices();
 
@@ -178,7 +182,7 @@ class UexSyncNotModifiedTest {
     // near-identical tests. Every repository is null: reaching any of them would NPE.
     UexUniverseSyncService service =
         new UexUniverseSyncService(
-            uexClient, null, null, null, null, null, null, null, null, null, null, null);
+            uexClient, null, null, null, null, null, null, null, null, null, null, null, writer);
 
     List<UniverseCase> cases =
         List.of(
@@ -237,7 +241,7 @@ class UexSyncNotModifiedTest {
     // The counterweight to every case above: the WARN must not have been softened away. An
     // empty-200 is a real outage signal and still has to read like one.
     when(uexClient.getStarSystems()).thenReturn(fetched(List.of()));
-    UexStarSystemService service = new UexStarSystemService(uexClient, null);
+    UexStarSystemService service = new UexStarSystemService(uexClient, null, writer);
 
     service.fetchAndProcessStarSystems();
 
@@ -251,7 +255,7 @@ class UexSyncNotModifiedTest {
     // Guards the "a 304 changes nothing" half of the contract with an explicit mock as well, so a
     // future refactor that hands the services a real repository cannot quietly lose it.
     when(uexClient.getVehicles()).thenReturn(unchanged());
-    new UexVehicleService(uexClient, null, null, null).syncVehicles();
+    new UexVehicleService(uexClient, null, null, null, writer).syncVehicles();
 
     verifyNoInteractions(uexCategoryRepository);
   }

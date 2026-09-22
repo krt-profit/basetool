@@ -111,4 +111,16 @@ public interface GameItemPriceRepository extends JpaRepository<GameItemPrice, UU
          OR p.statusSell IS NOT NULL
       """)
   List<UUID> findIdsWithLivePrices();
+
+  /**
+   * The (game item, terminal) key and id of every item price row. One query for the whole matrix;
+   * the UEX sync resolves "does this pair have a row yet" in memory instead of with a lookup per
+   * row (BE-PERF-09).
+   *
+   * @return one (parent id, terminal id, row id) row per matrix row
+   */
+  @Query(
+      "SELECT e.gameItem.id AS parentId, e.terminal.id AS terminalId, e.id AS id FROM GameItemPrice"
+          + " e")
+  List<PairKeyRef> findPriceKeyRefs();
 }

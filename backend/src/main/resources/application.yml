@@ -124,11 +124,34 @@ spring:
       minimum-idle: 5
       idle-timeout: 300000
       max-lifetime: 1800000
+      # BE-PERF-04: the PostgreSQL driver rewrites a JDBC insert batch into one multi-row INSERT.
+      # Set as a driver property rather than on the URL, so every profile and the compose/Quadlet
+      # SPRING_DATASOURCE_URL get it without an infrastructure change.
+      data-source-properties:
+        reWriteBatchedInserts: true
   jpa:
     open-in-view: false
     properties:
       hibernate:
         default_batch_fetch_size: 100
+        # BE-PERF-04: JDBC batching. Consecutive inserts / updates of one entity type go out as
+        # batches of up to 50 statements per round trip — a 100-recipient notification fan-out or a
+        # UEX price chunk is a handful of round trips instead of one per row. The statements keep
+        # the order the persistence context queued them in.
+        #
+        # hibernate.order_inserts / order_updates stay OFF, deliberately. order_updates would change
+        # the order row locks are taken in. order_inserts was tried and broke a real write path
+        # (2026-09-22): it regroups inserts by entity using only the associations Hibernate knows,
+        # and org_unit_membership references its org unit through a plain id in its embedded key, so
+        # a flush that created a Spezialkommando and its memberships inserted the memberships first
+        # and the V95 sync_org_unit_membership_kind trigger refused them ("org_unit ... does not
+        # exist"). HangarIntegrationTest caught it.
+        jdbc:
+          batch_size: 50
+        query:
+          # A collection-valued IN parameter is padded to the next power of two, so the plan cache
+          # holds a handful of shapes per query instead of one per list length.
+          in_clause_parameter_padding: true
       # SEC-03: global statement-execution backstop. Every Hibernate-issued query (JPQL, derived,
       # @Query incl. native, @Modifying, pessimistic-lock waits) is bounded to this many
       # milliseconds, so a single heavy request -- e.g. a size=100000 load-all of the material

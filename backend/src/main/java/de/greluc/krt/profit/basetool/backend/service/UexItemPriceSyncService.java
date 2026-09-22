@@ -22,23 +22,26 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.config.UexProperties;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexItemPriceDto;
 import de.greluc.krt.profit.basetool.backend.integration.UexClient;
-import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.GameItemPrice;
-import de.greluc.krt.profit.basetool.backend.model.Terminal;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemPriceRepository;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.TerminalRepository;
 import de.greluc.krt.profit.basetool.backend.support.StalePriceSweep;
-import jakarta.persistence.EntityManager;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -46,15 +49,24 @@ import org.springframework.transaction.annotation.Transactional;
  * ({@code /items_prices_all}) and upserts one {@code game_item_price} row per (item, terminal)
  * pair.
  *
- * <p>Resolution: {@code id_item → game_item} via {@link GameItemRepository#findByUexItemId} and
- * {@code id_terminal → terminal} via {@link TerminalRepository#findByIdTerminal}. Unlike the
- * commodity-price sync, an unknown item is <b>skipped</b> (not auto-created): {@code game_item} is
- * owned by the UEX item catalogue + Wiki backfill, which run earlier in the same scheduler tick, so
- * a price referencing an item not yet catalogued resolves on the next cycle. Unknown terminals are
- * skipped too (the universe sync owns {@code terminal}).
+ * <p>Resolution: {@code id_item → game_item} and {@code id_terminal → terminal}, both through id
+ * maps read once per run ({@link GameItemRepository#findUexItemRefs()}, {@link
+ * TerminalRepository#findUexTerminalRefs()}), and the existing row through a third ({@link
+ * GameItemPriceRepository#findPriceKeyRefs()}). Unlike the commodity-price sync, an unknown item is
+ * <b>skipped</b> (not auto-created): {@code game_item} is owned by the UEX item catalogue + Wiki
+ * backfill, which run earlier in the same scheduler tick, so a price referencing an item not yet
+ * catalogued resolves on the next cycle. Unknown terminals are skipped too (the universe sync owns
+ * {@code terminal}).
  *
- * <p>After the loop the ids of every touched row are passed to {@link
- * GameItemPriceRepository#clearStalePrices} to null out (item, terminal) pairs UEX no longer
+ * <p><strong>Transactions (BE-PERF-09, REQ-DATA-005).</strong> The ~24 000-row feed is fetched with
+ * no transaction open and written through {@link SyncChunkWriter}: chunks of {@value
+ * SyncChunkWriter#DEFAULT_CHUNK_SIZE} rows in their own transactions, each chunk's existing rows
+ * loaded with one {@code findAllById}, a failed chunk replayed row by row. Until 2026-09-22 the run
+ * was one transaction across the fetch and every row, with three lookups per row and a
+ * flush-and-clear every 500 rows to keep the context from growing.
+ *
+ * <p>After the writes the ids of every touched row drive the stale sweep ({@link
+ * GameItemPriceRepository#clearPricesByIds}), which nulls out (item, terminal) pairs UEX no longer
  * returns. The sweep is gated on a non-empty touched-set so a run that fails on every row never
  * wipes the whole matrix; an empty upstream response short-circuits before the sweep entirely.
  *
@@ -68,24 +80,21 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class UexItemPriceSyncService {
 
-  /**
-   * Flush/clear the persistence context every this-many upserts so the ~24 000-row matrix never
-   * accumulates in one context (§ M2 hardening). See {@link #flushAndClearIfBatchFull(int)}.
-   */
-  static final int FLUSH_BATCH_SIZE = 500;
-
   private final UexClient uexClient;
   private final UexProperties uexProperties;
   private final GameItemRepository gameItemRepository;
   private final GameItemPriceRepository gameItemPriceRepository;
   private final TerminalRepository terminalRepository;
-  private final EntityManager entityManager;
+
+  /** Writes the matrix in short isolated transactions after the fetch (BE-PERF-09). */
+  private final SyncChunkWriter chunkWriter;
 
   /**
    * Runs the full item-price matrix sync. No-op (with an INFO line) when the feature flag is off;
-   * an empty UEX response short-circuits before the stale-row sweep.
+   * an empty UEX response short-circuits before the stale-row sweep. Deliberately holds no
+   * transaction: the fetch runs with none open, and each chunk commits on its own.
    */
-  @Transactional
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public void syncItemPrices() {
     if (!Boolean.TRUE.equals(uexProperties.getItemPriceSyncEnabled())) {
       log.info(
@@ -108,28 +117,24 @@ public class UexItemPriceSyncService {
       return;
     }
 
-    Set<UUID> seenPriceIds = new HashSet<>();
     Instant now = Instant.now();
-    int processed = 0;
-    int skipped = 0;
-    for (UexItemPriceDto dto : dtos) {
-      try {
-        UUID savedId = upsert(dto, now);
-        if (savedId != null) {
-          seenPriceIds.add(savedId);
-          processed++;
-          flushAndClearIfBatchFull(processed);
-        } else {
-          skipped++;
-        }
-      } catch (Exception e) {
-        log.error(
-            "Failed to process UEX item-price dto (idItem={}, idTerminal={})",
-            dto.idItem(),
-            dto.idTerminal(),
-            e);
-      }
-    }
+    UexMatrixLookups lookups =
+        chunkWriter.inNewTransaction(
+            () ->
+                new UexMatrixLookups(
+                    gameItemRepository.findUexItemRefs(),
+                    terminalRepository.findUexTerminalRefs(),
+                    gameItemPriceRepository.findPriceKeyRefs()));
+    SyncChunkWriter.Outcome<UUID> outcome =
+        chunkWriter.write(
+            dtos,
+            SyncChunkWriter.DEFAULT_CHUNK_SIZE,
+            chunk -> writeChunk(chunk, lookups, now),
+            "item price",
+            dto -> "(idItem=" + dto.idItem() + ", idTerminal=" + dto.idTerminal() + ")");
+    Set<UUID> seenPriceIds = new HashSet<>(outcome.results());
+    int processed = seenPriceIds.size();
+    int skipped = dtos.size() - outcome.results().size() - outcome.failedRows();
 
     if (seenPriceIds.isEmpty()) {
       log.warn(
@@ -141,76 +146,83 @@ public class UexItemPriceSyncService {
       // bound a parameter per row UEX returned (23 770 today) and would hit PostgreSQL's 65 535
       // bind-parameter ceiling as the matrix grows (REQ-DATA-014).
       int cleared =
-          StalePriceSweep.clearStale(
-              gameItemPriceRepository.findIdsWithLivePrices(),
-              seenPriceIds,
-              gameItemPriceRepository::clearPricesByIds);
+          chunkWriter.inNewTransaction(
+              () ->
+                  StalePriceSweep.clearStale(
+                      gameItemPriceRepository.findIdsWithLivePrices(),
+                      seenPriceIds,
+                      gameItemPriceRepository::clearPricesByIds));
       if (cleared > 0) {
         log.info("Cleared prices on {} game_item_price row(s) no longer returned by UEX.", cleared);
       }
     }
     log.info(
-        "Finished UEX item-price sync: {} processed, {} skipped (unknown item / terminal).",
+        "Finished UEX item-price sync: {} processed, {} skipped (unknown item / terminal), {}"
+            + " failed.",
         processed,
-        skipped);
+        skipped,
+        outcome.failedRows());
   }
 
   /**
-   * Upserts one item-price DTO into {@code game_item_price}. Returns the saved row id, or {@code
-   * null} when the row is skipped — missing ids, an item not yet in {@code game_item}, or a
-   * terminal not yet in {@code terminal}.
+   * Writes one chunk of item-price rows inside its transaction: the chunk's existing rows are
+   * loaded with one {@code findAllById}, updated in place or created against {@code
+   * getReferenceById} parents, and saved. A row with a missing id, an item not yet in {@code
+   * game_item} or a terminal not yet in {@code terminal} is skipped.
    *
-   * @param dto inbound UEX item-price row
-   * @param now timestamp to stamp on the row
-   * @return the saved {@link GameItemPrice} id, or {@code null} if skipped
+   * @param chunk the rows of this chunk
+   * @param lookups the preloaded id maps, extended with every row written
+   * @param now timestamp to stamp on the rows
+   * @return the ids of the rows written
    */
-  @Nullable
-  private UUID upsert(UexItemPriceDto dto, Instant now) {
-    if (dto.idItem() == null || dto.idTerminal() == null) {
-      return null;
+  @NotNull
+  List<UUID> writeChunk(
+      @NotNull List<UexItemPriceDto> chunk, @NotNull UexMatrixLookups lookups, Instant now) {
+    List<UUID> existingIds = new ArrayList<>();
+    for (UexItemPriceDto dto : chunk) {
+      UUID itemId = lookups.parentId(dto.idItem());
+      UUID terminalId = lookups.terminalId(dto.idTerminal());
+      UUID priceId =
+          itemId == null || terminalId == null ? null : lookups.rowId(itemId, terminalId);
+      if (priceId != null) {
+        existingIds.add(priceId);
+      }
     }
-    GameItem item = gameItemRepository.findByUexItemId(dto.idItem()).orElse(null);
-    if (item == null) {
-      return null;
+    Map<UUID, GameItemPrice> existing =
+        existingIds.isEmpty()
+            ? Map.of()
+            : gameItemPriceRepository.findAllById(existingIds).stream()
+                .collect(Collectors.toMap(GameItemPrice::getId, Function.identity()));
+    Map<UexMatrixLookups.Pair, GameItemPrice> written = new LinkedHashMap<>();
+    for (UexItemPriceDto dto : chunk) {
+      UUID itemId = lookups.parentId(dto.idItem());
+      UUID terminalId = lookups.terminalId(dto.idTerminal());
+      if (itemId == null || terminalId == null) {
+        continue;
+      }
+      UexMatrixLookups.Pair key = new UexMatrixLookups.Pair(itemId, terminalId);
+      GameItemPrice price = written.get(key);
+      if (price == null) {
+        UUID priceId = lookups.rowId(itemId, terminalId);
+        price = priceId == null ? null : existing.get(priceId);
+      }
+      if (price == null) {
+        price = new GameItemPrice();
+        price.setGameItem(gameItemRepository.getReferenceById(itemId));
+        price.setTerminal(terminalRepository.getReferenceById(terminalId));
+      }
+      price.setPriceBuy(dto.priceBuy());
+      price.setPriceSell(dto.priceSell());
+      price.setDateModified(dto.dateModified());
+      price.setUexSyncedAt(now);
+      written.put(key, price);
     }
-    Terminal terminal = terminalRepository.findByIdTerminal(dto.idTerminal()).orElse(null);
-    if (terminal == null) {
-      return null;
+    List<UUID> ids = new ArrayList<>();
+    for (Map.Entry<UexMatrixLookups.Pair, GameItemPrice> entry : written.entrySet()) {
+      UUID id = gameItemPriceRepository.save(entry.getValue()).getId();
+      lookups.rememberRow(entry.getKey().parentId(), entry.getKey().terminalId(), id);
+      ids.add(id);
     }
-
-    GameItemPrice price =
-        gameItemPriceRepository
-            .findByGameItemIdAndTerminalId(item.getId(), terminal.getId())
-            .orElseGet(
-                () -> {
-                  GameItemPrice fresh = new GameItemPrice();
-                  fresh.setGameItem(item);
-                  fresh.setTerminal(terminal);
-                  return fresh;
-                });
-
-    price.setPriceBuy(dto.priceBuy());
-    price.setPriceSell(dto.priceSell());
-    price.setDateModified(dto.dateModified());
-    price.setUexSyncedAt(now);
-    return gameItemPriceRepository.save(price).getId();
-  }
-
-  /**
-   * Flushes and clears the persistence context every {@link #FLUSH_BATCH_SIZE} upserts so the ~24
-   * 000-row item-price matrix never accumulates in one context. Without this, Hibernate's
-   * auto-flush re-dirty-checks every managed entity before each lookup query — O(n²) over the run —
-   * and the heap holds every {@code game_item_price} for the transaction. {@code flush()} writes
-   * pending changes first (nothing is lost), then {@code clear()} detaches them; the {@code
-   * seenPriceIds} set holds row UUIDs (not entities), so the stale-row sweep after the loop is
-   * unaffected, and {@code item} / {@code terminal} are re-looked-up fresh on each iteration.
-   *
-   * @param processedSoFar count of price rows upserted so far this run
-   */
-  void flushAndClearIfBatchFull(int processedSoFar) {
-    if (processedSoFar > 0 && processedSoFar % FLUSH_BATCH_SIZE == 0) {
-      entityManager.flush();
-      entityManager.clear();
-    }
+    return ids;
   }
 }

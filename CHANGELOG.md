@@ -40,6 +40,12 @@
 
 ### Changed
 
+- **UEX-Abgleich: ein fehlerhafter Datensatz kostet nur noch sich selbst.** Preise, Rohstoffe,
+  Raffinerie-Ausbeuten und Universumsdaten werden nach dem Abruf in kleinen, getrennten Paketen
+  gespeichert; bisher verwarf ein einziger abgelehnter Datensatz den ganzen Abgleich, und während UEX
+  antwortete, blieb eine Datenbankverbindung belegt. Schreibzugriffe werden allgemein gebündelt
+  (REQ-DATA-005, REQ-DATA-003).
+
 - **Anmeldung: Das Sitzungs-Cookie heißt jetzt `__Host-SESSION`.** Der Browser nimmt es damit nur
   über HTTPS und nur für genau diese Adresse an, keine andere Seite kann es setzen oder überschreiben.
   **Mit diesem Update werden alle einmal abgemeldet** und melden sich neu an; die

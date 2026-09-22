@@ -20,11 +20,14 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import static de.greluc.krt.profit.basetool.backend.service.UexFetchResults.fetched;
+import static de.greluc.krt.profit.basetool.backend.service.UexRefs.pair;
+import static de.greluc.krt.profit.basetool.backend.service.UexRefs.ref;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -40,10 +43,8 @@ import de.greluc.krt.profit.basetool.backend.model.Terminal;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemPriceRepository;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.TerminalRepository;
-import jakarta.persistence.EntityManager;
 import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,8 +57,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 /**
  * Unit tests for {@link UexItemPriceSyncService} — the R7 UEX item-price matrix sync
  * (SC_WIKI_SYNC_PLAN.md §6.7 / §11 R7). Covers the flag gate, empty-feed abort, the
- * upsert-by-(item,terminal) path, skipping unknown items / terminals, and the non-empty-seen gate
- * on the stale-row sweep.
+ * upsert-by-(item,terminal) path against the preloaded id maps (BE-PERF-09), skipping unknown items
+ * / terminals, the per-row isolation of a failing row, and the non-empty-seen gate on the stale-row
+ * sweep.
  */
 @ExtendWith(MockitoExtension.class)
 class UexItemPriceSyncServiceTest {
@@ -66,8 +68,8 @@ class UexItemPriceSyncServiceTest {
   @Mock private GameItemRepository gameItemRepository;
   @Mock private GameItemPriceRepository gameItemPriceRepository;
   @Mock private TerminalRepository terminalRepository;
-  @Mock private EntityManager entityManager;
 
+  private final RecordingTransactionManager tx = new RecordingTransactionManager();
   private UexProperties properties;
   private UexItemPriceSyncService service;
 
@@ -82,7 +84,7 @@ class UexItemPriceSyncServiceTest {
             gameItemRepository,
             gameItemPriceRepository,
             terminalRepository,
-            entityManager);
+            new SyncChunkWriter(tx));
   }
 
   @Test
@@ -112,10 +114,11 @@ class UexItemPriceSyncServiceTest {
     Terminal terminal = terminal();
     when(uexClient.getItemPrices())
         .thenReturn(fetched(List.of(dto(1, 107, 15461.0, 0.0, 1778763945L))));
-    when(gameItemRepository.findByUexItemId(1)).thenReturn(Optional.of(item));
-    when(terminalRepository.findByIdTerminal(107)).thenReturn(Optional.of(terminal));
-    when(gameItemPriceRepository.findByGameItemIdAndTerminalId(item.getId(), terminal.getId()))
-        .thenReturn(Optional.empty());
+    knownItems(ref(1, item.getId()));
+    knownTerminals(ref(107, terminal.getId()));
+    when(gameItemPriceRepository.findPriceKeyRefs()).thenReturn(List.of());
+    when(gameItemRepository.getReferenceById(item.getId())).thenReturn(item);
+    when(terminalRepository.getReferenceById(terminal.getId())).thenReturn(terminal);
     stubSaveAssigningId();
 
     service.syncItemPrices();
@@ -134,6 +137,9 @@ class UexItemPriceSyncServiceTest {
     assertNull(price.getStatusBuy());
     // A processed row → non-empty seen set → the stale-row sweep runs.
     verify(gameItemPriceRepository).findIdsWithLivePrices();
+    // No per-row lookup: the ids come from the three preloaded maps (BE-PERF-09).
+    verify(gameItemRepository, never()).findByUexItemId(any());
+    verify(terminalRepository, never()).findByIdTerminal(any());
   }
 
   @Test
@@ -146,10 +152,12 @@ class UexItemPriceSyncServiceTest {
     existing.setTerminal(terminal);
     existing.setPriceBuy(99.0);
     when(uexClient.getItemPrices()).thenReturn(fetched(List.of(dto(1, 107, 250.0, 300.0, 10L))));
-    when(gameItemRepository.findByUexItemId(1)).thenReturn(Optional.of(item));
-    when(terminalRepository.findByIdTerminal(107)).thenReturn(Optional.of(terminal));
-    when(gameItemPriceRepository.findByGameItemIdAndTerminalId(item.getId(), terminal.getId()))
-        .thenReturn(Optional.of(existing));
+    knownItems(ref(1, item.getId()));
+    knownTerminals(ref(107, terminal.getId()));
+    when(gameItemPriceRepository.findPriceKeyRefs())
+        .thenReturn(List.of(pair(item.getId(), terminal.getId(), existing.getId())));
+    when(gameItemPriceRepository.findAllById(List.of(existing.getId())))
+        .thenReturn(List.of(existing));
     stubSaveAssigningId();
 
     service.syncItemPrices();
@@ -164,7 +172,9 @@ class UexItemPriceSyncServiceTest {
   @Test
   void skipsUnknownItem_andDoesNotSweep_whenNothingProcessed() {
     when(uexClient.getItemPrices()).thenReturn(fetched(List.of(dto(999, 107, 1.0, 2.0, 1L))));
-    when(gameItemRepository.findByUexItemId(999)).thenReturn(Optional.empty());
+    knownItems();
+    knownTerminals(ref(107, UUID.randomUUID()));
+    when(gameItemPriceRepository.findPriceKeyRefs()).thenReturn(List.of());
 
     service.syncItemPrices();
 
@@ -175,10 +185,10 @@ class UexItemPriceSyncServiceTest {
 
   @Test
   void skipsUnknownTerminal() {
-    GameItem item = gameItem();
     when(uexClient.getItemPrices()).thenReturn(fetched(List.of(dto(1, 555, 1.0, 2.0, 1L))));
-    when(gameItemRepository.findByUexItemId(1)).thenReturn(Optional.of(item));
-    when(terminalRepository.findByIdTerminal(555)).thenReturn(Optional.empty());
+    knownItems(ref(1, UUID.randomUUID()));
+    knownTerminals();
+    when(gameItemPriceRepository.findPriceKeyRefs()).thenReturn(List.of());
 
     service.syncItemPrices();
 
@@ -188,30 +198,33 @@ class UexItemPriceSyncServiceTest {
   }
 
   @Test
-  void flushAndClearIfBatchFull_flushesAndClearsAtTheBatchBoundary() {
-    service.flushAndClearIfBatchFull(UexItemPriceSyncService.FLUSH_BATCH_SIZE);
+  void aPairRepeatedInTheFeed_updatesOneRow_insteadOfInsertingTwo() {
+    // Two feed rows for the same (item, terminal) pair: the second must update the row the first
+    // created, as the per-row lookup used to find it — a second INSERT would hit the unique key.
+    GameItem item = gameItem();
+    Terminal terminal = terminal();
+    when(uexClient.getItemPrices())
+        .thenReturn(fetched(List.of(dto(1, 107, 1.0, 2.0, 1L), dto(1, 107, 3.0, 4.0, 2L))));
+    knownItems(ref(1, item.getId()));
+    knownTerminals(ref(107, terminal.getId()));
+    when(gameItemPriceRepository.findPriceKeyRefs()).thenReturn(List.of());
+    when(gameItemRepository.getReferenceById(item.getId())).thenReturn(item);
+    when(terminalRepository.getReferenceById(terminal.getId())).thenReturn(terminal);
+    stubSaveAssigningId();
 
-    verify(entityManager).flush();
-    verify(entityManager).clear();
+    service.syncItemPrices();
+
+    ArgumentCaptor<GameItemPrice> saved = ArgumentCaptor.forClass(GameItemPrice.class);
+    verify(gameItemPriceRepository).save(saved.capture());
+    assertEquals(3.0, saved.getValue().getPriceBuy(), "the later feed row wins");
   }
 
   @Test
-  void flushAndClearIfBatchFull_doesNothingBetweenBoundaries() {
-    service.flushAndClearIfBatchFull(0);
-    service.flushAndClearIfBatchFull(UexItemPriceSyncService.FLUSH_BATCH_SIZE - 1);
-    service.flushAndClearIfBatchFull(UexItemPriceSyncService.FLUSH_BATCH_SIZE + 1);
-
-    verifyNoInteractions(entityManager);
-  }
-
-  @Test
-  void syncItemPrices_isolatesPerRow_andSweepsOnlySavedIds() {
+  void syncItemPrices_isolatesAFailingRow_andSweepsOnlySavedIds() {
     GameItem item1 = gameItem();
     GameItem item2 = gameItem();
     GameItem item3 = gameItem();
-    Terminal terminal1 = terminal();
-    Terminal terminal2 = terminal();
-    Terminal terminal3 = terminal();
+    Terminal terminal = terminal();
     UUID id1 = UUID.randomUUID();
     UUID id3 = UUID.randomUUID();
     // A priced row left over from an earlier run that this run's feed does not mention.
@@ -221,20 +234,15 @@ class UexItemPriceSyncServiceTest {
             fetched(
                 List.of(
                     dto(1, 107, 10.0, 0.0, 1L),
-                    dto(2, 108, 20.0, 0.0, 2L),
-                    dto(3, 109, 30.0, 0.0, 3L))));
-    when(gameItemRepository.findByUexItemId(1)).thenReturn(Optional.of(item1));
-    when(gameItemRepository.findByUexItemId(2)).thenReturn(Optional.of(item2));
-    when(gameItemRepository.findByUexItemId(3)).thenReturn(Optional.of(item3));
-    when(terminalRepository.findByIdTerminal(107)).thenReturn(Optional.of(terminal1));
-    when(terminalRepository.findByIdTerminal(108)).thenReturn(Optional.of(terminal2));
-    when(terminalRepository.findByIdTerminal(109)).thenReturn(Optional.of(terminal3));
-    when(gameItemPriceRepository.findByGameItemIdAndTerminalId(item1.getId(), terminal1.getId()))
-        .thenReturn(Optional.empty());
-    when(gameItemPriceRepository.findByGameItemIdAndTerminalId(item2.getId(), terminal2.getId()))
-        .thenReturn(Optional.empty());
-    when(gameItemPriceRepository.findByGameItemIdAndTerminalId(item3.getId(), terminal3.getId()))
-        .thenReturn(Optional.empty());
+                    dto(2, 107, 20.0, 0.0, 2L),
+                    dto(3, 107, 30.0, 0.0, 3L))));
+    knownItems(ref(1, item1.getId()), ref(2, item2.getId()), ref(3, item3.getId()));
+    knownTerminals(ref(107, terminal.getId()));
+    when(gameItemPriceRepository.findPriceKeyRefs()).thenReturn(List.of());
+    when(gameItemRepository.getReferenceById(item1.getId())).thenReturn(item1);
+    when(gameItemRepository.getReferenceById(item2.getId())).thenReturn(item2);
+    when(gameItemRepository.getReferenceById(item3.getId())).thenReturn(item3);
+    when(terminalRepository.getReferenceById(terminal.getId())).thenReturn(terminal);
     // The middle row's persistence blows up; the first and third must still save and be swept.
     when(gameItemPriceRepository.save(any(GameItemPrice.class)))
         .thenAnswer(
@@ -250,12 +258,14 @@ class UexItemPriceSyncServiceTest {
 
     service.syncItemPrices();
 
-    // All three rows were attempted — the per-row catch did not abort the loop on the middle row.
-    verify(gameItemPriceRepository, times(3)).save(any(GameItemPrice.class));
+    // The chunk of three saved row 1, failed on row 2 and rolled back; each row was then replayed
+    // in
+    // its own transaction (REQ-DATA-005): row 1 again, row 2 (failing again), row 3 — five saves.
+    verify(gameItemPriceRepository, times(5)).save(any(GameItemPrice.class));
+    assertEquals(2, tx.rolledBack, "the chunk and the failing row roll back");
     // Only the two successfully-saved ids count as seen, so they are spared and the leftover row
     // is cleared. The sweep subtracts the seen ids from the priced rows and clears the remainder in
-    // bounded chunks (REQ-DATA-014), so what reaches the repository is the STALE set - the exact
-    // inverse of what the old `id NOT IN :seenIds` statement received.
+    // bounded chunks (REQ-DATA-014).
     ArgumentCaptor<Collection<UUID>> sweep = ArgumentCaptor.captor();
     verify(gameItemPriceRepository).clearPricesByIds(sweep.capture());
     assertEquals(Set.of(staleId), Set.copyOf(sweep.getValue()));
@@ -263,8 +273,17 @@ class UexItemPriceSyncServiceTest {
 
   // ---- helpers ---------------------------------------------------------------------------------
 
+  private void knownItems(de.greluc.krt.profit.basetool.backend.repository.UexKeyRef... refs) {
+    when(gameItemRepository.findUexItemRefs()).thenReturn(List.of(refs));
+  }
+
+  private void knownTerminals(de.greluc.krt.profit.basetool.backend.repository.UexKeyRef... refs) {
+    when(terminalRepository.findUexTerminalRefs()).thenReturn(List.of(refs));
+  }
+
   private void stubSaveAssigningId() {
-    when(gameItemPriceRepository.save(any(GameItemPrice.class)))
+    lenient()
+        .when(gameItemPriceRepository.save(any(GameItemPrice.class)))
         .thenAnswer(
             inv -> {
               GameItemPrice p = inv.getArgument(0);

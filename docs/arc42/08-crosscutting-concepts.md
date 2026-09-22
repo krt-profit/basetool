@@ -45,6 +45,10 @@ a drift between entity and column fails at start-up rather than at runtime. Seed
 Authority: [`data-persistence.md`](../specs/data-persistence.md) (`REQ-DATA-*`),
 [`db/migration/README.md`](../../backend/src/main/resources/db/migration/README.md).
 
+An external catalogue sync never holds a transaction across an HTTP call: it fetches with none open
+and writes through `SyncChunkWriter` — short chunk transactions, a failed chunk replayed row by row —
+so one refused row costs only itself (`REQ-DATA-005`).
+
 ## 8.4 Concurrency — the landmine field
 
 Optimistic locking with `@Version`, surfaced as HTTP 409, with the **finest granularity the data

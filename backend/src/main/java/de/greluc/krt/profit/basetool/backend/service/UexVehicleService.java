@@ -40,6 +40,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
@@ -90,8 +91,11 @@ public class UexVehicleService {
   private final ManufacturerRepository manufacturerRepository;
   private final ManufacturerUexCompanyRepository manufacturerAliasRepository;
 
+  /** Writes the rows in short isolated transactions after the fetch (BE-PERF-09). */
+  private final SyncChunkWriter chunkWriter;
+
   /** Pulls the UEX vehicle catalogue and upserts each row. */
-  @Transactional
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public void syncVehicles() {
     log.info("Starting synchronization of UEX vehicles (ships)...");
     UexClient.FetchResult<UexVehicleDto> fetched = uexClient.getVehicles();
@@ -109,31 +113,32 @@ public class UexVehicleService {
 
     Instant now = Instant.now();
     Set<Integer> seenUexVehicleIds = new HashSet<>();
-    int added = 0;
-    int updated = 0;
-    int skipped = 0;
-    for (UexVehicleDto dto : vehicles) {
-      try {
-        boolean isNew = upsertVehicle(dto, now, seenUexVehicleIds);
-        if (isNew) {
-          added++;
-        } else {
-          updated++;
-        }
-      } catch (Exception e) {
-        log.error(
-            "Failed to process UEX vehicle dto (id={}, name='{}')",
-            dto.id(),
-            LogSafe.text(dto.name(), MAX_NAME_LOG_LENGTH),
-            e);
-        skipped++;
-      }
-    }
+    // BE-PERF-09 / REQ-DATA-005: written after the fetch in chunk transactions of their own; a
+    // refused chunk is replayed row by row. The seen-id set may keep the id of a row that then
+    // failed on its own, which only spares that row the orphan sweep this run.
+    SyncChunkWriter.Outcome<Boolean> outcome =
+        chunkWriter.write(
+            vehicles,
+            SyncChunkWriter.DEFAULT_CHUNK_SIZE,
+            chunk -> chunk.stream().map(dto -> upsertVehicle(dto, now, seenUexVehicleIds)).toList(),
+            "vehicle",
+            dto ->
+                "(id="
+                    + dto.id()
+                    + ", name='"
+                    + LogSafe.text(dto.name(), MAX_NAME_LOG_LENGTH)
+                    + "')");
+    long added = outcome.results().stream().filter(Boolean::booleanValue).count();
+    long updated = outcome.results().size() - added;
+    int skipped = outcome.failedRows();
 
     if (seenUexVehicleIds.isEmpty()) {
       log.warn("Skipping orphan sweep — no UEX vehicle was processed successfully.");
     } else {
-      int marked = shipTypeRepository.markUexDeletedExcept(seenUexVehicleIds, now);
+      // A bulk update needs a transaction, and the sync no longer holds one (BE-PERF-09).
+      int marked =
+          chunkWriter.inNewTransaction(
+              () -> shipTypeRepository.markUexDeletedExcept(seenUexVehicleIds, now));
       if (marked > 0) {
         log.info("Marked {} ship_type row(s) uex_deleted (no longer in UEX feed)", marked);
       }

@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.GameItemSourceSystem;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -191,4 +192,14 @@ public interface GameItemRepository extends JpaRepository<GameItem, UUID> {
       AND g.scwikiDeletedAt IS NULL
       """)
   long countLiveScwikiItems();
+
+  /**
+   * The UEX item id and local id of every game item. One query for the whole table; the UEX syncs
+   * resolve every row of a run against the resulting map instead of looking the parent up per row
+   * (BE-PERF-09).
+   *
+   * @return one (UEX id, local id) row per GameItem that carries a UEX id
+   */
+  @Query("SELECT e.uexItemId AS uexId, e.id AS id FROM GameItem e WHERE e.uexItemId IS NOT NULL")
+  List<UexKeyRef> findUexItemRefs();
 }

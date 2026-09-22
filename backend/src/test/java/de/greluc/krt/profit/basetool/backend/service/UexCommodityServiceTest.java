@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import static de.greluc.krt.profit.basetool.backend.service.UexFetchResults.fetched;
+import static de.greluc.krt.profit.basetool.backend.service.UexRefs.pair;
+import static de.greluc.krt.profit.basetool.backend.service.UexRefs.ref;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -47,6 +49,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -59,6 +62,9 @@ class UexCommodityServiceTest {
   @Mock private MaterialPriceRepository materialPriceRepository;
 
   @Mock private TerminalRepository terminalRepository;
+
+  /** A real chunk writer, so the rows are actually written through its callbacks (BE-PERF-09). */
+  @Spy private SyncChunkWriter chunkWriter = new SyncChunkWriter(new RecordingTransactionManager());
 
   @InjectMocks private UexCommodityService uexCommodityService;
 
@@ -80,6 +86,7 @@ class UexCommodityServiceTest {
     // null and the phase NPEs before the price phase is ever reached.
     when(uexClient.getCommodities()).thenReturn(fetched(List.of()));
     when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of(dto)));
+    when(materialRepository.findUexCommodityRefs()).thenReturn(List.of());
     when(materialRepository.findByIdCommodity(1)).thenReturn(Optional.empty());
     when(materialRepository.findByName("Laranite")).thenReturn(Optional.empty());
 
@@ -91,11 +98,9 @@ class UexCommodityServiceTest {
     mockTerminal.setId(UUID.randomUUID());
     mockTerminal.setIdTerminal(10);
     mockTerminal.setCityName("Area18");
-    when(terminalRepository.findByIdTerminal(10)).thenReturn(Optional.of(mockTerminal));
-
-    when(materialPriceRepository.findByMaterialIdAndTerminalId(
-            savedMaterial.getId(), mockTerminal.getId()))
-        .thenReturn(Optional.empty());
+    when(terminalRepository.findUexTerminalRefs())
+        .thenReturn(List.of(ref(10, mockTerminal.getId())));
+    when(materialPriceRepository.findPriceKeyRefs()).thenReturn(List.of());
     stubPriceSaveAssignsId();
 
     // When
@@ -346,14 +351,23 @@ class UexCommodityServiceTest {
     when(materialRepository.findByName("Good")).thenReturn(Optional.empty());
 
     when(materialRepository.save(any()))
-        .thenThrow(new RuntimeException("DB hiccup"))
-        .thenReturn(new Material());
+        .thenAnswer(
+            invocation -> {
+              Material m = invocation.getArgument(0);
+              if ("Bad".equals(m.getName())) {
+                throw new RuntimeException("DB hiccup");
+              }
+              return m;
+            });
 
     // When
     assertDoesNotThrow(() -> uexCommodityService.fetchAndProcessCommoditiesPrices());
 
-    // Then — both rows attempted
-    verify(materialRepository, times(2)).save(any());
+    // Then — the chunk failed on the bad row and was replayed row by row (REQ-DATA-005): the bad
+    // row twice, the good one once in the replay, where it commits on its own.
+    ArgumentCaptor<Material> saved = ArgumentCaptor.forClass(Material.class);
+    verify(materialRepository, times(3)).save(saved.capture());
+    assertEquals("Good", saved.getAllValues().getLast().getName());
   }
 
   @Test
@@ -369,6 +383,10 @@ class UexCommodityServiceTest {
   }
 
   // ─── Price sync (second pass) ───────────────────────────────────────────
+  //
+  // Since BE-PERF-09 the price phase resolves material, terminal and existing price row from three
+  // id maps read once per run (findUexCommodityRefs / findUexTerminalRefs / findPriceKeyRefs) and
+  // loads each chunk's existing rows with one findAllById, instead of three lookups per row.
 
   @Test
   void priceSync_updatesExistingPriceRow_inPlace() {
@@ -406,10 +424,11 @@ class UexCommodityServiceTest {
 
     when(uexClient.getCommodities()).thenReturn(fetched(List.of()));
     when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of(fresh)));
-    when(materialRepository.findByIdCommodity(1)).thenReturn(Optional.of(material));
-    when(terminalRepository.findByIdTerminal(42)).thenReturn(Optional.of(terminal));
-    when(materialPriceRepository.findByMaterialIdAndTerminalId(materialId, terminalId))
-        .thenReturn(Optional.of(existing));
+    when(materialRepository.findUexCommodityRefs()).thenReturn(List.of(ref(1, materialId)));
+    when(terminalRepository.findUexTerminalRefs()).thenReturn(List.of(ref(42, terminalId)));
+    when(materialPriceRepository.findPriceKeyRefs())
+        .thenReturn(List.of(pair(materialId, terminalId, priceId)));
+    when(materialPriceRepository.findAllById(List.of(priceId))).thenReturn(List.of(existing));
     when(materialPriceRepository.save(any(MaterialPrice.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -425,21 +444,23 @@ class UexCommodityServiceTest {
     assertEquals(Boolean.FALSE, cap.getValue().getStatusBuy(), "0 maps to false");
     assertEquals(Boolean.TRUE, cap.getValue().getStatusSell(), "1 maps to true");
     assertEquals(Instant.ofEpochSecond(1700000100L), cap.getValue().getDateModified());
+    // The three maps replaced the three per-row lookups.
+    verify(materialRepository, never()).findByIdCommodity(any());
+    verify(terminalRepository, never()).findByIdTerminal(any());
+    verify(materialPriceRepository, never()).findByMaterialIdAndTerminalId(any(), any());
   }
 
   @Test
   void priceSync_skipsRow_whenTerminalUnknown() {
-    Material material = new Material();
-    material.setId(UUID.randomUUID());
-    material.setIdCommodity(1);
     UexCommodityPriceDto orphan =
         new UexCommodityPriceDto(
             1, "X", 9999, "Unknown", BigDecimal.ONE, BigDecimal.ONE, 0, 0, 0, 0, 0, 1L);
 
     when(uexClient.getCommodities()).thenReturn(fetched(List.of()));
     when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of(orphan)));
-    when(materialRepository.findByIdCommodity(1)).thenReturn(Optional.of(material));
-    when(terminalRepository.findByIdTerminal(9999)).thenReturn(Optional.empty());
+    when(materialRepository.findUexCommodityRefs()).thenReturn(List.of(ref(1, UUID.randomUUID())));
+    when(terminalRepository.findUexTerminalRefs()).thenReturn(List.of());
+    when(materialPriceRepository.findPriceKeyRefs()).thenReturn(List.of());
 
     uexCommodityService.fetchAndProcessCommoditiesPrices();
 
@@ -476,9 +497,11 @@ class UexCommodityServiceTest {
 
     when(uexClient.getCommodities()).thenReturn(fetched(List.of()));
     when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of(payload)));
+    when(materialRepository.findUexCommodityRefs()).thenReturn(List.of());
+    when(terminalRepository.findUexTerminalRefs()).thenReturn(List.of(ref(7, terminalId)));
+    when(materialPriceRepository.findPriceKeyRefs()).thenReturn(List.of());
     when(materialRepository.findByIdCommodity(123)).thenReturn(Optional.empty());
     when(materialRepository.findByName("NewStuff")).thenReturn(Optional.empty());
-    when(terminalRepository.findByIdTerminal(7)).thenReturn(Optional.of(terminal));
     when(materialRepository.save(any(Material.class)))
         .thenAnswer(
             invocation -> {
@@ -488,8 +511,6 @@ class UexCommodityServiceTest {
               }
               return m;
             });
-    when(materialPriceRepository.findByMaterialIdAndTerminalId(any(), any()))
-        .thenReturn(Optional.empty());
     stubPriceSaveAssignsId();
 
     uexCommodityService.fetchAndProcessCommoditiesPrices();
@@ -503,47 +524,50 @@ class UexCommodityServiceTest {
         matCap.getValue().getType(),
         "Placeholder materials default to NO_REFINE");
 
+    // The price row is written against the freshly created material.
     verify(materialPriceRepository).save(any(MaterialPrice.class));
+    verify(materialRepository).getReferenceById(matCap.getValue().getId());
   }
 
   @Test
-  void priceSync_swallowsExceptionPerRow_andContinuesBatch() {
+  void priceSync_isolatesAFailingRow_andTheOtherRowStillCommits() {
+    // REQ-DATA-005: the chunk fails on the first row and rolls back; replayed row by row, the bad
+    // row fails alone and the good one commits. Until 2026-09-22 the whole sync was one
+    // transaction, so a row the database refused would have rolled every row back.
     UexCommodityPriceDto bad =
         new UexCommodityPriceDto(
             1, "A", 1, "T1", BigDecimal.ONE, BigDecimal.ONE, 0, 0, 0, 0, 0, 1L);
     UexCommodityPriceDto good =
         new UexCommodityPriceDto(
             2, "B", 2, "T2", BigDecimal.ONE, BigDecimal.ONE, 0, 0, 0, 0, 0, 1L);
-
-    Material m1 = new Material();
-    m1.setId(UUID.randomUUID());
-    m1.setIdCommodity(1);
-    Material m2 = new Material();
-    m2.setId(UUID.randomUUID());
-    m2.setIdCommodity(2);
-    Terminal t1 = new Terminal();
-    t1.setId(UUID.randomUUID());
-    t1.setIdTerminal(1);
-    Terminal t2 = new Terminal();
-    t2.setId(UUID.randomUUID());
-    t2.setIdTerminal(2);
+    UUID m1 = UUID.randomUUID();
+    UUID m2 = UUID.randomUUID();
+    Material badMaterial = new Material();
+    badMaterial.setId(m1);
 
     when(uexClient.getCommodities()).thenReturn(fetched(List.of()));
     when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of(bad, good)));
-    when(materialRepository.findByIdCommodity(1)).thenReturn(Optional.of(m1));
-    when(materialRepository.findByIdCommodity(2)).thenReturn(Optional.of(m2));
-    when(terminalRepository.findByIdTerminal(1)).thenReturn(Optional.of(t1));
-    when(terminalRepository.findByIdTerminal(2)).thenReturn(Optional.of(t2));
-    when(materialPriceRepository.findByMaterialIdAndTerminalId(any(), any()))
-        .thenReturn(Optional.empty());
-
+    when(materialRepository.findUexCommodityRefs()).thenReturn(List.of(ref(1, m1), ref(2, m2)));
+    when(terminalRepository.findUexTerminalRefs())
+        .thenReturn(List.of(ref(1, UUID.randomUUID()), ref(2, UUID.randomUUID())));
+    when(materialPriceRepository.findPriceKeyRefs()).thenReturn(List.of());
+    when(materialRepository.getReferenceById(m1)).thenReturn(badMaterial);
     when(materialPriceRepository.save(any()))
-        .thenThrow(new RuntimeException("first row hiccup"))
-        .thenReturn(new MaterialPrice());
+        .thenAnswer(
+            invocation -> {
+              MaterialPrice mp = invocation.getArgument(0);
+              if (mp.getMaterial() == badMaterial) {
+                throw new RuntimeException("row refused");
+              }
+              mp.setId(UUID.randomUUID());
+              return mp;
+            });
 
     assertDoesNotThrow(() -> uexCommodityService.fetchAndProcessCommoditiesPrices());
 
-    verify(materialPriceRepository, times(2)).save(any());
+    // chunk [bad] throws at the first save; replay: bad (throws again), good (commits).
+    verify(materialPriceRepository, times(3)).save(any());
+    verify(materialPriceRepository).findIdsWithLivePrices();
   }
 
   // ─── Stale-row cleanup (price-sync postlude) ────────────────────────────
@@ -555,12 +579,6 @@ class UexCommodityServiceTest {
     UUID terminalId = UUID.randomUUID();
     UUID assignedPriceId = UUID.randomUUID();
     UUID stalePriceId = UUID.randomUUID();
-    Material material = new Material();
-    material.setId(materialId);
-    material.setIdCommodity(1);
-    Terminal terminal = new Terminal();
-    terminal.setId(terminalId);
-    terminal.setIdTerminal(1);
 
     UexCommodityPriceDto dto =
         new UexCommodityPriceDto(
@@ -568,10 +586,9 @@ class UexCommodityServiceTest {
 
     when(uexClient.getCommodities()).thenReturn(fetched(List.of()));
     when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of(dto)));
-    when(materialRepository.findByIdCommodity(1)).thenReturn(Optional.of(material));
-    when(terminalRepository.findByIdTerminal(1)).thenReturn(Optional.of(terminal));
-    when(materialPriceRepository.findByMaterialIdAndTerminalId(materialId, terminalId))
-        .thenReturn(Optional.empty());
+    when(materialRepository.findUexCommodityRefs()).thenReturn(List.of(ref(1, materialId)));
+    when(terminalRepository.findUexTerminalRefs()).thenReturn(List.of(ref(1, terminalId)));
+    when(materialPriceRepository.findPriceKeyRefs()).thenReturn(List.of());
     when(materialPriceRepository.save(any(MaterialPrice.class)))
         .thenAnswer(
             invocation -> {
@@ -599,21 +616,17 @@ class UexCommodityServiceTest {
 
   @Test
   void priceSync_skipsStaleCleanup_whenEveryRowFailsAndSeenSetIsEmpty() {
-    // Given — every DTO triggers an exception during upsert (here: unknown terminal, which
-    // returns null from processSingleDto, AND unknown commodity that resolveOrCreateMaterial
-    // would create — but we make terminal resolution fail to drive savedId = null without
-    // raising). The seen-id set ends up empty.
+    // Given — the only DTO names an unknown terminal, so nothing is written and the seen-id set
+    // ends up empty.
     UexCommodityPriceDto orphan =
         new UexCommodityPriceDto(
             1, "X", 9999, "Unknown", BigDecimal.ONE, BigDecimal.ONE, 0, 0, 0, 0, 0, 1L);
-    Material material = new Material();
-    material.setId(UUID.randomUUID());
-    material.setIdCommodity(1);
 
     when(uexClient.getCommodities()).thenReturn(fetched(List.of()));
     when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of(orphan)));
-    when(materialRepository.findByIdCommodity(1)).thenReturn(Optional.of(material));
-    when(terminalRepository.findByIdTerminal(9999)).thenReturn(Optional.empty());
+    when(materialRepository.findUexCommodityRefs()).thenReturn(List.of(ref(1, UUID.randomUUID())));
+    when(terminalRepository.findUexTerminalRefs()).thenReturn(List.of());
+    when(materialPriceRepository.findPriceKeyRefs()).thenReturn(List.of());
 
     // When
     uexCommodityService.fetchAndProcessCommoditiesPrices();

@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static de.greluc.krt.profit.basetool.backend.service.UexRefs.pair;
+import static de.greluc.krt.profit.basetool.backend.service.UexRefs.ref;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -46,6 +48,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
@@ -72,6 +75,10 @@ class UexRefinerySyncServiceTest {
   @Mock private TerminalRepository terminalRepository;
 
   @Mock private AuditService auditService;
+
+  /** A real chunk writer, so the rows are actually written through its callbacks (BE-PERF-09). */
+  @Spy private SyncChunkWriter chunkWriter = new SyncChunkWriter(new RecordingTransactionManager());
+
   @InjectMocks private UexRefinerySyncService service;
 
   // ── syncRefiningMethods ────────────────────────────────────────────────
@@ -197,10 +204,11 @@ class UexRefinerySyncServiceTest {
     UexRefineryYieldDto payload = new UexRefineryYieldDto(100, 1, 42, 5);
 
     when(uexClient.getRefineriesYields()).thenReturn(List.of(payload));
-    when(materialRepository.findByIdCommodity(1)).thenReturn(Optional.of(material));
-    when(terminalRepository.findByIdTerminal(42)).thenReturn(Optional.of(terminal));
-    when(refineryYieldRepository.findByTerminalIdAndMaterialId(terminalId, materialId))
-        .thenReturn(Optional.empty());
+    when(materialRepository.findUexCommodityRefs()).thenReturn(List.of(ref(1, material.getId())));
+    lenient().when(materialRepository.getReferenceById(material.getId())).thenReturn(material);
+    when(terminalRepository.findUexTerminalRefs()).thenReturn(List.of(ref(42, terminal.getId())));
+    lenient().when(terminalRepository.getReferenceById(terminal.getId())).thenReturn(terminal);
+    when(refineryYieldRepository.findYieldKeyRefs()).thenReturn(List.of());
     when(refineryYieldRepository.save(any(RefineryYield.class))).thenAnswer(i -> i.getArgument(0));
 
     service.syncRefineryYields();
@@ -235,10 +243,14 @@ class UexRefinerySyncServiceTest {
     UexRefineryYieldDto fresh = new UexRefineryYieldDto(100, 1, 42, 7);
 
     when(uexClient.getRefineriesYields()).thenReturn(List.of(fresh));
-    when(materialRepository.findByIdCommodity(1)).thenReturn(Optional.of(material));
-    when(terminalRepository.findByIdTerminal(42)).thenReturn(Optional.of(terminal));
-    when(refineryYieldRepository.findByTerminalIdAndMaterialId(terminalId, materialId))
-        .thenReturn(Optional.of(existing));
+    when(materialRepository.findUexCommodityRefs()).thenReturn(List.of(ref(1, material.getId())));
+    lenient().when(materialRepository.getReferenceById(material.getId())).thenReturn(material);
+    when(terminalRepository.findUexTerminalRefs()).thenReturn(List.of(ref(42, terminal.getId())));
+    lenient().when(terminalRepository.getReferenceById(terminal.getId())).thenReturn(terminal);
+    when(refineryYieldRepository.findYieldKeyRefs())
+        .thenReturn(List.of(pair(materialId, terminalId, existing.getId())));
+    when(refineryYieldRepository.findAllById(List.of(existing.getId())))
+        .thenReturn(List.of(existing));
     when(refineryYieldRepository.save(any(RefineryYield.class))).thenAnswer(i -> i.getArgument(0));
 
     service.syncRefineryYields();
@@ -271,7 +283,9 @@ class UexRefinerySyncServiceTest {
   void syncRefineryYields_skipsRow_whenMaterialUnknown() {
     UexRefineryYieldDto orphan = new UexRefineryYieldDto(1, 999, 42, 5);
     when(uexClient.getRefineriesYields()).thenReturn(List.of(orphan));
-    when(materialRepository.findByIdCommodity(999)).thenReturn(Optional.empty());
+    when(materialRepository.findUexCommodityRefs()).thenReturn(List.of());
+    when(terminalRepository.findUexTerminalRefs()).thenReturn(List.of());
+    when(refineryYieldRepository.findYieldKeyRefs()).thenReturn(List.of());
 
     service.syncRefineryYields();
 
@@ -289,8 +303,10 @@ class UexRefinerySyncServiceTest {
 
     UexRefineryYieldDto orphan = new UexRefineryYieldDto(1, 1, 9999, 5);
     when(uexClient.getRefineriesYields()).thenReturn(List.of(orphan));
-    when(materialRepository.findByIdCommodity(1)).thenReturn(Optional.of(material));
-    when(terminalRepository.findByIdTerminal(9999)).thenReturn(Optional.empty());
+    when(materialRepository.findUexCommodityRefs()).thenReturn(List.of(ref(1, material.getId())));
+    lenient().when(materialRepository.getReferenceById(material.getId())).thenReturn(material);
+    when(terminalRepository.findUexTerminalRefs()).thenReturn(List.of());
+    when(refineryYieldRepository.findYieldKeyRefs()).thenReturn(List.of());
 
     service.syncRefineryYields();
 
@@ -314,11 +330,11 @@ class UexRefinerySyncServiceTest {
     UexRefineryYieldDto skipped = new UexRefineryYieldDto(3, 1, 42, null);
 
     when(uexClient.getRefineriesYields()).thenReturn(List.of(good, orphan, skipped));
-    when(materialRepository.findByIdCommodity(1)).thenReturn(Optional.of(material));
-    when(terminalRepository.findByIdTerminal(42)).thenReturn(Optional.of(terminal));
-    when(terminalRepository.findByIdTerminal(999)).thenReturn(Optional.empty());
-    when(refineryYieldRepository.findByTerminalIdAndMaterialId(terminalId, materialId))
-        .thenReturn(Optional.empty());
+    when(materialRepository.findUexCommodityRefs()).thenReturn(List.of(ref(1, material.getId())));
+    lenient().when(materialRepository.getReferenceById(material.getId())).thenReturn(material);
+    when(terminalRepository.findUexTerminalRefs()).thenReturn(List.of(ref(42, terminal.getId())));
+    lenient().when(terminalRepository.getReferenceById(terminal.getId())).thenReturn(terminal);
+    when(refineryYieldRepository.findYieldKeyRefs()).thenReturn(List.of());
     when(refineryYieldRepository.save(any(RefineryYield.class))).thenAnswer(i -> i.getArgument(0));
 
     service.syncRefineryYields();
@@ -375,10 +391,11 @@ class UexRefinerySyncServiceTest {
     UexRefineryYieldDto payload = new UexRefineryYieldDto(100, 1, 42, 5);
 
     when(uexClient.getRefineriesYields()).thenReturn(List.of(payload));
-    when(materialRepository.findByIdCommodity(1)).thenReturn(Optional.of(material));
-    when(terminalRepository.findByIdTerminal(42)).thenReturn(Optional.of(terminal));
-    when(refineryYieldRepository.findByTerminalIdAndMaterialId(terminalId, materialId))
-        .thenReturn(Optional.empty());
+    when(materialRepository.findUexCommodityRefs()).thenReturn(List.of(ref(1, material.getId())));
+    lenient().when(materialRepository.getReferenceById(material.getId())).thenReturn(material);
+    when(terminalRepository.findUexTerminalRefs()).thenReturn(List.of(ref(42, terminal.getId())));
+    lenient().when(terminalRepository.getReferenceById(terminal.getId())).thenReturn(terminal);
+    when(refineryYieldRepository.findYieldKeyRefs()).thenReturn(List.of());
     when(refineryYieldRepository.save(any(RefineryYield.class))).thenAnswer(i -> i.getArgument(0));
 
     service.syncRefineryYields();
