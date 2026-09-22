@@ -686,9 +686,13 @@ not silent — so the only detector was a human reading a log export.
   ADR-0162) — operational lines only, **no client IPs or usernames**, so no shipper masking and not
   part of the 31-day IP-retention set. The NPM stdout stream (`app="npm"`) it replaces has had no
   producer since NPM was retired; `config.alloy` keeps the `npm` alternative in its relabel rule
-  only so a resurrected rollback stack would not ship unlabelled. **Known gap (2026-09-22):** the
-  *NPM errors & warnings* panel on dashboard `09-ssh-host-auth.json` still queries `{app="npm"}`
-  and therefore always reads "No data".
+  only so a resurrected rollback stack would not ship unlabelled. The *NPM errors & warnings* panel
+  on dashboard `09-ssh-host-auth.json`, which queried `{app="npm"}` and read "No data" from the
+  retirement on (recorded as a known gap on 2026-09-22), was re-sourced the same day as *Edge errors
+  & warnings*: the edge's nginx error-log lines in `app="edge"`, anchored on the error log's own
+  `YYYY/MM/DD HH:MM:SS [level]` prefix so an access-log line that merely contains "error" is not
+  counted, split by severity. Verified against production Loki before the change (~1.1k `[error]`
+  and ~1.2k `[warn]` lines in 24 h).
 - **PostgreSQL container logs** — ingested with `log_error_verbosity=terse` so `DETAIL`
   lines cannot leak row data. Both instances additionally run
   `log_line_prefix='%m [%p] %q%u@%d/%a '` (2026-07-29) so **every** line is self-attributing:
@@ -1032,11 +1036,14 @@ container start time and network counters.
 | `basetool_container_memory_limit_bytes` | gauge | `memory.max` | `container_spec_memory_limit_bytes` |
 | `basetool_container_pids` | gauge | `pids.current` | `container_threads` |
 | `basetool_container_pids_max` | gauge | `pids.max` | `container_threads_max` |
-| `basetool_container_metrics_containers` | gauge | the collector itself | — |
+| `basetool_container_metrics_containers` | gauge | the collector itself (containers only) | — |
+| `basetool_container_metrics_host_services` | gauge | the collector itself (added 2026-09-22) | — |
 | `basetool_container_metrics_timestamp_seconds` | gauge | the collector itself | — |
 
 **Labels.** Exactly one, `name`, holding the container name — bounded by the deployment's own
-container set, which is a fixed list in the compose files and the Quadlet units. cAdvisor's `id`,
+container set, which is a fixed list in the compose files and the Quadlet units — or, since
+2026-09-22, one of the two host services the collector also reads, under the name each had as a
+container: `alloy` and `node-exporter` (see REQ-OBS-014). cAdvisor's `id`,
 `image` and `container_label_*` are deliberately **not** reproduced: `id` changes on every
 recreation, which is unbounded cardinality by definition.
 
@@ -2399,11 +2406,25 @@ therefore alerts on:
   between the old and new start times and paged CRITICAL on any single restart, including a routine
   deploy recreate of backend/frontend/ingest (fixed 2026-07-15; the sibling Grafana "Container
   Restarts" panel already used `changes()`; locked by `tests/containerrestartloop_changes_test.yml`).
-  **Known gap (2026-09-22):** the rule still reads cAdvisor's `container_start_time_seconds`
-  directly, which has no producer since cAdvisor was removed, so it cannot fire on the Podman host —
-  the dead-alert shape this requirement exists for. The dashboard panel already reads the
-  normalised `basetool:container:start_time_seconds` (fed by `podman_container_started_seconds`);
-  the rule and its test have to follow.
+  The rule reads the normalised `basetool:container:start_time_seconds` (fed on the Podman host by
+  `podman_container_started_seconds` joined onto `podman_container_info`), like the dashboard panel.
+  It read cAdvisor's `container_start_time_seconds` until 2026-09-22 — recorded that morning as a
+  known gap, because with cAdvisor removed the series had no producer and the rule could not fire:
+  the dead-alert shape this requirement exists for. Its test was rewritten on the Podman shape in
+  the same change, one container id per start, because a test that fed the rule the old series had
+  stayed green throughout. It is proven to fail against the old expression.
+- **The monitoring plane's two host services are watched like containers** (added 2026-09-22).
+  Under Podman, `alloy` and `node-exporter` are systemd system units, not containers, so the
+  container alerts lost them at the cutover — and neither had a memory ceiling either
+  (`MemoryMax=infinity`, no `GOMEMLIMIT`, measured on production). The Ansible role now gives them
+  `MemoryMax` + `GOMEMLIMIT` (512M / 360MiB and 64M / 48MiB), and
+  `scripts/cgroup-container-metrics.py` reads their unit cgroups (`system.slice/alloy.service`,
+  `system.slice/prometheus-node-exporter.service`) under the names they had as containers, so
+  `ContainerMemoryHigh`, `ContainerOomKilled` and `ContainerPidsHigh` cover them unchanged.
+  `HostServiceMetricsMissing` (warning, 30m) fires when either name disappears while the collector
+  reports host services, so a renamed package unit cannot silently take that coverage away again.
+  Liveness stays with `TargetDown` (`job="alloy"`, `job="node"`) and `SystemdUnitFailed`. Locked by
+  `tests/host_service_metrics_test.yml` and the collector's self-test.
 - **Container memory pressure is measured on ANONYMOUS memory, not the working set** (amended
   2026-08-02). `ContainerMemoryHigh` (warning) fires when
   `basetool:container:memory_anon_bytes / basetool:container:memory_limit_bytes > 0.90` for 10m —

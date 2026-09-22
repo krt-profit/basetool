@@ -92,14 +92,29 @@ groups:
       # longer pages (single-restart faults stay covered by ContainerOomKilled / ContainerPidsHigh /
       # TargetDown). Locked by tests/containerrestartloop_changes_test.yml.
       #
-      # NOT normalised, and it cannot be: the cgroup collector publishes no start time and
-      # neither does prometheus-podman-exporter's subset until it lands with
-      # `podman_container_started_seconds`. This alert therefore goes SILENT at the Podman
-      # cutover rather than wrong, and the intent is covered meanwhile by SystemdUnitFailed
-      # plus the unit-level restart counters -- Quadlet containers ARE systemd units, which is
-      # a signal this migration gains. See the mapping table in docs/archive/PODMAN_MIGRATION_PLAN.md.
+      # Reads the NORMALISED start time (containers-runtime.yml), not cAdvisor's. Repointed
+      # 2026-09-22. Until then the expression still named `container_start_time_seconds`, which
+      # only cAdvisor emits, and cAdvisor is deleted on the Podman host (ADR-0163) -- so from the
+      # cutover on this rule evaluated to nothing and a crash-looping container paged no one. An
+      # earlier version of this comment said the rule could not be normalised because nothing on
+      # the Podman host published a start time. That stopped being true when
+      # `basetool:container:start_time_seconds` was added the same day, joining the podman
+      # exporter's `podman_container_started_seconds` onto `podman_container_info` by `id`
+      # (measured on production 2026-09-22: 18 containers, one series each).
+      #
+      # changes() keeps its meaning across the rename. Under Quadlet every restart is a RECREATE
+      # (ExecStart carries --replace --rm), so a restart arrives as a new container id with a new
+      # start time; `max by (name)` in the recording rule folds the old and new id into one
+      # series per name, and its value moving is exactly one restart.
+      #
+      # This is the ONLY crash-loop alert for the application containers, and nothing backs it up:
+      # every generated unit carries `Restart=always` with `StartLimitIntervalSec=0`, so systemd
+      # never gives up on one and never marks it failed -- and SystemdUnitFailed could not see it
+      # if it did, because node_exporter's systemd collector reads the SYSTEM manager and these are
+      # user units of the service account.
+      # Locked by tests/containerrestartloop_changes_test.yml, on the Podman shape.
       - alert: ContainerRestartLoop
-        expr: changes(container_start_time_seconds{name=~".+"}[15m]) > 3
+        expr: changes(basetool:container:start_time_seconds[15m]) > 3
         for: 5m
         labels:
           severity: critical

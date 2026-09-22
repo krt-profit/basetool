@@ -78,6 +78,22 @@ DEFAULT_PATTERN = (
 
 DEFAULT_CGROUP_ROOT = "/sys/fs/cgroup"
 
+#: The monitoring plane's two HOST services, read from their own system-unit cgroups and published
+#: under the names they had as containers (``UNIT=NAME``). Added 2026-09-22.
+#:
+#: Under Compose, ``alloy`` and ``node-exporter`` were containers, so the container memory, OOM and
+#: pids alerts watched them for free - and alloy's memory history (192 -> 256 -> 384 -> 512M) is
+#: exactly what those alerts caught. Under Podman both became host services (generate-quadlet.py
+#: says why), which took them out of every container cgroup this collector walks: from the cutover
+#: on, nothing watched either one's memory, and nothing capped it. A systemd unit's cgroup carries
+#: the same files a container's does, so reading it is the whole fix; the names are kept so every
+#: existing alert, dashboard panel and inhibit rule keyed on ``name`` means what it meant before.
+#: A unit that is not on this host is skipped, not an error - a Docker host has neither.
+DEFAULT_HOST_SERVICES = (
+    "alloy.service=alloy",
+    "prometheus-node-exporter.service=node-exporter",
+)
+
 #: Emitted alongside the per-container series so the collector's own silence is visible. A
 #: textfile that stops being rewritten is otherwise indistinguishable from a quiet system:
 #: node_exporter keeps serving the last file it read, forever.
@@ -173,6 +189,32 @@ def discover(cgroup_root: str, pattern: re.Pattern[str]) -> Iterator[tuple[str, 
         if match:
             found.append((match.group("name"), dirpath))
     yield from sorted(found)
+
+
+def discover_host_services(cgroup_root: str, specs: Sequence[str]) -> list[tuple[str, str]]:
+    """Resolve ``UNIT=NAME`` host-service specs to the unit cgroups that exist on this host.
+
+    Args:
+        cgroup_root: the cgroup v2 mount point, or a fake tree under test.
+        specs: ``UNIT=NAME`` strings, e.g. ``alloy.service=alloy``; the unit is looked up under
+            ``system.slice``, where systemd places every system service.
+
+    Returns:
+        ``(name, absolute_path)`` for each unit whose cgroup directory exists, in spec order. A unit
+        that is absent is left out silently: it is not running, or it is not a service here at all.
+
+    Raises:
+        CollectorError: when a spec is not of the form ``UNIT=NAME`` with both halves non-empty.
+    """
+    found: list[tuple[str, str]] = []
+    for spec in specs:
+        unit, sep, name = spec.partition("=")
+        if not sep or not unit or not name or "/" in unit:
+            raise CollectorError(f"--host-service expects UNIT=NAME, got {spec!r}")
+        path = os.path.join(cgroup_root, "system.slice", unit)
+        if os.path.isdir(path):
+            found.append((name, path))
+    return found
 
 
 def sample(path: str) -> dict[str, float]:
@@ -300,7 +342,8 @@ def _format(value: float) -> str:
     return repr(value)
 
 
-def render(samples: Sequence[tuple[str, dict[str, float]]], now: float) -> str:
+def render(samples: Sequence[tuple[str, dict[str, float]]], now: float,
+           containers: int | None = None, host_services: int = 0) -> str:
     """Render the exposition-format text node_exporter will serve.
 
     Metrics are grouped by name with a single ``# HELP`` / ``# TYPE`` pair each, because
@@ -308,8 +351,12 @@ def render(samples: Sequence[tuple[str, dict[str, float]]], now: float) -> str:
     per-container layout parses fine by eye and is refused at load.
 
     Args:
-        samples: ``(container_name, metrics)`` pairs.
+        samples: ``(name, metrics)`` pairs, containers and host services alike.
         now: the collection timestamp, as a Unix time.
+        containers: how many of ``samples`` are containers; ``None`` means all of them. Kept apart
+            from the host services because ContainerCgroupCollectorFoundNothing reads it as "the
+            pattern still matches the container layout", which two host services must not mask.
+        host_services: how many of ``samples`` are host services.
 
     Returns:
         The complete file contents, ending in a newline.
@@ -327,7 +374,12 @@ def render(samples: Sequence[tuple[str, dict[str, float]]], now: float) -> str:
 
     lines.append(f"# HELP {COLLECTOR_PREFIX}_containers Containers this collector found.")
     lines.append(f"# TYPE {COLLECTOR_PREFIX}_containers gauge")
-    lines.append(f"{COLLECTOR_PREFIX}_containers {len(samples)}")
+    container_count = len(samples) if containers is None else containers
+    lines.append(f"{COLLECTOR_PREFIX}_containers {container_count}")
+    lines.append(f"# HELP {COLLECTOR_PREFIX}_host_services "
+                 "Host services (systemd system units) this collector found.")
+    lines.append(f"# TYPE {COLLECTOR_PREFIX}_host_services gauge")
+    lines.append(f"{COLLECTOR_PREFIX}_host_services {host_services}")
     lines.append(f"# HELP {COLLECTOR_PREFIX}_timestamp_seconds When this file was last written.")
     lines.append(f"# TYPE {COLLECTOR_PREFIX}_timestamp_seconds gauge")
     lines.append(f"{COLLECTOR_PREFIX}_timestamp_seconds {now:.3f}")
@@ -384,6 +436,25 @@ def collect(cgroup_root: str, pattern: str) -> list[tuple[str, dict[str, float]]
     Raises:
         CollectorError: when the pattern is invalid, the root is missing, or nothing matched.
     """
+    return _containers(cgroup_root, pattern, required=True)
+
+
+def _containers(cgroup_root: str, pattern: str,
+                required: bool) -> list[tuple[str, dict[str, float]]]:
+    """Discover and sample the container cgroups, optionally insisting on finding one.
+
+    Args:
+        cgroup_root: the cgroup v2 mount point, or a fake tree under test.
+        pattern: the regex selecting container cgroups, with a ``name`` group.
+        required: raise when nothing matched, rather than returning an empty list.
+
+    Returns:
+        ``(name, metrics)`` for every container that published at least one value.
+
+    Raises:
+        CollectorError: when the pattern is invalid, the root is missing, or - with ``required`` -
+            nothing matched.
+    """
     if not os.path.isdir(cgroup_root):
         raise CollectorError(f"cgroup root {cgroup_root} is not a directory")
     try:
@@ -395,12 +466,46 @@ def collect(cgroup_root: str, pattern: str) -> list[tuple[str, dict[str, float]]
 
     samples = [(name, sample(path)) for name, path in discover(cgroup_root, compiled)]
     samples = [(name, values) for name, values in samples if values]
-    if not samples:
+    if not samples and required:
         raise CollectorError(
             f"no container cgroups matched under {cgroup_root} - an empty metrics file and a "
             "broken pattern look identical to Prometheus, so this is an error rather than a "
             "file with nothing in it")
     return samples
+
+
+def collect_all(cgroup_root: str, pattern: str, host_services: Sequence[str]
+                ) -> tuple[list[tuple[str, dict[str, float]]], int, int]:
+    """Sample the containers and the named host services together.
+
+    A host with its stack deliberately down but its host services up still gets a file - with
+    ``containers 0``, which is what ContainerCgroupCollectorFoundNothing exists to report - rather
+    than no file at all. Only a host where NOTHING matched is still an error.
+
+    Args:
+        cgroup_root: the cgroup v2 mount point, or a fake tree under test.
+        pattern: the regex selecting container cgroups, with a ``name`` group.
+        host_services: ``UNIT=NAME`` specs, see :data:`DEFAULT_HOST_SERVICES`.
+
+    Returns:
+        ``(samples, container_count, host_service_count)``; containers first, then host services.
+
+    Raises:
+        CollectorError: when the pattern or a spec is invalid, the root is missing, or neither a
+            container nor a host service was found.
+    """
+    containers = _containers(cgroup_root, pattern, required=False)
+    taken = {name for name, _ in containers}
+    hosts = [(name, sample(path))
+             for name, path in discover_host_services(cgroup_root, host_services)
+             if name not in taken]
+    hosts = [(name, values) for name, values in hosts if values]
+    if not containers and not hosts:
+        raise CollectorError(
+            f"no container cgroups matched under {cgroup_root} and no host service was found - an "
+            "empty metrics file and a broken pattern look identical to Prometheus, so this is an "
+            "error rather than a file with nothing in it")
+    return containers + hosts, len(containers), len(hosts)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -420,6 +525,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--pattern", default=DEFAULT_PATTERN,
                         help="regex with a (?P<name>...) group, matched against each cgroup "
                              "directory's path relative to --cgroup-root")
+    parser.add_argument("--host-service", action="append", metavar="UNIT=NAME",
+                        help="a systemd system unit to read as well, published as NAME; repeat "
+                             "for several (default: " + ", ".join(DEFAULT_HOST_SERVICES) + ")")
+    parser.add_argument("--no-host-services", action="store_true",
+                        help="read containers only")
     parser.add_argument("--output", metavar="PATH",
                         help="the .prom file to write; omit with --dry-run")
     parser.add_argument("--dry-run", action="store_true",
@@ -429,14 +539,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not args.dry_run and not args.output:
         parser.error("--output is required unless --dry-run is given")
 
+    host_specs: Sequence[str] = ()
+    if not args.no_host_services:
+        host_specs = args.host_service or DEFAULT_HOST_SERVICES
+
     try:
-        samples = collect(args.cgroup_root, args.pattern)
-        content = render(samples, time.time())
+        samples, containers, hosts = collect_all(args.cgroup_root, args.pattern, host_specs)
+        content = render(samples, time.time(), containers=containers, host_services=hosts)
         if args.dry_run:
             sys.stdout.write(content)
         else:
             write_atomically(args.output, content)
-            print(f"wrote {len(samples)} container(s) to {args.output}")
+            print(f"wrote {containers} container(s) and {hosts} host service(s) to {args.output}")
     except CollectorError as exc:
         print(f"cgroup-container-metrics: {exc}", file=sys.stderr)
         return 1

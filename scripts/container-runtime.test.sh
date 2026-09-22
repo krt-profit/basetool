@@ -631,6 +631,23 @@ expect_call "podman starts each named unit" podman \
   "$(mon) rt_monitoring_up" 'systemctl --user start prometheus.service'
 expect_call "...all of them, not just the first" podman \
   "$(mon) rt_monitoring_up" 'systemctl --user start grafana.service'
+# The same trap as the digest pin above, on the monitoring half, and it shipped: until 2026-09-22
+# this arm only ever said `start`, so a release that changed prometheus.container installed the unit
+# and left the old container running.
+expect_call "podman RESTARTS a monitoring unit this run re-defined" podman \
+  "$(mon) RT_CHANGED_SERVICES='prometheus'; rt_monitoring_up" 'systemctl --user restart prometheus.service'
+expect_no_call "...and leaves the others alone" podman \
+  "$(mon) RT_CHANGED_SERVICES='prometheus'; rt_monitoring_up" 'restart loki.service'
+# It runs twice on a deploy's success path. The second call must not recreate prometheus again.
+expect_out "...once: a second apply in the same run only starts it" podman \
+  "$(mon) RT_CHANGED_SERVICES='prometheus'; rt_monitoring_up; : > \"\${LOG}\"; rt_monitoring_up; grep -c 'restart prometheus' \"\${LOG}\" || true" '0'
+# A restart that failed is kept, so the second call is its retry rather than a silent give-up. The
+# stub fails `restart` ONLY: a plain `false` would fail the daemon-reload first, return before the
+# loop, and leave the list untouched for the wrong reason -- a case that passes whatever the code does.
+expect_out "...but a FAILED restart stays pending for the retry" podman \
+  "$(mon) RT_CHANGED_SERVICES='prometheus'; norestart() { [[ \"\$1\" != restart ]]; }; RT_SYSTEMCTL=norestart; rt_monitoring_up; printf '[%s]' \"\${RT_CHANGED_SERVICES}\"" '[prometheus]'
+expect_out "...and a successful one is not" podman \
+  "$(mon) RT_CHANGED_SERVICES='prometheus'; rt_monitoring_up; printf '[%s]' \"\${RT_CHANGED_SERVICES}\"" '[]'
 # `down` exists for exactly one reason: the monitoring project holds the shared
 # data networks as `external`, and a bridge with an endpoint attached cannot be
 # removed. Skipping it strands the topology change half-applied.
