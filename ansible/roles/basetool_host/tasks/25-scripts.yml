@@ -9,9 +9,11 @@
 # the bootstrap IS this role, so the bootstrap's own tools belong to it.
 #
 # The test ADR-0188 sets is whether this turns provisioning into a second
-# delivery loop. It does not: the role is operator-driven, never scheduled,
-# never run against a host serving traffic, and these files carry no image
-# digest and no application version. They are tooling.
+# delivery loop. It does not: the role is operator-driven and never scheduled,
+# runs in full only against a host that is not serving yet and afterwards only
+# for a deliberate, owner-approved, tag-limited host change (ansible/README.md),
+# and these files carry no image digest and no application version. They are
+# tooling.
 #
 # WHAT IT FIXES. Measured 2026-09-18: `/var/iri/code/scripts/` does not exist on
 # the testing host at all, so `deploy.sh`, `backup.sh` and `restore-drill.sh`

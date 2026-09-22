@@ -332,7 +332,7 @@ class OrgChartPageRenderTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void olTier_admin_rendersRootMembersAndAddAffordance() throws Exception {
-    // Given: an Organisationsleitung tier with one member (epic #692 / REQ-ORG-018). The OL renders
+    // Given: an Organisationsleitung tier with one member (epic #692 / REQ-ORG-026). The OL renders
     // as its own ARIA tree — the OL root box (level 1) with its OL_MEMBER nodes (level 2) — plus
     // the
     // admin add-OL-member affordance, which needs the OL's org-unit id carried by OlChartDto.
@@ -543,7 +543,7 @@ class OrgChartPageRenderTest {
   @WithMockUser(roles = "ADMIN")
   void bereichTier_admin_rendersDepartmentTintLeadershipAndUnits() throws Exception {
     // Given: one Bereich tier carrying the PROFIT Bereichsfarbe, a Bereichsleiter (hero) and one
-    // Staffel (epic #692 / REQ-ORG-018). The tier renders as its own ARIA tree, tinted via the
+    // Staffel (epic #692 / REQ-ORG-026). The tier renders as its own ARIA tree, tinted via the
     // oc-dept--profit class, with the Staffel fanning out through the shared ocUnitFan fragment.
     // The
     // legacy area tier must stay hidden once a Bereich is populated.

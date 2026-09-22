@@ -22,7 +22,7 @@ If you only have a couple of minutes, the very short version is:
 5. **Every user-visible change updates
    [`CHANGELOG.md`](CHANGELOG.md)** under `## [Unreleased]`.
 6. **Sign the [Contributor License Agreement](CLA.md) once** before
-   Your first PR, and **add a `Signed-off-by:` trailer
+   your first PR, and **add a `Signed-off-by:` trailer
    ([DCO](#developer-certificate-of-origin-dco-sign-off)) to every
    commit** (`git commit -s`).
 
@@ -79,11 +79,13 @@ matches what you are about to change *before* you open a PR:
 | Release notes and every user-visible change                                                         | [`CHANGELOG.md`](CHANGELOG.md)                                                                                                                                                   |
 | Security vulnerability reporting, supported versions, scope, safe harbor                            | [`.github/SECURITY.md`](.github/SECURITY.md)                                                                                                                                     |
 | Architectural invariants, build/test commands, AI-assistant guardrails                              | [`CLAUDE.md`](CLAUDE.md)                                                                                                                                                         |
-| Role and permission matrix (`ADMIN`, `OFFICER`, `LOGISTICIAN`, `MISSION_MANAGER`, `KRT_MEMBER`)     | [`ROLES_AND_PERMISSIONS.md`](ROLES_AND_PERMISSIONS.md)                                                                                                                           |
+| Role and permission matrix (realm roles + contextual `LOGISTICIAN` / `MISSION_MANAGER` grants)       | [`ROLES_AND_PERMISSIONS.md`](ROLES_AND_PERMISSIONS.md)                                                                                                                           |
 | Flyway migration conventions (destructive-ops two-phase rule, data migrations, pre-merge checklist) | [`backend/src/main/resources/db/migration/README.md`](backend/src/main/resources/db/migration/README.md)                                                                         |
 | "DAS KARTELL" Corporate Design Manual (brand colours, fonts, department palette)                    | [`.claude/skills/das-kartell-design/README.md`](.claude/skills/das-kartell-design/README.md) (binding rules: [`docs/specs/ui-design-system.md`](docs/specs/ui-design-system.md)) |
 | Pull-request expectations (template + checklist that ships with every PR)                           | [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md)                                                                                                           |
 | Production deployment runbook (host bootstrap, releases, rollback, PAT rotation)                    | [`docs/deployment.md`](docs/deployment.md)                                                                                                                                       |
+| Binding requirement specs (`REQ-<AREA>-NNN`) and architecture decisions (ADRs)                      | [`docs/specs/INDEX.md`](docs/specs/INDEX.md), [`docs/adr/README.md`](docs/adr/README.md)                                                                                         |
+| Architecture overview (arc42) and archived plans / one-time runbooks                                | [`docs/arc42/README.md`](docs/arc42/README.md), [`docs/archive/README.md`](docs/archive/README.md)                                                                               |
 | License                                                                                             | [`LICENSE.md`](LICENSE.md) — GPL-3.0                                                                                                                                             |
 
 CLAUDE.md and the SECURITY.md are the two documents that most often
@@ -105,7 +107,7 @@ Before asking, please:
 
 - Search the [README](README.md), this document, [CLAUDE.md](CLAUDE.md),
   and the [CHANGELOG](CHANGELOG.md). Most "why does the build do X?" /
-  "how do I run the test stack?" / "what is `owning_squadron_id`?"
+  "how do I run the test stack?" / "what is `owning_org_unit_id`?"
   questions are answered there.
 - Search open **and closed** Discussions / Issues for an existing answer.
 
@@ -155,9 +157,9 @@ Two non-obvious rules worth highlighting:
   else's closed issue makes triage harder.
 
 A good bug report includes the correlation ID; with it, maintainers can
-go straight to the matching log lines (`correlationId` MDC field in
-`logs/{backend,frontend}.json`) instead of guessing which request you
-mean.
+go straight to the matching log lines (the `correlationId` MDC field in
+the structured `logs/{backend,frontend,ingest}.json`, shipped to Loki)
+instead of guessing which request you mean.
 
 ---
 
@@ -181,20 +183,21 @@ the squadron-scope rules, please link to the relevant sections of
 
 Refactors, dependency upgrades, build / CI work, and docs-only changes
 use the
-[Task template](.github/ISSUE_TEMPLATE/task.yml) instead.
+[Task template](.github/ISSUE_TEMPLATE/task.yml) instead. A durable rule
+the software must always satisfy — as opposed to a feature — goes through
+the [Requirement / Spec template](.github/ISSUE_TEMPLATE/requirement.yml);
+accepted requirements are recorded as `REQ-<AREA>-NNN` in
+[`docs/specs/`](docs/specs/INDEX.md) via PR.
 
 ---
 
 ## Your first code contribution
 
-Looking for an entry point? Filter the issue tracker by these labels:
-
-- [`good first issue`](https://github.com/krt-profit/basetool/labels/good%20first%20issue) — small, well-scoped fixes that don't require deep architectural knowledge.
-- [`help wanted`](https://github.com/krt-profit/basetool/labels/help%20wanted) — open tasks where additional contributors are explicitly welcome.
-
-If you cannot find anything that suits you, opening a Discussion that
-describes what you would like to work on is a perfectly fine starting
-point.
+Looking for an entry point? Browse the
+[open issues](https://github.com/krt-profit/basetool/issues), or open a
+Discussion that describes what you would like to work on — that is a
+perfectly fine starting point, and it lets a maintainer point you at
+something well-scoped before you invest time.
 
 ---
 
@@ -231,21 +234,45 @@ and "works in the IDE" is not a passing state.
 ### CI
 
 The [CI workflow](.github/workflows/ci.yml) runs `./gradlew build --continue`
-on every PR and push to `main`. That includes Checkstyle, SpotBugs, the
-full JUnit suite, and the JaCoCo coverage report. Reports are uploaded as
-workflow artefacts so reviewers can download them when investigating a
-failure. **CI must be green before a PR merges** — there is no "rerun
-until it passes" allowance.
+on every PR and push to `main`. That includes Spotless, Checkstyle,
+SpotBugs, the frontend asset linters and JS type check, the full JUnit
+suite, and the JaCoCo coverage report. Reports are uploaded as workflow
+artefacts so reviewers can download them when investigating a failure.
+**CI must be green before a PR merges** — there is no "rerun until it
+passes" allowance.
+
+The `main` ruleset makes five checks **required**: *Build, Test & Lint*
+([`ci.yml`](.github/workflows/ci.yml)), the two CodeQL *Analyze* jobs
+([`codeql.yml`](.github/workflows/codeql.yml)), *Verify Signed-off-by on
+every commit* ([`dco.yml`](.github/workflows/dco.yml)) and *Check
+migration version numbering*
+([`flyway-migrations.yml`](.github/workflows/flyway-migrations.yml)).
+Further PR checks run alongside (some only when their paths are
+touched) and are expected to pass:
+[`repo-lint.yml`](.github/workflows/repo-lint.yml) (shellcheck,
+actionlint, hadolint, ansible-lint, Quadlet drift, ADR registry,
+monitoring and logging-facade gates),
+[`gitleaks.yml`](.github/workflows/gitleaks.yml) (secret scan),
+[`wrapper-validation.yml`](.github/workflows/wrapper-validation.yml),
+[`deploy-script.yml`](.github/workflows/deploy-script.yml) and
+[`keycloak-provisioner.yml`](.github/workflows/keycloak-provisioner.yml).
+
+The Playwright end-to-end suite ([`e2e.yml`](.github/workflows/e2e.yml))
+runs on a PR **only when it carries the `e2e` label** (and nightly on
+`main`). Maintainers apply the label to any PR that touches frontend
+flows, auth / session, controllers or migrations; ask for it if your PR
+does.
 
 The CycloneDX SBOMs are a release artefact, not a build output: they are
 regenerated and committed only by the
 [release-prepare workflow](.github/workflows/release-prepare.yml) (or on
 demand via `./gradlew :<module>:cyclonedxBom`), never by `./gradlew build`.
 
-In addition, [CodeQL](.github/workflows/codeql.yml) and an OWASP
-[dependency check](.github/workflows/dependency-check.yml) run on a
-schedule; if your change introduces a new security finding, expect to
-address it before merge.
+CodeQL additionally runs weekly, and the OWASP
+[dependency check](.github/workflows/dependency-check.yml) runs weekly
+and on every PR that touches the build files, the version catalog or its
+suppression file; if your change introduces a new security finding,
+expect to address it before merge.
 
 ### Review and merge
 
@@ -404,8 +431,8 @@ If the check fails:
 2. `git push --force-with-lease origin "$(git branch --show-current)"` to refresh the PR.
 3. The check re-runs automatically.
 
-We block at **merge** time (the check is wired up as a required status
-check via branch protection on `main`), not at commit time. If You
+We block at **merge** time (the check is a required status check in
+the `main` branch ruleset), not at commit time. If You
 forget the `-s` flag a few times, the rebase fix is one command — no
 harm done.
 
@@ -470,10 +497,17 @@ Examples: `feat/squadron-switcher-ui`, `fix/orders-material-relay`,
 `chore/refresh-versions-may`. Avoid embedding issue numbers in branch
 names — they go into commit messages and PR descriptions instead.
 
-The `main` branch is the only long-lived branch. There is no `develop`,
-no `release/*`, no `staging/*`. Releases are cut by tagging `main` with
-`vX.Y.Z`; see [`docs/deployment.md`](docs/deployment.md) for the full
-release loop.
+The `main` branch is the only long-lived branch. There is no `develop`
+and no `staging/*`. Releases are cut by a maintainer in two phases:
+[`release-prepare.yml`](.github/workflows/release-prepare.yml) (manual
+dispatch with the version) cuts `## [Unreleased]` into the version
+section, regenerates the SBOMs and opens a short-lived `release/vX.Y.Z`
+PR; merging it lets
+[`release-publish.yml`](.github/workflows/release-publish.yml) tag the
+merge commit `vX.Y.Z` and publish the GitHub Release, which in turn
+builds the signed images. Nobody hand-pushes a tag. What happens after
+that — promotion to `:stable` and the host rollout — is in
+[`docs/deployment.md`](docs/deployment.md).
 
 ---
 
@@ -482,8 +516,7 @@ release loop.
 ### Java
 
 - **Google Java Style** is the baseline, enforced by Checkstyle
-  (`config/checkstyle/google_checks.xml`). IntelliJ IDEA settings live in
-  the `settings/` directory.
+  (`config/checkstyle/google_checks.xml`).
 - **Spotless** auto-formats Java sources — `./gradlew spotlessApply` is
   mandatory before every push. Spotless is wired into `check` with
   `isEnforceCheck = true`, so unformatted code fails CI.
@@ -501,11 +534,16 @@ release loop.
 - **Lombok** — lean on it (`@Slf4j`, `@Getter`, `@Setter`, `@Builder`,
   `@RequiredArgsConstructor`, `@NoArgsConstructor`, `@AllArgsConstructor`,
   `@Data`) to avoid boilerplate.
-- **Loggers** exclusively via `@Slf4j` — never `LoggerFactory.getLogger(...)`.
+- **Loggers** exclusively via `@Slf4j` (`@JBossLog` in `keycloak-spi`) —
+  never `LoggerFactory.getLogger(...)` or `System.out` in `src/main`;
+  `lombok.config` and the `logging-facade` CI job enforce it (ADR-0193).
+  Tests that capture a logger to assert on its output are the exception.
 - **Modern Java** — switch expressions, pattern matching, sealed classes
   where exhaustiveness genuinely helps.
-- **JetBrains annotations** (`@NotNull`, `@Nullable`, `@Contract`) on
-  anything that communicates a real contract.
+- **JetBrains annotations** (`@NotNull`, `@Nullable`, `@Contract`,
+  `@Unmodifiable`) only where the code actually establishes the contract
+  — see the *Java conventions* section of [CLAUDE.md](CLAUDE.md) for the
+  exact rules.
 
 ### Javadoc
 
@@ -538,7 +576,7 @@ Javadoc is **gate-enforced** via Checkstyle (`MissingJavadocType`,
   labels, buttons, tooltips, error messages, flash messages, alerts,
   placeholders, titles. No hardcoded text in HTML, JS, or Java.
 - **German umlauts in `.properties` files MUST be encoded as `\uXXXX`**
-  — e.g. `ä` for `ä`. This is a hard rule, enforced by review.
+  — e.g. `\u00e4` for `ä`. This is a hard rule, enforced by review.
 - **German umlauts in Markdown files MUST be literal UTF-8 characters.**
   Never use `\uXXXX` outside `.properties`.
 - New keys land in `messages.properties` (fallback) plus both
@@ -548,8 +586,9 @@ Javadoc is **gate-enforced** via Checkstyle (`MissingJavadocType`,
 
 The UI follows the *DAS KARTELL* Corporate Design Manual strictly — see
 [`.claude/skills/das-kartell-design/README.md`](.claude/skills/das-kartell-design/README.md)
-and the *Frontend / UI rules* section
-of [`CLAUDE.md`](CLAUDE.md). Highlights:
+(a git submodule: run `git submodule update --init` if it is empty), the
+binding rules in [`docs/specs/ui-design-system.md`](docs/specs/ui-design-system.md)
+and [`frontend/CLAUDE.md`](frontend/CLAUDE.md). Highlights:
 
 - **Brand colour** `#E77E23` (orange). Logo only in this orange, white,
   or black.
@@ -557,21 +596,27 @@ of [`CLAUDE.md`](CLAUDE.md). Highlights:
 - **Type** `Lato` only (Light 300 standard, Bold 700 emphasis). Headlines are
   Lato **Bold + uppercase only** with display letter-spacing (~0.05em) — there is
   no separate display face (Audiowide/Ethnocentric retired 2026-06).
-- **Department colours** are semantic — Combat red `#A3000A`,
-  Sub-Radar/Covert blue `#355DDC`, Research cyan `#37BBC0`, Profit
-  green `#239E33`, Search & Rescue yellow `#FFD23F`, Marine Corps
-  purple `#7A5E96`. Use them only in their semantic context.
+- **Department colours** are semantic and frozen (REQ-UI-005) —
+  Raumüberlegenheit `#37BBC0`, Forschung `#355DDC`, Sub-Radar `#A3000A`,
+  Marinekorps `#7A5E96`, Profit `#239E33`, Search and Rescue `#FFD23F`.
+  Use the official token names (`--color-dept-*`), never the deprecated
+  `combat` / `research` / `marine` aliases.
 - **Never** use `confirm()`, `alert()`, or any native browser dialog.
   Build a KRT-styled modal or toast instead.
 - **Responsive design is mandatory across four device classes**:
   Smartphone (≤ 768 px), Tablet (768–1024 px), Desktop (1024–1600 px),
   Ultra-wide (1600 px+). Minimum touch target 44 px; long-form text
   capped at `max-width: 80ch`.
+- **Live update is binding** — every create / update / delete / toggle /
+  reorder / filter / paginate interaction updates the DOM in place via
+  `krtFetch`, with **no** full-page reload on success, and on shared
+  surfaces a peer's change reaches the other viewers without a reload
+  ([`docs/specs/frontend-ajax-mutations.md`](docs/specs/frontend-ajax-mutations.md)).
 - **DOM `data-version` propagation** — when an entity is updated via
   AJAX, the new `version` must propagate to **every** related element in
   the same context (edit buttons, modals inside the same `<tr>` /
   container). A missed `data-version` becomes a 409 on the user's next
-  click. When in doubt, `window.location.reload()` on success.
+  click.
 
 ### Markdown and documentation
 
@@ -614,12 +659,15 @@ you touch these areas.
 
 ### Security model
 
-- Both modules use Spring Security with Keycloak OIDC. Backend = resource
-  server (validates JWT); frontend = OAuth2 client.
+- All three apps use Spring Security with Keycloak OIDC. Backend and
+  ingest = resource servers (validate JWTs); frontend = OAuth2 client.
+  The whole tool is members-only: the landing page and the legal pages
+  are its only anonymous surface (ADR-0159).
 - **Authorization is centralised in `@PreAuthorize` annotations on
   services and controllers.** Keep checks out of business logic.
 - `SecurityContextHolder` is forbidden outside the auth-helper service
-  (ArchUnit-enforced). Every `@RestController` carries at least one
+  (ArchUnit-enforced,
+  [`ArchitectureTest`](backend/src/test/java/de/greluc/krt/profit/basetool/backend/ArchitectureTest.java)). Every `@RestController` carries at least one
   `@PreAuthorize`. Controllers do not return JPA entities. The frontend
   module does not depend on Spring Data JPA.
 - Full role / permission matrix:
@@ -638,10 +686,12 @@ you touch these areas.
 
 ### Multi-squadron tenancy
 
-- Five aggregate roots are **strictly squadron-scoped**: `Ship`,
-  `InventoryItem` (direct Lager-View), `RefineryOrder`, `Operation`,
-  and `Mission` (with a public-escape carve-out for non-internal
-  missions).
+- The tenant unit is the **OrgUnit** (Staffel, Spezialkommando, and the
+  Bereich / Organisationsleitung levels above them). `Ship`,
+  `InventoryItem` (direct Lager-View) and `RefineryOrder` are **strictly
+  scoped** by `owning_org_unit_id`, with a per-owner escape for the row's
+  own owner; `Operation` is strict with two read-only escapes; `Mission`
+  is visible beyond its unit unless it is internal.
 - `JobOrder` is intentionally **cross-squadron** and carries a
   `responsible_org_unit_id` (the processing unit — governs visibility,
   changed only via `PATCH /{id}/responsible-org-unit`) and a
@@ -658,13 +708,13 @@ you touch these areas.
   `AuthHelperService` / `OwnerScopeService`. Update the whitelist in
   [`ArchitectureTest`](backend/src/test/java/de/greluc/krt/profit/basetool/backend/ArchitectureTest.java)
   when you add a new staffel-scoped aggregate.
-- Full operational rules: [`CLAUDE.md`](CLAUDE.md) → *Multi-squadron tenancy*.
+- Full scope model: [`docs/specs/org-unit-tenancy.md`](docs/specs/org-unit-tenancy.md) (`REQ-ORG-*`).
 
 ### Concurrency: optimistic locking and the `*WithinTransaction` pattern
 
 The codebase has been bitten by optimistic-locking traps multiple times.
-The rules in [CLAUDE.md → Concurrency](CLAUDE.md) exist because of real
-bugs that shipped. The short version:
+The rules in [`backend/CLAUDE.md` → Concurrency](backend/CLAUDE.md) exist
+because of real bugs that shipped. The short version:
 
 - **Optimistic locking via `@Version`** — every write DTO carries
   `version`; concurrent modifications surface as
@@ -732,11 +782,13 @@ bugs that shipped. The short version:
 
 ### Logging
 
-- Both modules emit one access-log line per request and enrich every log
-  line with MDC fields `correlationId`, `userId`, and `orgUnitId`.
+- All three apps emit one access-log line per request and enrich every
+  log line with MDC fields `correlationId` and `userId`; backend and
+  frontend add `orgUnitId`. Details:
+  [`docs/specs/observability.md`](docs/specs/observability.md).
 - The `prod` profile additionally writes structured JSON
-  (`LogstashEncoder`) to `logs/{backend,frontend}.json` with errors
-  rolled into `*-error.log` for fast triage.
+  (`LogstashEncoder`) to `logs/{backend,frontend,ingest}.json`, which
+  Alloy ships to Loki; errors also roll into `*-error.log`.
 - **Never log names, emails, JWTs, or tokens.**
 
 ### Tests
@@ -765,19 +817,19 @@ A condensed version of the PR template. Run through this before opening
 the PR — every box should be reasonably tickable.
 
 - [ ] `./gradlew spotlessApply` was the last formatting change.
-- [ ] `./gradlew check` passes locally (Checkstyle, SpotBugs, tests).
+- [ ] `./gradlew check` passes locally (Spotless, Checkstyle, SpotBugs, the frontend asset linters and type check, tests).
 - [ ] No new Checkstyle / SpotBugs findings in the **changed code**.
 - [ ] Every new / changed public API has Javadoc — concrete, code-specific, no boilerplate.
 - [ ] New / changed code has tests (`*Test`, Given/When/Then); concurrency-sensitive changes test the optimistic-lock path.
 - [ ] No production credentials in test artefacts, stack spin-ups, or screenshots.
-- [ ] `CHANGELOG.md` updated under `## [Unreleased]` in the correct category (`Added` / `Changed` / `Fixed` / `Removed` / `Security`).
+- [ ] `CHANGELOG.md` updated under `## [Unreleased]` in the correct category (`Added` / `Changed` / `Fixed` / `Removed` / `Security`) — entries are written in German, short and user-facing, like the existing ones.
 - [ ] No tokens, passwords, real names, emails, or JWTs in the diff or in logs.
 - [ ] My [CLA](CLA.md) is on file (one-time, signature in [`docs/cla-signatures.md`](docs/cla-signatures.md) or via CLA-Assistant).
 - [ ] **Every** commit in the PR carries a `Signed-off-by:` trailer (DCO; `git commit -s`).
 - [ ] For schema changes: a new `V<n>__<desc>.sql` migration, `ddl-auto=validate` still passes, destructive operations follow the two-phase rule.
 - [ ] For API changes: `openapi.json` updated, every endpoint carries SpringDoc annotations, write DTOs carry Jakarta validation annotations, list endpoints whitelist sort fields, all timestamps in UTC.
 - [ ] For UI changes: verified on at least one of each device class (Smartphone / Tablet / Desktop / Ultra-wide), every user-visible string in `messages.properties` (DE + EN + fallback), umlauts encoded `\uXXXX` in `.properties`, literal in Markdown.
-- [ ] For dependency upgrades: edited `versions.properties` / `gradle/libs.versions.toml`, not `build.gradle.kts` directly.
+- [ ] For dependency upgrades: edited the version catalog `gradle/libs.versions.toml`, not `build.gradle.kts` directly (`versions.properties` is vestigial and holds no versions).
 
 If you find yourself wanting to skip a checklist item "for now", that is
 the moment to add a follow-up issue and link it from the PR description

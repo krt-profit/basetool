@@ -66,7 +66,9 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * REST surface for the local {@code app_user} mirror. The {@code /me} endpoints derive the user id
  * from the JWT — never from the URL — so a caller can never impersonate another user via this path.
- * {@code /attributes}, the logistician/mission-manager toggles and {@code DELETE} are admin-scoped.
+ * {@code /sync}, {@code /attributes}, the membership write and detail endpoints and {@code DELETE}
+ * are admin-scoped. The per-Staffel logistician/mission-manager flags are no longer toggled here;
+ * they are patched on the membership row through {@link SquadronMembershipController}.
  *
  * <p>The class-level {@link Transactional} keeps the persistence session open across the {@code
  * userMapper.toDto} projection every endpoint returns: {@link UserMapper} resolves the caller's

@@ -3,7 +3,7 @@
 - **Status:** Accepted — ITEM-ingredient scope extended by [ADR-0046](0046-blueprint-craftability-bridges-piece-item-ingredients.md)
 - **Date:** 2026-06-21
 - **Deciders:** @greluc
-- **Related:** spec [REQ-INV-019](../specs/personal-inventory-blueprints.md) · issue [#781](https://github.com/krt-profit/basetool/issues/781) · ingredient scope extended by [ADR-0046](0046-blueprint-craftability-bridges-piece-item-ingredients.md)
+- **Related:** spec [REQ-INV-048](../specs/personal-inventory-blueprints.md) · issue [#781](https://github.com/krt-profit/basetool/issues/781) · ingredient scope extended by [ADR-0046](0046-blueprint-craftability-bridges-piece-item-ingredients.md)
 
 ## Context
 

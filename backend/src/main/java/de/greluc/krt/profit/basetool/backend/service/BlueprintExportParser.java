@@ -149,7 +149,7 @@ public final class BlueprintExportParser {
     // structural tag (lower-cased) when present, else the trimmed product name. Keying on the tag
     // is what stops two DISTINCT DataForge blueprints that scmdb.net happens to display under the
     // same name — e.g. a genuine piece and a CIG-mislabeled one both shown as "Antium Core Jet"
-    // (REQ-INV-007) — from collapsing into one (which would drop one tag and import only one of the
+    // (REQ-INV-047) — from collapsing into one (which would drop one tag and import only one of the
     // two owned products). Tag-less entries (watcher / extractor / bare array) key on the name, so
     // their de-dup behaviour is unchanged. scmdb.net checklist entries the user has not unlocked
     // yet

@@ -14,7 +14,7 @@ repository — and the frontend is also the **parity reference** the Android app
 so what is written about a screen here is what the app must reproduce.
 
 - **Before**: read the notes for what you are touching (`Frontend`, `Session Lifecycle`,
-  `Anonymous Surface`, `Live Sync`, `Design System`, the domain note). They state what a screen
+  `Public Surface`, `Live Sync`, `Design System`, the domain note). They state what a screen
   does, who may see it, and which of its behaviours are load-bearing rather than incidental.
 - **With every change**: a new route, a changed `permitAll`, a live-update wiring, a picker's
   remote source, a CSP or session behaviour — each moves with its notes, in the same unit of work.
@@ -34,7 +34,7 @@ square-first sci-fi HUD style, "no native browser dialogs", and the four respons
 classes — live in [`docs/specs/ui-design-system.md`](../docs/specs/ui-design-system.md). The
 visual source of truth is the design skill at
 [`.claude/skills/das-kartell-design/README.md`](../.claude/skills/das-kartell-design/README.md)
-(README.md = Quelle der Wahrheit für Farben, Typografie, Komponenten).
+(its README.md is the source of truth for colours, typography and components).
 
 **The design system is a git submodule (`github.com/krt-profit/design-system`) and MUST be
 present before any UI work.** `git worktree add` does not populate submodules, so in a fresh
@@ -72,12 +72,13 @@ sync (a new editable section, a renamed/retired one, a new mutation on an existi
 **must** update its live-update and peer-sync wiring in the **same change** — never defer it to a
 follow-up. For the multi-user sync in particular, a section key must stay consistent across **all**
 its mirror points at once: the acting client's broadcast (the page's section/seam map), the server
-relay's accept-list (`BROADCASTABLE_SECTIONS`), and the receiving client's apply map. A key present
+relay's accept-list (`LiveSyncTopicClass.allowedSections`), and the receiving client's apply map. A key present
 in one but missing from another **silently** leaves other viewers stale with no error — the
 REQ-FE-010 defect that shipped when `objectives`/`frequencies` were added to the write seam but not
 the receiver/relay. Prefer deriving these maps from a single source of truth so they cannot diverge;
 where they can't share one, changing one **requires** changing the others in the same PR, and the
-change is incomplete otherwise.
+change is incomplete otherwise. `LiveSyncSectionMapParityTest` fails the build when the relay's
+whitelist and a page's JS seam map disagree.
 
 ## Type checking (REQ-FE-018, ADR-0125)
 
@@ -138,7 +139,7 @@ debt rather than anything TS 7 introduced.
 
 ## Concurrency — the frontend half
 
-- **Frontend DOM version sync** — when an entity is updated via AJAX (dropdown change, row reorder, etc.), the new `version` must propagate to **every** related DOM element in the same context (edit/action buttons, modals inside the same `<tr>` or container). A missed `data-version` attribute → 409 on the user's next click. If targeted updates are too tangled, just `window.location.reload()` on success.
+- **Frontend DOM version sync** — when an entity is updated via AJAX (dropdown change, row reorder, etc.), the new `version` must propagate to **every** related DOM element in the same context (edit/action buttons, modals inside the same `<tr>` or container). A missed `data-version` attribute → 409 on the user's next click. A reload on success is **not** an escape hatch here: the Live update rule above forbids it, so a tangled update is re-rendered through a fragment swap instead.
 
 The backend half — the `support.OptimisticLock` helper family, `Mission`'s manual section
 counters, the `…WithinTransaction` pattern, bulk-updates-inside-loops and the find-or-create

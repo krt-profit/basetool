@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Frontend mirror of one Bereich tier of the multi-Bereich org chart (epic #692, REQ-ORG-018),
+ * Frontend mirror of one Bereich tier of the multi-Bereich org chart (epic #692, REQ-ORG-026),
  * decoded from {@code GET /api/v1/org-chart}: the Bereich's Bereichsleitung sub-tree plus the
  * Staffeln/SKs reporting into it, tinted by the Bereich's department.
  *

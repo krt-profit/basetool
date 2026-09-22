@@ -23,18 +23,27 @@ A good report typically includes:
 - A clear description of the issue and its impact.
 - The affected version, commit SHA, or container image digest.
 - The affected component (`backend`, `frontend`, `keycloak-theme`,
-  `keycloak-spi`, `ingest`, `scripts/`, GitHub Actions workflow, container
-  image, etc.).
+  `keycloak-spi`, `ingest`, `scripts/`, `quadlet/`, `ansible/`, the edge
+  proxy, GitHub Actions workflow, container image, etc.).
 - Reproduction steps, a proof of concept, or a minimal test case.
 - Any relevant configuration (Spring profile, Keycloak realm settings,
   reverse-proxy setup) needed to trigger the issue.
 - Your assessment of severity (CVSS vector welcome but not required).
 - Whether you intend to publish your own write-up, and on what timeline.
 
-If you cannot use GitHub Security Advisories for some reason, please open a
-minimal public issue that says only *"I would like to report a security
+If you cannot use GitHub Security Advisories for some reason, e-mail the
+maintainer at [lucas.greuloch@gmail.com](mailto:lucas.greuloch@gmail.com)
+with the subject *"Security report: Profit Basetool"*. As a last resort, open
+a minimal public issue that says only *"I would like to report a security
 issue, please contact me"* — without any technical detail — and we will reach
 out privately to arrange a channel.
+
+Vulnerabilities in the Android app go to its own repository's advisory form
+([`krt-profit/basetool-android`](https://github.com/krt-profit/basetool-android/security/advisories/new)).
+The desktop SC extractor's repository has no private reporting channel, so
+report extractor findings here and name the component. A finding that only
+shows up through a client but lives in the server — an API endpoint, the
+ingest gateway, Keycloak configuration — belongs here in any case.
 
 ## What to Expect
 
@@ -54,19 +63,18 @@ advisory and the [`CHANGELOG.md`](../CHANGELOG.md) unless you ask us not to.
 
 ## Supported Versions
 
-Profit Basetool is currently in the `0.x` release line and under active
-development. Only the latest minor release receives security fixes; older
-`0.x` minors do not get backports.
+Profit Basetool is in the `1.x` release line (current release: see
+[`CHANGELOG.md`](../CHANGELOG.md) — `v1.9.2` as of 2026-09-22) and under active
+development. It is operated as a single production deployment, so only the
+latest minor release receives security fixes; older releases do not get
+backports — the fix ships in the next patch release of the current minor.
 
-|                          Version                          |                        Supported                        |
-|-----------------------------------------------------------|---------------------------------------------------------|
-| Latest `0.x` minor on `main`                              | :white_check_mark:                                      |
-| Older `0.x` releases                                      | :x: (please upgrade)                                    |
-| Container tags `:edge`, `:sha-<short>`, `:stable`         | :white_check_mark:                                      |
-| Container tags `:1`, `:1.4`, `:1.4.2`, `:latest` once cut | :white_check_mark: for the *current* major / minor only |
-
-Once the project reaches `1.0`, this table will be updated to define a clear
-support window across major versions.
+|                    Version                     |                   Supported                    |
+|------------------------------------------------|------------------------------------------------|
+| Latest `1.x` minor (e.g. `1.9.x`) and `main`   | :white_check_mark:                             |
+| Older `1.x` minors and every `0.x` release     | :x: (please upgrade)                           |
+| Container tags `:edge`, `:sha-<short>`, `:stable` | :white_check_mark:                          |
+| Container tags `:1`, `:1.9`, `:1.9.2`, `:latest`  | :white_check_mark: for the *current* minor only |
 
 ## Scope
 
@@ -78,13 +86,15 @@ The following are **in scope** for this policy:
 - Published container images under
   [`ghcr.io/krt-profit/basetool-backend`](https://github.com/krt-profit/basetool/pkgs/container/basetool-backend),
   [`ghcr.io/krt-profit/basetool-frontend`](https://github.com/krt-profit/basetool/pkgs/container/basetool-frontend),
-  and
   [`ghcr.io/krt-profit/basetool-ingest`](https://github.com/krt-profit/basetool/pkgs/container/basetool-ingest)
-  (the internet-facing gateway).
+  (the internet-facing gateway), and the two bundles the host pulls through
+  the same channel, `basetool-config` and `basetool-keycloak-spi`.
 - GitHub Actions workflows under `.github/workflows/` and their pinned
   actions.
-- The Docker Compose definitions and deployment scripts shipped in this
-  repository.
+- The deployment definitions shipped in this repository: the Docker Compose
+  files, the Quadlet units generated from them (`quadlet/`), the host
+  bootstrap (`ansible/`), the edge proxy configuration (`docker/edge/`), the
+  monitoring configuration (`monitoring/`) and the deployment scripts.
 - The default Keycloak realm export and theme shipped here, when used as
   documented.
 
@@ -116,9 +126,10 @@ Particularly interesting classes of issue, given the project's architecture:
 - Information disclosure to a caller below the peer redaction tier (see the
   `cleanup…ForPeer` helpers — anything leaking e-mail, real name or internal
   orders/items to a member who may not see it is in scope).
-- Anything reachable without a login beyond the surface REQ-SEC-052 enumerates:
-  the landing page, the legal pages, the assets, `/error`, `/actuator/health`
-  and two documented `GET` reads.
+- Anything reachable without a login beyond the surface REQ-SEC-052 enumerates
+  (the tool is members-only, ADR-0159): the landing page, the legal pages, the
+  assets, `/error`, `/actuator/health`, the Android App Link and web-manifest
+  entries, and two documented backend `GET` reads.
 - Authentication or authorisation bypass against any `@RestController` or
   Thymeleaf view, including missing `@PreAuthorize` annotations.
 - Optimistic-locking bypass leading to lost writes or privilege escalation.
@@ -191,7 +202,7 @@ before reporting a finding against it:
   organisation's CI really build this digest?"*:
 
   ```bash
-  gh attestation verify oci://ghcr.io/krt-profit/basetool-backend:1.6.3 --repo krt-profit/basetool
+  gh attestation verify oci://ghcr.io/krt-profit/basetool-backend:1.9.2 --repo krt-profit/basetool
   ```
 
   The same works for `basetool-frontend`, `basetool-ingest`,

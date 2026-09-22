@@ -1,6 +1,6 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-16.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
 > **Owner area:** INV / ORDERS · **Related ADRs:** ADR-0101 (builds on ADR-0098/0099); design
-> context in [`docs/DESIGN_ITEM_INVENTORY.md`](../DESIGN_ITEM_INVENTORY.md).
+> context in [`docs/archive/DESIGN_ITEM_INVENTORY.md`](../archive/DESIGN_ITEM_INVENTORY.md).
 
 # Inventory — game-item stock rows (Items im Lager)
 
@@ -22,9 +22,10 @@ An `InventoryItem` row references **exactly one** catalog entry: a `Material` (w
 `quality` 0–1000) or a `GameItem` (with `quality IS NULL`). Game-item rows hold
 **positive whole-unit** amounts, follow the PIECE auto-merge rule of REQ-INV-026, and
 their stack identity is `user · gameItem · location · personal · owningOrgUnit` (no
-quality dimension). Only items that are the output of ≥ 1 active blueprint are bookable
-(the catalog predicate is deliberately a superset of the order picker's
-RESOURCE-ingredient requirement). Tenancy, owner escape, audit and append-only
+quality dimension). Only items that are the output of ≥ 1 active blueprint are bookable:
+the Lager item picker (`GET /api/v1/inventory/item-catalog`, `InventoryItemCatalogService`)
+offers only those (the catalog predicate is deliberately a superset of the order picker's
+RESOURCE-ingredient requirement); the create path itself does not re-check it. Tenancy, owner escape, audit and append-only
 semantics are identical to material rows.
 
 **Acceptance**
@@ -42,12 +43,10 @@ semantics are identical to material rows.
 
 **Enforced by:** `InventoryItemServiceTest` / `InventoryStockMergeTest` item cases,
 `ValidQuantityAmountValidatorTest` · **Code:** `InventoryItem`, V220,
-`ValidQuantityAmountValidator`, `InventoryItemRepository` · **Issues:** —
+`ValidQuantityAmountValidator`, `InventoryItemRepository`, `InventoryItemCatalogService` ·
+**Issues:** —
 
 ### REQ-INV-030 — Separate Material / Items views on the Lager surfaces
-
-**Status:** the API `catalog` contract (last sentence and the API acceptance items) is
-live; the view-switch UI described here ships with the follow-up frontend PR (PR 3).
 
 `/inventory`, `/inventory/my` and `/inventory/all` offer a Material ↔ Items view switch
 (`view=items` riding the page's query state); the item view mirrors the material tree
@@ -142,5 +141,5 @@ order-detail item-stock panel shipped as REQ-ORDERS-028 and delivery-consumes-ea
 
 ## Open questions
 
-None — owner decisions of 2026-07-16 are recorded in `docs/DESIGN_ITEM_INVENTORY.md`
+None — owner decisions of 2026-07-16 are recorded in `docs/archive/DESIGN_ITEM_INVENTORY.md`
 §10/§11.

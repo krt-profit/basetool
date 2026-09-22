@@ -49,7 +49,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 /**
  * Full Thymeleaf render / proxy tests for the Discord registration-approval queue. Covers the
- * server-nickname column (REQ-DATA-008) — a captured per-guild nickname is shown next to the name,
+ * server-nickname column (REQ-DATA-018) — a captured per-guild nickname is shown next to the name,
  * a registration without one falls back to the muted em-dash — and the admin
  * link-to-existing-account action (REQ-SEC-026): the "Verknüpfen" button and the remote-users
  * account picker render, and the {@code linkAjax} proxy forwards to the backend. Also covers the
@@ -172,7 +172,7 @@ class AdminDiscordRegistrationsNicknameRenderTest {
             List.of(
                 new PendingRegistrationDto(
                     UUID.randomUUID(),
-                    "conrad7247",
+                    "examplehandle4711",
                     null,
                     Instant.parse("2026-07-20T00:00:00Z"),
                     null,
@@ -208,7 +208,7 @@ class AdminDiscordRegistrationsNicknameRenderTest {
         .thenReturn(
             new PendingRegistrationDto(
                 target,
-                "MadrukSedras",
+                "ExamplePilot",
                 null,
                 Instant.parse("2026-07-20T00:00:00Z"),
                 null,

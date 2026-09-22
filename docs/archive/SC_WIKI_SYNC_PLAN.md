@@ -1,3 +1,7 @@
+> **Archived 2026-09-22.** Doc type: Historical plan — frozen, kept as a record and no longer updated. Shipped (R1–R9). Where the shipped code deviates from it is listed in the header below.
+>
+> **Current truth:** the code under `backend/…/integration/scwiki/` and the `scwiki`/`uex` settings in `application-prod.yml`. Index of the archive: [`README.md`](README.md).
+
 # Star Citizen Wiki + UEX-Items Sync Plan
 
 Doc type: **historical plan** — the design intent, written 2026-05-27 *before* any of it existed.
@@ -684,7 +688,7 @@ The two schedulers race-free for the joint tables (`game_item`, `ship_type`, `ma
 
 ### 6.1 `material` table — new columns
 
-Add to existing entity ([Material.java](backend/src/main/java/de/greluc/krt/iri/basetool/backend/model/Material.java:26)):
+Add to existing entity (Material.java):
 
 ```java
 @Column(name = "scwiki_uuid", unique = true)

@@ -1,15 +1,16 @@
 # logrotate(8) configuration for /var/log/iri-deploy.log.
 #
-# Installation (on the production host, one-time):
-#   sudo cp /var/iri/code/scripts/iri-deploy.logrotate /etc/logrotate.d/iri-deploy
-#   sudo chown root:root /etc/logrotate.d/iri-deploy
-#   sudo chmod 0644       /etc/logrotate.d/iri-deploy
+# Installed to /etc/logrotate.d/iri-deploy (root:root 0644) by
+# ansible/roles/basetool_host/tasks/25-scripts.yml — not by hand.
 #
 # `copytruncate` is required because the systemd unit appends to the file via
 # `StandardOutput=append:...` — that holds a file descriptor open across
 # logrotate's run, so a naive `create` strategy would leave systemd writing
 # into the rotated (now-renamed) file. `copytruncate` rotates the inode
 # without breaking the open fd.
+#
+# logrotate ignores `create` when `copytruncate` is set: the live file stays in
+# place and keeps whatever owner and mode it already has.
 
 /var/log/iri-deploy.log {
     weekly

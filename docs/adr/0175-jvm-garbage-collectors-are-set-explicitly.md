@@ -1,6 +1,6 @@
 # ADR-0175 — JVM garbage collectors are set explicitly, never left to container ergonomics
 
-- **Status:** Proposed
+- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-09-13 (`e401742db`; the frontend's `-XX:+UseG1GC` was completed on 2026-09-15): every JVM service in `docker-compose.yml` names its collector.
 - **Date:** 2026-09-13
 - **Deciders:** @greluc (pending)
 - **Related:** specs `REQ-OPS-028` (new) · [`deployment-delivery.md`](../specs/deployment-delivery.md) ·

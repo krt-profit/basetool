@@ -5,7 +5,7 @@
 # (config.alloy). "fake" is the single-tenant id when auth_enabled is false.
 #
 # NOTE: the exact NPM access-log and host auth.log line formats are verified ONCE on
-# the test stack during rollout (docs/MONITORING_ROLLOUT_RUNBOOK.md) and the line filters below
+# the test stack during rollout (docs/archive/MONITORING_ROLLOUT_RUNBOOK.md) and the line filters below
 # adjusted there if needed — they are the documented first-cut patterns.
 groups:
   - name: log-alerts-critical
@@ -96,6 +96,18 @@ groups:
       #
       # Step 1 is a local observation and steps 3-4 are a config reading; only step 2 was measured on
       # the host. Say so rather than implying all four were watched live.
+      #
+      # RE-VERIFIED 2026-09-22 on the digest the Dockerfiles now pin,
+      # eclipse-temurin:25-jre-alpine@sha256:3137541d… (Temurin 25.0.4+7), after the Podman cutover:
+      #   1. The same Spawn-under-`--pids-limit 60` run printed both matched phrases word for word
+      #      ("pthread_create failed (EAGAIN) for attributes: stacksize: 1024k, guardsize: 0k,
+      #      detached." and "java.lang.OutOfMemoryError: unable to create native thread: possibly out
+      #      of memory or process/resource limits reached").
+      #   2. The streams now arrive through journald rather than Docker's json-file, and they do:
+      #      production Loki held backend-stdout 11,180, frontend-stdout 29,796 and ingest-stdout 706
+      #      lines over the preceding 24 h, entry for entry what the journal holds for those units.
+      #   3-4. Unchanged in config.alloy: still the one `older_than = "167h"` drop, still the same three
+      #      masking replaces, none of which touches either phrase.
       - alert: JvmNativeThreadExhaustion
         expr: 'sum(count_over_time({app=~"(backend|frontend|ingest)-stdout"} |~ "pthread_create failed|unable to create native thread" [5m])) > 0'
         for: 0m
@@ -237,8 +249,8 @@ groups:
           summary: "Edge 5xx spike"
           description: "The edge access log shows an elevated 5xx rate — catches upstream failures app metrics cannot see."
 
-      # 429s come from the edge limiter (REQ-SEC-023, limit_req/limit_conn in the custom
-      # server_proxy.conf snippet) or the backend Bucket4j limiter passing through the edge —
+      # 429s come from the edge limiter (REQ-SEC-023, limit_req/limit_conn in
+      # docker/edge/include/limits.conf) or the backend Bucket4j limiter passing through the edge —
       # either way a sustained rate means someone is flooding or brute-forcing.
       - alert: EdgeRateLimitSpike
         expr: sum(rate({app="edge"} |~ " 429 " [5m])) > 1

@@ -1,12 +1,12 @@
 # ADR-0134 — The backend joins the management-port isolation, and keeps its gated log-level write
 
-- **Status:** Proposed
+- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since v1.7.7 (2026-09-09) at the latest (backend `ManagementPortSecurityConfig` + `ManagementPortIsolationTest`, management port `11271`).
 - **Date:** 2026-08-18
 - **Related:** [ADR-0090](0090-isolate-app-actuator-on-internal-management-port.md) (extended,
   not superseded) · [ADR-0072](0072-monitoring-stack-prometheus-grafana.md) ·
   [ADR-0049](0049-config-as-promotable-oci-artifact.md) · spec `REQ-OBS-005`, `REQ-OBS-008`,
   `REQ-OBS-012`, `REQ-OBS-016`, `REQ-SEC-014` ·
-  [`ANDROID_API_EXPOSURE_PLAN.md`](../ANDROID_API_EXPOSURE_PLAN.md) item A2 ·
+  [`ANDROID_API_EXPOSURE_PLAN.md`](../archive/ANDROID_API_EXPOSURE_PLAN.md) item A2 ·
   `ManagementPortSecurityConfig`, `ManagementPortIsolationTest` (backend)
 
 ## Context

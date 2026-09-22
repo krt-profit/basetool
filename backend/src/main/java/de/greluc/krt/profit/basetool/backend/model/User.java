@@ -161,7 +161,7 @@ public class User extends AbstractEntity<UUID> {
    * The user's per-guild Discord server nickname (the {@code nick} they carry inside the
    * das-kartell guild), captured best-effort at each Discord login and surfaced to an admin in the
    * Discord registration-approval queue so the decision can be tied to a recognisable in-server
-   * identity (REQ-DATA-008). Written from the {@code discord_guild_nickname} token claim, which the
+   * identity (REQ-DATA-018). Written from the {@code discord_guild_nickname} token claim, which the
    * Keycloak Discord IdP fills from the guild-member call — Discord's plain profile has no
    * nickname. {@code null} when the user set no server nickname, never logged in via Discord, or
    * the optional capture mappers are not configured. Display-only: it grants nothing and is exposed

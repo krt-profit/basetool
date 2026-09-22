@@ -1,6 +1,6 @@
 # ADR-0067 — Move the org-unit-membership entity→DTO mapping into the service; retire the mapper-forced controller `@Transactional`
 
-- **Status:** Proposed
+- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-07-03 (`af3ec3c80`, #958; ArchUnit rule `controllersMustNotInjectTheLazyMembershipMapper`). The read-side `…Dto` projections (`listMemberDtos`, …) have since moved to `OrgUnitMembershipQueryService` (`4f6693538`, 2026-07-11).
 - **Date:** 2026-07-03
 - **Deciders:** Repository owner (@greluc)
 - **Related:** issue #923 (L4, epic #905) · the ArchUnit rules `controllerMethodsShouldNotReturnJpaEntities` (kept), `controllersUsingTheLazyMembershipMapperMustBeTransactional` (deleted) and `controllersMustNotInjectTheLazyMembershipMapper` (added as its inverted replacement) · REQ-FE-003 (optimistic-lock version echo)

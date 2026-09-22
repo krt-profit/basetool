@@ -1,24 +1,22 @@
 ; systemd service for the weekly Profit Basetool container housekeeping.
 ;
-; Installation (on the production host, one-time — see docs/deployment.md):
-;   sudo cp /var/iri/code/scripts/iri-container-cleanup.service /etc/systemd/system/
-;   sudo cp /var/iri/code/scripts/iri-container-cleanup.timer   /etc/systemd/system/
-;   sudo systemctl daemon-reload
-;   sudo systemctl enable --now iri-container-cleanup.timer
+; Installation is by the Ansible role (ansible/roles/basetool_host/tasks/25-scripts.yml), not by
+; hand: it copies this unit and iri-container-cleanup.timer to /etc/systemd/system/, verifies them
+; with `systemd-analyze verify`, and enables the timer without starting it.
 ;
 ; Run an immediate cleanup (bypassing the next scheduled tick):
 ;   sudo systemctl start iri-container-cleanup.service
 ;
 ; Inspect:
 ;   systemctl status iri-container-cleanup.timer
-;   journalctl -u iri-container-cleanup.service -f
+;   tail -f /var/log/iri-container-cleanup.log   # the script output; journald has only the unit lifecycle
+; Off-host: Grafana -> Explore -> Loki, `{app="ops-cleanup"}`.
 ;
-; Runs as the same unprivileged `deploy` user as iri-backup / iri-deploy (member
-; of the `docker` group, no shell, no sudo): it needs the Docker socket to prune
-; unused resources, nothing more. DOCKER_CONFIG is pinned to a real path because
-; `deploy` is created with `--no-create-home` (no usable $HOME) and, under
-; ProtectHome=true, the Docker CLI would otherwise fail reading its config from
-; the unreachable $HOME/.docker — the same reason deploy.sh pins it.
+; Runs as the same unprivileged `deploy` user as iri-backup / iri-deploy (no shell, no password
+; sudo): it prunes the service user's stopped containers, unused images and networks through the sudoers bridge of
+; ansible/roles/basetool_host/tasks/22-deploy-user.yml, nothing more. DOCKER_CONFIG is pinned to a
+; real path because `deploy` has no usable $HOME (its home is /var/lib/iri, created without a
+; skeleton) — the same reason deploy.sh pins it.
 
 [Unit]
 Description=Profit Basetool — weekly container housekeeping (prune unused containers/images/networks)
@@ -67,15 +65,15 @@ User=deploy
 # (ansible/roles/basetool_host/tasks/22-deploy-user.yml), which is strictly narrower than docker
 # group membership, that being root-equivalent by design.
 
-; `deploy` has no usable $HOME, so point the Docker CLI at a real, writable path
-; (already in ReadWritePaths below). Mirrors the DOCKER_CONFIG the retired
-; docker-cleanup.cron drop-in used to export.
+; `deploy` has no usable $HOME, so point the registry-credential config at a real,
+; writable path (already in ReadWritePaths below). Mirrors the DOCKER_CONFIG the
+; retired docker-cleanup.cron drop-in used to export.
 Environment=DOCKER_CONFIG=/var/lib/iri/.docker
 
 ExecStart=/var/iri/code/scripts/container-cleanup.sh
 
-; stdout/stderr to journald AND to /var/log/iri-container-cleanup.log for
-; logrotate-kept history.
+; stdout/stderr to /var/log/iri-container-cleanup.log for logrotate-kept history.
+; `append:` REPLACES journald for these streams rather than teeing to it.
 StandardOutput=append:/var/log/iri-container-cleanup.log
 StandardError=append:/var/log/iri-container-cleanup.log
 

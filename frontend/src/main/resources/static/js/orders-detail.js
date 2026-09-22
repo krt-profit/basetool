@@ -53,10 +53,10 @@ const ORDER_SECTIONS = {
     aggregated: { container: '#order-aggregated-results', fragmentValue: 'aggregated' },
     items: { container: '#order-items-results', fragmentValue: 'items' },
     // The earmarked item stock is now rendered inline in each ordered item's expand row (part of the
-    // `items` fragment), so the `item-stock` wire key — still broadcast by the Lager pages, the
-    // production book-in and the item-handover consumption, and still whitelisted on the relay —
-    // re-renders the items section. Keeping the key aliased (rather than dropping it) means those
-    // external broadcasters need no change and stay in sync.
+    // `items` fragment), so the `item-stock` wire key — still broadcast by the Lager pages
+    // (`inventory-my.js` / `inventory-admin.js` broadcastOrdersChanged) and still whitelisted on the
+    // relay — re-renders the items section. Keeping the key aliased (rather than dropping it) means
+    // those external broadcasters need no change and stay in sync.
     'item-stock': { container: '#order-items-results', fragmentValue: 'items' },
     handovers: { container: '#order-handovers-results', fragmentValue: 'handovers' },
     'item-handovers': {

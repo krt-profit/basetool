@@ -230,7 +230,8 @@
         "y": 8
       },
       "type": "timeseries",
-      "title": "NPM errors & warnings",
+      "title": "Edge errors & warnings",
+      "description": "nginx error-log lines of the native edge (app=\"edge\"), by severity. Anchored on the error log's own `YYYY/MM/DD HH:MM:SS [level]` prefix, so an access-log line whose path or user agent happens to contain \"error\" is not counted. Re-sourced 2026-09-22 from the retired NPM stream {app=\"npm\"}, which has had no producer since NPM was removed.",
       "datasource": {
         "type": "loki",
         "uid": "loki"
@@ -256,9 +257,9 @@
       },
       "targets": [
         {
-          "expr": "sum(rate({app=\"npm\"} |~ \"(?i)(error|emerg|warn|failed|host not found)\" [10m]))",
+          "expr": "sum by (severity) (rate({app=\"edge\"} |~ `^\\S+ \\S+ \\[(warn|error|crit|alert|emerg)\\]` | regexp `^\\S+ \\S+ \\[(?P<severity>[a-z]+)\\]` [10m]))",
           "refId": "A",
-          "legendFormat": "npm errors/warnings",
+          "legendFormat": "edge {{severity}}",
           "datasource": {
             "type": "loki",
             "uid": "loki"

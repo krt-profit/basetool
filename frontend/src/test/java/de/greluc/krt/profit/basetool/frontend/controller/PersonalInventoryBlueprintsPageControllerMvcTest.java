@@ -231,7 +231,7 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
   @Test
   @WithMockUser
   void view_rendersCraftableOnlyFilter_nextToRefineryToggle() throws Exception {
-    // covers REQ-INV-019 — the "show only craftable" view filter renders as a toggle inside the
+    // covers REQ-INV-048 — the "show only craftable" view filter renders as a toggle inside the
     // craftability toolbar, alongside the refinery fold-in toggle, so a user can narrow the list to
     // the blueprints they can craft right now.
     PersonalBlueprintDto bp =

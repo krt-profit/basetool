@@ -1,6 +1,6 @@
 # ADR-0183 — A granted erasure anonymises the handle snapshots in place, with a sentinel rather than NULL
 
-- **Status:** Proposed
+- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-09-17 (`f8b6c19ae`, PR #1920: `support.HandleErasureCoverage` and its test).
 - **Date:** 2026-09-15
 - **Deciders:** @greluc (scope and placeholder decided 2026-09-15)
 - **Related:** spec `REQ-SEC-062` (new) · `REQ-SEC-061`
@@ -153,6 +153,15 @@ And `audit_event.subject_label` was worse than missed: the erasure rewrote `acto
 the execution's own audit row put the member's effective name back into `subject_label` on the same
 row, six lines later. All four deletion-request events did the same, so a granted erasure left rows
 literally half-anonymised for the full 24-month retention.
+
+> **Note (2026-09-22):** The count below is out of date. On 2026-09-17 the three substring
+> `REPLACE` statements over `notification.params`, `audit_event.details` and
+> `bank_audit_event.details` were removed again (a self-service display name as the needle could
+> rewrite unrelated rows, e.g. the amount annotations of the whole financial trail); a name inside
+> those payloads is now an admin's manual step via the Personensuche. The anonymised set is
+> **twelve columns in eight statements** — `HandleAnonymisationService.ANONYMISED_COLUMNS` is the
+> authoritative list and [REQ-SEC-062](../specs/security-and-access.md#req-sec-062--a-granted-art-17-request-anonymises-the-surviving-handle-snapshots)
+> the current statement of it.
 
 Three things changed, and only the third of them is a fix rather than a lesson:
 

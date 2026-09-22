@@ -1,6 +1,6 @@
 # ADR-0135 — The mobile API is exposed through a dedicated public vhost, not through a gateway
 
-- **Status:** Proposed
+- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since v1.7.7 (2026-09-09) at the latest; the vhost was rolled out 2026-08-21 → 2026-09-09 ([`API_VHOST_ROLLOUT_RUNBOOK.md`](../archive/API_VHOST_ROLLOUT_RUNBOOK.md)) and its allow-list now lives in `docker/edge/include/api-allowlist.conf` (ADR-0162).
 - **Date:** 2026-08-18
 - **Related:** [ADR-0129](0129-ingest-gateway-is-a-trusted-subsystem-not-a-token-relay.md) (the
   rejected alternative's own reasoning) · [ADR-0131](0131-mobile-auth-refresh-only-dpop-binding.md) ·
@@ -8,7 +8,7 @@
   [ADR-0090](0090-isolate-app-actuator-on-internal-management-port.md) ·
   [ADR-0072](0072-monitoring-stack-prometheus-grafana.md) · specs `REQ-SEC-011`, `REQ-SEC-030`,
   `REQ-SEC-031`, `REQ-SEC-032`, `REQ-SEC-033`, `REQ-OBS-012`, `REQ-OBS-018` ·
-  [`ANDROID_API_EXPOSURE_PLAN.md`](../ANDROID_API_EXPOSURE_PLAN.md) items B1, C, D3
+  [`ANDROID_API_EXPOSURE_PLAN.md`](../archive/ANDROID_API_EXPOSURE_PLAN.md) items B1, C, D3
 
 ## Context
 

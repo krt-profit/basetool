@@ -1,6 +1,6 @@
 # ADR-0065 — Split `OwnerScopeService` into a scope/gate/stamping trio and extract the org-unit-bank write mechanics
 
-- **Status:** Proposed
+- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-07-02 (`9e37776bf`: `RequestScopeResolver`, `AccessGateService`, `OrgUnitStampingService`, `OrgUnitBankVisibilityService`, `OrgUnitBankApprovalLimitService`).
 - **Date:** 2026-07-02
 - **Deciders:** Repository owner (@greluc)
 - **Related:** issue #922 (L3, epic #905) · ADR-0061 / ADR-0062 (the `MissionService` / `JobOrderService` splits, same delegating-facade pattern) · ADR-0020 (org-unit-aware bank seam) · REQ-BANK-008 / REQ-AUDIT-001 · the ArchUnit invariants `orgUnitAwareBankSeamIsContainedToOneClass`, `bankClassesMustNotConsultOrgUnitScope`, `staffelScopedServicesMustWireOwnerScopeOrAuthHelper`

@@ -81,7 +81,7 @@ public class DiscordIdentityProvider
    * Importer</em> mapper map that name to the {@code discord_guild_nickname} user attribute exactly
    * the way {@code id} maps to {@code discord_user_id} — Discord's {@code /users/@me} payload
    * itself has no per-guild name, which is only available via the guild-member call. Absent when
-   * neither a nickname nor a global name was captured. Epic #720 / REQ-DATA-008.
+   * neither a nickname nor a global name was captured. Epic #720 / REQ-DATA-018.
    */
   public static final String GUILD_NICK_PROFILE_FIELD = "guild_nick";
 
@@ -209,12 +209,12 @@ public class DiscordIdentityProvider
    * Importer</em> mapper can carry it onward to the {@code discord_guild_nickname} user attribute.
    * The {@code global_name} fallback ({@link DiscordGuildNicknameReader#readGuildDisplayName}) is
    * what keeps a member who never set an explicit server nickname from surfacing as a blank in the
-   * admin approval queue (the reported conrad7247/MadrukSedras case). Runs on every Discord login
-   * (so the value stays current with the mapper's FORCE sync mode), but is skipped — with no
-   * Discord call — when {@link #GUILD_ID_ENV} is unset or the profile is not a JSON object. It
-   * <strong>never throws</strong>: a missing or failed capture must never break or delay the login
-   * beyond the reader's bounded timeout (REQ-DATA-008), in deliberate contrast to the fail-closed
-   * membership gate.
+   * admin approval queue (the reported case of a member with no per-guild nick). Runs on every
+   * Discord login (so the value stays current with the mapper's FORCE sync mode), but is skipped —
+   * with no Discord call — when {@link #GUILD_ID_ENV} is unset or the profile is not a JSON object.
+   * It <strong>never throws</strong>: a missing or failed capture must never break or delay the
+   * login beyond the reader's bounded timeout (REQ-DATA-018), in deliberate contrast to the
+   * fail-closed membership gate.
    *
    * @param profile the parsed {@code /users/@me} profile, mutated in place when a name is found
    * @param accessToken the user's brokered Discord access token (scope {@code guilds.members.read})

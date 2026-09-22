@@ -3,9 +3,9 @@
 - **Status:** Accepted
 - **Date:** 2026-06-06
 - **Deciders:** Repository owner (@greluc)
-- **Related:** spec `REQ-MISSION-001`, `REQ-ORDERS-001` / `002`, `REQ-INV-004`
+- **Related:** spec `REQ-MISSION-001`, `REQ-ORDERS-001` / `002`, `REQ-INV-045`
   ([`whole-number-amounts.md`](../specs/whole-number-amounts.md)) · contrasts with
-  `REQ-INV-001..003` ([`inv-material-quantities.md`](../specs/inv-material-quantities.md)) · PR #465
+  `REQ-INV-003`, `REQ-INV-042`, `REQ-INV-043` ([`inv-material-quantities.md`](../specs/inv-material-quantities.md)) · PR #465
 
 ## Context
 

@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-19.
-> **Owner area:** INGEST · **Related ADRs:** [ADR-0018](../adr/0018-desktop-ingest-gateway-device-grant.md) · **Related:** epic [#639](https://github.com/krt-profit/basetool/issues/639), runbook [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md), [`refinery-screenshot-import.md`](refinery-screenshot-import.md) (`REQ-REFINERY-018`), [`security-and-access.md`](security-and-access.md), [`api-conventions.md`](api-conventions.md), [ADR-0007](../adr/0007-client-side-vlm-screenshot-extraction.md), [ADR-0008](../adr/0008-refinery-extract-json-contract.md)
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Owner area:** INGEST · **Related ADRs:** [ADR-0018](../adr/0018-desktop-ingest-gateway-device-grant.md), [ADR-0110](../adr/0110-ingest-handoff-consume-off-navigational-get.md), [ADR-0129](../adr/0129-ingest-gateway-is-a-trusted-subsystem-not-a-token-relay.md) · **Related:** epic [#639](https://github.com/krt-profit/basetool/issues/639), runbook [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md), [`refinery-screenshot-import.md`](refinery-screenshot-import.md) (`REQ-REFINERY-018`), [`security-and-access.md`](security-and-access.md), [`api-conventions.md`](api-conventions.md), [ADR-0007](../adr/0007-client-side-vlm-screenshot-extraction.md), [ADR-0008](../adr/0008-refinery-extract-json-contract.md)
 
 # Desktop one-click ingest (send-to-basetool)
 
@@ -37,7 +37,7 @@
 
 ## Context & goal
 
-The desktop extractor (`basetool-bp-extractor`) produces refinery-extract and
+The desktop extractor (`basetool-sc-extractor`, formerly `basetool-bp-extractor`) produces refinery-extract and
 personal-blueprint JSON entirely on the user's machine. This spec governs the path that
 lets the user send that JSON into the basetool with **one click** at the end of the
 extractor workflow — landing on the matching basetool page with the data already
@@ -124,13 +124,15 @@ network only.
 - [x] The gateway declares no `DataSource`/JPA and runs no schema migration (architecture
   test / startup assertion).
 - [x] The gateway serves **HTTPS** on 11262 (`server.ssl.enabled=true`), mirroring backend/frontend.
-  nginx-proxy-manager terminates the public TLS and **re-encrypts** to the gateway over
-  `https://…:11262` (NPM upstream scheme `https`, upstream-certificate verification **off** for the
-  shared self-signed cert). The shared `SERVER_SSL_KEY_STORE` env vars feed **both** the server
-  connector and the `backend-trust` truststore. Both the Docker `HEALTHCHECK` and the NPM upstream
-  address the gateway over `https://…:11262` (the healthcheck skips cert verification). The connector
-  scheme, the NPM upstream scheme and the healthcheck scheme must stay aligned — a mismatch makes the
-  proxy return a bare 400 and keeps the container `unhealthy`.
+  The native nginx edge terminates the public TLS and **re-encrypts** to the gateway
+  (`docker/edge/conf.d/30-ingest.conf.template`: `proxy_pass https://ingest:11262`, upstream
+  certificate **verified** against the upstream CA via `include/upstream-tls.conf`,
+  `proxy_ssl_name ingest`). The shared `SERVER_SSL_KEY_STORE` env vars feed **both** the server
+  connector and the `backend-trust` truststore. The container healthcheck (the image `HEALTHCHECK`
+  and the Quadlet `HealthCmd` in `quadlet/systemd/ingest.container`) probes
+  `https://localhost:11272/actuator/health/readiness` on the management port, skipping cert
+  verification. The connector scheme and the edge's upstream scheme must stay aligned — a mismatch
+  makes the proxy return a bare 400.
 
 **Enforced by:** `ArchitectureTest` (no JPA / no relational persistence; every controller +
 `@PostMapping` is `@PreAuthorize`-annotated), `IngestControllerTest` (exactly the two endpoints,
@@ -142,7 +144,8 @@ forward-only relay, backend 4xx relayed verbatim, 502 on backend-unreachable), `
 
 The gateway is a Keycloak JWT resource server in the existing realm. Tokens are issued to a
 new **public** Keycloak client (`basetool-sc-extractor`) via the **Device Authorization
-Grant** (RFC 8628) with PKCE and **no client secret**. The gateway requires
+Grant** (RFC 8628) and **no client secret** — no PKCE, because the device code itself is the
+proof of possession; DPoP binds the tokens instead (`REQ-INGEST-012`). The gateway requires
 `isAuthenticated()` — no elevated role; any member may ingest, mirroring `REQ-REFINERY-011`.
 The token carries `aud=basetool-backend` (stamped by the dedicated `extractor-ingest` client
 scope, #641) and is consumed here: since ADR-0129 it is **not** forwarded, and the backend is called
@@ -159,8 +162,10 @@ never acts for a user other than the one it authenticated.
 
 **Acceptance**
 
-- [x] A request without a valid signed realm token (carrying `aud=basetool-backend`) is
-  rejected 401/403; no forward happens.
+- [x] A request without a valid signed realm token is rejected 401/403; no forward happens. With
+  the audience check configured, a token lacking the configured audience is rejected too — the
+  gateway's value is `basetool-ingest` (`IRI_INGEST_EXPECTED_AUDIENCES`), never the backend's (see
+  the amendment above).
 - [x] The device-grant client is public (no secret) and the secret is never embedded in the
   desktop binary or in any committed config.
 - [x] The handoff staged by an ingest call is readable only under the same `sub`.
@@ -331,8 +336,9 @@ INGEST-DOS-1 / INGEST-RATELIMIT-1
 ### REQ-INGEST-006 — Egress is opt-in; the CLI stays offline
 
 Data leaves the user's machine **only** when the user explicitly clicks Send in the
-extractor GUI. There is no background sync, no auto-send, and no telemetry. The extractor's
-CLI / offline mode never transmits. The "nothing leaves your machine" promise in the
+extractor GUI. There is no background sync, no auto-send, and no telemetry. Saving the JSON
+to a file never transmits. (The heading's "CLI" is historical: the extractor has since become
+GUI-only — `fun main() = guiMain()` — so no CLI path exists to transmit.) The "nothing leaves your machine" promise in the
 extractor's documentation is reconciled to state precisely that the locally-produced JSON is
 transmitted to the basetool **only on an explicit Send**, and that screenshots/images never
 leave the machine (ADR-0007).
@@ -340,11 +346,11 @@ leave the machine (ADR-0007).
 **Acceptance**
 
 - [x] No extractor code path transmits the extract without an explicit user Send action.
-- [x] The CLI path performs no network egress of extract data.
+- [x] No CLI path exists; the local save-to-file path performs no network egress of extract data.
 - [x] The extractor docs describe the egress accurately (no remaining absolute
   "nothing-leaves" claim).
 
-**Enforced by:** verified in the `basetool-bp-extractor` repo (the extractor internals are out of
+**Enforced by:** verified in the `basetool-sc-extractor` repo (the extractor internals are out of
 scope here — see *Out of scope*) · **Code:** the extractor's explicit Send action (#645) and the
 "nothing-leaves" docs reconciliation (#646), both in the extractor repo · **Issues:** #645, #646
 
@@ -352,23 +358,33 @@ scope here — see *Out of scope*) · **Code:** the extractor's explicit Send ac
 
 If the user opts into "remember me", the extractor persists the device-grant **refresh
 token** in the Windows Credential Manager (DPAPI) — never in plaintext on disk, never in a
-log. Refresh-token rotation is used with reuse-detection (a replayed old refresh token
-invalidates the session). The extractor offers an in-app "Vom Basetool trennen" action that
+log. The refresh token is **DPoP-bound** and stored together with its key (`REQ-INGEST-012`), so a
+lifted token is useless without the key.
+
+> **Correction (2026-09-22).** This paragraph used to say refresh-token rotation with reuse-detection
+> protects the stored token. Rotation is **off** realm-wide (`INGEST_KEYCLOAK_SETUP.md` step 4,
+> disabled 2026-06-18; `REQ-SEC-012`); sender-constraining is the protection that replaced it.
+>
+> **Open divergence, for the owner (2026-09-22).** The shipped extractor (`SendController.run`,
+> `basetool-sc-extractor` at `c5c6e84`) stores the credential after **every** successful grant —
+> there is no "remember me" opt-in toggle — so the first acceptance criterion below does not hold
+> as written. "Vom Basetool trennen" is the only way not to keep a stored token. Either the extractor
+> gains the toggle or this requirement is amended; that decision is the owner's. The extractor offers an in-app "Vom Basetool trennen" action that
 revokes the token at Keycloak and clears the stored credential. Tokens, refresh tokens and
 the user's name/email are never logged (project-wide logging rule).
 
 **Acceptance**
 
-- [x] With "remember me" off, no refresh token is persisted; a new send re-runs the device
-  approval.
+- [ ] With "remember me" off, no refresh token is persisted; a new send re-runs the device
+  approval. *(Not met — no opt-in toggle exists; see the divergence note above.)*
 - [x] With it on, the refresh token is stored via DPAPI and a second send needs no
   re-approval until expiry/revocation.
 - [x] "Vom Basetool trennen" revokes at Keycloak and removes the stored credential; a
   subsequent send requires re-approval.
 - [x] No token or refresh token appears in any log line.
 
-**Enforced by:** verified in the `basetool-bp-extractor` repo (extractor internals out of scope here)
-· **Code:** the extractor's DPAPI refresh-token store with rotation/reuse-detection and the "Vom
+**Enforced by:** verified in the `basetool-sc-extractor` repo (extractor internals out of scope here)
+· **Code:** the extractor's DPAPI refresh-token store (`net/auth/CredentialStore.kt`) and the "Vom
 Basetool trennen" revoke action (#648), in the extractor repo · **Issues:** #648
 
 ### REQ-INGEST-008 — No new role; backend stays internal; audience sequencing
@@ -453,7 +469,7 @@ counter) · **Code:** `BotProtectionFilter`, `MetricNames` (`BOT_BLOCKED` + `rul
 ### REQ-INGEST-010 — Published API contract for the extractor
 
 The gateway's two endpoints are the contract a **separately developed, separately released** client
-(the `basetool-bp-extractor` desktop app) codes against, so that contract is published as a
+(the `basetool-sc-extractor` desktop app) codes against, so that contract is published as a
 committed OpenAPI document — `ingest/src/main/resources/api/openapi.json`, the module's single
 API-documentation artifact, regenerated by `OpenApiGeneratorTest` exactly like the backend's
 (`api-conventions.md`, `REQ-API-007`). Without it the extractor's authors had only the source to
@@ -642,26 +658,30 @@ authentication with no obvious cause, which is why the extractor names clock dri
   `basetool_ingest_auth_failures_total`. (Earlier drafts of this list said the gateway does *not*
   configure `dPoP(...)`; the requirement body above and the ingest `SecurityConfig` both show it
   does — the extractor still presents its token under the `DPoP` scheme.)
-- [ ] An access token arriving with `cnf.jkt` is logged at `WARN` as a realm-policy regression — it
-  means access-token binding was switched on and the backend relay is about to fail.
+- [x] An access token arriving **without** `cnf.jkt` is logged at `WARN` as a lapsed-protection
+  regression (`ClientIdentityFilter#warnOnUnboundAccessToken`) and still served — the direction
+  flipped with ADR-0129; the old "bound token about to fail the relay" canary is gone.
 - [ ] The refresh token is bound; a replayed refresh token without the key is refused by Keycloak.
-- [ ] A plain bearer access token relays to the backend unchanged.
+- [x] The backend is called with the gateway's own service-account bearer, never the caller's token
+  (`BackendImportClientTest`).
 
 **Enforced by:** `ClientIdentityFilterTest` (the `cnf.jkt` canary), `IngestControllerTest` (the
 bearer path through the real filter chain) · **Code:** ingest `SecurityConfig` (configures
 `.dPoP(...)` beside `.jwt(...)`, with the reasoning inline), `PublicUriDpopAuthenticationConverter`,
-`ClientIdentityFilter#warnOnDowngrade` · **Operator:**
-`INGEST_KEYCLOAK_SETUP.md` step 8 · **Client:** the extractor keeps its DPoP key and its
-token-endpoint proofs, and must **not** send `Authorization: DPoP` to the gateway.
+`ClientIdentityFilter#warnOnUnboundAccessToken` · **Operator:**
+`INGEST_KEYCLOAK_SETUP.md` step 8 (nothing to configure) · **Client:** the extractor keeps its DPoP
+key, sends token-endpoint proofs, and presents a bound token to the gateway as
+`Authorization: DPoP` with a proof (`BasetoolIngestClient`; `Bearer` only for an unbound token).
 
 ## Out of scope
 
 - The desktop extractor's internals (device-flow UI, token store implementation) — they live
-  in the `basetool-bp-extractor` repo; this spec governs the basetool-side contract and the
+  in the `basetool-sc-extractor` repo; this spec governs the basetool-side contract and the
   cross-repo expectations (#645/#646/#648 track the extractor work).
 - Server-to-server / unattended ingest (no user in the loop) — explicitly excluded: ingest is
-  always tied to a `sub` and a browser review step. There is no `client_credentials` path
-  (ADR-0018).
+  always tied to a `sub` and a browser review step. No caller may use `client_credentials` against
+  the gateway (ADR-0018); the gateway's own client-credentials grant towards the backend (ADR-0129)
+  only ever carries a request a member sent.
 - New import *semantics*. Matching, validation, draft shape and the create path are
   unchanged (ADR-0008, `REQ-REFINERY-002`); ingest only changes how the draft request is
   delivered.
@@ -670,5 +690,5 @@ token-endpoint proofs, and must **not** send `Authorization: DPoP` to the gatewa
 
 None outstanding — epic #639 has shipped. The two questions from the decision gate were both
 resolved during implementation: the blueprint-preview forwarding shape in #642 (the gateway
-forwards, it does not reshape the contract, ADR-0008) and the hostname / NPM proxy entry + CI
-deployment shape in #643.
+forwards, it does not reshape the contract, ADR-0008) and the hostname / proxy entry + CI
+deployment shape in #643 (then an NPM proxy host; since 2026-09-12 the native nginx edge vhost).

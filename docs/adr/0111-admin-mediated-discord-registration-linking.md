@@ -3,17 +3,21 @@
 - **Status:** Accepted
 - **Date:** 2026-07-20
 - **Deciders:** @greluc, Claude
-- **Related:** spec REQ-SEC-026 · REQ-DATA-006 · REQ-DATA-008 · extends [ADR-0036](0036-discord-link-recognised-from-federated-identity.md) (self-service linking → admin-mediated) · complements [ADR-0051](0051-discord-first-login-account-existence-precheck.md) (REQ-SEC-022 login-time deny, unchanged) · runbook `docs/keycloak/DISCORD_KEYCLOAK_SETUP.md`
+- **Related:** spec REQ-SEC-026 · REQ-DATA-006 · REQ-DATA-018 · extends [ADR-0036](0036-discord-link-recognised-from-federated-identity.md) (self-service linking → admin-mediated) · complements [ADR-0051](0051-discord-first-login-account-existence-precheck.md) (REQ-SEC-022 login-time deny, unchanged) · runbook `docs/keycloak/DISCORD_KEYCLOAK_SETUP.md`
+
+> **Note (2026-09-22):** a member's in-app name and Discord handle stood in this record as the worked
+> example. Both are personal data and are replaced by the placeholders `<in-app-name>` and
+> `<discord-handle>`; nothing else changed.
 
 ## Context
 
-A member who already has a Basetool account (e.g. `MadrukSedras`) signed in via Discord (handle
-`conrad7247`) and appeared as a **new** pending registration in the admin approval queue. Two things
+A member who already has a Basetool account (e.g. `<in-app-name>`) signed in via Discord (handle
+`<discord-handle>`) and appeared as a **new** pending registration in the admin approval queue. Two things
 combined to let this happen:
 
 1. The **automatic collision precheck (REQ-SEC-022) is fail-open and name-based.** It matches the
    Discord username / server nickname / e-mail against existing accounts. The Discord *username*
-   (`conrad7247`) differs from the in-app / server name (`MadrukSedras`), so the username did not
+   (`<discord-handle>`) differs from the in-app / server name (`<in-app-name>`), so the username did not
    match; and the one signal that *would* have matched — the server nickname — was not captured
    because this member has no per-guild `nick` set (their server name is their global display name),
    which the capture path ignored. So the login slipped through to the PENDING queue.
@@ -22,7 +26,7 @@ combined to let this happen:
    way to link on the member's behalf; approving would create a **duplicate** account.
 
 The owner wants to link such a registration onto the existing account **himself**, from the queue.
-(The nickname-capture gap is fixed separately under REQ-DATA-008 — the display now falls back to the
+(The nickname-capture gap is fixed separately under REQ-DATA-018 — the display now falls back to the
 global name — but name mismatches remain the normal case, so a manual admin path is still needed.)
 
 **Constraint discovered:** `KeycloakService` was strictly **read-only**. Moving a Discord federated
@@ -86,7 +90,7 @@ fail-open precheck let through.
   `@Enumerated(STRING)` value. That overlooked the `chk_user_approval_event_decision` **check
   constraint** from V173, which whitelisted only `('APPROVED', 'REJECTED')` — so inserting the
   `LINKED` audit row failed at flush with a `23514` violation and rolled the whole link back (every
-  link attempt `409`ed; the reported conrad7247/MardukSedras case). **V223** widens the whitelist to
+  link attempt `409`ed; the reported `<discord-handle>`/`<in-app-name>` case). **V223** widens the whitelist to
   include `LINKED`. The collision context is still not persisted.
 - **Not a unified-audit area.** Discord registration stays outside the ten audited areas (ADR-0051);
   the `LINKED` event lives in the bespoke `user_approval_event` trail, not `AuditEventType`.

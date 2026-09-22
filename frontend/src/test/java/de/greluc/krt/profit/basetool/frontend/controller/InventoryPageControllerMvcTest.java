@@ -833,7 +833,7 @@ class InventoryPageControllerMvcTest {
     verify(backendApiClient, never()).getCached(eq(CachedCatalog.MATERIALS_LOOKUP), anyTypeRef());
   }
 
-  // covers REQ-INV-001 (SCU amount input) / REQ-INV-002 (PIECE amount input) — see
+  // covers REQ-INV-042 (SCU amount input) / REQ-INV-043 (PIECE amount input) — see
   // docs/specs/inv-material-quantities.md (render-wiring of the shared scu-decimal-input helper).
   @Test
   @WithMockUser(roles = "KRT_MEMBER")

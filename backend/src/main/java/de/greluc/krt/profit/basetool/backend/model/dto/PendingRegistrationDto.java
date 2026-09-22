@@ -28,7 +28,7 @@ import java.util.UUID;
  *
  * @param id the pending user's id
  * @param username the user's effective display name
- * @param serverNickname the user's per-guild Discord server nickname (REQ-DATA-008), or {@code
+ * @param serverNickname the user's per-guild Discord server nickname (REQ-DATA-018), or {@code
  *     null} when none was captured; shown alongside the name to anchor the decision to an in-server
  *     identity. This admin-only queue is the only DTO that carries it
  * @param registeredAt when the registration first appeared (the user row's creation time)

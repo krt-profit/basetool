@@ -413,7 +413,7 @@ class BlueprintImportServiceTest {
   void preview_matchesByTagWhenNameWouldNotMatch() {
     // covers REQ-INV-019 — the scmdb.net structural tag resolves straight to the product, bypassing
     // the name chain. The name here is deliberately unmatchable (mirrors a CIG-mislabeled output
-    // name, REQ-INV-007) yet the entry still resolves via its DataForge tag.
+    // name, REQ-INV-047) yet the entry still resolves via its DataForge tag.
     when(blueprintProductService.allProducts())
         .thenReturn(List.of(product("antium arms maroon", "Antium Arms Maroon")));
     when(blueprintProductService.scwikiKeyToProductKeyIndex())
@@ -489,7 +489,7 @@ class BlueprintImportServiceTest {
   void preview_keepsDistinctTagsUnderSameName() {
     // covers REQ-INV-019 — two scmdb.net blueprints sharing a display name but carrying different
     // DataForge tags (a genuine piece and a CIG-mislabeled one both shown as "Antium Core Jet",
-    // REQ-INV-007) must NOT collapse by name: each resolves via its own tag to its own product.
+    // REQ-INV-047) must NOT collapse by name: each resolves via its own tag to its own product.
     when(blueprintProductService.allProducts())
         .thenReturn(
             List.of(

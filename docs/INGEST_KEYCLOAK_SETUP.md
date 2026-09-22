@@ -1,17 +1,27 @@
 # Desktop ingest — Keycloak setup runbook
 
-> **Doc type:** Implementation runbook for [ADR-0018](adr/0018-desktop-ingest-gateway-device-grant.md)
-> and [`docs/specs/desktop-ingest.md`](specs/desktop-ingest.md) (`REQ-INGEST-002`,
-> `REQ-INGEST-007`, `REQ-INGEST-008`). The *decision* and the *requirements* live there; this
-> document is the step-by-step *how* for the operator. Registered in
-> [`docs/specs/INDEX.md`](specs/INDEX.md). Tracks GitHub issue #641 (epic #639).
+> **Doc type:** Living runbook for [ADR-0018](adr/0018-desktop-ingest-gateway-device-grant.md),
+> [ADR-0129](adr/0129-ingest-gateway-is-a-trusted-subsystem-not-a-token-relay.md) and
+> [`docs/specs/desktop-ingest.md`](specs/desktop-ingest.md) (`REQ-INGEST-002`, `-007`, `-008`,
+> `-011`, `-012`). The *decision* and the *requirements* live there; this document is the operator's
+> *how*. Registered in [`docs/specs/INDEX.md`](specs/INDEX.md). Last reviewed: 2026-09-22.
 
-**Status:** open — the live Keycloak changes and the validator enablement are an operator
-deployment step that cannot be done by PR. The **prod realm dump (with secrets) is not in this
-repository**: only a **sanitized reference** of the prod realm config lives at
-[`docs/keycloak/realm-config.reference.json`](keycloak/realm-config.reference.json) (secrets,
-SMTP and real URLs redacted — see [`docs/keycloak/README.md`](keycloak/README.md)), and the
-throwaway `frontend/src/e2e/resources/realm-export.e2e.json` test artifact — do **not** copy its
+**Status: implemented.** The setup this runbook describes is live: epic #639 and its issues #641
+(Keycloak client + audience scope) and #642 (the gateway) closed on 2026-06-17, and #1247 (backend
+audience enforcement) on 2026-08-28. What the document is for now:
+
+1. **the record of the configured state** — [*Configured state*](#configured-state) below; and
+2. **the repeatable procedure for onboarding a new approved ingest client** —
+   [*Onboarding a new approved client*](#onboarding-a-new-approved-client).
+
+Steps 1–9 further down are the original setup sequence, kept as the procedure for rebuilding a realm
+from scratch and as the record of *why* each value is what it is. They are corrected to what is
+deployed, not to what was first written.
+
+The **prod realm dump (with secrets) is not in this repository**: only a **sanitized reference**
+lives at [`docs/keycloak/realm-config.reference.json`](keycloak/realm-config.reference.json)
+(secrets, SMTP and real URLs redacted — see [`docs/keycloak/README.md`](keycloak/README.md)), and
+the throwaway `frontend/src/e2e/resources/realm-export.e2e.json` test artifact — do **not** copy its
 `directAccessGrantsEnabled: true`.
 
 > ## ⚠️ The ingest interface is restricted to approved clients
@@ -27,14 +37,91 @@ throwaway `frontend/src/e2e/resources/realm-export.e2e.json` test artifact — d
 > access-token lifespan, ~5 min) without needing a Keycloak change or a release. Do not add a client
 > id here on anyone's request but the owner's.
 
+## Configured state
+
+Keycloak side, read from the realm export of **2026-09-09** (the reference above):
+
+|         Object          |                                                                                              State                                                                                               |
+|-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `basetool-sc-extractor` | public, no secret, device grant on, direct access grants off, service accounts off, `fullScopeAllowed: false`; default scopes include `extractor-ingest` **and** `extractor-ingest-only`          |
+| `basetool-ingest-gateway` | confidential, service account only (standard flow and direct access grants off), empty redirect/origin lists — the gateway's own identity for the hop to the backend (step 9); still carries both ingest scopes, inherited from the realm defaults at creation (hardening step 9b leaves that to its own audience needs) |
+| `basetool-frontend`     | carries `extractor-ingest` (so its relayed token has `aud=basetool-backend`), **not** `extractor-ingest-only`                                                                                    |
+| `extractor-ingest`      | audience mapper `aud-basetool-backend` → `basetool-backend`; `include.in.token.scope: false`; no longer a realm default scope (hardening step 9, 2026-09-09)                                     |
+| `extractor-ingest-only` | audience mapper `aud-basetool-ingest` → `basetool-ingest`; `include.in.token.scope: true`; no longer a realm default scope                                                                       |
+| Realm                   | `revokeRefreshToken: false` (step 4); client policies: only `krt-mobile-dpop`, scoped to `basetool-android` by its marker role — none applies to the extractor (step 8)                         |
+
+Environment side (host `.env` → `env.d`), as last recorded — the values live only on the host and
+this repository cannot see them:
+
+|             Variable             |               Service               |                                                               State                                                                |
+|----------------------------------|-------------------------------------|------------------------------------------------------------------------------------------------------------------------------------|
+| `IRI_BACKEND_EXPECTED_AUDIENCES` | backend                             | `basetool-backend` — enforcing since #1247 (2026-08-28)                                                                            |
+| `IRI_INGEST_ALLOWED_CLIENT_IDS`  | ingest                              | `basetool-sc-extractor`                                                                                                            |
+| `IRI_INGEST_CLIENT_AUDIT_ONLY`   | ingest                              | `false` since 2026-08-30 — the `azp` allowlist enforces                                                                            |
+| `IRI_INGEST_EXPECTED_AUDIENCES`  | ingest                              | **must be `basetool-ingest`**; read on 2026-08-28 as the backend's value (wrong, see 7a) and not re-read since — **open**          |
+| `IRI_INGEST_REQUIRED_SCOPE`, `IRI_INGEST_ALLOWED_TOOLS` | ingest       | not present in the environment read on 2026-08-28, so inert — **open** (7b, 7c)                                                    |
+| `IRI_INGEST_SERVICE_ACCOUNT_*`, `IRI_INGEST_PUBLIC_BASE_URL`, `IRI_INGEST_GATEWAY_CLIENT_IDS` | ingest / backend | set — the extractor's sends go through this path since v2.7.2, and it refuses by name when a value is missing (step 9) |
+
+The two **open** rows are the remaining work of the client-identity gate: read the host's values
+(a read, needing no approval under the production-host rule), then set them in the order 7b → 7c →
+7a's audience last.
+
+### Applying an `.env` change on the production host
+
+Since the rootless-Podman cutover (2026-09-22) a container does not read `/var/iri/code/.env`
+directly: each unit reads its own `/var/iri/code/env.d/<service>.env`, which `deploy.sh` renders
+from `.env` — but only when a new config bundle arrives. After editing `.env`, render and restart
+by hand:
+
+```bash
+cd /    # sudo -u keeps the working directory, and neither deploy nor iri can enter /root
+sudo -u deploy /var/iri/code/scripts/render-env-d.py \
+  --env /var/iri/code/.env --templates /var/iri/code/quadlet/env.d --out /var/iri/code/env.d
+sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) systemctl --user restart ingest.service   # and/or backend.service
+```
+
+The renderer refuses, naming every missing variable, rather than writing a half-rendered file.
+
+## Onboarding a new approved client
+
+Only for client software the owner has explicitly approved (box above). The gateway's gates are
+built for more than one client: the allowlist and the tool list are comma-separated, the required
+scope is one shared scope, and the per-client counter labels every allowlisted id separately.
+
+1. **Register a dedicated Keycloak client** for it — never reuse `basetool-sc-extractor`'s id.
+   A desktop or other native app is **public** (no secret, which it could not keep), uses the
+   **device authorization grant**, and has direct access grants, service accounts, the standard flow
+   and web origins **off** — the step 1 table, with its own client id. Set `fullScopeAllowed: false`
+   and map only the realm roles its members need (hardening runbook step 8 shows how).
+2. **Give it the ingest scope, and nothing broader.** Assign `extractor-ingest-only` as a
+   **Default** client scope — that is what puts `basetool-ingest` in its `aud` and
+   `extractor-ingest-only` in its `scope`, the two things the gateway checks. It does **not** need
+   `extractor-ingest` (the backend audience): since ADR-0129 its token is consumed at the gateway,
+   which calls the backend under its own identity. Never give `extractor-ingest-only` to a browser
+   client.
+3. **Verify a real token** from the new client, decoded locally (5b): `aud` contains
+   `basetool-ingest`, `scope` contains `extractor-ingest-only`, `azp` is the new id.
+4. **Allowlist it on the gateway**: append the id to `IRI_INGEST_ALLOWED_CLIENT_IDS` and, when
+   `IRI_INGEST_ALLOWED_TOOLS` is set, the `tool` value(s) the client writes into its payload; apply
+   ([above](#applying-an-env-change-on-the-production-host)).
+5. **Watch** `basetool_ingest_client_total{client_id="<new id>"}` carry its traffic and
+   `basetool_ingest_client_rejected_total` stay flat. Traffic landing on `client_id="other"` means
+   the `azp` is not the id you allowlisted.
+6. **Record it**: the client in this document's *Configured state*, the realm reference on its next
+   regeneration ([`docs/keycloak/README.md`](keycloak/README.md)), and the vault.
+
+**Revoking** a client is step 4 in reverse — remove its id from the allowlist and apply. Tokens it
+already holds stop working at once at the gateway; disabling the Keycloak client additionally stops
+new ones being issued.
+
 ## What this sets up
 
-The desktop extractor (`basetool-bp-extractor`) must obtain a **minimal, per-user,
-audience-restricted** Keycloak token **without shipping any secret**, and that token must be
-accepted by the backend's import endpoints (reached through the ingest gateway, #642). Four
-pieces, applied in a **strict order**:
+The desktop extractor (the Basetool SC Extractor, repository `basetool-sc-extractor`) must obtain a
+**minimal, per-user, audience-restricted** Keycloak token **without shipping any secret**, and that
+token must be accepted by the ingest gateway (#642), which since ADR-0129 calls the backend's import
+endpoints under its own identity (step 9). The original four pieces, applied in a **strict order**:
 
-1. a new **public** client `basetool-sc-extractor` (device-grant, PKCE, no secret);
+1. a new **public** client `basetool-sc-extractor` (device grant, no secret);
 2. an **audience mapper** that stamps `aud=basetool-backend` on its access tokens (via a
    dedicated `extractor-ingest` client scope);
 3. **the same audience mapper** on the existing frontend client, so the frontend's relayed
@@ -52,7 +139,8 @@ pieces, applied in a **strict order**:
 - Admin access to the Keycloak realm that backs prod (the same realm the frontend client
   `basetool-frontend` and the backend resource server live in).
 - A staging/replica realm to rehearse the sequence.
-- The ability to restart the backend container (step 4 is an env change).
+- The ability to apply an `.env` change and restart the backend and the gateway
+  ([*Applying an `.env` change*](#applying-an-env-change-on-the-production-host)).
 
 ## Step 1 — New public client `basetool-sc-extractor`
 
@@ -63,12 +151,12 @@ realm-export JSON keys):
 |--------------------------------------|----------------------------------------------------------------------|
 | Client ID                            | `basetool-sc-extractor`                                              |
 | Client authentication                | **Off** (public client — no secret)                                  |
-| Standard flow                        | **On** (RFC 8252 loopback auth-code fallback)                        |
+| Standard flow                        | **Off** — see the note below                                         |
 | Direct access grants                 | **Off** (no ROPC — the desktop app must never see the password)      |
 | Service accounts                     | **Off**                                                              |
 | OAuth 2.0 Device Authorization Grant | **On**                                                               |
-| PKCE Code Challenge Method           | `S256` (required)                                                    |
-| Valid redirect URIs                  | `http://127.0.0.1/*`, `http://localhost/*` (loopback only, RFC 8252) |
+| PKCE Code Challenge Method           | *(none — not used by the device grant)*                              |
+| Valid redirect URIs                  | *(empty — the device grant has no redirect)*                         |
 | Web origins                          | *(empty — no browser CORS surface)*                                  |
 
 Equivalent realm-export fragment (for reference / IaC):
@@ -80,15 +168,14 @@ Equivalent realm-export fragment (for reference / IaC):
   "enabled": true,
   "protocol": "openid-connect",
   "publicClient": true,
-  "standardFlowEnabled": true,
+  "standardFlowEnabled": false,
   "directAccessGrantsEnabled": false,
   "serviceAccountsEnabled": false,
   "fullScopeAllowed": false,
-  "redirectUris": ["http://127.0.0.1/*", "http://localhost/*"],
+  "redirectUris": [],
   "webOrigins": [],
   "attributes": {
-    "oauth2.device.authorization.grant.enabled": "true",
-    "pkce.code.challenge.method": "S256"
+    "oauth2.device.authorization.grant.enabled": "true"
   }
 }
 ```
@@ -96,12 +183,19 @@ Equivalent realm-export fragment (for reference / IaC):
 Notes:
 
 - `publicClient: true` + no secret is correct and RFC-conform for a native app (a desktop
-  binary cannot keep a secret — REQ-INGEST-002). PKCE `S256` is the proof-of-possession that
-  replaces the secret.
-- `fullScopeAllowed: false` keeps the token's roles to what the client scope grants, not the
-  whole realm — least privilege.
-- The device grant has no redirect; the redirect URIs only serve the loopback auth-code
-  fallback.
+  binary cannot keep a secret — REQ-INGEST-002). The extractor uses **only** the device grant
+  (`DeviceGrantClient` in the extractor repository), where the device code itself is the
+  proof-of-possession, so it sends no PKCE; DPoP binds its tokens (step 8).
+- **Correction (2026-09-22).** This step used to enable the standard flow with loopback redirect
+  URIs and PKCE `S256` "for an RFC 8252 loopback auth-code fallback". That fallback was never built:
+  the extractor contains no authorization-code client. The production client still carries
+  `standardFlowEnabled: true` with the two loopback wildcards and no PKCE — an unused flow, recorded
+  as the thirteenth finding of the
+  [Keycloak hardening runbook](KEYCLOAK_HARDENING_RUNBOOK.md#step-6--basetool-frontend-require-pkce-with-s256--version-sensitive),
+  where closing it is the owner's decision.
+- `fullScopeAllowed: false` keeps the token's roles to what the client's scope mappings grant, not
+  every realm role the member holds — least privilege. Production carries it since 2026-09-09
+  (hardening step 8); before that it was `true`.
 
 ## Step 2 — Audience mapper via an `extractor-ingest` client scope
 
@@ -131,7 +225,8 @@ Add mapper → **Audience**:
 > (`app.security.jwt.expected-audiences=basetool-backend`).
 
 Then: Clients → `basetool-sc-extractor` → Client scopes → Add client scope → `extractor-ingest`
-as **Default**.
+as **Default**. (The deployed scope has `include.in.token.scope: false` — its name never appears in
+the token's `scope` claim, which is why 7a needed a second scope for the gateway's scope check.)
 
 Equivalent realm-export fragment:
 
@@ -139,7 +234,7 @@ Equivalent realm-export fragment:
 {
   "name": "extractor-ingest",
   "protocol": "openid-connect",
-  "attributes": { "include.in.token.scope": "true", "display.on.consent.screen": "false" },
+  "attributes": { "include.in.token.scope": "false" },
   "protocolMappers": [
     {
       "name": "aud-basetool-backend",
@@ -212,7 +307,7 @@ Do **not** proceed to step 6 until both checks pass.
 contain an `oidc-audience-mapper` with `Included Custom Audience = basetool-backend` and *Add to
 access token* ON. Both clients showing that is the condition step 6 depends on. The committed
 [`realm-config.reference.json`](keycloak/realm-config.reference.json) records this shape, but it
-is a sanitized snapshot (2026-06-18), **not** live state — read it from the running realm.
+is a sanitized snapshot (2026-09-09), **not** live state — read it from the running realm.
 
 **5b — Token check (confirmation).** Obtain an access token per client (device flow for the
 extractor; a normal frontend login for the browser token) and decode the payload **locally**:
@@ -245,23 +340,27 @@ IRI_BACKEND_EXPECTED_AUDIENCES=basetool-backend
 This sets `app.security.jwt.expected-audiences`, which activates the backend's already-present
 `SecurityConfig#resourceServerJwtDecoder` (a `@ConditionalOnExpression` bean, shared with the
 `jwk-set-uri` knob) and its `audienceValidator` — layering an `aud` check on top of the existing
-signature / issuer / expiry validation. Restart the backend. Smoke-test: the frontend still works
+signature / issuer / expiry validation. Apply it and restart the backend
+([*Applying an `.env` change*](#applying-an-env-change-on-the-production-host)). Smoke-test: the frontend still works
 (pages load, writes succeed) **and** an extractor ingest call still reaches the backend.
 
-Rollback is instant and needs no release: blank the variable (or delete the line) and restart.
+Rollback is instant and needs no release: blank the variable (or delete the line), re-render and
+restart.
+
+**Done 2026-08-28** (#1247).
 
 ## Step 7 — Client-identity gate (REQ-INGEST-011)
 
 Everything below is **inert until configured**, and each check is fail-closed once enabled. Do it in
 this order; the audit-only pass is what keeps it from locking out the real extractor.
 
-### 7a — ⚠️ First: `extractor-ingest` is currently shared with the frontend
+### 7a — ⚠️ First: `extractor-ingest` is shared with the frontend
 
-**This is the trap, and in the deployed realm it is already sprung.** Step 3 above offered two ways
-to give the frontend its `basetool-backend` audience, and the realm took the shared-scope route. Per
-[`docs/keycloak/realm-config.reference.json`](keycloak/realm-config.reference.json), the
-`extractor-ingest` scope is a **default scope on both** `basetool-frontend` **and**
-`basetool-sc-extractor`.
+**This is the trap.** Step 3 above offered two ways to give the frontend its `basetool-backend`
+audience, and the realm took the shared-scope route: the `extractor-ingest` scope is a **default
+scope on both** `basetool-frontend` **and** `basetool-sc-extractor`. The fix below — a second,
+extractor-only scope — is in place in the deployed realm (2026-09-09 export); the audience variable
+at the end of this section is the part still open (*Configured state*).
 
 Two consequences, and both silently defeat step 7 if ignored:
 
@@ -273,14 +372,12 @@ Two consequences, and both silently defeat step 7 if ignored:
 **Fix the scope topology before anything else.** Create a **new** client scope that only the
 extractor ever gets, and put the ingest-specific mapper there:
 
-|             Setting              |           Value           |
-|----------------------------------|---------------------------|
-| Setting                          | Value                     |
-| -------------------------------- | ------------------------- |
-| Name                             | `extractor-ingest-only`   |
-| Type                             | Default                   |
-| Protocol                         | `openid-connect`          |
-| **Include in token scope**       | **On** ⚠️ see below       |
+|          Setting           |          Value          |
+|----------------------------|-------------------------|
+| Name                       | `extractor-ingest-only` |
+| Type                       | Default                 |
+| Protocol                   | `openid-connect`        |
+| **Include in token scope** | **On** ⚠️ see below     |
 
 > **⚠️ `Include in token scope` must be On — the shared scope has it Off.** Spring Security derives
 > the `SCOPE_…` authority from the token's `scope` claim, and the deployed `extractor-ingest` scope
@@ -292,7 +389,10 @@ extractor ever gets, and put the ingest-specific mapper there:
 
 Add an **Audience** mapper to it — name `aud-basetool-ingest`, *Included Custom Audience* =
 `basetool-ingest`, *Add to access token* **On** — and assign the scope as a **Default** scope to
-`basetool-sc-extractor` **only**.
+`basetool-sc-extractor` **only** (and to any later approved ingest client — never to a browser
+client). Set its type to **None** rather than *Default* at realm level, or every client created
+afterwards inherits it; hardening step 9 removed both extractor scopes from the realm defaults for
+exactly that reason.
 
 Equivalent realm-export fragment (already reflected in
 [`realm-config.reference.json`](keycloak/realm-config.reference.json)):
@@ -302,8 +402,7 @@ Equivalent realm-export fragment (already reflected in
   "name": "extractor-ingest-only",
   "protocol": "openid-connect",
   "attributes": {
-    "include.in.token.scope": "true",
-    "display.on.consent.screen": "false"
+    "include.in.token.scope": "true"
   },
   "protocolMappers": [
     {
@@ -368,7 +467,8 @@ Setting it to `extractor-ingest` would look configured and enforce nothing.
 
 > **Two names for one setting — use the `IRI_*` one on the host.** The application reads
 > `APP_INGEST_CLIENT_IDENTITY_*` (that is what the spec and the `@ConfigurationProperties` class
-> name), but `docker-compose.yml` maps those from `IRI_*` variables. Putting an `APP_*` name in
+> name), but the service's environment map — `docker-compose.yml`, generated into
+> `quadlet/env.d/ingest.env.tmpl` — maps those from `IRI_*` variables. Putting an `APP_*` name in
 > `/var/iri/code/.env` sets a variable the container never receives — the gate would stay silently
 > inert and look configured. Everything below is the host-side name.
 
@@ -383,15 +483,16 @@ IRI_INGEST_ALLOWED_TOOLS=basetool-sc-extractor,Basetool SC Extractor
 IRI_INGEST_CLIENT_AUDIT_ONLY=true
 ```
 
-Restart, then watch for at least one full scrape interval:
+Apply and restart the gateway, then watch for at least one full scrape interval:
 
 - `basetool_ingest_client_rejected_total` must stay at **zero**. Any value means a legitimate caller
   would have been locked out — read the `reason` label before proceeding.
 - `basetool_ingest_client_total{client_id="basetool-sc-extractor"}` should carry the traffic. If it
   lands on `client_id="other"` instead, the `azp` is not what the allowlist expects.
 
-Only when both hold, set `IRI_INGEST_CLIENT_AUDIT_ONLY=false` and restart. The
-`IngestUnknownClient` alert fires on the same counter afterwards.
+Only when both hold, set `IRI_INGEST_CLIENT_AUDIT_ONLY=false` and apply again. The
+`IngestUnknownClient` alert fires on the same counter afterwards. (Audit-only went to `false` on
+2026-08-30, with only the client-id allowlist configured.)
 
 > Multiple client ids are supported (comma-separated), which is what makes a client-id **rotation**
 > possible without downtime: ship the new extractor with a new id, run both, drop the old id once the
@@ -416,8 +517,10 @@ configuration*.
 
 There is no step here any more, and that is the point: since Keycloak 26.4 DPoP binds whenever a
 client presents a proof, the extractor always presents one, and since ADR-0129 **both** tokens being
-bound is the wanted state. Verified against production on 2026-08-17: the realm carries zero client
-profiles and zero policies, which is correct.
+bound is the wanted state. Verified against production on 2026-08-17: the realm then carried zero
+client profiles and zero policies. It now carries exactly one of each, `krt-mobile-dpop` /
+`krt-mobile-dpop-policy` (ADR-0131), whose condition is the `dpop-refresh-only` client role that
+only `basetool-android` holds — so it does not apply to the extractor, and nothing here changes.
 
 > **Do not create the `extractor-dpop` profile this step used to describe.** A
 > `dpop-bind-enforcer` executor with `allow-only-refresh-token-binding = On` would narrow binding to
@@ -436,7 +539,8 @@ profiles and zero policies, which is correct.
 > (`DPoPBindEnforcerExecutorFactory`: `auto-configure`,
 > `enforce-authorization-code-binding-to-dpop`, `allow-only-refresh-token-binding`) — it is simply
 > the wrong tool for this deployment. It **is** the right tool for a client that talks to the
-> backend directly, which is why the Android app plans to use it.
+> backend directly, which is why the Android app uses it (`krt-mobile-dpop`, provisioned by
+> `scripts/provision-keycloak-mobile-client.py`).
 
 ### 8b — Verify
 
@@ -468,9 +572,9 @@ naming the member it acts for.
 **Everything below is fail-closed.** With none of it applied, the deployed code behaves exactly as
 before: the backend refuses every on-behalf-of header, and the gateway keeps accepting plain
 bearers. So the code can ship first and this can be applied afterwards — but **the extractor will
-not send until all four values are set**.
+not send until all five values are set**.
 
-**Order matters:** create the client (9a), then set all four env values together (9b), then restart
+**Order matters:** create the client (9a), then set all five env values together (9b), then restart
 (9c), then verify (9d). Setting the gateway's credentials without the backend allowlist gives you a
 gateway that authenticates and a backend that refuses it.
 
@@ -505,9 +609,9 @@ need it in 9b.
 **No role assignment is needed.** The backend authorises this caller by its `azp`, not by a role,
 and the two endpoints it reaches require only `isAuthenticated()`.
 
-### 9b — Four values in the prod `.env`
+### 9b — Five values in the prod `.env`
 
-All four, together. Each is inert on its own.
+All five, together. Each is inert on its own.
 
 ```
 IRI_INGEST_PUBLIC_BASE_URL=https://ingest.profit-base.online
@@ -519,7 +623,7 @@ IRI_INGEST_GATEWAY_CLIENT_IDS=basetool-ingest-gateway
 
 > **`IRI_INGEST_PUBLIC_BASE_URL` is the one that will bite you.** It is the DPoP `htu` comparison
 > target. Spring compares `htu` with a bare `String.equals` against a URL Tomcat assembles from the
-> reverse proxy's forwarded headers — so if nginx-proxy-manager omits `X-Forwarded-Port`, the server
+> reverse proxy's forwarded headers — so if the edge proxy (`docker/edge`) omits `X-Forwarded-Port`, the server
 > expects `…:11262/v1/…` while the extractor signed the public URL, and **every** send fails with
 > `invalid_dpop_proof`. Setting this pins the origin to a value that is identical everywhere.
 >
@@ -540,10 +644,11 @@ accept an `X-Ingest-On-Behalf-Of` header from.
 
 ### 9c — Restart
 
-Both services read these at startup:
+Both services read these at startup — render `env.d` and restart both, per
+[*Applying an `.env` change*](#applying-an-env-change-on-the-production-host):
 
 ```bash
-docker compose --profile prod up -d --force-recreate ingest backend
+sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) systemctl --user restart ingest.service backend.service
 ```
 
 ### 9d — Verify, in this order
@@ -577,17 +682,17 @@ is the defect being fixed, and those installs must update.
 
 ## Rollback
 
-- **Step 9:** unset the five values from 9b and restart. The backend stops honouring the
+- **Step 9:** unset the five values from 9b, re-render `env.d` and restart. The backend stops honouring the
   on-behalf-of header and the gateway stops trying to obtain its own token — ingest writes then fail
   with a named configuration error rather than misbehaving. The Keycloak client can be left in
   place; it issues tokens nobody consumes. Note this does **not** restore sends for a 2.7.x
   extractor, which was already broken before this change.
-- **Step 6:** unset `IRI_BACKEND_EXPECTED_AUDIENCES` and restart the backend — the
+- **Step 6:** unset `IRI_BACKEND_EXPECTED_AUDIENCES`, re-render and restart the backend — the
   validator becomes inert (the decoder bean is no longer created); all previously-valid
   tokens are accepted again. This is the fast rollback if anything 401s after step 6.
-- **Steps 1–3:** remove the `extractor-ingest` scope assignment / the `basetool-sc-extractor`
-  client. Harmless to leave in place even if the gateway is not yet deployed — the client
-  issues tokens nobody consumes until #642 is live.
+- **Steps 1–3:** removing the `extractor-ingest` scope assignment or the `basetool-sc-extractor`
+  client stops every extractor send, and removing the scope from `basetool-frontend` breaks the web
+  app while step 6 is enforcing. There is no reason to roll these back short of retiring ingest.
 - **Step 4:** refresh-token rotation is **off** as of 2026-06-18 (it broke the server-rendered
   frontend BFF — REQ-SEC-012 / ADR-0019 amendment #4). Re-enabling it (`Revoke Refresh Token = On`)
   restores desktop-token rotation but re-introduces the frontend session-revocation cascade, so do
@@ -597,7 +702,9 @@ is the defect being fixed, and those installs must update.
 
 - [ ] `basetool-sc-extractor` is **public**, has **no secret**, ROPC **off**, service
   accounts **off**, web origins **empty**.
-- [ ] PKCE `S256` required; redirect URIs are loopback only.
+- [ ] Device grant only: standard flow off and no redirect URIs (production: open, see step 1).
+- [ ] `extractor-ingest-only` is on the extractor (and any later approved ingest client) only —
+  never on `basetool-frontend` or another browser client.
 - [ ] `aud=basetool-backend` verified on **both** the extractor token and the frontend token
   **before** the validator is enabled.
 - [ ] Refresh-token rotation + reuse-detection **off** realm-wide (`"revokeRefreshToken": false`) —

@@ -1,6 +1,6 @@
 # ADR-0171 — An ADR number is claimed against the base branch, and a gate says so
 
-- **Status:** Proposed
+- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-09-13 (`a232cf498`: `scripts/check-adr-numbering.sh`, the `adr-numbering` job of `repo-lint.yml`).
 - **Date:** 2026-09-13
 - **Deciders:** @greluc (pending)
 - **Related:** [`README.md`](README.md) > *Numbering* · the Flyway twin

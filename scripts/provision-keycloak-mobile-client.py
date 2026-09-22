@@ -17,7 +17,7 @@
 #
 # WHAT THE ORDER OF OPERATIONS IS FOR
 # -----------------------------------
-# Experiment E1 (2026-08-17, docs/ANDROID_API_EXPOSURE_PLAN.md section 7) established that while
+# Experiment E1 (2026-08-17, docs/archive/ANDROID_API_EXPOSURE_PLAN.md section 7) established that while
 # the DPoP policy is attached to a client, Keycloak refuses **every** admin update to that client
 # with `invalid_client_metadata: DPoP token is disabled` — down to a description change. So the
 # order below is load-bearing, not stylistic:
@@ -42,19 +42,32 @@
 #
 # USAGE
 # -----
-#   # authenticate kcadm first, inside the container, so no password reaches this process.
-#   # NOTE THE /auth: Keycloak serves under that relative path since ADR-0166, so a --server
-#   # without it answers 404 and kcadm reports that as a credentials failure.
+# Authenticate kcadm first, inside the container, so no password reaches this process.
+# NOTE THE /auth: Keycloak serves under that relative path since ADR-0166, so a --server
+# without it answers 404 and kcadm reports that as a credentials failure.
+#
+# The default kcadm prefix is `docker exec -i <--container> /opt/keycloak/bin/kcadm.sh`, which fits
+# a LOCAL Docker Compose stack only. The dev/test container serves plain HTTP on 18080:
+#
 #   docker exec -it keycloak /opt/keycloak/bin/kcadm.sh config credentials \
-#       --server https://localhost:18443/auth --realm master --user <admin>
+#       --server http://localhost:18080/auth --realm master --user <admin>
+#   scripts/provision-keycloak-mobile-client.py --profile test --dry-run
 #
-#   (18443 and https, because that is the connector the prod container listens on -
-#   `--https-port=18443 --http-enabled=false`. The dev/test container serves plain HTTP
-#   on 18080, so there it is `--server http://localhost:18080/auth`. Neither is 8080.)
+# PRODUCTION is rootless Podman: the container belongs to the service user `iri`, has a read-only
+# root filesystem (kcadm needs `--config` on the unit's tmpfs), serves HTTPS only on 18443
+# (`--https-port=18443 --http-enabled=false`) and needs a truststore for the self-signed connector.
+# There, run as root from `/` and pass the whole invocation with --kcadm-command, e.g.
 #
-#   scripts/provision-keycloak-mobile-client.py --dry-run     # print every payload, write nothing
-#   scripts/provision-keycloak-mobile-client.py               # apply
-#   scripts/provision-keycloak-mobile-client.py --verify-only # assert the live state, change nothing
+#   cd / && python3 provision-keycloak-mobile-client.py --realm iri --profile prod --dry-run \
+#       --kcadm-command "sudo -n -u iri podman exec -i keycloak sh -c '...kcadm.sh ... --config ...' kcadm"
+#
+# The complete, exact procedure (truststore, credentials, the KCADM string, rollback basis and
+# cleanup) is docs/keycloak/README.md -> "Runbook — provisioning the mobile client
+# `basetool-android`"; do not improvise it from this header.
+#
+#   --dry-run      print every payload, write nothing
+#   (no flag)      apply
+#   --verify-only  assert the live state, change nothing
 
 from __future__ import annotations
 

@@ -13,7 +13,7 @@
 #
 # The config bundle travels the SAME pull-only, digest-pinned, deliberately
 # promoted GHCR channel as the app images (see docs/adr/0049-*), so a promoted
-# compose change — e.g. a bumped redis/npm image pin — reaches the host and is
+# compose change — e.g. a bumped redis/edge image pin — reaches the host and is
 # applied automatically, with no manual `cp docker-compose.yml` or hand-run
 # `docker compose up -d`. A postgres/Keycloak image change is the one carve-out:
 # it is operator-gated (stateful migration / provider+keystore choreography),
@@ -157,6 +157,18 @@ IRI_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # sourced file and reports SC1091 at info level, which fails the job. The
 # library is linted on its own by the same sweep, so nothing goes unchecked.
 . "${IRI_SCRIPT_DIR}/lib/container-runtime.sh"
+
+# Out of the caller's working directory, before anything can reach the container runtime -- and
+# AFTER IRI_SCRIPT_DIR above, which may have been derived from a relative $0. `sudo -u <service
+# user>` keeps the caller's cwd, and the service user cannot traverse root's home or the deploy
+# account's, so on a rootless host started by hand from /root every RT_CLI call -- rt_detect's
+# `sudo -n -u iri podman ps` first of all -- dies with "cannot chdir to /root: Permission denied".
+# rt_detect then concludes that no lingering user owns the containers and aborts, with an error that
+# names neither the directory nor the cause. The timer was never affected (a systemd service starts
+# in /), which is exactly why the hand-started path went unnoticed. container-cleanup.sh has done
+# the same since the Podman preparation; deploy.sh did not until 2026-09-22. Every path this script
+# uses from here on is absolute, and the apply below changes into COMPOSE_DIR itself.
+cd /
 
 # --- Defaults / paths -------------------------------------------------------
 COMPOSE_DIR="${IRI_COMPOSE_DIR:-/var/iri/code}"
@@ -406,7 +418,7 @@ assert_no_secrets() {
 # Emit the postgres + Keycloak image pins of a compose file, normalised and
 # sorted. These are the stateful/choreographed images whose change must be
 # operator-gated (PGDATA major migration; Keycloak provider+keystore dance);
-# everything else (redis, npm) is safe to auto-apply via a declarative `up -d`.
+# everything else (redis, the edge) is safe to auto-apply via a declarative `up -d`.
 infra_image_pins() {
   # `|| true`: a compose file with no match makes grep exit 1, which under
   # `set -o pipefail` would abort the surrounding command substitution. An empty
@@ -476,7 +488,8 @@ network_block() {
 # strands name resolution (#974). This is a brief FULL-STACK outage, which is why it
 # is gated on an actual topology change, never taken on an ordinary config swap.
 # Because the pinning fixes each subnet, the recreated bridges keep the same
-# addresses/gateways, so the NPM SSH-tunnel admin allow-list stays valid.
+# addresses/gateways, so the edge's gateway-address allow-list
+# (docker/edge/conf.d/10-frontend.conf.template) stays valid.
 clean_slate_recreate() {
   log "network topology changed -> clean recreate (brief full-stack downtime)"
   if [[ "${IRI_MONITORING_ENABLED:-false}" == "true" ]] && rt_monitoring_configured; then
@@ -818,7 +831,8 @@ reconcile_edge() {
   # every single tick, this whole branch was skipped in silence, and certs.sha256
   # was never written. A renewed certificate would therefore never have been
   # loaded, however correctly acme published it. Found on 2026-09-12, after acme
-  # itself was fixed and the edge went on serving the material seeded from NPM.
+  # itself was fixed and the edge went on serving the material seeded from the
+  # retired Nginx Proxy Manager at the ADR-0162 cutover.
   # The edge already mounts the volume read-only, so `exec` needs neither a new
   # container nor root.
   if rt_is_running edge; then
@@ -981,13 +995,9 @@ check_only_verify_one() {
 require_file "${COMPOSE_DIR}/.env"
 require_file "${TOKEN_FILE}"
 
-# Pull the host-side keystore path from .env so the pre-flight check covers
-# the actual mount source, not just our hard-coded default. The fall-back
-# matches the default in docker-compose.yml's volume entry.
-KEYSTORE_HOST_PATH="$(grep -E '^IRI_KEYSTORE_HOST_PATH=' "${COMPOSE_DIR}/.env" 2>/dev/null \
-                       | tail -n1 | cut -d= -f2- | tr -d '"' || true)"
-KEYSTORE_HOST_PATH="${KEYSTORE_HOST_PATH:-/var/iri/secrets/keystore.p12}"
-require_file "${KEYSTORE_HOST_PATH}"
+# The keystore pre-flight is further down, after rt_detect: WHICH file is the mount source depends on
+# the runtime, and until 2026-09-22 this spot checked the Docker answer on every host. See
+# keystore_mount_source.
 
 mkdir -p "${STATE_DIR}"
 
@@ -1047,7 +1057,14 @@ export RT_PROFILE="${PROFILE}"
 export RT_HEALTH_TIMEOUT="${HEALTH_TIMEOUT}"
 # Under Quadlet there is no project to ask what "the whole stack" is, so the list
 # is named here. It is the compose prod profile's services, in dependency order.
-export RT_STACK_SERVICES="db-backend db-keycloak redis keycloak backend ingest frontend edge"
+#
+# `acme` was missing from it until 2026-09-22, and nothing said so: it is the one prod-profile service
+# nothing else depends on, so no start of another unit pulls it in. A release that changed
+# acme.container installed the unit and restarted nothing, and a host where the acme unit was not
+# running was never brought back by a deploy. It goes last because it needs the edge's webroot to
+# answer the HTTP-01 challenge, and it is gated like every other service here -- exactly as it was
+# under Compose, where `up --wait --profile prod` covered it with the rest.
+export RT_STACK_SERVICES="db-backend db-keycloak redis keycloak backend ingest frontend edge acme"
 log "container runtime: ${RT_BACKEND}"
 
 case "${RT_BACKEND}" in
@@ -1088,6 +1105,38 @@ case "${RT_BACKEND}" in
       || fail "no Quadlet unit directory (${RT_UNIT_DIR:-unset}) — run the basetool_host role first; it creates the directory this fills"
     ;;
 esac
+
+# The keystore the application containers will actually mount -- checked here and not earlier,
+# because the answer depends on the runtime.
+#
+# Under Compose the mount source is `${IRI_KEYSTORE_HOST_PATH:-/var/iri/secrets/keystore.p12}`, read
+# from .env at `up` time, so .env is the truth and is what gets checked. Under Quadlet it is NOT:
+# scripts/generate-quadlet.py substitutes the fixed /var/iri/secrets/keystore.p12 into each unit's
+# `Volume=` at GENERATION time, and nothing reads .env's value afterwards. Until 2026-09-22 this
+# pre-flight still read .env on a Podman host, so it certified a file the stack does not mount: an
+# .env naming an existing file passed while the unit's source was missing, and the release then died
+# at the first `systemctl start` as an application fault.
+#
+# So on Podman the path is read out of the units that will be started, from the `Volume=` whose
+# destination is /run/secrets/keystore.p12. Reading it rather than repeating the generator's
+# constant is what keeps the two from being able to disagree again. A unit directory that names no
+# keystore mount yet -- a freshly provisioned host before its first bundle -- has nothing mounting
+# one, so it falls through to the Compose answer, which is what this check did before; the constant
+# is the last resort under both runtimes, as it is in docker-compose.yml.
+keystore_mount_source() {
+  local src=""
+  if [[ "${RT_BACKEND}" == podman ]]; then
+    src="$(grep -h -E '^Volume=[^:]+:/run/secrets/keystore\.p12(:|$)' "${RT_UNIT_DIR}"/*.container \
+             2>/dev/null | head -n1 | sed -E 's/^Volume=([^:]+):.*/\1/' || true)"
+  fi
+  if [[ -z "${src}" ]]; then
+    src="$(grep -E '^IRI_KEYSTORE_HOST_PATH=' "${COMPOSE_DIR}/.env" 2>/dev/null \
+             | tail -n1 | cut -d= -f2- | tr -d '"' || true)"
+  fi
+  printf '%s\n' "${src:-/var/iri/secrets/keystore.p12}"
+}
+KEYSTORE_HOST_PATH="$(keystore_mount_source)"
+require_file "${KEYSTORE_HOST_PATH}"
 
 # cosign is required for the host-side signature gate (REQ-OPS-015). Fail closed:
 # a host that cannot verify signatures must not silently fall back to trusting an
@@ -1747,8 +1796,8 @@ rt_pin_apply \
   "ingest=${INGEST_IMAGE}@${INGEST_DIGEST}"
 
 # --- Deliver promoted host config -------------------------------------------
-# The compose file and its sibling host config (NPM maintenance page, Keycloak
-# theme) ride the SAME promoted, digest-pinned GHCR channel as the app images.
+# The compose file and its sibling host config (the edge's maintenance page,
+# Keycloak theme) ride the SAME promoted, digest-pinned GHCR channel as the app images.
 # Only (re)stage them when the promoted config digest actually moved, so an
 # app-only promotion stays byte-for-byte the legacy path.
 if [[ "${CONFIG_CHANGED}" == "true" ]]; then
@@ -1840,7 +1889,7 @@ fi
 cd "${COMPOSE_DIR}"
 
 # Only pre-pull the images this deploy actually moves (backend + frontend +
-# ingest from GHCR). The third-party infra images (keycloak/postgres/redis/npm)
+# ingest from GHCR). The third-party infra images (keycloak/postgres/redis/edge)
 # are pinned by digest and change only on a deliberate compose edit; pulling
 # them here would make every deploy hostage to a transient outage of a
 # third-party registry (e.g. a quay.io 502/504 on the Keycloak manifest aborting
@@ -1929,7 +1978,15 @@ if rt_apply_stack; then
   # the stack). pipefail makes the `if` observe compose's real exit through the sed pipe.
   if [[ "${IRI_MONITORING_ENABLED:-false}" == "true" ]] && rt_monitoring_configured; then
     log "applying monitoring stack (non-gating)"
-    if rt_monitoring_up 2>&1 | sed 's/^/  monitoring: /'; then
+    # Through a file and NOT a pipe into sed. A pipeline runs rt_monitoring_up in a subshell, so
+    # the service it restarts is forgotten only there -- and reconcile_monitoring_reloads below calls
+    # it again in THIS shell, where the service is still listed as changed, and would recreate it a
+    # second time for the same release. The file is overwritten on every run and left in place, so
+    # the last apply's output can still be read after the journal has rotated.
+    MONITORING_APPLY_RC=0
+    rt_monitoring_up > "${STATE_DIR}/monitoring-apply.log" 2>&1 || MONITORING_APPLY_RC=$?
+    sed 's/^/  monitoring: /' "${STATE_DIR}/monitoring-apply.log" 2>/dev/null || true
+    if [[ "${MONITORING_APPLY_RC}" -eq 0 ]]; then
       log "monitoring stack reconciled"
       # `up -d` recreates a service only when its DEFINITION changes; a bind-mounted config-file edit
       # (inode-pinned single-file mount) needs a force-recreate. Reconcile the applied config against

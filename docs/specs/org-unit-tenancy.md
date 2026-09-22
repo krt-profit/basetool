@@ -1,13 +1,25 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-29.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
 > **Owner area:** ORG · **Related:** [`security-and-access.md`](security-and-access.md) · issues #214, #340–#344, #500
 
 # Multi-org-unit tenancy & scope (CRITICAL)
 
 ## Context & goal
 
-The system supports multiple OrgUnits in parallel. Two kinds coexist under a shared
-`org_unit` table with a `kind` discriminator: `SQUADRON` (the legacy Staffel) and
-`SPECIAL_COMMAND` (SK). Scope (who can see/edit what) is enforced in the service layer.
+The system supports multiple OrgUnits in parallel. Four kinds coexist under a shared
+`org_unit` table with a `kind` discriminator (`OrgUnitKind`): `SQUADRON` (the Staffel),
+`SPECIAL_COMMAND` (SK), and — above them since epic #692 — `BEREICH` and `ORGANISATIONSLEITUNG`
+(REQ-ORG-014). Scope (who can see/edit what) is enforced in the service layer. The historical plans
+behind this spec are archived: [`MULTI_SQUADRON_PLAN.md`](../archive/MULTI_SQUADRON_PLAN.md) and
+[`SPEZIALKOMMANDO_PLAN.md`](../archive/SPEZIALKOMMANDO_PLAN.md) (history only — this spec is the
+living truth).
+
+> **Numbering note.** The ORG ids are shared with [`org-chart.md`](org-chart.md). Four of them had
+> each named one requirement here and a different one there; on 2026-09-22, on the owner's decision,
+> they were renumbered once: this file keeps `REQ-ORG-011` (owner retains see/edit) and `REQ-ORG-018`
+> (mission owning-unit reassignment), while its active-context surfacing (was `REQ-ORG-010`) is now
+> `REQ-ORG-024` and its participant escape (was `REQ-ORG-021`) is now `REQ-ORG-027`. See the
+> renumbering table in [`INDEX.md`](INDEX.md). `REQ-ORG-010`, `-012`, `-013`, `-020`, `-021`, `-025`
+> and `-026` live only in `org-chart.md`.
 
 ## Requirements
 
@@ -20,6 +32,13 @@ staffel-scoped aggregate carries both the legacy `owning_squadron_id` and the ne
 Repository queries read the new column; the legacy column drops in the destructive cleanup
 release.
 
+> **Completed (2026-09-22 review):** the soak is over. The dual-write lifecycle hooks were removed
+> (R9 Step 2) and `V103` dropped the legacy `owning_squadron_id` columns from `mission`,
+> `operation`, `ship`, `inventory_item`, `refinery_order` and `job_order` (plus the job order's two
+> squadron columns); `owning_org_unit_id` is the only owner column. Only `promotion_topic` and
+> `rank_requirement` keep an `owning_squadron_id`, deliberately — promotion is Squadron-only
+> (REQ-ORG-005).
+
 > **Amended by epic #692 (REQ-ORG-014):** `org_unit.kind` gains `BEREICH` and `ORGANISATIONSLEITUNG`, and
 > a nullable self-referential `parent_org_unit_id` introduces the fixed three-level hierarchy
 > OL → Bereich → Staffel/SK.
@@ -27,7 +46,7 @@ release.
 ### REQ-ORG-002 — Scope is enforced in the service layer
 
 Use [`OwnerScopeService.currentOrgUnitId()`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/OwnerScopeService.java)
-for list-endpoint filters (three-parameter `ScopePredicate`: `boolean isAdminAllScope`,
+for list-endpoint filters (three-component record `ScopePredicate`: `boolean adminAllScope`,
 `UUID activeOrgUnitId`, `Set<UUID> memberOrgUnitIds`) and `OwnerScopeService.canSee*` /
 `canEdit*` for `@PreAuthorize` SpEL on detail/write endpoints. Admins without an active pin
 get all-scope visibility; admins with a pin get the same restrictive view as a member;
@@ -75,8 +94,7 @@ non-admins see the union of their memberships unless they pin one.
   also be **ownerless** (`owning_org_unit_id IS NULL`, V144) — a leadership / "Bereichsleitung"
   mission created by a user who belongs to no OrgUnit; see REQ-ORG-009.
 - **Conditionally staffel-scoped** (visibility driven by the responsible OrgUnit's `kind`,
-
-  # 343): `JobOrder` + linked `JobOrderMaterial` + `JobOrderHandover`. Job Order carries
+  #343): `JobOrder` + linked `JobOrderMaterial` + `JobOrderHandover`. Job Order carries
 
   `responsible_org_unit_id` (the **processing** unit — a profit-eligible squadron or SK;
   governs visibility; mutable only via `PATCH /api/v1/orders/{id}/responsible-org-unit`) and
@@ -188,8 +206,9 @@ enforced at DB (V97 CHECK + V101 trigger `guard_promotion_topic_owner_kind`), ap
 breaks the build if a staffel-scoped service stops injecting `AuthHelperService` /
 `OwnerScopeService` (`staffelScopedServicesMustWireOwnerScopeOrAuthHelper` — update the
 whitelist when adding an aggregate), and `noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities`
-prevents new `@JoinColumn(name = "squadron_id")` (only `User.squadron` +
-`MissionParticipant.squadron` are grandfathered).
+prevents new `@JoinColumn(name = "squadron_id")`. Its allow-list names only `User`, and that
+entity no longer maps the column at all (V104 dropped `app_user`'s legacy squadron fields);
+`MissionParticipant`'s affiliation moved to the `mission_participant_org_unit` join table.
 
 ### REQ-ORG-007 — Audit MDC field
 
@@ -260,7 +279,9 @@ construction, no creator-owner fallback and no ownerless-leadership use case).
 > owner scopes the row to that level's leadership (strict silo). No existing `NULL`-owner row is
 > backfilled to a concrete owner.
 
-### REQ-ORG-010 — Active-context surfacing in the UI
+### REQ-ORG-024 — Active-context surfacing in the UI
+
+> **Renumbered 2026-09-22:** this requirement was `REQ-ORG-010` until 2026-09-22; that id also named the descriptive, ADMIN-edited org chart in [`org-chart.md`](org-chart.md), which keeps it.
 
 The active OrgUnit context is surfaced to the user **only** by appending it to the application
 title (`appTitle`, resolved in
@@ -343,7 +364,7 @@ so the system is byte-identical to today's flat behaviour while the hierarchy is
 - [x] An ADMIN-only management UI (`/admin/org-structure`) creates Bereiche and the Organisationsleitung
   and sets the parent edges (Staffel/SK → Bereich, Bereich → OL) over the existing `/api/v1/org-hierarchy`
   API, reading the whole structure — each unit's current parent and optimistic-lock version — from a
-  single `GET /api/v1/org-hierarchy/org-units`. Leadership seating stays on the org chart (REQ-ORG-018).
+  single `GET /api/v1/org-hierarchy/org-units`. Leadership seating stays on the org chart (REQ-ORG-026).
 
 **Enforced by:** `OrgHierarchyMigrationTest` (V164: the two new kinds, the `parent_org_unit_id` column +
 its kind-pairing parent trigger, the OL-has-no-parent CHECK, `ddl-auto=validate` at boot), and
@@ -358,9 +379,10 @@ stub so every pre-#692 scenario stays byte-identical (the degrade-to-flat proof)
 ### REQ-ORG-015 — Cascading oversight without admin rights, via one descent helper
 
 Leadership reach cascades, mirroring `ADMIN > OFFICER > LOGISTICIAN/MISSION_MANAGER`: a **Bereichsleitung**
-(`is_bereichsleiter` / `is_bereichskoordinator` / `is_bereichsoperator`, REQ-ORG-017) gets
+(rank `BEREICHSLEITER` / `BEREICHSKOORDINATOR` / `BEREICHSOPERATOR`; the boolean flags this text
+originally named were dropped by V187, REQ-ROLE-001) gets
 officer-equivalent reach over **all Staffeln + SKs of its Bereich** (and its Bereich's own data); the
-**OL** (`is_ol_member`) over **everything**. This reach is computed in **exactly one** helper
+**OL** (rank `OL_MEMBER`) over **everything**. This reach is computed in **exactly one** helper
 `OrgUnitCascadeService.expandWithDescendants(...)` (with `cascadedOfficerReach(...)` for the
 leadership-only subset), consumed by `OwnerScopeService.currentMemberOrgUnitIds()`;
 `ScopePredicate.permits()` and the `IN :memberOrgUnitIds` JPQL cascade automatically once fed the
@@ -370,13 +392,11 @@ expanded set, so lists and per-row gates widen together (ADR-0026).
 > `currentMemberOrgUnitIds()`, so it flows into `currentScopePredicate()` (all org-scoped aggregate
 > lists + per-row `canSee*`/`canEdit*` gates: mission, hangar, inventory, refinery, operation,
 > job-order) and the Job-Order profit gate `canViewJobOrders()`. The JWT-authority cascade ships in
-> the same phase. **Deferred to Phase 6 (#699):** `currentOversightScope()` is **not** yet
-> cascaded — it is shared by the bank seam (`OrgUnitBankAccessService`), where Q4 requires the
-> balance **view** to cascade down but deposit/withdrawal **requests** to stay own-level only
-> (REQ-BANK-027). Widening that one method atomically with the bank's read/write split belongs to the
-> bank phase, so the blueprint-availability overview and the bank balance-view inherit the cascade
-> there rather than here. Until then a Bereichsleitung/OL sees descendant **aggregates** but not the
-> descendant **blueprint-availability overview** — strictly fail-closed (less reach, never more).
+> the same phase. **Phase 6 (#699, #711) then cascaded `currentOversightScope()`** together with the
+> bank's read/write split: the balance **view** and the blueprint-availability overview cascade down
+> (`cascadedOfficerReach`), while bank booking **requests** use the separate, non-cascading
+> `currentOwnLevelOversightScope()` (REQ-BANK-027). *(Updated 2026-09-22: this note used to describe
+> the oversight scope as not yet cascaded.)*
 
 Hard invariants:
 
@@ -414,17 +434,18 @@ Hard invariants:
 
 - [ ] For a Bereichsleitung and the OL, list-query scope equals `permits()` for every descendant **and**
   denies every non-descendant / foreign pin (foreign-pin-collapses-to-union preserved).
-- [ ] A Bereichsleitung is denied another Bereich's data in both lists and detail gates (strict silo).
-- [ ] An OL/Bereich principal fails `isAdmin()` and every `hasRole('ADMIN')` carve-out.
-- [ ] An SK-lead's reach is SK-only (no Bereich expansion).
+- [x] A Bereichsleitung is denied another Bereich's data in both lists and detail gates (strict silo).
+- [x] An OL/Bereich principal fails `isAdmin()` and every `hasRole('ADMIN')` carve-out.
+- [x] An SK-lead's reach is SK-only (no Bereich expansion).
 - [ ] The REQ-ORG-011 owner-bypass and the ADR-0024 global-sharing union still hold for a leadership
   principal.
 
 **Enforced by:** `OrgUnitCascadeServiceTest` (cascade math + strict silo + no-flag short-circuit +
 SK-lead no-cascade + per-request memoisation), `OwnerScopeServiceTest` (cascade routed into the
 scope predicate; `adminAllScope` never set),
-`CustomJwtGrantedAuthoritiesConverterTest` (flat + cascaded contextual authorities); visibility-matrix
-e2e *(planned, Phase 7)* · **ADR:** [ADR-0026](../adr/0026-cascading-scope-without-admin.md) · also pins
+`CustomJwtGrantedAuthoritiesConverterTest` (flat + cascaded contextual authorities),
+`OrgHierarchyVisibilityMatrixE2eTest` (strict silo, no admin escalation, a plain member sees no Bereich
+data) · **ADR:** [ADR-0026](../adr/0026-cascading-scope-without-admin.md) · also pins
 [REQ-SEC-015](security-and-access.md) · **Issues:** #692, #696.
 
 ### REQ-ORG-016 — Bereich/OL as direct owners of org-unit-scoped aggregates
@@ -441,7 +462,7 @@ extended:
   stamping is unchanged.
 - **Create-on-behalf is authorised by `canEditOrgUnit(target)`** (cascades per REQ-ORG-015), not by
   admin-ness. This gate lives in the shared **owning-org-unit picker resolver**
-  (`OwnerScopeService.resolveStampedOrgUnit`): an explicit pick is accepted when it is a DIRECT
+  (`OrgUnitStampingService.resolveStampedOrgUnit`, reached through the `OwnerScopeService` facade): an explicit pick is accepted when it is a DIRECT
   membership of the **target user** *or* an org unit the current **caller** may edit. The gate keys
   `canEditOrgUnit` on the caller while the membership set is the target user's, so the two coincide for
   every **self-service** create (caller = target) — there an ordinary member, whose `canEditOrgUnit`
@@ -491,7 +512,7 @@ resolved as owners, create-on-behalf of a descendant **Staffel and SK** via `can
 caller ≠ target divergence keyed on the caller's scope, foreign-to-both pick still 400, strict-silo
 read/edit lock); existing picker-resolver + per-aggregate stamping/visibility tests stay green
 (self-service stamping unchanged); the Job Order requesting-picker surfacing by
-`JobOrderPageControllerMvcTest` (the picker offers Bereich/OL, responsible excludes them); visibility-matrix e2e (`OrgHierarchyVisibilityMatrixE2eTest`, Phase 7) · **ADR:**
+`JobOrderPageControllerResponsiblePickerMvcTest` (the picker offers Bereich/OL, responsible excludes them); visibility-matrix e2e (`OrgHierarchyVisibilityMatrixE2eTest`, Phase 7) · **ADR:**
 [ADR-0027](../adr/0027-bereich-ol-aggregate-ownership.md) · **Issues:** #692, #697.
 
 ### REQ-ORG-017 — Membership cardinality & exclusivity rules
@@ -580,8 +601,10 @@ dropped to one:
   Mission-Manager flags, in one membership-delta reconcile; clearing a slot drops that Staffel
   membership and an empty set removes every Staffel membership.
 - [x] A duplicate squadron in the desired set, or more than two squadrons, is rejected with 400.
-- [x] Making a user an SK-lead while they hold a Staffel membership is rejected; assigning an SK to a
-  Bereich (or making the user lead) auto-adds the reach-less Bereichsleitung membership.
+- [x] Making a user an SK-lead while they hold a Staffel membership is rejected. The lead's
+  reach-less Bereichsleitung seat is **derived** from the `SK_LEAD` rank + the SK's parent Bereich
+  (rule 2), never stored as a membership row. *(Corrected 2026-09-22: this line used to say the seat
+  was auto-added as a membership, which contradicted rule 2 and the code.)*
 - [x] A Bereichsleitung or OL flag on a user who holds a Staffel membership is rejected.
 - [x] A leadership flag on the wrong `kind` is rejected by CHECK.
 
@@ -659,7 +682,25 @@ badge in place (REQ-FE-001).
 `MissionServiceLifecycleTest` (happy path, 409, target validation, audit), `OwnerScopeServiceTest`
 (`resolveReassignTargetOrgUnit`), `MissionControllerSecurityTest` (the `canChangeOwner` gate).
 
-### REQ-ORG-021 — The participant escape opens the operation, not its ledger
+### REQ-ORG-019 — Bereich and OL own their bank accounts through the org-unit FK
+
+Since Bereiche and the OL are `org_unit` rows (REQ-ORG-014), the bank's `AREA` account is owned by
+its Bereich and the `CARTEL` account by the Organisationsleitung through the same `org_unit` foreign
+key an `ORG_UNIT` (Staffel/SK) account uses — one account per org unit, no free-form area names
+(`V168`). The org-unit pickers that feed account creation read every active kind from
+`GET /api/v1/org-units/active-all-kinds`. The id was allocated by epic #692 Phase 6 and is cited by
+the code; the full requirement — the cascading view and own-level requests built on this linkage —
+is specified in [`bank.md`](bank.md) REQ-BANK-027 (ADR-0028). *(Section added 2026-09-22: the id was
+referenced from the code and `INDEX.md` but had no entry in any spec.)*
+
+**Enforced by:** `V168BankAreaCartelLinkageMigrationTest`, `BankAccountServiceTest`,
+`OrgUnitControllerTest`, `BankManagePageControllerOrgUnitPickerMvcTest` · **Code:**
+`BankAccountService`, `BankAccount`, `OrgUnitController#listActiveOrgUnitsAllKinds`,
+`V168__link_bank_area_cartel_to_org_unit.sql` · **Issues:** #692, #699.
+
+### REQ-ORG-027 — The participant escape opens the operation, not its ledger
+
+> **Renumbered 2026-09-22:** this requirement was `REQ-ORG-021` until 2026-09-22; that id also named the single Grand Admiral at the top of the Organisationsleitung in [`org-chart.md`](org-chart.md), which keeps it.
 
 `OwnerScopeService.canSeeOperation` admits a caller either through org-unit scope (or the
 ownerless-leadership case of REQ-ORG-009) **or** through the participant escape of ADR-0006. The

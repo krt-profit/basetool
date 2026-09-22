@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-21.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
 > **Owner area:** ORDERS/UI · **Related ADRs:** [ADR-0099](../adr/0099-job-order-item-production-booking.md),
 > [ADR-0101](../adr/0101-inventory-game-item-rows.md) (production book-in)
 
@@ -29,7 +29,8 @@ requesting-side viewer of an SK-public order (`REQ-ORDERS-029`, ADR-0107). It fu
 invariants that keep a booked `manufacturedAmount` trustworthy over time: an **edit must re-derive the
 ordered-item lines in place** rather than recreate them (`REQ-ORDERS-032`, ADR-0121), and an
 ordered-item line whose **blueprint drifted away from the ordered item** must be detected and surfaced
-(`REQ-ORDERS-033`, ADR-0121). The decision behind the
+(`REQ-ORDERS-033`, ADR-0121), and the item handover's PDF delivery note (`REQ-ORDERS-035`). The
+decision behind the
 booking flow is [ADR-0099](../adr/0099-job-order-item-production-booking.md).
 
 ## Requirements
@@ -126,7 +127,7 @@ consumed entry, from snapshots captured before the writes; no user free text / n
 payload (`REQ-AUDIT-001`). A skipped material produces no `INVENTORY_CONSUMED_BY_PRODUCTION` event.
 - Returns the refreshed ordered-item-line DTO (advanced `manufacturedAmount` + version).
 
-Aufträge and Mein Inventar are **audited areas**, so both event types are recorded, added to the
+Aufträge and Lager (audit domain `INVENTORY`) are **audited areas**, so both event types are recorded, added to the
 unified viewer's per-area filter, and carried in the DE/EN i18n labels (`REQ-AUDIT-001`,
 [`audit.md`](audit.md)).
 
@@ -136,26 +137,32 @@ into the Lager** as game-item stock ([`inventory-items.md`](inventory-items.md))
 (create-on-behalf stamping semantics) and the personal flag, and auto-earmarks the produced
 units to the producing order by default (`allocateToOrder`, deselectable; mutually exclusive
 with `personal = true` → 400). The book-in runs in the same transaction as the consumption and
-is audited as `INVENTORY_RECEIVED_FROM_PRODUCTION`. **Rollout:** `bookIn` is
-transitional-optional at the API level (`null` ⇒ the legacy no-stock behaviour above) until the
-frontend's production modal ships it, then becomes required. The full contract lives in
-REQ-INV-032.
+is audited as `INVENTORY_RECEIVED_FROM_PRODUCTION`. `bookIn` is **required**
+(`@NotNull @Valid` on `JobOrderItemProductionCreateDto`): a payload without it is a 400 validation
+error — the transitional null-tolerant rollout window closed when the production modal's book-in
+section shipped. The full contract lives in REQ-INV-032.
 
 **Frontend.** The Herstellung modal renders one reconciliation card per required material; each card
 carries a **"Nicht ausbuchen" checkbox** (`data-prod-skip`). Ticking it flags the card, disables that
 material's stock inputs, drops the material from the "buchen" coverage gate, and adds its id to the
 posted `skippedMaterialIds` (no `consumption` is sent for it) — so the operator can record production
-while leaving a material's linked stock untouched. The relay `JobOrderWriteController.bookProductionAjax`
+while leaving a material's linked stock untouched. Below the cards the modal carries the book-in
+section (location — required, the booking button stays disabled without it —, owner defaulting to
+the acting user, owning org unit, personal flag, "allocate to order") that fills the `bookIn` block.
+The relay `JobOrderWriteController.bookProductionAjax`
 (`POST /orders/{id}/items/{itemId}/production`, consumes JSON) forwards the payload to the backend,
 re-fetches the order, and returns it so `orders-detail.js` re-renders the affected sections in place
 (no reload, `REQ-FE-001`). A `BackendServiceException` is relayed **verbatim** via
 `propagateBackendError`, preserving the RFC 7807 `code` so `krt-fetch.js` keeps its reload-vs-toast
 distinction — a **409** (`OPTIMISTIC_LOCK`) drives the optimistic-lock reload-confirm, a **422**
 (`PRODUCTION_ALLOCATION`) an inline toast. A successful booking re-renders and **broadcasts** the
-`production` and `kpi` sections to peers viewing the same order (`REQ-FE-010` / `REQ-FE-015`); both
-keys are present at all three live-sync mirror points — the acting client's `ORDER_SECTIONS` seam
-map, the server relay's `ORDER_DETAIL` broadcastable set (`LiveSyncTopicClass`), and the receiver's
-apply map.
+`items`, `aggregated`, `header`, `kpi`, `item-handovers` and `item-handover-lines` sections to peers
+viewing the same order (`REQ-FE-010` / `REQ-FE-015`) — there is no separate `production` section;
+the booking surface lives in the `items` fragment — and pokes the global `inventory` room's `stock`
+seam so Lager viewers see the booked-in units. Every key is present at all three live-sync mirror
+points — the acting client's `ORDER_SECTIONS` seam map, the relay whitelist
+(`LiveSyncTopicClass.ORDER`, metric label `order_detail`, held in both the frontend and the backend
+registry), and the receiver's apply map.
 
 **Acceptance**
 
@@ -184,11 +191,10 @@ apply map.
   `INVENTORY_CONSUMED_BY_PRODUCTION` per consumed entry, none carrying free text.
 - [ ] A booking with a `bookIn` block creates (or merges into) the matching game-item stack,
   earmarked to the order unless deselected, audited as `INVENTORY_RECEIVED_FROM_PRODUCTION` in
-  the same transaction (REQ-INV-032); `bookIn == null` preserves the legacy counter-only
-  behaviour during rollout.
+  the same transaction (REQ-INV-032); a payload without `bookIn` is rejected with 400.
 - [ ] The endpoint is reachable only by a LOGISTICIAN/OFFICER/ADMIN with `canEditJobOrder`; the
-  success response re-renders the `production` + `kpi` sections in place and propagates them to a
-  peer without a reload.
+  success response re-renders the `items` (booking surface + inline stock) and `kpi` sections, among
+  others, in place and propagates them to a peer without a reload.
 
 **Enforced by:** `JobOrderItemProductionServiceTest` (amount/coverage/slice caps, delete-on-depletion,
 mission auto-clamp, 409/422 mapping, audit, skipped/not-booked-out material),
@@ -199,7 +205,8 @@ mapping), `JobOrderItemHandoverServiceTest` (delivery capped at manufactured-but
 `JobOrderItemProductionService.bookProduction`, `JobOrderController.bookProduction`,
 `JobOrderItemHandoverService.createItemHandover`, `JobOrderItemProductionCreateDto` /
 `JobOrderItemProductionConsumptionDto`, `ProductionAllocationException`, `AuditEventType`
-(`JOB_ORDER_PRODUCTION_BOOKED` / `INVENTORY_CONSUMED_BY_PRODUCTION`),
+(`JOB_ORDER_PRODUCTION_BOOKED` / `INVENTORY_CONSUMED_BY_PRODUCTION` /
+`INVENTORY_RECEIVED_FROM_PRODUCTION`),
 `JobOrderWriteController.bookProductionAjax`, migration `V219` · **Issues:** #1182 · **ADR:**
 ADR-0099
 
@@ -231,16 +238,17 @@ cannot be claimed omits the tile entirely. The KPI band is its own AJAX-swappabl
 (`kpiSection`, container `#order-kpi-results`, live-sync key `kpi`) so a production booking, a claim,
 a delivery or an assignee change refreshes the KPIs in place.
 
-**Tabs.** Each tab and its pane carry the **same condition**, so a tab appears only when its pane
-exists. The tab sets:
+**Tabs.** A tab appears only when its pane is rendered. Tab and pane carry the same condition, except
+that the two handover tabs additionally drop out of the requester view — their panes still render
+there but, having no tab, can never be selected. The tab sets:
 
-- **`MATERIAL`** — *Materialien*, *Bearbeiter* (unless requester-redacted view), *Übergaben*, and
-  *Verknüpft* (only when orphaned linked inventory is present).
+- **`MATERIAL`** — *Materialien*, *Bearbeiter* (unless requester-redacted view), *Übergaben* (unless
+  requester view), and *Verknüpft* (only when orphaned linked inventory is present).
 - **`ITEM`** — *Bestellte Items* (which, for a LOGISTICIAN+ editor, also carries the production
   booking surface of `REQ-ORDERS-025` — see below; there is no separate *Herstellung* tab),
   *Aggregierte Materialien* (unless requester view), *Blaupausen* (only when the caller may see the
-  blueprint-coverage view, `REQ-ORDERS-016`), *Bearbeiter* (unless requester view), *Item-Übergaben*,
-  and *Verknüpft* (as above).
+  blueprint-coverage view, `REQ-ORDERS-016`), *Bearbeiter* (unless requester view), *Item-Übergaben*
+  (unless requester view), and *Verknüpft* (as above).
 
 **Tab behaviour.** Tabs use the WAI-ARIA tabs pattern (`role="tablist"/"tab"/"tabpanel"`,
 `aria-selected`, `aria-controls`, roving `tabindex`). The active tab resolves from a **`?tab=`** URL
@@ -304,8 +312,8 @@ the write server-side (no overclaim), and is still surfaced to the user as the c
 - [ ] `?tab=<key>` selects that tab on load and is honoured over `#tab=`, `localStorage`, and the
   default; back/forward re-applies the tab.
 - [ ] Arrow-key navigation moves selection along the tablist; `aria-selected` tracks the active tab.
-- [ ] Requester-redacted views omit the same tabs (Bearbeiter, Aggregierte Materialien, Übergaben)
-  they omitted before.
+- [ ] Requester-redacted views omit the same tabs (Bearbeiter, Aggregierte Materialien, Übergaben /
+  Item-Übergaben) they omitted before.
 - [ ] On the *Bestellte Items* tab a line's per-unit demand is hidden behind a chevron and revealed
   in a sub-row on click; both Hergestellt and Geliefert render a progress bar; booking a production
   run from that tab still works (its machine-readable demand stays on the main row).
@@ -395,7 +403,7 @@ visible after a booked production with auto-earmark) · **Code:** `JobOrderItemS
 `items` dispatch), `orders-detail.html` (`itemsSection` item expand rows), `orders-detail.js`
 (`ORDER_SECTIONS['item-stock']` aliased to the items container), `LiveSyncTopicClass.ORDER`,
 `inventory-my.js` / `inventory-admin.js` (`broadcastOrdersChanged`) · **Issues:** — · **Design:**
-[`DESIGN_ITEM_INVENTORY.md`](../DESIGN_ITEM_INVENTORY.md) §10 PR 4 / §11.2
+[`DESIGN_ITEM_INVENTORY.md`](../archive/DESIGN_ITEM_INVENTORY.md) §10 PR 4 / §11.2
 
 ### REQ-ORDERS-029 — Requesting-side viewers see redacted inventory owner/location
 
@@ -513,7 +521,7 @@ drawn-down stock, mirroring the production-booking success path. All keys pre-ex
 live-sync mirror points; no seam-map change.
 
 **Rationale / no ADR.** This is a behaviour refinement of an already-decided feature (owner decision
-2026-07-16, [`DESIGN_ITEM_INVENTORY.md`](../DESIGN_ITEM_INVENTORY.md) §10 Phase 6 / §11.1), building on
+2026-07-16, [`DESIGN_ITEM_INVENTORY.md`](../archive/DESIGN_ITEM_INVENTORY.md) §10 Phase 6 / §11.1), building on
 the item-stock model (ADR-0101) and production booking (ADR-0099); it introduces no new architectural
 choice, so the rationale is captured in this requirement rather than in a separate ADR.
 
@@ -546,7 +554,7 @@ after a UI handover) · **Code:** `JobOrderItemHandoverService.createItemHandove
 `InventoryAllocations.reduceJobOrder`, `MaterialExchangeOfferRepository.clampItemQuantityToStock`,
 `AuditEventType.INVENTORY_HANDED_OVER`, `orders-detail.js`
 (item-handover success `items` + `inventory`/`stock` broadcast) · **Issues:** — · **Design:**
-[`DESIGN_ITEM_INVENTORY.md`](../DESIGN_ITEM_INVENTORY.md) §10 Phase 6 / §11.1
+[`DESIGN_ITEM_INVENTORY.md`](../archive/DESIGN_ITEM_INVENTORY.md) §10 Phase 6 / §11.1
 
 ### REQ-ORDERS-031 — Itemsammelübersicht (item collection page)
 
@@ -603,7 +611,7 @@ move re-fetches the page's `collectionResults` fragment in place.
 persists) · **Code:** `ItemCollectionPageController`, `item-collection.html`, `item-collection.js`
 (`ITEM_COLLECTION_SECTIONS`), `orders-detail.html` (Item-Übergaben toolbar link),
 `InventoryCheckoutService.bookOutTransfer` / `applyTransferInherit` · **Issues:** — · **Design:**
-[`DESIGN_ITEM_INVENTORY.md`](../DESIGN_ITEM_INVENTORY.md)
+[`DESIGN_ITEM_INVENTORY.md`](../archive/DESIGN_ITEM_INVENTORY.md)
 
 ### REQ-ORDERS-032 — An item-order edit re-derives its lines in place and never discards booked production
 
@@ -688,6 +696,28 @@ blueprint change on a line with booked production so this repair works).
 `JobOrderItemService#isBlueprintStale`, `orders-detail.html`,
 `monitoring/prometheus/alerts/business.yml`, `monitoring/grafana/dashboards/07-basetool-operations.json` ·
 **Decision:** [ADR-0121](../adr/0121-item-order-edit-reconciles-lines-in-place.md)
+
+### REQ-ORDERS-035 — An item handover can be downloaded as a PDF delivery note
+
+Every persisted item handover of an `ITEM` order MUST be downloadable from the *Item-Übergaben* tab
+as a PDF delivery note (Übergabeprotokoll) in the KRT corporate design, listing the order number and
+the handed-over items with their whole-unit quantities. It is the item counterpart of the material
+handover protocol (`GET /api/v1/orders/{jobOrderId}/handovers/{handoverId}/report`).
+
+- `GET /api/v1/orders/{jobOrderId}/item-handovers/{handoverId}/report`, gated
+  `hasAnyRole(LOGISTICIAN, OFFICER, ADMIN) and @ownerScopeService.canSeeJobOrder(#jobOrderId)` —
+  the same gate as the material report; answers `application/pdf` as an attachment
+  (`uebergabeprotokoll-<orderId>.pdf`).
+- A handover id that belongs to a different order is a 404, never another order's document.
+- Timestamps render in the caller's zone from the optional `X-User-Time-Zone` header (the page
+  sends the browser's IANA zone); a missing or invalid zone falls back to UTC rather than failing.
+- The frontend reaches it through `JobOrderHandoverReportProxyController`, which forwards the zone
+  header.
+
+**Enforced by:** `JobOrderItemHandoverReportServiceTest` (order number + item name in the PDF,
+foreign-order handover rejected) · **Code:** `JobOrderController.downloadItemHandoverReport`,
+`JobOrderItemHandoverReportService`, `JobOrderHandoverReportProxyController`, `orders-detail.js`
+(item-handover download) · **Issues:** —
 
 ## Out of scope
 

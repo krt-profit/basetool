@@ -9,7 +9,7 @@
   reach this extends past approval),
   [ADR-0140](0140-rejected-registrations-are-reopened-not-re-decided.md) (the same shape, closed once
   for rejections),
-  [ADR-0142](0142-a-session-belongs-to-the-tokens-subject.md) point 5 (the merge this composes),
+  [ADR-0142](0142-one-user-identifier-named-user-id-with-the-sub-as-an-authentication-input.md) point 5 (the merge this composes),
   REQ-SEC-022 (the fail-open precheck that lets duplicates through), REQ-SEC-026, REQ-SEC-034,
   REQ-SEC-046, REQ-DATA-008
 - **Issues:** #1827 (the regression that had to be fixed first), #1828

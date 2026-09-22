@@ -228,9 +228,10 @@ public class OrgUnitContextAdvice {
     // purposes.
     try {
       // Slow-changing global catalogue, identical URI for every caller — route through the
-      // 10-min STATIC_DATA_CACHE (same entry the page controllers already cache, evicted on admin
-      // squadron mutations) so this advice does not re-fetch it on every authenticated render and
-      // shares the cached entry with the admin switcher's identical call below (REQ-DATA-007).
+      // CacheDomain.SQUADRON cache (same entry the page controllers already cache, evicted on
+      // admin squadron and SK mutations, 2-hour backstop TTL) so this advice does not re-fetch it
+      // on every authenticated render and shares the cached entry with the admin switcher's
+      // identical call below (REQ-DATA-007).
       PageResponse<SquadronDto> page =
           backendApiClient.getCached(CachedCatalog.SQUADRONS, SQUADRON_PAGE);
       return page != null && page.content() != null ? page.content() : List.of();

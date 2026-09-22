@@ -4,7 +4,11 @@
 > **Scope:** Discord **login** with a fail-closed Kartell-membership gate. **OAuth only — no bot.**
 > The Discord **bot** (and the automated role-sync) belong to Track 2 and are set up separately later.
 > Spec: [`docs/specs/discord-integration.md`](../specs/discord-integration.md) · decision:
-> [ADR-0030](../adr/0030-discord-federation-first-login-membership-gate.md).
+> [ADR-0030](../adr/0030-discord-federation-first-login-membership-gate.md). Last reviewed:
+> 2026-09-22 (checked against `keycloak-spi/`, the realm reference and the Quadlet units; commands
+> rewritten for the rootless-Podman production host). Host commands run as root, from `/`, with the
+> `UCTL` / `UPOD` shorthands of
+> [`deployment.md` → *Shell conventions*](../deployment.md#shell-conventions-used-below).
 
 This is an **operator** procedure: it provisions secrets and live Keycloak config that are **never**
 committed. The redacted shape of the Keycloak side is in
@@ -22,19 +26,18 @@ committed. The redacted shape of the Keycloak side is in
 | **Guild ID** of the das-kartell server    | Discord client → Developer Mode → right-click the server → *Copy Server ID*                                                                                                         |
 | **KRT-Mitglied role ID**                  | Server Settings → Roles → right-click *KRT-Mitglied* → *Copy Role ID* (numeric, **not** the name)                                                                                   |
 
-> [!warning] The redirect URI moved on 2026-09-13 and Discord holds a copy of it
+> [!warning] The redirect URI moved on 2026-09-13, and Discord holds a copy of it
 > Keycloak used to answer on a host of its own; since
 > [ADR-0166](../adr/0166-identity-moves-onto-the-app-origin.md) it answers at `/auth` on the web
-> origin, so the broker endpoint it generates is now
+> origin, so the broker endpoint it generates is
 > `https://profit-base.online/auth/realms/iri/broker/discord/endpoint`. **Discord validates the
-> redirect URI against the list registered in its developer portal**, so an unchanged registration
-> fails every Discord login with `Invalid OAuth2 redirect_uri` — at Discord, before Keycloak is
-> reached, which is why nothing in this repository can catch it.
+> redirect URI against the list registered in its developer portal**, so a registration that does
+> not list exactly this value fails every Discord login with `Invalid OAuth2 redirect_uri` — at
+> Discord, before Keycloak is reached, which is why nothing in this repository can catch it.
 >
-> Discord accepts **several** redirect URIs per application, so add the new one **before** the
-> cutover rather than swapping it: both are then valid, the switch is seamless, and the old entry
-> can be removed afterwards. That ordering is step 1 of the cutover runbook in
-> [`deployment.md`](../deployment.md).
+> Discord accepts **several** redirect URIs per application. Whenever the public Keycloak URL moves
+> again, add the new URI **before** the move and remove the old one afterwards; the pre-2026-09-13
+> entry (without `/auth`, on the old Keycloak host) can be removed now.
 
 Enable **Developer Mode** in Discord (User Settings → Advanced) to get the *Copy ID* options.
 
@@ -50,31 +53,20 @@ Enable **Developer Mode** in Discord (User Settings → Advanced) to get the *Co
 
 ---
 
-## 2. Build & stage the provider JAR
+## 2. The provider JAR
 
-The Discord identity provider and the membership gate ship as one JAR from the `keycloak-spi` module.
+The Discord identity provider, its mappers and the membership gate ship as one JAR from the
+`keycloak-spi` module, bind-mounted from `/var/iri/code/keycloak/providers/` at
+`/opt/keycloak/providers` (`quadlet/systemd/keycloak.container`).
 
-```bash
-./gradlew :keycloak-spi:build
-# Output: keycloak-spi/build/libs/keycloak-spi-<version>.jar
-```
+**On production there is nothing to do.** The JAR is a promotable artifact (ADR-0055,
+`basetool-keycloak-spi`): `deploy.sh` stages `keycloak-spi.jar` whenever a new one is promoted and
+restarts keycloak alone, restoring the previous JAR on failure. The manual fallback (build, install
+as `deploy` `0644` — Keycloak runs as container uid 1000 and must read it — `restorecon`, restart)
+is in [`deployment.md` → *Keycloak provider JAR*](../deployment.md#keycloak-provider-jar).
 
-Stage it into the providers volume on the Keycloak host (bind-mounted at `/opt/keycloak/providers`,
-see `docker-compose.yml`):
-
-```bash
-sudo install -D -m 0644 keycloak-spi/build/libs/keycloak-spi-*.jar \
-    /var/iri/code/keycloak/providers/keycloak-spi.jar
-# 0644 is REQUIRED: the quay Keycloak image runs as uid 1000 and must read the JAR
-# (the same world-readable lesson as the shared keystore.p12).
-```
-
-Restart Keycloak so the `start` command re-runs the provider build and discovers the JAR:
-
-```bash
-docker compose --profile prod up -d --no-deps keycloak
-# Then confirm the provider loaded — "Discord" appears under Identity Providers → Add provider → Social.
-```
+Keycloak's `start` re-runs the provider build at every start, so a restart is what makes a new JAR
+take effect. Confirm it loaded: **Identity providers → Add provider → Social** lists *Discord*.
 
 ---
 
@@ -156,7 +148,7 @@ already used for user sync (its service account needs `view-users` **and** `view
 
 ### 3d. (Optional) Capture the per-guild server nickname for the approval queue
 
-To show each pending user's **das-kartell server name** in the admin approval queue (REQ-DATA-008),
+To show each pending user's **das-kartell server name** in the admin approval queue (REQ-DATA-018),
 capture the guild display name — the Discord `nick`, or the global display name (`user.global_name`)
 when the member set no per-guild nick — and carry it into a token claim, mirroring `discord_user_id`.
 (The provider injects `nick ?? global_name` into `guild_nick`, so a member who appears in the server
@@ -175,12 +167,19 @@ gate.
    DISCORD_GUILD_ID=<das-kartell guild id>   # same value as the gate's Guild ID (step 4.3)
    ```
 
-   > **`.env` alone is not enough for a *new* variable.** Compose uses `.env` only to interpolate
-   > `${...}` references that already exist in a service's `environment:` block — it does not inject
-   > `.env` keys into containers by itself. `DISCORD_GUILD_ID` is pre-wired here, so setting it in
-   > `.env` suffices; a brand-new variable would also need its `environment:` reference added.
+   > **`.env` alone is not enough for a *new* variable.** Each service sees only the variables its
+   > own environment map names — the compose `environment:` block, generated into
+   > `quadlet/env.d/keycloak.env.tmpl` for production. `DISCORD_GUILD_ID` is pre-wired there, so
+   > setting it in `.env` suffices; a brand-new variable would also need its `environment:`
+   > reference added and the units regenerated (`scripts/generate-quadlet.py`).
 
-   Restart Keycloak to pick up the change.
+   Apply it on the production host — re-render the environment files and restart Keycloak:
+
+   ```bash
+   sudo -u deploy /var/iri/code/scripts/render-env-d.py \
+     --env /var/iri/code/.env --templates /var/iri/code/quadlet/env.d --out /var/iri/code/env.d
+   ${UCTL} restart keycloak.service
+   ```
 
 2. **Attribute importer mapper.** On the Discord IdP → **Mappers** → **Add mapper**:
 
@@ -251,8 +250,8 @@ ambiguity (5xx / timeout / malformed / rate-limited), distinct from a clean 404 
 
 > **Enforced once, at first link.** The guild + KRT-Mitglied check runs in the first-broker-login
 > flow — i.e. only when the Discord account is first linked, not on every login. A member later
-> kicked from the guild or stripped of KRT-Mitglied keeps access until the Track 2 role-sync lands;
-> until then, revoke access by disabling/removing the user in Keycloak.
+> kicked from the guild or stripped of KRT-Mitglied keeps access until the Track 2 role-sync
+> (planned, #726–#730) lands; until then, revoke access by disabling/removing the user in Keycloak.
 
 ---
 
@@ -261,7 +260,8 @@ ambiguity (5xx / timeout / malformed / rate-limited), distinct from a clean 404 
 - The Discord **Client Secret**, **Guild ID** and **role ID** live only as Keycloak component config
   supplied at deploy — never in git. The committed realm reference shows `__SET_AT_DEPLOY__`.
 - Rotating the client secret: reset it in the Discord app, update the IdP config, no restart needed.
-- Re-staging a new provider JAR (step 2) **does** need a Keycloak restart to rebuild providers.
+- A new provider JAR (step 2) needs a Keycloak restart to rebuild providers — `deploy.sh` does
+  that itself when it stages a promoted JAR.
 
 > **Track 2 (later):** the Discord **bot** (bot token + `Server Members` privileged intent, read-only
 > invite) and the automated role/unit sync are configured in a separate runbook when Track 2 ships.
@@ -309,9 +309,26 @@ keytool -importcert -noprompt \
   -alias backend -file backend.crt
 ```
 
-Mount it read-only into the keycloak service and point `KRT_BACKEND_TRUSTSTORE_PATH` at it (a compose
-override; the base `docker-compose.yml` plumbs the env vars but deliberately leaves this mount to the
-operator so non-users are unaffected):
+Mount it read-only into the keycloak container and point `KRT_BACKEND_TRUSTSTORE_PATH` at it
+(`/opt/keycloak/conf/backend-truststore.p12`). The environment variables are plumbed already; the
+mount is deliberately left to the operator so a deployment without the precheck is unaffected.
+
+On the **production** (rootless Podman) host the mount is a Quadlet **drop-in** beside the generated
+unit — `deploy.sh` never touches a unit's `.container.d/` directory, so it survives every release.
+The truststore holds only the backend's public certificate, so it may be world-readable; Keycloak
+reads it as container uid 1000 (host uid 100999):
+
+```bash
+install -o root -g root -m 0644 backend-truststore.p12 /var/iri/secrets/backend-truststore.p12
+restorecon -F /var/iri/secrets/backend-truststore.p12
+D=/etc/containers/systemd/users/$(id -u iri)/keycloak.container.d
+install -d -m 0755 "$D"
+printf '[Container]\nVolume=/var/iri/secrets/backend-truststore.p12:/opt/keycloak/conf/backend-truststore.p12:ro\n' \
+  > "$D/50-backend-truststore.conf"
+${UCTL} daemon-reload && ${UCTL} restart keycloak.service
+```
+
+On a local Docker Compose stack, use a compose override instead:
 
 ```yaml
 services:
@@ -329,7 +346,8 @@ services; rebuild the truststore when the backend certificate is rotated.
 - A new Discord login whose username / server nickname / e-mail matches an existing account → denied
   with the "account already exists, link instead" page; no session, no new account.
 - A new, non-colliding Discord login → lands PENDING as before.
-- Unset `KRT_BACKEND_PRECHECK_URL` → the precheck is skipped (fail-open), colliding logins land PENDING.
+- Unset `KRT_BACKEND_PRECHECK_URL` (and re-render `env.d`, restart keycloak) → the precheck is
+  skipped (fail-open), colliding logins land PENDING.
 - Linking Discord to an existing account from the Account Console still works (the precheck is skipped
   for an already-authenticated session).
 - Keycloak/SPI logs contain **no** candidate usernames, nicknames, e-mails or Discord ids.

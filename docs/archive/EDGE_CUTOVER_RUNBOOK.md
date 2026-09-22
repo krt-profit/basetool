@@ -1,7 +1,11 @@
+> **Archived 2026-09-22.** Doc type: Historical runbook — frozen, kept as a record and no longer updated. Executed 2026-09-12: the edge moved from Nginx Proxy Manager to native nginx, and NPM was later removed from the stack. The Docker commands below describe the host as it was then.
+>
+> **Current truth:** [ADR-0162](../adr/0162-edge-is-native-nginx-with-a-separate-acme-client.md), [`docker/edge/`](../../docker/edge/), [`deployment.md`](../deployment.md). Index of the archive: [`README.md`](README.md).
+
 # Edge cutover runbook — Nginx Proxy Manager → native nginx
 
 Doc type: **operational runbook**. Companion to
-[ADR-0162](adr/0162-edge-is-native-nginx-with-a-separate-acme-client.md), which carries the decision
+[ADR-0162](../adr/0162-edge-is-native-nginx-with-a-separate-acme-client.md), which carries the decision
 and the reasoning. This file carries only the steps.
 
 **Merging and promoting is not enough**, and this runbook exists because of the two reasons why:

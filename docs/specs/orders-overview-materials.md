@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-15.
-> **Owner area:** ORDERS · **Related ADRs:** none
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Owner area:** ORDERS/UI · **Related ADRs:** [ADR-0120](../adr/0120-per-browser-filter-selection-persistence.md)
 
 # Order-overview Materialien column
 
@@ -36,11 +36,14 @@ count. A `MATERIAL` order's column is unchanged.
 The progress per row is `currentStock / totalQuantity`, clamped to 100 %, where
 `currentStock` is the total of inventory **linked to that order** for the material at or above
 the aggregated bucket's quality floor (`GOOD` → 650, `NONE` → no floor) — the same per-bucket
-sum the `MATERIAL` requirement rows use (`InventoryItemRepository`
-`sumAmountByMaterialAndJobOrderAndMinQuality`). `currentStock` is carried on
+sum the `MATERIAL` requirement rows use (per order via `InventoryItemRepository`
+`sumAmountByMaterialAndJobOrderAndMinQuality` on the detail path, page-batched through
+`JobOrderStockProjectionService.loadOrderLinkedStockIndex` on the list path — no N+1). `currentStock` is carried on
 `AggregatedMaterialDto` and populated by the backend for every item order it returns (list and
 detail); it is `0.0` when nothing is linked. An item order whose blueprints derived no
-material renders the empty-materials placeholder.
+material renders the empty-materials placeholder. The requester "Meine Aufträge" view omits the
+progress column, because its rows carry no collection-progress fields
+([`orders-requester-access.md`](orders-requester-access.md), REQ-ORDERS-023).
 
 **Acceptance**
 
@@ -52,7 +55,7 @@ material renders the empty-materials placeholder.
 
 **Enforced by:** `JobOrderListRenderTest` (frontend render),
 `JobOrderServiceTest` (UpdateItemJobOrderTests — aggregated stock enrichment) · **Code:**
-`JobOrderService.enrichAggregatedWithClaims`, `JobOrderItemService.aggregateMaterials`,
+`JobOrderStockProjectionService.enrichAggregatedWithClaims`, `JobOrderItemService.aggregateMaterials`,
 `AggregatedMaterialDto.currentStock`, `templates/orders-index.html` · **Issues:** #595
 
 ### REQ-ORDERS-018 — Inventory may only be linked to an order that requires its material
@@ -63,15 +66,17 @@ matched onto those rows, an inventory item linked for a material the order does 
 has no row to surface under — it binds stock to the order while staying invisible everywhere in
 the order.
 
-Linking an inventory item to a job order — whether on create or via the in-place
-association edit (the Lager "Auftrag" picker) — MUST be rejected with HTTP `400` when the item's
+Linking an inventory item to a job order — whether on create (the check-in allocations) or by
+adding an order allocation to an existing entry (the Lager "+ Zuordnen" chip picker,
+`POST /api/v1/inventory/{id}/allocation`) — MUST be rejected with HTTP `400` when the item's
 material is not one of the order's **required materials**. The required-material set is
 kind-agnostic: for a `MATERIAL` order its material lines, for an `ITEM` order the materials
 derived and snapshotted from the ordered items' blueprints (`JobOrderItemService.requiredMaterialIds`).
 Every job-order picker that links stock to an order MUST hide an order that does not require the
-material being linked, and MAY still list the order the row is **already** assigned to, so an
-existing (possibly orphaned) link stays visible and clearable. This covers all three linking
-pickers: the Lager stack-entry "Auftrag" picker (in-place association edit), the Lager book-in
+material being linked. An existing (possibly orphaned) link stays visible and removable as an
+allocation chip on the entry, so the stack-entry add picker additionally leaves out the orders the
+entry is already allocated to. This covers all three linking
+pickers: the Lager stack-entry "+ Zuordnen" allocation picker, the Lager book-in
 create form's per-row "Aufträge zuordnen" allocation picker (`inventory-input.html`), and the
 refinery store ("Einlagern") dialog's per-item "Auftrag" picker, which links the refined output
 material to an order that needs it. The picker filter MUST be correct
@@ -83,7 +88,9 @@ client-side: each order option carries a `data-materials` CSV built from `requir
 (the item-mode sibling `data-game-items` from `requiredGameItemIds`), and `inventory-input.js`
 filters the rows to the option whose CSV contains the picked material/game item.
 
-The lookup projection (`/api/v1/orders/lookup`) MUST list each active order **at most once**, even
+The lookup projection (`/api/v1/orders/lookup`; with `withNeeds=true` it also carries each order's
+outstanding need per material bucket for the Lager pickers, REQ-INV-039 in
+[`inventory-lager.md`](inventory-lager.md)) MUST list each active order **at most once**, even
 when it carries several material or item lines and one or more handovers, so a picker never renders
 a duplicated `<option>`. Hibernate de-duplicates the roots of a fetch-join result, so the returned
 list already carries each order once; the lookup additionally MUST NOT eager-fetch collections it
@@ -103,11 +110,11 @@ two gates are parallel, not a replacement.
 
 **Acceptance**
 
-- [ ] Creating or updating an inventory item with a job-order link whose material the order does
-  not require returns `400` and persists nothing.
+- [ ] Creating an inventory item with, or adding to an existing entry, a job-order allocation whose
+  material the order does not require returns `400` and persists nothing.
 - [ ] The same link succeeds when the order requires the material (both order kinds).
-- [ ] The Lager "Auftrag" dropdown for a row offers only orders that require that row's material,
-  plus the order the row is already assigned to.
+- [ ] The Lager "+ Zuordnen" picker for a row offers only orders that require that row's material
+  and that the row is not yet allocated to; existing allocations stay visible as chips.
 - [ ] The Lager book-in form's "Aufträge zuordnen" dropdown offers only orders that require the
   picked material/game item (both order kinds, `ITEM` orders included) — its `data-materials` CSV
   is keyed on `requiredMaterialIds`, not the MATERIAL-only `materials` list.
@@ -116,7 +123,8 @@ two gates are parallel, not a replacement.
 - [ ] The lookup lists each active order at most once (no duplicate `<option>`) even for an order
   with multiple material or item lines plus a handover.
 
-**Enforced by:** `InventoryItemServiceTest` (create/update gate),
+**Enforced by:** `InventoryItemServiceTest` (create gate), `InventoryItemServiceAllocationTest`
+(`addAllocation` gate),
 `JobOrderItemServiceTest` (`requiredMaterialIds`),
 `InventoryPageControllerMvcTest` (stack-entry picker + book-in form `data-materials`) /
 `RefineryOrderStoreJobOrderDropdownTest` (picker filters),
@@ -124,7 +132,8 @@ two gates are parallel, not a replacement.
 **Code:** `InventoryItemService.createInventoryItem` / `addAllocation` (the former
 `updateInventoryItem` went with `PUT /api/v1/inventory/{id}` in d03a9238b; corrected 2026-09-22),
 `JobOrderItemService.requiredMaterialIds`, `JobOrderReferenceDto.requiredMaterialIds`,
-`JobOrderService.findAllActiveReference`, `templates/fragments/inventory-stack-entries.html`,
+`JobOrderQueryService.findAllActiveReference`, `JobOrderRepository.findAllActiveWithMaterials`,
+`templates/fragments/inventory-stack-entries.html`,
 `templates/inventory-input.html` / `static/js/inventory-input.js`,
 `RefineryOrderPageController.fetchActiveJobOrders`, `templates/refinery-orders-details.html`
 
@@ -137,8 +146,8 @@ material, owner, location, quality and amount. The list is the order-linked inve
 required-material set; it is empty (section hidden) when every linked item matches a requirement.
 The warning also flags **item earmarks** — game-item allocation slices whose order no longer
 requests that gameItem ([`inventory-items.md`](inventory-items.md) REQ-INV-031) — the gameItem
-sibling of the material check. The link itself is undone from the Lager (setting the entry's
-"Auftrag" back to none). Computing
+sibling of the material check. The link itself is undone from the Lager (removing the order's
+allocation chip on the entry). Computing
 the warning MUST NOT add an N+1 to the order **list** endpoint — it is only resolved on the
 detail view.
 
@@ -150,7 +159,7 @@ detail view.
 
 **Enforced by:** `JobOrderServiceTest`
 (`getOrphanedLinkedInventoryReturnsOnlyLinksWhoseMaterialIsNotRequired`) · **Code:**
-`JobOrderService.getOrphanedLinkedInventory`, `JobOrderController` `GET
+`JobOrderQueryService.getOrphanedLinkedInventory`, `JobOrderController` `GET
 /api/v1/orders/{id}/inventory/orphaned`, `JobOrderPageController.viewOrderDetail`,
 `templates/orders-detail.html`
 
@@ -180,7 +189,7 @@ live **inside** the `ordersResults` AJAX-swap fragment so a filter change re-ren
   `priority,asc`).
 - [ ] A `?size=` outside {50,100,200} falls back to 100; a negative `?page=` clamps to 0.
 
-**Enforced by:** `JobOrderPaginationMvcTest`, `JobOrderPageCookieTest` (fetch URL) · **Code:**
+**Enforced by:** `JobOrderPaginationMvcTest`, `JobOrderPageStatusFilterTest` (fetch URL) · **Code:**
 `JobOrderPageController.viewOrders` / `buildPaginationBaseUrl`, `templates/orders-index.html`,
 `templates/fragments/pagination.html` · **Issues:** #2 (performance audit)
 
@@ -216,7 +225,7 @@ backend change is needed and the order-list endpoint gains no query; the badge r
 ### REQ-ORDERS-027 — Overview: collapsible material sublist + status & squadron filters
 
 Three order-overview affordances, all persisted **per browser** in `localStorage` — the same
-client-side persistence the Lager tree uses (REQ-INV-002), and not a server cookie. Note the one
+client-side persistence the Lager tree uses (REQ-INV-002, [`inventory-lager.md`](inventory-lager.md)), and not a server cookie. Note the one
 difference from that tree: all three keys here (`orders_materials_expanded`,
 `orders_squadron_filter`, `orders_status_filter`) are **bare** — they carry no user id, where the
 Lager tree suffixes its keys with the tree's `data-user-id`. That is the app-wide default for
@@ -240,11 +249,9 @@ repeatable `squadronId` query params and the backend keeps only orders whose res
 requesting org unit is in the set (`JobOrderController.getAllJobOrders` → `JobOrderQueryService` →
 `JobOrderRepository.findScopedJobOrders`, `List<UUID> squadronId`). "All checked" sends **no**
 `squadronId` (no narrowing); a subset sends its ids; "none checked" sends a nil-UUID sentinel (empty
-result). The filter is a pure display preference layered on the caller's visibility scope (Phase 3,
-
-# 343) — it can only narrow, never widen — and is absent for the requester "Meine Auftraege" view. On
-
-load the client re-fetches only when the server did not already render the persisted selection (so a
+result). The filter is a pure display preference layered on the caller's visibility scope
+(Phase 3, #343) — it can only narrow, never widen — and is absent for the requester "Meine Aufträge"
+view. On load the client re-fetches only when the server did not already render the persisted selection (so a
 pagination reload carrying the ids is not clobbered back to page 1).
 
 **Status filter.** The status checkboxes (`OPEN`, `IN_PROGRESS`, `REJECTED`, `COMPLETED`) that

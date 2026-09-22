@@ -98,7 +98,7 @@ class UserRegistrationServiceTest {
     User u = new User();
     u.setId(TARGET_ID);
     u.setApprovalStatus(ApprovalStatus.ACTIVE);
-    u.setDisplayName("MadrukSedras");
+    u.setDisplayName("ExamplePilot");
     u.setVersion(0L);
     return u;
   }
@@ -268,12 +268,12 @@ class UserRegistrationServiceTest {
     @Test
     void linkRegistration_movesIdentity_deletesDuplicate_setsFieldsAndAuditsLinked() {
       User pending = pendingUser(0L);
-      pending.setDiscordGuildNickname("MadrukSedras");
+      pending.setDiscordGuildNickname("ExamplePilot");
       User target = activeTarget();
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(pending));
       when(userRepository.findById(TARGET_ID)).thenReturn(Optional.of(target));
       when(keycloakService.readDiscordLink(USER_ID))
-          .thenReturn(Optional.of(new KeycloakService.DiscordLink(SNOWFLAKE, "conrad7247")));
+          .thenReturn(Optional.of(new KeycloakService.DiscordLink(SNOWFLAKE, "examplehandle4711")));
       when(userRepository.saveAndFlush(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
       when(selfProvider.getObject()).thenReturn(userRegistrationService);
 
@@ -291,7 +291,7 @@ class UserRegistrationServiceTest {
       // resolves it, so the identity must never be on both at once. Asserted as an order, not as a
       // call — an unlink after the link would restore exactly the state it exists to prevent.
       order.verify(keycloakService).unlinkDiscordIdentity(USER_ID);
-      order.verify(keycloakService).linkDiscordIdentity(TARGET_ID, SNOWFLAKE, "conrad7247");
+      order.verify(keycloakService).linkDiscordIdentity(TARGET_ID, SNOWFLAKE, "examplehandle4711");
       // #1827: the deletion runs with the presence probe WAIVED. It has to -- the throwaway
       // Keycloak user is still there at this point, by the very ordering asserted here, so the
       // enforced probe would refuse and roll the link back. Verifying the mode (and not just the
@@ -306,7 +306,7 @@ class UserRegistrationServiceTest {
       assertFalse(pending.isInKeycloak());
       // The surviving account carries the Discord link + the captured nickname.
       assertEquals(SNOWFLAKE, result.getDiscordUserId());
-      assertEquals("MadrukSedras", result.getDiscordGuildNickname());
+      assertEquals("ExamplePilot", result.getDiscordGuildNickname());
       // The LINKED audit is recorded against the surviving account.
       ArgumentCaptor<UserApprovalEvent> audit = ArgumentCaptor.forClass(UserApprovalEvent.class);
       verify(userApprovalEventRepository).save(audit.capture());
@@ -321,7 +321,7 @@ class UserRegistrationServiceTest {
       // no longer knows the pending user, but its app_user row still carries the snowflake locally.
       // The link must still complete off the local discord_user_id (the reported stranded case).
       User pending = pendingUser(0L);
-      pending.setUsername("conrad7247");
+      pending.setUsername("examplehandle4711");
       pending.setDiscordUserId(SNOWFLAKE);
       User target = activeTarget();
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(pending));
@@ -336,7 +336,7 @@ class UserRegistrationServiceTest {
 
       // The identity resolved from the local snowflake (username carried as the Discord handle) is
       // linked onto the target, the throwaway user deleted, and the LINKED audit recorded.
-      verify(keycloakService).linkDiscordIdentity(TARGET_ID, SNOWFLAKE, "conrad7247");
+      verify(keycloakService).linkDiscordIdentity(TARGET_ID, SNOWFLAKE, "examplehandle4711");
       verify(keycloakService).deleteUser(USER_ID);
       verify(userDeletionService)
           .deleteUser(

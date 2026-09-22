@@ -1,6 +1,6 @@
 # Processors and recipients (Art. 28 GDPR)
 
-> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-09-15.
+> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-09-22.
 
 Every third party that can reach personal data, what role it plays, and what has to be in place for
 it. A party is a **processor** when it processes on the controller's instructions (Art. 28 — a data
@@ -25,14 +25,17 @@ either a missing contract or a missing paragraph in the privacy policy.
 - **Processing agreement:** in place — **data processing agreement dated 2026-07-20 with Hetzner as
   the host of the virtual machine**. The executed copy is filed outside this repository; only its
   existence and date are recorded here.
-- **Last confirmed:** 2026-09-15.
+- **Last confirmed:** 2026-09-15. On 2026-09-22 production moved to a new virtual machine (Rocky
+  Linux 10, rootless Podman) **at the same provider**, so neither the processor nor the location
+  changed.
 
 ### Outbound e-mail relay
 
 - **Role:** processor, **once the transactional e-mail channel is switched on**.
 - **Status: not active.** The channel exists in code (REQ-NOTIF-013 and its two consumers) but no
-  SMTP host is configured, so `MailService` drops every message and no personal data leaves this
-  way. The `MailDroppedConfigDrift` alert is correspondingly silent today and starts protecting the
+  SMTP host is configured (the backend's `SPRING_MAIL_HOST` defaults to empty in
+  `quadlet/env.d/backend.env.tmpl`), so `MailService` drops every message and no personal data
+  leaves this way. The `MailDroppedConfigDrift` alert is correspondingly silent today and starts protecting the
   moment mail is enabled.
 - **What activation would send:** the approval or refusal decision to the applicant's own e-mail
   address, and a notice to every admin's e-mail address **carrying the new registrant's handle**.
@@ -63,6 +66,14 @@ either a missing contract or a missing paragraph in the privacy policy.
   policy's Discord section.
 - **Named in the privacy policy:** yes, with both entities and a link to Discord's own policy.
 
+### GitHub
+
+- **Role:** independent controller, and **not a recipient of anything from the tool**. The Android
+  app is distributed through GitHub releases, and the app checks for a newer release against the
+  GitHub API directly from the member's device. The tool itself sends GitHub no personal data.
+- **Named in the privacy policy:** yes, in the Android-app section, with a link to GitHub's privacy
+  statement.
+
 ---
 
 ## Not recipients
@@ -71,8 +82,14 @@ Listed so the question does not get re-opened every review:
 
 - **UEX and the Star Citizen Wiki** — outbound catalogue synchronisation. The tool *reads* game data
   from them; no personal data is sent.
-- **The container registry and the CI provider** — receive source and build artifacts, not personal
-  data from the production database.
+- **The container registry and the CI provider** (GitHub Container Registry, GitHub Actions) —
+  receive source and build artifacts, not personal data from the production database.
+- **Alert delivery** — Alertmanager sends alerts by e-mail through an SMTP relay, to a Discord
+  webhook, and a heartbeat to an external dead-man's-switch service
+  (`monitoring/alertmanager/alertmanager.yml.tmpl`). Alert labels and annotations carry no personal
+  data (REQ-OBS-006/-007), so none of the three receives any.
+- **The certificate authority and the signature transparency log** — the ACME client and `cosign`
+  exchange certificates and signatures, never member data.
 - **The monitoring stack** (Prometheus, Loki, Tempo, Grafana, Alertmanager) — self-hosted alongside
   the application, not a third party. It does hold personal data (IP addresses in the log streams),
   which is why its retention windows are in the record of processing activities.

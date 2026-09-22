@@ -1,3 +1,7 @@
+> **Archived 2026-09-22.** Doc type: Historical plan — frozen, kept as a record and no longer updated. Superseded by the generated units in [`quadlet/`](../../quadlet/) and their generator [`scripts/generate-quadlet.py`](../../scripts/generate-quadlet.py), which the `quadlet-drift` CI job keeps in step with the compose files.
+>
+> **Current truth:** [`quadlet/`](../../quadlet/), [`scripts/generate-quadlet.py`](../../scripts/generate-quadlet.py), [arc42 §7](../arc42/07-deployment-view.md). Index of the archive: [`README.md`](README.md).
+
 # Compose → Quadlet — the translation
 
 > **Doc type:** Implementation plan — **living**, and **not yet validated on a host**. Phase 2 of
@@ -5,7 +9,7 @@
 > places where the translation is *not* one-to-one are known before anybody is debugging them at
 > two in the morning. Everything marked *measured* was; the rest is derived from
 > `podman-systemd.unit(5)` as CentOS Stream 10 ships it and has to survive first contact.
-> **Decision record:** [ADR-0163](adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md).
+> **Decision record:** [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md).
 > **Last updated:** 2026-09-16.
 
 ---
@@ -318,7 +322,7 @@ Not every container survives as a container, and this is a design change rather 
   socket. There is no Docker socket.
 - **`cadvisor`.** Its rootless-Podman support is closed as not planned upstream. Its series come
   back from `prometheus-podman-exporter` plus
-  [`scripts/cgroup-container-metrics.py`](../scripts/cgroup-container-metrics.py) — see
+  [`scripts/cgroup-container-metrics.py`](../../scripts/cgroup-container-metrics.py) — see
   [`PODMAN_MIGRATION_PLAN.md`](PODMAN_MIGRATION_PLAN.md) §10.
 
 **Moved out of containers, onto the host:**

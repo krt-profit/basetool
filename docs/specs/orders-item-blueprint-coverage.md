@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-26.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
 > **Owner area:** ORDERS · **Related ADRs:** none
 
 # Item-order blueprint coverage
@@ -80,7 +80,8 @@ data exposed.
 **Enforced by:** `JobOrderItemBlueprintOwnersServiceTest`, `BlueprintVariantFamilyResolverTest`,
 `JobOrderItemDetailRenderTest` ·
 **Code:** `JobOrderItemBlueprintOwnersService`, `BlueprintVariantFamilyResolver`,
-`JobOrderController.getItemBlueprintOwners` · **Issues:** —
+`JobOrderController.getItemBlueprintOwners` (`GET /api/v1/orders/{id}/item-blueprint-owners`) ·
+**Issues:** —
 
 ### REQ-ORDERS-016 — Coverage view is restricted to the responsible org unit's members
 
@@ -105,7 +106,8 @@ this gate — it changes only which owners are counted *inside* the view, never 
 
 **Enforced by:** `OwnerScopeServiceTest` (canSeeJobOrderBlueprintOwners),
 `JobOrderControllerTest` (getItemBlueprintOwners auth) · **Code:**
-`OwnerScopeService.canSeeJobOrderBlueprintOwners` · **Issues:** —
+`OwnerScopeService.canSeeJobOrderBlueprintOwners` (delegating to
+`AccessGateService.canSeeJobOrderBlueprintOwners`) · **Issues:** —
 
 ### REQ-ORDERS-021 — Per-order toggle: count blueprint coverage with or without variants
 

@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-23.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
 > **Owner area:** ROLE · **Related ADRs:** ADR-0042 (qualifies ADR-0026, ADR-0027, ADR-0029)
 
 # Functional rank & permission model (squadron / area / OL)
@@ -14,8 +14,10 @@ can belong to the **Organisationsleitung (OL)**; every Bereichsleiter is automat
 body.
 
 This spec defines the **functional rank model** — the source of truth for "what may this user do in
-this org unit" — so that other features (first the bank, in a later session) can key permissions off
-these ranks. It is the anchor for the rank-related amendments in
+this org unit" — so that other features can key permissions off these ranks. The bank is the first
+consumer: an account's responsible holder (Staffelleiter, SK lead, Bereichsleiter, the OL members) is
+derived from the rank inside the `OrgUnitBankAccessService` seam ([`bank.md`](bank.md) REQ-BANK-034,
+ADR-0043). It is the anchor for the rank-related amendments in
 [`org-unit-tenancy.md`](org-unit-tenancy.md), [`security-and-access.md`](security-and-access.md) and
 [`org-chart.md`](org-chart.md), and for the role matrix in
 [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md). Tracked by epic #800, now complete
@@ -150,8 +152,9 @@ Rank assignment is delegated down a strict ladder, with admin able to do everyth
   squadron.
 
 Invariant: a leader can **never** assign the rank they themselves hold at that level (to grant rank
-R you must hold a strictly-higher rank, which you cannot grant to yourself) — preserving the
-"`is_lead` toggle is ADMIN-only" no-self-escalation property at every tier. The delegated verdict is
+R you must hold a strictly-higher rank, which you cannot grant to yourself) — the no-self-escalation
+property the ADMIN-only `is_lead` toggle used to provide, now held at every tier (the SK lead itself is
+appointed by the Bereichsleiter of the SK's parent Bereich, `canAppointSkLead`). The delegated verdict is
 computed from the caller's own membership ranks only (never from the admin-pin header, contextual
 authorities, or `isAdmin()` inside the verdict); admin short-circuits only at the `@PreAuthorize`
 layer.
@@ -207,7 +210,7 @@ chart position keyed by org unit (singletons are reassigned, not duplicated, so 
 indexes hold), while the in-Kommando ranks project onto the Kommando sub-tree — a `COMMAND_LEAD`
 node tied to its Kommandogruppe via the V186 `kommando_group_id` link carries the Kommandoleiter, and
 the stellv. Kommandoleiter / Ensigns hang off it. A Kommandogruppe create / rename / delete mirrors
-the leaderless node, and revoking a rank vacates a led Kommando (keeping the node, REQ-ORG-011) or
+the leaderless node, and revoking a rank vacates a led Kommando (keeping the node, REQ-ORG-025) or
 removes the other seats. Legacy admin-authored Kommandos (no `kommando_group_id`) stay chart-only.
 
 The mirror is the **single writer** of account-linked chart seats: the chart editor itself is
@@ -215,7 +218,7 @@ account-free — its write API rejects setting an account holder, and editing / 
 mirror-managed seat (account-held or `kommando_group`-linked), with
 `problem.org_chart.account_managed_in_leitung`. So an admin can no longer manually set an
 account-linked seat on the chart (no drift); only free-text holders stay editable there
-(org-chart.md REQ-ORG-010 / -011 / -020 amendments). A `kommando_group`-linked Kommando is read-only
+(org-chart.md REQ-ORG-010 / -025 / -020 amendments). A `kommando_group`-linked Kommando is read-only
 as a whole subtree: `CommandChartDto.kommandoGroupId` drives the editor to suppress every affordance
 on it (rename / remove / assign-lead / add-child) and the backend additionally **rejects creating a
 child** (Stv. / Ensign) under a `kommando_group`-linked parent — so no chart-only seat can be bolted
@@ -243,12 +246,10 @@ an OL member's by construction.
   assign-lead / add-child), and creating a child under it is rejected with
   `problem.org_chart.account_managed_in_leitung`.
 
-**Enforced by:** `OrgChartServiceTest` (the `mirror*` cases, `getOrgChart_groupLinkedCommand_projectsKommandoGroupId`, `createPosition_childUnderGroupLinkedKommando_isRejected`), `OrgChartPageRenderTest#groupLinkedCommand_admin_rendersReadOnlyHeadWithNoEditAffordances`, `OrgChartDtoDeserializationTest`, `OrgUnitMembershipServiceTest` / `KommandoGroupServiceTest` (mirror wiring), `OrgHierarchyMigrationTest` (V186), `ArchitectureTest` · **Code:** `OrgChartService#mirror*`, `OrgChartService#buildCommand` / `#createPosition`, `CommandChartDto#kommandoGroupId`, `OrgUnitMembershipService`, `KommandoGroupService`, `OrgChartPosition#kommandoGroup`, `V186__org_chart_kommando_group_link.sql` · **Decision:** ADR-0042 · **Issues:** #800
+**Enforced by:** `OrgChartServiceTest` (the `mirror*` cases, `getOrgChart_groupLinkedCommand_projectsKommandoGroupId`, `createPosition_childUnderGroupLinkedKommando_isRejected`), `OrgChartPageRenderTest#groupLinkedCommand_admin_rendersReadOnlyHeadWithNoEditAffordances`, `OrgChartDtoDeserializationTest`, `OrgUnitMembershipServiceTest` / `KommandoGroupServiceTest` (mirror wiring), `OrgHierarchyMigrationTest` (V186), `ArchitectureTest` · **Code:** `OrgChartService#mirror*`, `OrgChartReadService#buildCommand`, `OrgChartService#createPosition`, `CommandChartDto#kommandoGroupId`, `OrgUnitMembershipService`, `KommandoGroupService`, `OrgChartPosition#kommandoGroup`, `V186__org_chart_kommando_group_link.sql` · **Decision:** ADR-0042 · **Issues:** #800
 
 ## Out of scope
 
-- **Bank** consumption of these ranks (who sees / requests on which account) — a later session; the
-  `OrgUnitBankAccessService` / `OwnerScopeService` seam is kept clean for it.
 - Per-rank / per-feature differentiation of rights beyond the SK-lead-equivalent baseline.
 - Retiring the flat Keycloak `OFFICER` role for squadrons.
 

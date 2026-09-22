@@ -1,6 +1,6 @@
 # ADR-0063 — Split `InventoryItemService` into read + checkout services behind a delegating facade
 
-- **Status:** Proposed
+- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-07-02 (`d88eafc0e`: `InventoryAggregationService`, `InventoryCheckoutService`).
 - **Date:** 2026-07-02
 - **Deciders:** Repository owner (@greluc)
 - **Related:** issue #921 (L2, epic #905) · ADR-0061 (the `MissionService` split precedent) · ADR-0003 (group-on-read stacks) · spec [`org-unit-tenancy.md`](../specs/org-unit-tenancy.md) (`OwnerScopeService` scope) · `REQ-FE-003` (`saveAndFlush` `@Version` parity) · `REQ-AUDIT-001` · the CLAUDE.md optimistic-lock / bulk-update-after-loop rules

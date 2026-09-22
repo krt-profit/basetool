@@ -54,11 +54,12 @@ public interface PersonalInventoryItemRepository
 
   /**
    * Deletes every "Mein Inventar" row of the given owner as part of the hard account deletion
-   * (REQ-DATA-008). {@code owner_user_id} carries no foreign key to {@code app_user} (V65 declares
-   * none at all), so nothing cascades and nothing else in the system would ever remove these rows:
-   * before this method existed they survived the account indefinitely, free-text {@code note}
-   * included, and were undiscoverable afterwards because every lookup is keyed by the owner sub
-   * that no roster can still offer. A returning Keycloak subject would silently re-adopt them.
+   * (REQ-DATA-008). {@code owner_user_id} carried no foreign key to {@code app_user} (V65 declared
+   * none at all) until V235 added one with {@code ON DELETE CASCADE}; the explicit delete stays so
+   * the purge is counted and audited. Before this method existed, the rows outlived the account
+   * indefinitely — free-text {@code note} included, and were undiscoverable afterwards because
+   * every lookup is keyed by the owner sub that no roster can still offer. A returning Keycloak
+   * subject would silently re-adopt them.
    *
    * @param ownerUserId the departing owner's {@code app_user.id}; never {@code null}.
    * @return the number of deleted rows, for the audit summary event.

@@ -1,6 +1,6 @@
 # ADR-0031 — Live multi-user mission sync over the presence WebSocket
 
-- **Status:** Accepted
+- **Status:** Accepted — **generalized by [ADR-0094](0094-tool-wide-topic-room-live-sync-relay.md)** (2026-07-10): the per-mission relay became one tool-wide topic-room WebSocket with Redis fan-out; the "only opaque section keys cross the socket" rule stands
 - **Date:** 2026-06-21
 - **Deciders:** @greluc
 - **Related:** spec REQ-FE-010 · REQ-FE-001…008 · ADR-0012 (krtFetch) · ADR-0013 (bfcache) · ADR-0016 (notification SSE)

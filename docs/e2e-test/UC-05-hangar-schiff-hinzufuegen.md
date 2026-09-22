@@ -25,13 +25,15 @@ Der User öffnet im Hangar den Dialog „Schiff hinzufügen".
 1. Navigiere zu `/hangar`.
 2. Öffne den Dialog über `hangar-add-ship`.
 3. Wähle den Schiffstyp (`#ship-type` → „E2E Ship Type") und die Versicherung (`#ship-insurance` → „LTI").
-4. Speichern über `hangar-ship-submit`.
+4. Setze den Marker `window.__krtNoReload`, blende den `position:fixed`-Footer aus und speichere über `hangar-ship-submit`; warte auf die Antwort des `POST /hangar/add`.
 
 ## Erwartetes Ergebnis
 
-Das Schiff erscheint in der Hangar-Liste als `hangar-ship-row` mit dem gewählten Schiffstyp.
+- Die Seite hat nicht neu geladen (der Marker ist noch gesetzt).
+- Das Schiff erscheint **in place** in der Hangar-Liste als `hangar-ship-row` mit dem gewählten Schiffstyp — die Tabelle wird per `krtFetch` neu eingesetzt, ohne Navigation (#578, REQ-FE-001).
 
 ## Sonderfälle & Lehren
 
 - **ShipTypes sind UEX-synced** (kein POST-Endpunkt, praktisch DB-Insert-only). Deshalb wird der Schiffstyp über den JDBC-Katalog-Snapshot geseedet statt über die Admin-API.
 - Der Add-Ship-Dialog wird per JS geöffnet; die Selects (`#ship-type`, `#ship-insurance`) sind server-gerendert.
+- **Footer ausblenden:** Der fixierte `.krt-footer` kann auf WebKit den vertrauenswürdigen Klick auf den Speichern-Button abfangen.

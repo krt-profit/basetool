@@ -1,6 +1,6 @@
 # DPIA threshold assessment (Art. 35) and DPO assessment (Art. 37)
 
-> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-09-15.
+> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-09-22.
 
 Two obligations that turn out **not** to apply. Both are written down anyway, because "we considered
 it and concluded no" is a defensible position and "nobody ever asked" is not. A supervisory authority

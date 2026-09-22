@@ -183,7 +183,7 @@ public class OrgChartReadService {
   }
 
   /**
-   * Assembles one Bereich tier (epic #692, REQ-ORG-018): its Bereichsleitung sub-tree plus the
+   * Assembles one Bereich tier (epic #692, REQ-ORG-026): its Bereichsleitung sub-tree plus the
    * Staffeln/SKs whose parent is this Bereich, carrying the Bereich's Bereichsfarbe.
    *
    * @param bereich the Bereich org unit.

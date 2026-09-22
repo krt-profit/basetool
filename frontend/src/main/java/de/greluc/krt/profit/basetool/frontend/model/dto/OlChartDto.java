@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the Organisationsleitung tier of the org chart (epic #692, REQ-ORG-018),
+ * Frontend mirror of the Organisationsleitung tier of the org chart (epic #692, REQ-ORG-026),
  * decoded from {@code GET /api/v1/org-chart}: the OL org unit's id + name plus its OL_MEMBER nodes.
  *
  * <p>The whole record is {@code null} on the parent {@link OrgChartDto} when no active OL exists,

@@ -122,7 +122,7 @@ class PromotionAdminRankRequirementsPageMvcTest {
             List.of());
     when(backendApiClient.get(contains("/api/v1/squadrons"), anyTypeRef()))
         .thenReturn(squadronPage);
-    // availableSquadrons() reads the catalogue through the STATIC_DATA_CACHE (getCached) now
+    // availableSquadrons() reads the catalogue through the SQUADRON cache (getCached) now
     // (REQ-DATA-007); stub that path too or the officer's promotion-feature flag resolves empty.
     when(backendApiClient.getCached(eq(CachedCatalog.SQUADRONS), anyTypeRef()))
         .thenReturn(squadronPage);

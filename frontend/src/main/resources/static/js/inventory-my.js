@@ -801,13 +801,11 @@ function restoreMyInventoryFilters() {
 
 // ===================== Filter panel collapse (REQ-INV-037) =====================================
 // The filter widgets are a full row above the table and wrap onto lines of their own, which
-// pushes the bulk bar and the table down. The panel collapses out of the flow; the preference is
-// per browser and lives in the SAME localStorage object as the filter values, under a top-level
-// slot. Top-level, not per view, because it describes the page's chrome rather than one view's
-// selection — switching Material <-> Items must not silently re-open a panel the user closed.
-//
-// persistMyInventoryFilters() re-reads the whole object and replaces only its view slot, so the
-// two writers never clobber each other.
+// pushes the bulk bar and the table down. The panel collapses out of the flow. The collapse
+// preference is per browser and owned by the shared krt-filter-panel.js (localStorage key
+// `krt.filterPanel.inventory-my`, one per page rather than per view, so switching Material <->
+// Items never silently re-opens a panel the user closed); the filter values themselves stay in
+// this page's own filter object (persistMyInventoryFilters).
 
 // Number of dimensions currently narrowing the table. Derived from the very snapshot the
 // persistence layer stores, so a filter dimension added there is counted here automatically

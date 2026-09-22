@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # =============================================================================
-# The container-runtime seam (ADR-0163, Phase 3 of docs/PODMAN_MIGRATION_PLAN.md).
+# The container-runtime seam (ADR-0163, Phase 3 of docs/archive/PODMAN_MIGRATION_PLAN.md).
 #
 # `deploy.sh`, `backup.sh` and `restore-drill.sh` were written against Docker
 # Compose. The Podman migration does not swap a binary underneath them — it
@@ -777,6 +777,18 @@ rt_note_changed() {
   RT_CHANGED_SERVICES="${RT_CHANGED_SERVICES}${RT_CHANGED_SERVICES:+ }${svc}"
 }
 
+# Drop a service from RT_CHANGED_SERVICES once its new definition has reached the running container,
+# so a later apply in the same run starts it instead of recreating it again. Only rt_monitoring_up
+# calls it: it is the one apply that runs twice for a single change (see its comment).
+rt_forget_changed() {
+  local svc="$1" out="" s
+  for s in ${RT_CHANGED_SERVICES}; do
+    [[ "${s}" == "${svc}" ]] && continue
+    out="${out}${out:+ }${s}"
+  done
+  RT_CHANGED_SERVICES="${out}"
+}
+
 rt_pin_clear() {
   rm -f "$(rt_pin_path "$1")"
 }
@@ -897,7 +909,26 @@ rt_monitoring_up() {
         set -- "${msvcs[@]}"
       fi
       for svc in "$@"; do
-        ${RT_SYSTEMCTL} start "${svc}.service" || rc=1
+        # RESTART what this run re-defined, START the rest -- the same rule, for the same measured
+        # reason, as rt_apply_stack. Until 2026-09-22 this arm only ever said `start`, and `start`
+        # on an active unit is a no-op: a release that changed prometheus.container (an image
+        # bump, a memory limit, a new mount) installed the new unit, daemon-reloaded, and left the
+        # old container running the old definition until something else happened to restart it.
+        #
+        # A restarted service is then forgotten, because this function runs TWICE on the success
+        # path -- once from the monitoring apply and once from reconcile_monitoring_reloads -- and
+        # the second call must not recreate prometheus a second time for the same change. A restart
+        # that FAILED is remembered, so the second call is its retry.
+        case " ${RT_CHANGED_SERVICES} " in
+          *" ${svc} "*)
+            if ${RT_SYSTEMCTL} restart "${svc}.service"; then
+              rt_forget_changed "${svc}"
+            else
+              rc=1
+            fi
+            ;;
+          *) ${RT_SYSTEMCTL} start "${svc}.service" || rc=1 ;;
+        esac
       done
       return "${rc}"
       ;;

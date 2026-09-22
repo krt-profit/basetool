@@ -1,3 +1,7 @@
+> **Archived 2026-09-22.** Doc type: Historical runbook — frozen, kept as a record and no longer updated. Every phase has shipped and every flag it flips is on in `application-prod.yml`.
+>
+> **Current truth:** `backend/src/main/resources/application-prod.yml`. Index of the archive: [`README.md`](README.md).
+
 # Deployment Runbook - SC Wiki + UEX-Items Sync
 
 Doc type: **historical plan** — the phase-by-phase deployment procedure for the rollout described in

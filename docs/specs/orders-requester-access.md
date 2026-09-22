@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-10.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
 > **Owner area:** ORDERS · **Related ADRs:** ADR-0091
 
 # Requesting-owner (Auftraggeber) job-order access
@@ -74,10 +74,11 @@ side's owners. See [`orders-item-production.md`](orders-item-production.md) `REQ
 
 **Enforced by:** `OwnerScopeServiceTest` (RequesterEscapeGateTests), `JobOrderServiceTest`
 (updateJobOrderAsRequester\_\*) · **Code:** `AccessGateService.canSeeJobOrderAsRequester` /
-`canEditJobOrderAsRequester`, `RequestScopeResolver.isOrderRequester` (via
-`currentUserIsMemberOfOrgUnit`) + `currentDirectMembershipOrgUnitIds` / `canViewOwnJobOrders`,
-`JobOrderService.updateJobOrderAsRequester` / `updateItemJobOrderAsRequester` /
-`getRequestedJobOrders`, `JobOrderController` (`GET /requested`, `PUT /{id}/requested`,
+`canEditJobOrderAsRequester` (via the private `isOrderRequesterRow` →
+`RequestScopeResolver.currentUserIsMemberOfOrgUnit`), `RequestScopeResolver`
+`currentDirectMembershipOrgUnitIds` / `canViewOwnJobOrders`,
+`JobOrderService.updateJobOrderAsRequester` / `updateItemJobOrderAsRequester`,
+`JobOrderQueryService.getRequestedJobOrders`, `JobOrderController` (`GET /requested`, `PUT /{id}/requested`,
 `PUT /{id}/items/requested`, `cleanupJobOrderForRequester`) · **Issues:** #1186
 
 ## Out of scope
@@ -87,9 +88,10 @@ side's owners. See [`orders-item-production.md`](orders-item-production.md) `REQ
   but that did not add authorship — access still follows the requesting org unit, not an author.
 - Changing the responsible org unit, status, priority or handle from the requester side — those stay
   processing-side concerns (the reassignment endpoint owns the responsible unit).
-- The item-order requester **edit UI** ships in a later increment; the backend endpoint
-  (`PUT /{id}/items/requested`) already enforces the same limits, and the requester can already view
-  item orders. Material-order requester editing is the shipped UI surface.
+- An item-order requester **edit UI** — none exists yet (the frontend calls only
+  `PUT /{id}/requested`, from `JobOrderWriteController`); the backend endpoint
+  (`PUT /{id}/items/requested`) already enforces the same limits, and the requester can view item
+  orders. Material-order requester editing is the only shipped UI surface.
 
 ## Open questions
 

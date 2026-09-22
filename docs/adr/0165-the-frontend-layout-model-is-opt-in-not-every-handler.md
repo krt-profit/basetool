@@ -1,6 +1,6 @@
 # ADR-0165 — The frontend's layout model is opt-in, not every-handler
 
-- **Status:** Proposed
+- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-09-13 (`bde3c6486`: the `UsesLayoutModel` marker).
 - **Date:** 2026-09-13
 - **Deciders:** @greluc (pending)
 - **Related:** specs `REQ-FE-020` (new), `REQ-FE-001`…`REQ-FE-010` (the surface that pays for this) ·

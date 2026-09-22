@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-06-27
 - **Deciders:** @greluc
-- **Related:** spec [REQ-INV-019](../specs/personal-inventory-blueprints.md) · supersedes the ingredient-scope decision of [ADR-0035](0035-blueprint-craftability-from-own-stock.md) · issue [#781](https://github.com/krt-profit/basetool/issues/781)
+- **Related:** spec [REQ-INV-048](../specs/personal-inventory-blueprints.md) · supersedes the ingredient-scope decision of [ADR-0035](0035-blueprint-craftability-from-own-stock.md) · issue [#781](https://github.com/krt-profit/basetool/issues/781)
 
 ## Context
 

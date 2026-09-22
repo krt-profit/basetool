@@ -5,7 +5,7 @@ Module-scoped guidance lives in [`backend/CLAUDE.md`](backend/CLAUDE.md) and
 
 ## Project
 
-Profit Basetool — a squadron-management web app (mission planning, hangar, inventory, refinery, user admin) for the "DAS KARTELL" / IRIDIUM organization. Two Spring Boot 4 modules (`backend`, `frontend`) on Java 25, PostgreSQL 18, Keycloak 26 OAuth2, Redis-backed Spring Sessions. Gradle 9 with Kotlin DSL. Dependency versions live in the **version catalog** at **`gradle/libs.versions.toml`** — edit that, not `build.gradle.kts`. [refreshVersions](https://jmfayard.github.io/refreshVersions/) runs in *catalog* mode: `./gradlew refreshVersions` annotates the catalog in place with `## ⬆ = "…"` comment markers for each available update and changes no version itself. **`versions.properties` is vestigial** — it holds zero version entries and nothing reads it; earlier revisions of this file pointed there, which sent readers to a file that cannot affect the build.
+Profit Basetool — a squadron-management web app (mission planning, hangar, inventory, refinery, user admin) for the "DAS KARTELL" / IRIDIUM organization. Three Spring Boot 4 applications (`backend`, `frontend`, `ingest`) on Java 25, plus the `keycloak-spi` provider JAR, the `keycloak-theme`, and the test-only `test-support` library; PostgreSQL 18, Keycloak 26 OAuth2, Redis-backed Spring Sessions. Production runs as rootless Podman + Quadlet units generated from the compose files (arc42 §7); local and test stacks run on Docker Compose. Gradle 9 with Kotlin DSL. Dependency versions live in the **version catalog** at **`gradle/libs.versions.toml`** — edit that, not `build.gradle.kts`. [refreshVersions](https://jmfayard.github.io/refreshVersions/) runs in *catalog* mode: `./gradlew refreshVersions` annotates the catalog in place with `## ⬆ = "…"` comment markers for each available update and changes no version itself. **`versions.properties` is vestigial** — it holds zero version entries and nothing reads it; earlier revisions of this file pointed there, which sent readers to a file that cannot affect the build.
 
 ## The knowledge base (HARD RULE — read before every task)
 
@@ -78,7 +78,8 @@ in its [`INDEX.md`](docs/specs/INDEX.md)), and architecture/design decisions in
   `REQ-<AREA>-NNN` or adapt the existing one(s) it touches. Code and spec move together; a
   behaviour change with no matching spec change is incomplete.
 - **Every change to an audited area keeps its audit log in sync** — the audited areas (Bank,
-  Lager, Aufträge, Raffinerie, Mein Inventar, Missionen, Operationen, Rollen, Beförderung) log
+  which keeps its own `bank_audit_event` trail, plus the nine `AuditDomain` values: Lager, Aufträge,
+  Raffinerie, Mein Inventar, Missionen, Operationen, Rollen, Beförderung, Materialbörse) log
   **every** state-mutating
   activity (REQ-AUDIT-001, [`docs/specs/audit.md`](docs/specs/audit.md)). When you add, change or
   remove such an activity, adapt its audit logging in the **same PR**: add or adjust the
@@ -174,15 +175,15 @@ Always use the Gradle wrapper. **Never** use the IDE test runner or the harness 
 ./gradlew :frontend:checkstyleMain :frontend:spotbugsMain  # frontend lint only
 ```
 
-Tests force `spring.profiles.active=test`; `bootRun` forces `dev`. Both `Test` and `BootRun` set `--enable-native-access=ALL-UNNAMED` and a Mockito agent JVM arg.
+Tests force `spring.profiles.active=test`; `bootRun` forces `dev`. Both `Test` and `BootRun` set `--enable-native-access=ALL-UNNAMED`; `Test` additionally attaches the Mockito agent (`-Xshare:off -javaagent:<mockito-core>`). The `ingest` app runs the same way (`./gradlew :ingest:bootRun`, https://localhost:11262).
 
 ## Linting / static analysis
 
-- **Checkstyle** (Google Java Style, `config/checkstyle/google_checks.xml`) and **SpotBugs** (`spotbugsMain`, wired into `check`) run against the `main` source set of both modules. Reports land under `<module>/build/reports/{checkstyle,spotbugs}/main.{html,xml}`.
+- **Checkstyle** (Google Java Style, `config/checkstyle/google_checks.xml`) and **SpotBugs** (`spotbugsMain`, wired into `check`) run against the `main` source set of every Java module (`backend`, `frontend`, `ingest`; `keycloak-spi` runs Checkstyle). Reports land under `<module>/build/reports/{checkstyle,spotbugs}/main.{html,xml}`.
 - **Every new or modified piece of code must be linted before the task is considered done.** Run at least `./gradlew :<module>:checkstyleMain :<module>:spotbugsMain` (or `./gradlew check` for the full sweep) and read the reports.
 - **All Checkstyle and SpotBugs errors *and* warnings introduced or touched by your change must be fixed.** Do not silence findings with `@SuppressWarnings`, `@SuppressFBWarnings`, or Checkstyle suppression files unless the rule is genuinely wrong for that specific call site — and in that case leave a one-line comment explaining why.
 - Pre-existing findings in code you did not touch are out of scope; do not opportunistically clean them up in an unrelated change. But never *add* a new finding on top of them.
-- **Run `./gradlew spotlessApply` (whole repo) locally before *every* push — no exceptions, even for a one-line test or comment edit**, and **ALL** lint tasks must be green before *every* push. Formatting alone is **not sufficient**: the frontend runs three strict asset linters (`:frontend:lintCss`, `:frontend:lintJs`, `:frontend:lintHtml`) plus the static type check `:frontend:typecheckJs` (REQ-FE-018, ADR-0125) that fail CI independently and are not covered by Spotless/Prettier/Checkstyle. Never push relying only on the tests + Spotless being green. Exact tasks, the Stylelint/ESLint rules that bite, and the auto-fix recipe: the [`lint-gate`](.claude/skills/lint-gate/SKILL.md) skill.
+- **Run `./gradlew spotlessApply` (whole repo) locally before *every* push — no exceptions, even for a one-line test or comment edit**, and **ALL** lint tasks must be green before *every* push. Formatting alone is **not sufficient**: the frontend's `check` also runs strict asset gates — Stylelint (`:frontend:lintCss`, `:frontend:lintCssInline`), ESLint (`:frontend:lintJs`, `:frontend:lintProbeJs`), HTMLHint (`:frontend:lintHtml`), Prettier (`:frontend:prettierCheck`) — plus the static type check `:frontend:typecheckJs` (REQ-FE-018, ADR-0125), all of which fail CI independently and are not covered by Spotless/Checkstyle. Never push relying only on the tests + Spotless being green. Exact tasks, the Stylelint/ESLint rules that bite, and the auto-fix recipe: the [`lint-gate`](.claude/skills/lint-gate/SKILL.md) skill.
 
 ## Local stack
 
@@ -204,8 +205,9 @@ it conflicts with something else, this rule wins.
 
 ### Reading — standing permission, no approval needed
 
-- **Non-mutating inspection needs no approval**: logs and metrics, `docker ps` / `docker logs` /
-  `docker inspect`, Prometheus, Loki and Grafana queries, `SELECT`-only queries (open the session
+- **Non-mutating inspection needs no approval**: logs and metrics, `podman ps` / `podman logs` /
+  `podman inspect` (the production runtime since the 2026-09-22 cutover; `docker …` on a Docker
+  host), Prometheus, Loki and Grafana queries, `SELECT`-only queries (open the session
   with `SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY` first), and `cat`-style reads of
   files that carry no credentials.
 - **Read-only means read-only in effect, not just in intent.** If a command *can* mutate, it is a
@@ -237,10 +239,12 @@ A **write** is anything whose effect outlives the command. Non-exhaustively:
 - **Executing scripts or programs.** Deploy, promote, rollback, migration, backup/restore and
   maintenance scripts; ad-hoc shell scripts, one-liners that pipe into a shell, package installs,
   and anything that runs code of Claude's authoring on the host.
-- **Lifecycle and infrastructure.** `docker compose up/down/restart/recreate/pull`,
-  `docker restart|stop|kill|rm`, `docker exec` into a shell, `systemctl` actions, container or
+- **Lifecycle and infrastructure.** `podman`/`docker` `restart|stop|kill|rm|pull`,
+  `docker compose up/down/restart/recreate/pull`, `podman exec`/`docker exec` into a shell,
+  `systemctl` actions (system or `--user`, including the Quadlet container units), container or
   service reconciliation, config reloads, cron/timer changes, firewall or network changes.
-- **Config, secrets and credentials.** `.env`, compose files, monitoring configs, the edge proxy,
+- **Config, secrets and credentials.** `.env`, the rendered `env.d/` files, compose files, Quadlet
+  units and their drop-ins, monitoring configs, the edge proxy,
   Keycloak realm settings, TLS material, or any secret.
 
 The gate itself:
@@ -280,6 +284,10 @@ for anything that writes, a recipe is documentation and never permission.
 
 - **`backend`** — REST API only. Layered: `controller` → `service` → `repository` → `model` (JPA entities), with `dto` records and MapStruct `mapper`s.
 - **`frontend`** — Thymeleaf server-rendered UI that calls the backend via WebClient. No business logic of its own; `service.BackendApiClient` is the single seam. Persistent state across frontend restarts goes in Redis (Spring Session).
+- **`ingest`** — the internet-facing gateway the desktop SC extractor posts to; owns no database and relays to the backend over the internal network ([`docs/specs/desktop-ingest.md`](docs/specs/desktop-ingest.md), `REQ-INGEST-*`).
+- **`keycloak-spi`** — Keycloak provider JAR (Discord federation + the first-login membership gate); a plain library compiled against the Keycloak SPIs, emitting Java-21 bytecode, logging through `@JBossLog`.
+- **`keycloak-theme`** — the Keycloak login/account theme (FreeMarker, not a Gradle module).
+- **`test-support`** — test-only helpers shared by the backend and frontend anonymous-surface sweeps; never on a runtime classpath.
 
 The frontend never talks to PostgreSQL or Keycloak Admin API directly. The backend never serves HTML.
 
@@ -289,7 +297,7 @@ Moved to [`docs/specs/security-and-access.md`](docs/specs/security-and-access.md
 
 ### Multi-org-unit tenancy (CRITICAL)
 
-Moved to [`docs/specs/org-unit-tenancy.md`](docs/specs/org-unit-tenancy.md) (`REQ-ORG-*`): the two OrgUnit kinds (`SQUADRON` / `SPECIAL_COMMAND`) + dual-write soak, service-layer scope via [`OwnerScopeService`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/OwnerScopeService.java) (the `ScopePredicate` triple + admin-pin semantics), the aggregate scope kinds (strict-staffel / `Mission` public-escape / `JobOrder` SK-public queue), the create-time stamping matrix, the admin-area + promotion carve-outs, the ArchUnit guards, the `orgUnitId` MDC field, and the active-context relay headers.
+Moved to [`docs/specs/org-unit-tenancy.md`](docs/specs/org-unit-tenancy.md) (`REQ-ORG-*`): the four OrgUnit kinds (`OrgUnitKind`: `SQUADRON` / `SPECIAL_COMMAND` as the tenant units, `BEREICH` / `ORGANISATIONSLEITUNG` stacked above them) and the completed dual-write soak, service-layer scope via [`OwnerScopeService`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/OwnerScopeService.java) (the `ScopePredicate` triple + admin-pin semantics), the aggregate scope kinds (strict-staffel / `Mission` public-escape / `JobOrder` SK-public queue), the create-time stamping matrix, the admin-area + promotion carve-outs, the ArchUnit guards, the `orgUnitId` MDC field, and the active-context relay headers.
 
 ### Database
 
@@ -329,7 +337,7 @@ Moved to [`docs/specs/observability.md`](docs/specs/observability.md) (`REQ-OBS-
 ## i18n
 
 - **Every** user-visible string comes from `messages.properties` (`messages_de.properties` / `messages_en.properties`). No exceptions — labels, buttons, tooltips, error messages, flash messages, alerts, placeholders, titles. No hardcoded text in HTML, JS, or Java. Translation keys for the personal-inventory feature live under `personalInventory.*` and `admin.personalInventory.*`.
-- **In `.properties` files**, German umlauts (`ä ö ü Ä Ö Ü ß`) MUST be encoded as `\uXXXX` (e.g. `ä`).
+- **In `.properties` files**, German umlauts (`ä ö ü Ä Ö Ü ß`) MUST be encoded as `\uXXXX` (e.g. `\u00e4` for `ä`).
 - **In Markdown files** (`CHANGELOG.md`, `README.md`, …), German umlauts MUST be literal UTF-8 characters. Never use `\uXXXX` outside `.properties`.
 
 ## Testing
@@ -352,7 +360,7 @@ the Boot-managed version, because `lombok.config` is a single shared file at the
 - **JetBrains annotations** (`@NotNull`, `@Nullable`, `@Contract`, `@Unmodifiable`) wherever they communicate a real contract — and **only where the code establishes it**. A parameter the body dereferences **unconditionally** is `@NotNull` — and `x != null && x.foo()` does *not* qualify, because `&&` short-circuits and the access beside the test is exactly the conditional one (the same applies to `||`, a ternary's branches and a switch's arms); one the body null-checks, or a return documented as absent, is `@Nullable`; a framework-callback parameter the body never touches gets nothing, because its nullity is that framework's contract and not ours. `@Unmodifiable` and `@UnmodifiableView` are **not** interchangeable and the difference is load-bearing: `@Unmodifiable` says mutators throw *and* the stored references never change, which is true of `List.of` / `Set.of` / `List.copyOf` / `Collections.emptyList()`; `@UnmodifiableView` says only that mutators throw while the backing collection may still be changed by whoever holds it, which is exactly what `Collections.unmodifiableList(backing)` returns. A mutable `ArrayList` handed straight back by a getter gets neither — it keeps `@NotNull` alone. Nothing gates any of these, so a wrong one is a lie nothing will catch — guessing is worse than leaving it off.
 - **A field's `@NotNull` is not free.** Lombok recognises `org.jetbrains.annotations.NotNull` as a non-null annotation, so a field carrying it makes the generated setter, constructor, `@With` and builder emit a runtime null-check. That is usually what you want — but it is a behaviour change, not documentation.
 - **Lombok annotates its own generated code**: `lombok.config` sets `lombok.addNullAnnotations = jetbrains`, so `toString()`, `equals`, `builder()`/`build()`, `@With` and `@Builder.Singular` adders carry the right nullity without anyone writing it. Lombok separately *copies* a field's `@NotNull` / `@Nullable` onto the accessors it derives, with no configuration — do not add `lombok.copyableAnnotations` entries for them.
-- **Logging**: `@Slf4j` — never instantiate loggers manually. In `keycloak-spi`, which logs through JBoss Logging inside the Keycloak JVM, that is `@JBossLog`. **Both halves are enforced, by different mechanisms, because they fail differently** ([ADR-0193](docs/adr/0193-one-logging-facade-enforced-with-keycloak-spi-excepted.md)): `lombok.config` makes every other logging annotation a *compile error* (and `keycloak-spi/lombok.config` inverts the rule for that one module), while `scripts/check-logging-facade.sh` — the `logging-facade` job in `repo-lint.yml` — rejects a hand-written `LoggerFactory.getLogger(...)` or a `System.out` write anywhere in `src/main`, which `lombok.config` cannot see because it is not an annotation at all. Do **not** "fix" the 33 test files that hold a `LoggerFactory.getLogger(...)`: they are capturing a logger to assert on its output, which is the opposite of logging and something `@Slf4j` cannot express. `src/test` and `src/e2e` are out of the gate's scope for exactly that reason.
+- **Logging**: `@Slf4j` — never instantiate loggers manually. In `keycloak-spi`, which logs through JBoss Logging inside the Keycloak JVM, that is `@JBossLog`. **Both halves are enforced, by different mechanisms, because they fail differently** ([ADR-0193](docs/adr/0193-one-logging-facade-enforced-with-keycloak-spi-excepted.md)): `lombok.config` makes every other logging annotation a *compile error* (and `keycloak-spi/lombok.config` inverts the rule for that one module), while `scripts/check-logging-facade.sh` — the `logging-facade` job in `repo-lint.yml` — rejects a hand-written `LoggerFactory.getLogger(...)` or a `System.out` write anywhere in `src/main`, which `lombok.config` cannot see because it is not an annotation at all. Do **not** "fix" the test files (32 as of 2026-09-22) that hold a `LoggerFactory.getLogger(...)`: they are capturing a logger to assert on its output, which is the opposite of logging and something `@Slf4j` cannot express. `src/test` and `src/e2e` are out of the gate's scope for exactly that reason.
 
 ## Documentation
 
@@ -369,15 +377,15 @@ Do not run destructive Git commands without explicit user instruction: `git rese
 
 **Before every `push`, run `./gradlew spotlessApply` (whole repo) — no exceptions, even for a one-line edit.** Spotless is gate-enforced in CI; a narrower local check (`compileE2eJava`, `checkstyleMain`, …) does not cover every source set and will let a formatting violation reach CI. See [Linting / static analysis](#linting--static-analysis).
 
-**Every commit MUST carry a DCO `Signed-off-by:` trailer — always use `git commit -s` (or `-S -s` when GPG-signing).** No exceptions, including AI-generated commits. **The signing identity is `Lucas Greuloch (greluc) <lucas.greuloch@gmail.com>` — that address, not any other, belongs in the `Signed-off-by:` trailer.** The owner's contact address (`lucas.greuloch@pm.me`) is a different address and is NOT the git identity; using it fails the DCO gate. Never hand-write the trailer at all: `-s` derives it from `git config user.name` / `user.email`, which is already correct — typing it out by hand is exactly how the wrong address gets in. The trailer's `Name <email>` must match the commit's author identity case-insensitively on the email; the [`.github/workflows/dco.yml`](.github/workflows/dco.yml) check rejects any PR commit lacking a matching sign-off. Bot exemptions (Dependabot / Renovate / GitHub Actions) do NOT apply to commits authored under a real user identity, even if Claude generated the body. If you forget the `-s` flag and the commit is still local (not yet pushed), fix it before pushing: `git commit --amend --signoff --no-edit` for the last commit, `git rebase --signoff main` for the whole branch. For already-pushed commits, ask the user before force-pushing the rewrite — `git push --force-with-lease` falls under the destructive-ops rule above. Full policy and the DCO 1.1 text: [`CONTRIBUTING.md → Developer Certificate of Origin (DCO) sign-off`](CONTRIBUTING.md#developer-certificate-of-origin-dco-sign-off).
+**Every commit MUST carry a DCO `Signed-off-by:` trailer — always use `git commit -s` (or `-S -s` when GPG-signing).** No exceptions, including AI-generated commits. **The signing identity is `Lucas Greuloch (greluc) <lucas.greuloch@gmail.com>` — that address, not any other, belongs in the `Signed-off-by:` trailer.** The owner uses this one address for both the git identity and public contact (`SECURITY.md`, `CODE_OF_CONDUCT.md`, package metadata); the owner's former second (Proton) address was retired on 2026-09-11 and must not appear anywhere — a trailer carrying it fails the DCO gate. Never hand-write the trailer at all: `-s` derives it from `git config user.name` / `user.email`, which is already correct — typing it out by hand is exactly how the wrong address gets in. The trailer's `Name <email>` must match the commit's author identity case-insensitively on the email; the [`.github/workflows/dco.yml`](.github/workflows/dco.yml) check rejects any PR commit lacking a matching sign-off. Bot exemptions (Dependabot / Renovate / GitHub Actions) do NOT apply to commits authored under a real user identity, even if Claude generated the body. If you forget the `-s` flag and the commit is still local (not yet pushed), fix it before pushing: `git commit --amend --signoff --no-edit` for the last commit, `git rebase --signoff main` for the whole branch. For already-pushed commits, ask the user before force-pushing the rewrite — `git push --force-with-lease` falls under the destructive-ops rule above. Full policy and the DCO 1.1 text: [`CONTRIBUTING.md → Developer Certificate of Origin (DCO) sign-off`](CONTRIBUTING.md#developer-certificate-of-origin-dco-sign-off).
 
-**Every commit Claude authors MUST include a `Co-Authored-By:` trailer naming the model — no exceptions, no inconsistency.** This is a transparency requirement that is independent of the DCO sign-off: `Signed-off-by:` attests the human contributor's legal grant; `Co-Authored-By:` discloses AI involvement so reviewers, auditors, and future archaeologists can see which commits had AI in the loop. Use the exact form below, with the human-readable model identifier from this session's system prompt:
+**Every commit Claude authors MUST include a `Co-Authored-By:` trailer naming the model — no exceptions, no inconsistency.** This is a transparency requirement that is independent of the DCO sign-off: `Signed-off-by:` attests the human contributor's legal grant; `Co-Authored-By:` discloses AI involvement so reviewers, auditors, and future archaeologists can see which commits had AI in the loop. Use the form below, replacing `<Model Name>` with the human-readable model identifier from this session's system prompt:
 
 ```
-Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+Co-Authored-By: Claude <Model Name> <noreply@anthropic.com>
 ```
 
-If the model identifier in your system prompt is different (e.g. `Claude Sonnet 4.6`, `Claude Haiku 4.5`), substitute that — the rule is "name the model that actually wrote the commit", not "always write Opus 4.7". The email stays `noreply@anthropic.com` regardless of model. Apply this rule to **every** commit Claude composes the message for or makes substantive edits to, including one-line typo fixes, CHANGELOG-only commits, and commits where the diff originated from a verbatim user instruction. The bar is "Claude touched this commit", not "Claude wrote most of the diff". If Claude is only running `git` commands the user typed and not authoring anything, the trailer is not required — but when in doubt, include it. Forgetting the trailer is fixed the same way as forgetting `-s`: `git commit --amend --no-edit` (after appending the trailer to the message) for the last commit, locally only, before pushing.
+The placeholder is not a literal value: the rule is "name the model that actually wrote the commit" (e.g. `Claude Sonnet 4.6`, `Claude Haiku 4.5`), never a model copied from an example or an earlier commit. The email stays `noreply@anthropic.com` regardless of model. Apply this rule to **every** commit Claude composes the message for or makes substantive edits to, including one-line typo fixes, CHANGELOG-only commits, and commits where the diff originated from a verbatim user instruction. The bar is "Claude touched this commit", not "Claude wrote most of the diff". If Claude is only running `git` commands the user typed and not authoring anything, the trailer is not required — but when in doubt, include it. Forgetting the trailer is fixed the same way as forgetting `-s`: `git commit --amend --no-edit` (after appending the trailer to the message) for the last commit, locally only, before pushing.
 
 **Always write Git, GitHub, and in-code prose in English — no exceptions.** This covers every piece of text you author for Git or GitHub, regardless of the language the user speaks to you in: commit messages, branch names, tag names and tag messages, PR titles, PR descriptions/bodies, PR review comments and replies, issue titles and bodies, issue comments, GitHub Discussions posts, release notes, and any inline comment you write on someone else's behalf via `gh`. It **equally** covers all prose inside the code itself — Javadoc, inline `//` and block comments, TODO/FIXME notes, developer-facing log messages, and any other comment or annotation text in source files. If the user prompts you in German (or any other language), translate the substance into English before committing, posting, or writing it into the code. There are exactly two carve-outs: (1) verbatim quoting of existing non-English content (e.g. quoting a user-reported error message in an issue) — the surrounding prose you author stays English; and (2) the **Basetool wiki** (the `basetool.wiki` git repo), which is authored in German by design and is the single exception to the English-on-GitHub rule. This rule does **not** change the i18n contract above: user-visible UI strings still live in the DE + EN `messages*.properties` bundles — "code in English" governs developer-facing prose, not the localized end-user text.
 

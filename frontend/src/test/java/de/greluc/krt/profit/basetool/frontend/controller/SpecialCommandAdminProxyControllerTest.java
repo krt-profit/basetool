@@ -40,8 +40,8 @@ import org.springframework.http.ResponseEntity;
  * profit-eligibility toggle to the backend. {@code isProfitEligible} is carried on the cached
  * org-units owner-picker options and the admin switcher's SK catalogue, so the contract under test
  * (REQ-DATA-007) mirrors {@code SquadronAdminProxyController}: the toggle forwards the PATCH and
- * then evicts {@code STATIC_DATA_CACHE} — in that order — so no cached surface serves a stale flag
- * up to the cache TTL.
+ * then evicts the {@code SQUADRON} + {@code ORG_UNIT} caches — in that order — so no cached surface
+ * serves a stale flag up to the cache TTL.
  */
 @ExtendWith(MockitoExtension.class)
 class SpecialCommandAdminProxyControllerTest {

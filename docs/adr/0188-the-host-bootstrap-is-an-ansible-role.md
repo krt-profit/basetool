@@ -6,13 +6,13 @@
 - **Related:** [ADR-0049](0049-config-as-promotable-oci-artifact.md) ·
   [ADR-0163](0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md) ·
   specs `REQ-OPS-001`, `REQ-OPS-004` ·
-  [`PODMAN_HOST_BOOTSTRAP.md`](../PODMAN_HOST_BOOTSTRAP.md) ·
-  [`PODMAN_MIGRATION_PLAN.md`](../PODMAN_MIGRATION_PLAN.md) §11
+  [`PODMAN_HOST_BOOTSTRAP.md`](../archive/PODMAN_HOST_BOOTSTRAP.md) ·
+  [`PODMAN_MIGRATION_PLAN.md`](../archive/PODMAN_MIGRATION_PLAN.md) §11
 
 ## Context
 
 [ADR-0163](0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md) rebuilds the
-production host on CentOS Stream 10, and [the plan's §11](../PODMAN_MIGRATION_PLAN.md) rules that
+production host on CentOS Stream 10, and [the plan's §11](../archive/PODMAN_MIGRATION_PLAN.md) rules that
 the **testing host is built first and production is built from the same procedure afterwards**. That
 sequence is the whole safety argument of the migration.
 
@@ -56,6 +56,12 @@ decision:**
 > does not deploy, does not ship unit files as part of a release, and is not run against a host
 > that is serving traffic.**
 > Whatever a future contributor needs, the answer is never to widen this role's job.
+
+> **Note (2026-09-22):** in practice the role is also run against the serving hosts, but only as a
+> deliberate, owner-approved, **tag-limited** change — e.g. `--tags deploy,scripts` to deliver
+> updated host tooling (`tasks/22-deploy-user.yml`, `ansible/README.md`). A full run stays reserved
+> for a host that is not serving yet, and the role still never deploys the stack or ships units as
+> part of a release, so the rule above holds in substance.
 
 ### On `REQ-OPS-001`, and a correction it forced
 
@@ -106,7 +112,7 @@ built from the same procedure as testing" true, only hoped for.
   `community.general` for the SELinux modules, pinned in a `requirements.yml`. The controller cannot
   be Windows natively — WSL or a container.
 - **The prose document does not go away, and is not duplicated.**
-  [`PODMAN_HOST_BOOTSTRAP.md`](../PODMAN_HOST_BOOTSTRAP.md) carries the **why**: why redis needs
+  [`PODMAN_HOST_BOOTSTRAP.md`](../archive/PODMAN_HOST_BOOTSTRAP.md) carries the **why**: why redis needs
   uid 999, why the Keycloak provider directory must exist or the deploy fails at the very last step,
   why SELinux will bite the certificate handover first. A playbook is a bad place for that reasoning
   and the reasoning is half the value. The role carries the **what**, and the two cross-reference.
@@ -123,6 +129,6 @@ built from the same procedure as testing" true, only hoped for.
 ## Status of this decision
 
 Accepted. The role is written against
-[`PODMAN_HOST_BOOTSTRAP.md`](../PODMAN_HOST_BOOTSTRAP.md) and is **unvalidated against a real host**
+[`PODMAN_HOST_BOOTSTRAP.md`](../archive/PODMAN_HOST_BOOTSTRAP.md) and is **unvalidated against a real host**
 until the CentOS Stream 10 testing VM exists — which is the same status as the document it
 implements, and for the same reason.

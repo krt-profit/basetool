@@ -1,9 +1,11 @@
 > **Doc type:** Operator runbook — **the owner runs every step; nothing here is automated and
-> nothing here ships with the image.** Written 2026-09-06 as WP-K2 of
-> [`MEMBERS_ONLY_PLAN.md`](MEMBERS_ONLY_PLAN.md); the owner took all twelve items on 2026-09-05
+> nothing here ships with the image.** Written 2026-09-06 as WP-K2 of the (now archived)
+> [`MEMBERS_ONLY_PLAN.md`](archive/MEMBERS_ONLY_PLAN.md); the owner took all twelve items on 2026-09-05
 > (decision D11), the two originally marked optional included. Rewritten 2026-09-08 from a decision
 > list into an executable procedure, against the Keycloak **26.7** sources the deployment pins.
-> **Requirement:** [REQ-SEC-052, REQ-SEC-053](specs/security-and-access.md) ·
+> **Living document** — the per-step status below is kept current. Last reviewed: 2026-09-22
+> (status re-checked against the realm reference; commands rewritten for the rootless-Podman
+> production host). **Requirement:** [REQ-SEC-052, REQ-SEC-053](specs/security-and-access.md) ·
 > **ADR:** [0159](adr/0159-the-basetool-has-no-anonymous-or-guest-surface.md)
 
 # Keycloak hardening runbook (WP-K2)
@@ -12,11 +14,38 @@ Twelve changes to the production realm `iri`. Each states the exact change, the 
 the equivalent `kcadm` command, **how to verify it took**, the one line that undoes it, and what
 breaks if it is wrong.
 
-> [!important] This is the owner's list, not Claude's
-> Every step below is a **write** against the production Keycloak. The repository's production-host
-> rule forbids an agent from running any of them, with or without approval, and there is no
-> emergency exception. This document exists so the person running them does not have to re-derive
-> anything at the console.
+> [!important] This is the owner's procedure
+> Every step below is a **write** against the production Keycloak. The owner runs them. Under the
+> repository's production-host rule (`CLAUDE.md`, since 2026-09-12) an agent may *read* the realm,
+> but may run a write only after @greluc has approved that exact command in chat — per command, with
+> no emergency exception. This document exists so the person running them does not have to
+> re-derive anything at the console.
+
+## Status
+
+Nine of the twelve are applied; three are open, plus a thirteenth finding and the clean-up. The
+evidence is the sanitized realm export regenerated from production on **2026-09-09**
+([`docs/keycloak/realm-config.reference.json`](keycloak/realm-config.reference.json), commit
+`72b9b1b2b`, which recorded "steps 1 and 3–10 applied, 11 not, 2 and 12 open"), and for step 4 a
+read-only query of `db-keycloak` on 2026-09-16. Production may have moved since: **re-read the live
+value (§ 0.5) before acting on an "open" row.**
+
+| Step  |                    Change                     |             Status             |                                            Evidence (2026-09-09 export unless noted)                                             |
+|-------|-----------------------------------------------|--------------------------------|------------------------------------------------------------------------------------------------------------------------------------|
+| 3     | `Require SSL` → `external`                    | **Done**                       | `sslRequired: "external"`                                                                                                        |
+| 1     | `Edit username` off                           | **Done**                       | `editUsernameAllowed: false`                                                                                                     |
+| 2     | `Forgot password` — decide on Keycloak's SMTP | **Open**                       | `resetPasswordAllowed: true`; no record that the Email tab's *Test connection* was run                                           |
+| 4     | Events on, 30 d                               | **Done** — verified 2026-09-16 | both event switches on, `eventsExpiration` and the `adminEventsExpiration` attribute `2592000`, details off                      |
+| 5     | Clear service-account redirect/origin lists   | **Done**                       | `backend-service`, `basetool-ingest-gateway`: `redirectUris: []`, `webOrigins: []`                                               |
+| 6     | `basetool-frontend` PKCE `S256`               | **Done**                       | `pkce.code.challenge.method: S256`                                                                                               |
+| 7     | Drop `http://backend:11261`                   | **Done**                       | gone from both lists; `http://frontend:18081` remains (see the step)                                                             |
+| 8     | Extractor `fullScopeAllowed: false`           | **Done**                       | `basetool-sc-extractor`: `fullScopeAllowed: false`                                                                               |
+| 9     | Audience scopes off defaults and `grafana`    | **Done**                       | neither scope in `defaultDefaultClientScopes`; `grafana` carries neither; `basetool-ingest-gateway` keeps both                   |
+| 10    | `offline_access` off `default-roles-iri`      | **Done**                       | composites: `uma_authorization`, `KRT Member`, `account` `view-profile`/`manage-account`                                         |
+| 12    | Decide the session windows                    | **Open**                       | still 30 d / 180 d, with and without remember-me                                                                                 |
+| 11    | OTP for `Admin`, browser **and** Discord      | **Open** — not started         | `browserFlow: "browser"` (the built-in flow); the `discord` IdP has no `postBrokerLoginFlowAlias`                                 |
+| 13th  | Extractor's unused authorization-code flow    | **Open** — owner's choice      | `standardFlowEnabled: true`, loopback redirect wildcards, no PKCE (see step 6)                                                   |
+| After | Delete `basetool-provisioner`, re-export      | **Open**                       | the client is in the export (taken mid-procedure); it stays until step 11 is done                                                |
 
 ---
 
@@ -24,8 +53,10 @@ breaks if it is wrong.
 
 ### 0.1 What this was written against
 
-Production pins `quay.io/keycloak/keycloak:26.7` by digest (`docker-compose.yml`). Every field name,
-menu label and endpoint below was read out of the **26.7.0 sources**, not from memory:
+Production pins `quay.io/keycloak/keycloak:26.7` by digest (26.7.4 by its label since 2026-09-16) —
+declared in `docker-compose.yml` and carried into the generated Quadlet unit
+`quadlet/systemd/keycloak.container`. Every field name, menu label and endpoint below was read out
+of the **26.7.0 sources**, not from memory:
 
 |                                                                                              Claim                                                                                              |                                                                                                                         Source                                                                                                                          |
 |-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -146,13 +177,34 @@ self-signed keystore, so kcadm needs a truststore first. Both facts were verifie
 container started with the production command line (2026-08-17); `KC_HOSTNAME_STRICT=true` does not
 interfere.
 
-```bash
-docker exec -it keycloak /opt/keycloak/bin/kcadm.sh config truststore \
-    --trustpass - /run/secrets/keystore.p12
+**On the production host (rootless Podman, since 2026-09-22)** the container belongs to the service
+user `iri`, so every call goes through `sudo -u iri podman exec`, and the Keycloak container runs
+with a **read-only root filesystem** (`ReadOnly=true` in `quadlet/systemd/keycloak.container`).
+kcadm's default session file, `/opt/keycloak/.keycloak/kcadm.config`, cannot be written there; the
+only writable paths are the unit's tmpfs mounts. The session therefore goes to
+`/opt/keycloak/data/tmp/kcadm.config` via kcadm's `--config` option, on **every** call. Define the
+helper once per shell — as root, **from `/`** (`sudo -u` keeps the working directory, and `iri`
+cannot enter `/root`; see [`deployment.md` → *Shell conventions*](deployment.md#shell-conventions-used-below)),
+with the § 0.5 captures kept in a root-only directory:
 
-docker exec -it keycloak /opt/keycloak/bin/kcadm.sh config credentials \
-    --server https://localhost:18443/auth --realm iri --client basetool-provisioner
+```bash
+cd /
+KCDIR=/root/kc-hardening; install -d -m 0700 "$KCDIR"
+KCCFG=/opt/keycloak/data/tmp/kcadm.config
+kc() { sudo -u iri podman exec -i keycloak /opt/keycloak/bin/kcadm.sh "$@" --config "$KCCFG"; }
+
+sudo -u iri podman exec -it keycloak /opt/keycloak/bin/kcadm.sh config truststore \
+    --trustpass - /run/secrets/keystore.p12 --config "$KCCFG"
+
+sudo -u iri podman exec -it keycloak /opt/keycloak/bin/kcadm.sh config credentials \
+    --server https://localhost:18443/auth --realm iri --client basetool-provisioner --config "$KCCFG"
 ```
+
+Every `kc …` line below is that helper. The read-only root and the `--config` workaround were
+derived from the generated unit on 2026-09-22 and have **not yet been exercised on the production
+host**: if `config truststore` answers with a read-only-filesystem error, the `--config` is missing.
+On a Docker Compose host (the local stack) the root filesystem is writable, and
+`kc …` without `--config` works as before.
 
 > [!note] The `/auth` in `--server` is load-bearing since 2026-09-13
 > Keycloak serves under that relative path ([ADR-0166](adr/0166-identity-moves-onto-the-app-origin.md)),
@@ -162,9 +214,9 @@ docker exec -it keycloak /opt/keycloak/bin/kcadm.sh config credentials \
 > [!important] `No server specified. Use --server, or 'kcadm.sh config credentials'.`
 > That message does **not** mean a flag is missing. It is what kcadm says for **every** command
 > when no session exists — including reads that carry no `--server` because they are not supposed
-> to. Seeing it means the two commands above have not run (or the container was **recreated**: the
-> session file lives inside it and survives a restart but not a recreate). Run them, then repeat
-> whatever you were doing.
+> to. Seeing it means the two commands above have not run, the call went without `--config`, or the
+> container **restarted**: the session file lives on a tmpfs and does not survive a restart, let
+> alone a recreate. Run them again, then repeat whatever you were doing.
 >
 > It is the first thing a reader of this runbook hits if they try any `kcadm` line before this
 > section, and it sends them looking for a URL problem they do not have.
@@ -173,7 +225,7 @@ Then a **read-only smoke test**, so a URL, truststore or permission problem surf
 that changes nothing:
 
 ```bash
-docker exec keycloak /opt/keycloak/bin/kcadm.sh get realms/iri \
+kc get realms/iri \
     --fields realm,sslRequired,editUsernameAllowed,resetPasswordAllowed
 ```
 
@@ -182,10 +234,10 @@ role. The realm read above proves only `view-realm`; each of the four is gated s
 missing one shows up on its own step and nowhere earlier:
 
 ```bash
-docker exec keycloak /opt/keycloak/bin/kcadm.sh get authentication/flows -r iri --fields alias
-docker exec keycloak /opt/keycloak/bin/kcadm.sh get clients -r iri --fields clientId
-docker exec keycloak /opt/keycloak/bin/kcadm.sh get events/config -r iri
-docker exec keycloak /opt/keycloak/bin/kcadm.sh get identity-provider/instances -r iri --fields alias
+kc get authentication/flows -r iri --fields alias
+kc get clients -r iri --fields clientId
+kc get events/config -r iri
+kc get identity-provider/instances -r iri --fields alias
 ```
 
 All four must return data. A **403** names the missing role — in order: `manage-realm`,
@@ -203,25 +255,26 @@ the first time.
 The service-account token carries the realm's 300 s access-token lifespan and the
 client-credentials grant issues no refresh token, so a step run after a long pause may need
 `config credentials` again. `kcadm.config` holds the truststore password and a token in cleartext
-inside the container — `docker exec keycloak rm -f /opt/keycloak/.keycloak/kcadm.config` when done.
+inside the container — `sudo -u iri podman exec keycloak rm -f "$KCCFG"` when done (a container
+restart also discards it).
 
 ### 0.5 Capture the current state — this is the rollback basis
 
 **Do not use `docs/keycloak/realm-config.reference.json` as the picture of production.** It was
-regenerated on **2026-08-17**, it is sanitized, and it predates `basetool-android` — the client the
-app signs in with does not appear in it at all. It is a reference for *shape*, not for *current
-values*.
+regenerated on **2026-09-09**, mid-procedure, and it is sanitized: it records the intermediate state
+the *Status* table cites and nothing later. It is a reference for *shape* and for what was true that
+day, not for *current values*.
 
 ```bash
-docker exec keycloak /opt/keycloak/bin/kcadm.sh get realms/iri            > kc-realm.before.json
-docker exec keycloak /opt/keycloak/bin/kcadm.sh get events/config -r iri  > kc-events.before.json
-docker exec keycloak /opt/keycloak/bin/kcadm.sh get clients -r iri \
+kc get realms/iri            > "$KCDIR/kc-realm.before.json"
+kc get events/config -r iri  > "$KCDIR/kc-events.before.json"
+kc get clients -r iri \
     --fields clientId,id,publicClient,serviceAccountsEnabled,fullScopeAllowed,redirectUris,webOrigins,defaultClientScopes,attributes \
-                                                                          > kc-clients.before.json
-docker exec keycloak /opt/keycloak/bin/kcadm.sh get default-default-client-scopes -r iri \
-                                                                          > kc-default-scopes.before.json
-docker exec keycloak /opt/keycloak/bin/kcadm.sh get roles/default-roles-iri/composites -r iri \
-                                                                          > kc-default-roles.before.json
+                                                                          > "$KCDIR/kc-clients.before.json"
+kc get default-default-client-scopes -r iri \
+                                                                          > "$KCDIR/kc-default-scopes.before.json"
+kc get roles/default-roles-iri/composites -r iri \
+                                                                          > "$KCDIR/kc-default-roles.before.json"
 ```
 
 **Every "Rollback" line below assumes these five files exist.** Steps 5, 7 and 9 restore *lists*,
@@ -230,7 +283,7 @@ and a list you did not write down first cannot be restored from this document.
 Also confirm the leftover the plan flagged:
 
 ```bash
-docker exec keycloak /opt/keycloak/bin/kcadm.sh get roles -r iri --fields name
+kc get roles -r iri --fields name
 ```
 
 The sanitized reference carries no `Guest` realm role. If production has one it is a leftover; the
@@ -254,6 +307,8 @@ test belongs after each of them rather than at the end.
 
 ## Step 3 — `Require SSL`: `none` → `external`
 
+> **Status:** done — applied by 2026-09-09 (realm export of that day; see *Status* above).
+
 **Run this one first.**
 
 |           |                                                                                       |
@@ -266,13 +321,13 @@ test belongs after each of them rather than at the end.
 **CLI:**
 
 ```bash
-docker exec keycloak /opt/keycloak/bin/kcadm.sh update realms/iri -s sslRequired=external
+kc update realms/iri -s sslRequired=external
 ```
 
 **Verify:**
 
 ```bash
-docker exec keycloak /opt/keycloak/bin/kcadm.sh get realms/iri --fields sslRequired
+kc get realms/iri --fields sslRequired
 ```
 
 **Rollback:** `… update realms/iri -s sslRequired=none`
@@ -285,6 +340,8 @@ Everything member-facing already arrives over TLS from the edge.
 ---
 
 ## Step 1 — `Edit username`: on → off
+
+> **Status:** done — applied by 2026-09-09 (realm export of that day; see *Status* above).
 
 |           |                              |
 |-----------|------------------------------|
@@ -299,7 +356,7 @@ member change it silently re-labels their own history.
 **CLI:**
 
 ```bash
-docker exec keycloak /opt/keycloak/bin/kcadm.sh update realms/iri -s editUsernameAllowed=false
+kc update realms/iri -s editUsernameAllowed=false
 ```
 
 **Verify:** `… get realms/iri --fields editUsernameAllowed` → `false`.
@@ -309,6 +366,9 @@ docker exec keycloak /opt/keycloak/bin/kcadm.sh update realms/iri -s editUsernam
 ---
 
 ## Step 2 — `Forgot password`: decide on **Keycloak's own** SMTP
+
+> **Status:** **open** — `resetPasswordAllowed` was still `true` on 2026-09-09 and the decision
+> below has not been recorded. Record the outcome here when it is taken.
 
 |         |                                                                                    |
 |---------|------------------------------------------------------------------------------------|
@@ -370,20 +430,20 @@ the *detect* half of the security ladder was blind on the token endpoint.
 
 ```bash
 # user + admin events: the events-config resource
-docker exec keycloak /opt/keycloak/bin/kcadm.sh update events/config -r iri \
+kc update events/config -r iri \
     -s eventsEnabled=true -s eventsExpiration=2592000 \
     -s adminEventsEnabled=true -s adminEventsDetailsEnabled=false
 
 # admin-events expiration: a REALM ATTRIBUTE, not part of the resource above
-docker exec keycloak /opt/keycloak/bin/kcadm.sh update realms/iri \
+kc update realms/iri \
     -s 'attributes.adminEventsExpiration=2592000'
 ```
 
 **Verify both, separately** — this is the step whose half-done state looks finished:
 
 ```bash
-docker exec keycloak /opt/keycloak/bin/kcadm.sh get events/config -r iri
-docker exec keycloak /opt/keycloak/bin/kcadm.sh get realms/iri --fields attributes \
+kc get events/config -r iri
+kc get realms/iri --fields attributes \
     | grep adminEventsExpiration
 ```
 
@@ -400,13 +460,16 @@ picker hides the unit — which is why the verification above reads the raw valu
 
 ## Step 5 — Clear the redirect/origin lists on the two service-account clients
 
+> **Status:** done — applied by 2026-09-09 (realm export of that day; see *Status* above).
+
 `backend-service` and `basetool-ingest-gateway` are service-account-only: they never perform a
 browser redirect, so **every** entry on those two lists is a standing offer nobody needs — not only
 the `/*`.
 
-As of the (stale) reference, `backend-service` carried four redirect URIs including `/*` and
+Before this step `backend-service` carried four redirect URIs including `/*` and
 `http://backend:11261/*`, and four web origins. **Read the live values from
-`kc-clients.before.json`** and clear both lists entirely.
+`kc-clients.before.json`** and clear both lists entirely. (Done: both lists are empty in the
+2026-09-09 export.)
 
 **Console:** *Clients* → the client → *Settings* → **Valid redirect URIs** / **Web origins** →
 remove every row → *Save*.
@@ -414,9 +477,9 @@ remove every row → *Save*.
 **CLI:**
 
 ```bash
-id=$(docker exec keycloak /opt/keycloak/bin/kcadm.sh get clients -r iri \
+id=$(kc get clients -r iri \
      -q clientId=backend-service --fields id --format csv --noquotes)
-docker exec keycloak /opt/keycloak/bin/kcadm.sh update clients/$id -r iri \
+kc update clients/$id -r iri \
     -s 'redirectUris=[]' -s 'webOrigins=[]'
 ```
 
@@ -434,12 +497,14 @@ evidence you edited the right client; check `clientId` in the verify output.
 
 ## Step 6 — `basetool-frontend`: require PKCE with `S256` ⚠ version-sensitive
 
+> **Status:** done — applied by 2026-09-09 (realm export of that day; see *Status* above).
+
 `basetool-frontend` is a **public** client (`publicClient: true`) with no PKCE attribute set. An
 intercepted authorization code is redeemable without it.
 
 > [!important] This step is the interim state, not the target — [ADR-0001](adr/0001-frontend-confidential-oauth2-client.md) is still pending
 > The frontend is public **today**, and that is the code's answer, not a plan's:
-> `frontend/src/main/resources/application.yml:142` registers the client with
+> `frontend/src/main/resources/application.yml` registers the client with
 > `client-authentication-method: none`, and the realm has `publicClient: true` with no secret.
 > ADR-0001 (**Accepted — implementation pending**, 2026-05-20) decided to give it a client secret
 > and has not been carried out; reading the ADR as the state of the system is how an earlier version
@@ -460,9 +525,9 @@ attribute; the switch is "attribute non-empty" and the select is its value.
 **CLI:**
 
 ```bash
-id=$(docker exec keycloak /opt/keycloak/bin/kcadm.sh get clients -r iri \
+id=$(kc get clients -r iri \
      -q clientId=basetool-frontend --fields id --format csv --noquotes)
-docker exec keycloak /opt/keycloak/bin/kcadm.sh update clients/$id -r iri \
+kc update clients/$id -r iri \
     -s 'attributes."pkce.code.challenge.method"=S256'
 ```
 
@@ -509,6 +574,17 @@ python3 scripts/provision-keycloak-mobile-client.py --realm iri --verify-only --
 and it shells out to `kcadm` inside the container, so it must run **on the production host** and it
 uses the session § 0.4 opened. A clean answer is one line: *"the client and its refresh-only DPoP
 policy are in the intended state"*.
+
+On the **Podman** production host two things differ. The script is not deployed there (the host has
+no repository checkout; `/var/iri/code/scripts` carries only the operational scripts), so copy it
+over first. And its default kcadm prefix is `docker exec -i keycloak …`, which does not exist on
+that host. Pass the prefix through a shell inside the container, so the `--config` of § 0.4 lands
+after the subcommand the script appends:
+
+```bash
+python3 provision-keycloak-mobile-client.py --realm iri --verify-only --profile prod \
+  --kcadm-command "sudo -u iri podman exec -i keycloak sh -c 'exec /opt/keycloak/bin/kcadm.sh \"\$@\" --config /opt/keycloak/data/tmp/kcadm.config' kcadm"
+```
 
 > [!bug] `--fields attributes` reports `{ }` for a client that has eleven of them
 > `--fields` is a **projection**, and a nested object needs the parenthesis-star form. `--fields
@@ -565,6 +641,8 @@ about clearing the redirect lists they never use). PKCE has nothing to protect t
 
 ## Step 7 — `basetool-frontend`: drop the stale `http://backend:11261` entries
 
+> **Status:** done — applied by 2026-09-09 (realm export of that day; see *Status* above).
+
 An internal Docker hostname on a **browser** client's redirect list. A browser cannot reach it, so it
 grants nothing today; it is a leftover that becomes a real redirect target the day that name
 resolves in a browser's network.
@@ -586,6 +664,8 @@ confirm the production login URI is still there.
 
 ## Step 8 — `basetool-sc-extractor`: `fullScopeAllowed` → `false`, with an explicit scope
 
+> **Status:** done — applied by 2026-09-09 (realm export of that day; see *Status* above).
+
 The extractor is a **public** client on members' desktops with `fullScopeAllowed: true`: its tokens
 carry every realm role the holder has, `Admin` included.
 
@@ -596,18 +676,18 @@ that same *Scope* tab, only the realm roles the extractor actually needs.
 **CLI:**
 
 ```bash
-id=$(docker exec keycloak /opt/keycloak/bin/kcadm.sh get clients -r iri \
+id=$(kc get clients -r iri \
      -q clientId=basetool-sc-extractor --fields id --format csv --noquotes)
-docker exec keycloak /opt/keycloak/bin/kcadm.sh update clients/$id -r iri -s fullScopeAllowed=false
+kc update clients/$id -r iri -s fullScopeAllowed=false
 ```
 
 **Model it on `basetool-android`**, which already runs narrowed — but read that client's scope
 mappings from the **live realm**, not from the reference export, which predates it:
 
 ```bash
-aid=$(docker exec keycloak /opt/keycloak/bin/kcadm.sh get clients -r iri \
+aid=$(kc get clients -r iri \
       -q clientId=basetool-android --fields id --format csv --noquotes)
-docker exec keycloak /opt/keycloak/bin/kcadm.sh get clients/$aid/scope-mappings/realm -r iri
+kc get clients/$aid/scope-mappings/realm -r iri
 ```
 
 **Verify:** `… get clients/$id -r iri --fields clientId,fullScopeAllowed` → `false`.
@@ -621,6 +701,8 @@ upload fails afterwards.
 ---
 
 ## Step 9 — Take the two audience scopes off everything that does not need them
+
+> **Status:** done — applied by 2026-09-09 (realm export of that day; see *Status* above).
 
 `extractor-ingest` and `extractor-ingest-only` are realm **default** client scopes, so they stamp the
 backend and ingest audiences onto clients that have no business carrying them — `grafana` among them.
@@ -637,10 +719,10 @@ check decorative.
 **CLI:**
 
 ```bash
-sid=$(docker exec keycloak /opt/keycloak/bin/kcadm.sh get client-scopes -r iri \
+sid=$(kc get client-scopes -r iri \
       --fields id,name --format csv --noquotes | awk -F, '$2=="extractor-ingest"{print $1}')
 echo "[$sid]"   # exactly one uuid, or stop here
-docker exec keycloak /opt/keycloak/bin/kcadm.sh delete default-default-client-scopes/$sid -r iri
+kc delete default-default-client-scopes/$sid -r iri
 ```
 
 > [!warning] `-q` does not filter this endpoint, and says nothing when it does not
@@ -677,15 +759,15 @@ Removing the realm default leaves every existing client exactly as it was. Work 
 **CLI:**
 
 ```bash
-gid=$(docker exec keycloak /opt/keycloak/bin/kcadm.sh get clients -r iri \
+gid=$(kc get clients -r iri \
       -q clientId=grafana --fields id --format csv --noquotes)
-docker exec keycloak /opt/keycloak/bin/kcadm.sh delete clients/$gid/default-client-scopes/$sid -r iri
+kc delete clients/$gid/default-client-scopes/$sid -r iri
 ```
 
 **Verify — one token per affected client**, not just the config:
 
 ```bash
-docker exec keycloak /opt/keycloak/bin/kcadm.sh get clients/$gid/default-client-scopes -r iri
+kc get clients/$gid/default-client-scopes -r iri
 ```
 
 and then an actual login through Grafana.
@@ -695,9 +777,9 @@ as exactly this case) or `update` fails trying to read the current value first:
 
 ```bash
 # realm half
-docker exec keycloak /opt/keycloak/bin/kcadm.sh update default-default-client-scopes/$sid -r iri -n
+kc update default-default-client-scopes/$sid -r iri -n
 # one client
-docker exec keycloak /opt/keycloak/bin/kcadm.sh update clients/<id>/default-client-scopes/$sid -r iri -n
+kc update clients/<id>/default-client-scopes/$sid -r iri -n
 ```
 
 **If it goes wrong:** a missing audience is refused by the resource server with a **401 that reads
@@ -706,6 +788,8 @@ like an expired token**. If Grafana logins break right after this step, this ste
 ---
 
 ## Step 10 — Drop `offline_access` from `default-roles-iri`
+
+> **Status:** done — applied by 2026-09-09 (realm export of that day; see *Status* above).
 
 Every account can currently mint an offline token, which outlives every session policy in the realm.
 The composite holds `offline_access`, `uma_authorization`, `KRT Member` and two `account` client
@@ -717,14 +801,14 @@ roles.
 **CLI:**
 
 ```bash
-docker exec keycloak /opt/keycloak/bin/kcadm.sh remove-roles -r iri \
+kc remove-roles -r iri \
     --rname default-roles-iri --rolename offline_access
 ```
 
 **Verify:**
 
 ```bash
-docker exec keycloak /opt/keycloak/bin/kcadm.sh get roles/default-roles-iri/composites -r iri \
+kc get roles/default-roles-iri/composites -r iri \
     --fields name
 ```
 
@@ -738,7 +822,7 @@ docker exec keycloak /opt/keycloak/bin/kcadm.sh get roles/default-roles-iri/comp
 > still true on the live client before you remove the realm default:
 >
 > ```bash
-> docker exec keycloak /opt/keycloak/bin/kcadm.sh get clients/$aid/optional-client-scopes -r iri
+> kc get clients/$aid/optional-client-scopes -r iri
 > ```
 >
 > `offline_access` must **not** be in that list. Then open the app once after the change.
@@ -746,6 +830,9 @@ docker exec keycloak /opt/keycloak/bin/kcadm.sh get roles/default-roles-iri/comp
 ---
 
 ## Step 12 — Decide the session windows
+
+> **Status:** **open** — the values in the table below are those of 2026-09-09; no decision has
+> been recorded. Record it here, and whether the app's per-client overrides followed.
 
 Not a defect: a decision that has never been made explicitly. Current values, in seconds:
 
@@ -785,6 +872,9 @@ below the app's usage gap means a member reopening the app after that long must 
 ---
 
 ## Step 11 — Require OTP for holders of `Admin` — **run this last**
+
+> **Status:** **open, not started** — on 2026-09-09 the realm still bound the built-in `browser`
+> flow and the `discord` provider had no `postBrokerLoginFlowAlias`.
 
 Two halves, and the incomplete version looks finished: the browser flow alone is half the gate,
 because an admin who signs in **through Discord** never traverses it. The realm's `discord` provider
@@ -844,7 +934,7 @@ A *Conditional* sub-flow acts as *Required* when all its conditions evaluate tru
    **Verify it is gone**, rather than assuming the click landed — the read must come back empty:
 
    ```bash
-   docker exec keycloak /opt/keycloak/bin/kcadm.sh get clients -r iri \
+   kc get clients -r iri \
        -q clientId=basetool-provisioner --fields clientId
    ```
 
@@ -852,8 +942,8 @@ A *Conditional* sub-flow acts as *Required* when all its conditions evaluate tru
    outcome and not a fault.
 
 2. **Remove the kcadm session file:**
-   `docker exec keycloak rm -f /opt/keycloak/.keycloak/kcadm.config` — it holds the truststore
-   password and a token in cleartext.
+   `sudo -u iri podman exec keycloak rm -f /opt/keycloak/data/tmp/kcadm.config` — it holds the
+   truststore password and a token in cleartext.
 
 3. **Re-export and commit the sanitized realm**, so this state is version-controlled rather than
    living only in the console:

@@ -75,7 +75,7 @@ public enum OrgChartPositionType {
   SK_COMMANDER(OrgChartScope.SPECIAL_COMMAND),
 
   /**
-   * Bereichsleiter — the single head of a Bereich (epic #692, REQ-ORG-018). At most one per Bereich
+   * Bereichsleiter — the single head of a Bereich (epic #692, REQ-ORG-026). At most one per Bereich
    * (the cardinality is scoped to the Bereich's {@code org_unit_id}, unlike the legacy singleton
    * {@link #AREA_LEAD}).
    */
@@ -88,7 +88,7 @@ public enum OrgChartPositionType {
   BEREICHSOPERATOR(OrgChartScope.BEREICH),
 
   /**
-   * A member of the Organisationsleitung (epic #692, REQ-ORG-018). Any number — the OL is a body of
+   * A member of the Organisationsleitung (epic #692, REQ-ORG-026). Any number — the OL is a body of
    * several people, mirroring the single {@code is_ol_member} membership flag (no separate OL head
    * rank).
    */

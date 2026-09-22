@@ -16,8 +16,11 @@ Beyond roles there are three mechanisms that are easy to miss:
   caller's relationship to the object, not only on a realm role.
 - **Per-`sub` isolation** — personal data (inventory, blueprints, hangar) is keyed on the Keycloak
   subject, so it is invisible to everyone else regardless of role.
-- **Guest field redaction** — some surfaces return a reduced projection rather than refusing, so a
-  page can exist for a caller who may see *some* of it.
+- **Field redaction for partial viewers** — some surfaces return a reduced projection rather than
+  refusing, so a page can exist for a caller who may see *some* of it: a member below Logistician
+  reading a peer's mission (`MissionPeerRedactor`, guarded by an ArchUnit rule), a requester-only
+  viewer of a job order (`REQ-ORDERS-023`). There is no anonymous or guest tier any more — ADR-0159
+  removed both audiences.
 
 Authority: [`security-and-access.md`](../specs/security-and-access.md) (`REQ-SEC-*`),
 [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md), `ArchitectureTest`.
@@ -73,7 +76,8 @@ Two binding rules shape every UI change:
   peer's change propagates without a manual reload.
 
 Authority: [`ui-design-system.md`](../specs/ui-design-system.md),
-[`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md) (`REQ-FE-*`), ADR-0012/0013/0031.
+[`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md) (`REQ-FE-*`),
+ADR-0012/0013/0031/0094.
 
 ## 8.7 Resilience of the frontend → backend call
 

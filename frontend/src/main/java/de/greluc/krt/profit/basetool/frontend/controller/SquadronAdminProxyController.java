@@ -41,8 +41,9 @@ import org.springframework.web.bind.annotation.RestController;
  * and the CSRF-protected session is reused via {@link BackendApiClient}.
  *
  * <p>Both flags live on the cached {@code SquadronDto} that {@code OrgUnitContextAdvice} reads on
- * every authenticated render, so each toggle evicts {@code STATIC_DATA_CACHE} (REQ-DATA-007) to
- * keep the shared squadron catalogue truthful rather than stale up to the cache TTL.
+ * every authenticated render, so each toggle evicts the {@code CacheDomain.SQUADRON} and {@code
+ * CacheDomain.ORG_UNIT} caches (REQ-DATA-007) to keep the shared squadron catalogue truthful rather
+ * than stale up to the cache TTL.
  *
  * <p>Endpoints carry their own {@code ADMIN}-role gate at the Spring Security layer; the backend
  * re-checks the role, so this proxy is defence-in-depth and not the sole guard.
@@ -69,8 +70,9 @@ public class SquadronAdminProxyController {
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
     backendApiClient.patch("/api/v1/squadrons/" + id + "/promotion-enabled", body, Void.class);
     // The flag lives on the cached SquadronDto that OrgUnitContextAdvice reads on every render, so
-    // a toggle must evict STATIC_DATA_CACHE or the sidebar/title gate stays stale up to the TTL
-    // (REQ-DATA-007 — squadron-catalogue cacheability is gated on every admin mutation evicting).
+    // a toggle must evict the SQUADRON (and ORG_UNIT) caches or the sidebar/title gate stays stale
+    // up to the TTL (REQ-DATA-007 — squadron-catalogue cacheability is gated on every admin
+    // mutation evicting).
     backendApiClient.evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
     return ResponseEntity.noContent().build();
   }
@@ -90,7 +92,8 @@ public class SquadronAdminProxyController {
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
     backendApiClient.patch("/api/v1/squadrons/" + id + "/profit-eligible", body, Void.class);
     // Same reason as setPromotionEnabled: isProfitEligible is part of the cached SquadronDto, so
-    // evict STATIC_DATA_CACHE on the toggle to keep the cached catalogue truthful (REQ-DATA-007).
+    // evict the SQUADRON (and ORG_UNIT) caches on the toggle to keep the cached catalogue truthful
+    // (REQ-DATA-007).
     backendApiClient.evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
     return ResponseEntity.noContent().build();
   }

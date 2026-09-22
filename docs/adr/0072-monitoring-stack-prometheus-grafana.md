@@ -5,6 +5,14 @@
 - **Deciders:** @greluc
 - **Related:** epic [#936](https://github.com/krt-profit/basetool/issues/936) (approved plan of record) · spec `REQ-OBS-005..008` ([`observability.md`](../specs/observability.md)) · amends the `REQ-SEC-014` HTTPS-only posture ([`security-and-access.md`](../specs/security-and-access.md), wording change ships with the Phase-2 PR) · follow-up [#937](https://github.com/krt-profit/basetool/issues/937) (host re-tuning) · builds on ADR-0049 (config bundle), ADR-0056 (backups)
 
+> **Note (2026-09-22):** the container-metrics half of this decision is Docker-specific and did not
+> survive the 2026-09-22 cutover to rootless Podman (ADR-0163). There is no Docker socket, so
+> `docker-socket-proxy` and cAdvisor are gone (cAdvisor's rootless-Podman support was closed upstream
+> as not planned); the `basetool_container_*` series come from `scripts/cgroup-container-metrics.py`
+> on a systemd timer, and node-exporter and Alloy run as host services installed by the Ansible role
+> (`ansible/roles/basetool_host/tasks/27-observability.yml`). Prometheus, Grafana, Loki, Tempo and
+> the isolated monitoring plane stand as decided.
+
 ## Context
 
 The stack (backend, frontend, ingest, Keycloak, 2× PostgreSQL, Redis, NPM on one Docker

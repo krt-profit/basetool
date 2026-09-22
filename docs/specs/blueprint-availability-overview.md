@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-21.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
 > **Owner area:** INV/UI · **Related ADRs:** none
 
 # Blueprint availability overview — list & drill-down contract
@@ -40,15 +40,15 @@ users outside the requested family.
   cached `BlueprintVariantFamilyCatalog` (a base plus its cosmetic variants — usually a handful),
   rebuilt only on the periodic blueprint sync, so an expand click never rescans the blueprint master.
 - [ ] For the admin "all org units" scope, the owners lookup queries by that **family product-key
-  set alone** (`findAllByProductKeyIn`); it must not enumerate all distinct owner subs first nor pass
+  set alone** (`findAllByProductKeyIn`); it must not enumerate all distinct owner user ids first nor pass
   them back as an `IN` restriction.
-- [ ] Non-admin scopes keep the owner-restricted lookup (family product keys + in-scope member subs
-  — **unioned with the subs of users who opted into global blueprint sharing, REQ-INV-018** —
-  `findAllByProductKeyInAndOwnerSubIn`), resolved server-side: the client cannot widen the scope,
+- [ ] Non-admin scopes keep the owner-restricted lookup (family product keys + in-scope member user
+  ids — **unioned with the ids of users who opted into global blueprint sharing, REQ-INV-018** —
+  `findAllByProductKeyInAndOwnerUserIdIn`), resolved server-side: the client cannot widen the scope,
   the multi-user data-isolation rule is unaffected, and the opt-in widens only *whose* blueprints
   are counted, never *who may open* the overview.
 - [ ] The list count aggregation loads only the `(ownerUserId, productName)` pair it groups on, via the
-  `findOwnerProductByOwnerSubIn` projection — never the full `PersonalBlueprint` rows — so an admin
+  `findOwnerProductByOwnerUserIdIn` projection — never the full `PersonalBlueprint` rows — so an admin
   all-scope view does not hydrate the entire `personal_blueprint` table (every column of every
   owner's blueprints) just to count owners per family (REQ-DATA-003). The item-order owner
   drill-down (`JobOrderItemBlueprintOwnersService`) uses the same projection.

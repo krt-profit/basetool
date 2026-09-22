@@ -96,10 +96,10 @@ management:
   # dedicated internal-only management port. ADR-0090 deliberately left the backend out because it
   # was not internet-reachable at all; the public API vhost removes that premise, so the connector a
   # proxy will forward must serve no Actuator — a 404 from the application itself, independent of
-  # any edge deny living in the NPM admin database.
+  # the edge's own `location /actuator` deny (docker/edge/include/api-allowlist.conf).
   #
-  # Reachable only from net-monitoring-scrape (Prometheus) and localhost (the Docker HEALTHCHECK),
-  # never host-published, never on an NPM proxy network. HTTPS with the same keystore so the scrape
+  # Reachable only from net-monitoring-scrape (Prometheus) and localhost (the container
+  # healthcheck), never host-published, never on an edge proxy network. HTTPS with the same keystore so the scrape
   # keeps its pinned CA (REQ-OBS-008 unchanged).
   #
   # Unlike frontend and ingest this module does NOT set `endpoint.loggers.access: read-only`, and
@@ -139,9 +139,11 @@ app:
     # Enables the JSON/LogstashEncoder appender defined in logback-spring.xml for the prod profile.
     structured-enabled: true
   rate-limit:
-    # Audit finding H-8: behind nginx-proxy-manager the backend's immediate peer is the frontend
-    # container, both on the compose bridge networks. Every internal bridge is PINNED under
-    # 172.28.0.0/16 (docker-compose.yml, since #974) — NOT the default Docker bridge (172.17.0.0/16).
+    # Audit finding H-8: behind the native nginx edge (itself behind the host haproxy, ADR-0162 /
+    # ADR-0187) the backend's immediate peer is a container — the frontend, or the edge for the API
+    # vhost — on the internal bridge networks. Every one of them is PINNED under 172.28.0.0/16
+    # (docker-compose.yml since #974, and the Quadlet .network units generated from it) — NOT the
+    # default Docker bridge (172.17.0.0/16).
     # Trusting the wrong range silently collapses every per-IP bucket onto the single relaying
     # container IP, degrading the per-user limiter into one shared org-wide budget — exactly the
     # 2026-07-06 multi-user mission-page outage, where all traffic was attributed to 172.28.3.2 and
@@ -152,7 +154,7 @@ app:
   security:
     jwt:
       # REQ-SEC-024: opt-in. Fetch the JWKS from the INTERNAL Keycloak (https://keycloak:18443) so
-      # backend JWT validation no longer hairpins through the public edge (NPM), where an edge or
+      # backend JWT validation no longer hairpins through the public edge, where an edge or
       # public-Keycloak blip turns every authenticated request into a 5xx. Empty (default) keeps the
       # current behaviour: keys are derived from issuer-uri (the public host). When set, the key
       # fetch reuses the keycloak-trust bundle above, so the cert's SAN must carry dns:keycloak.

@@ -34,7 +34,7 @@ import org.jetbrains.annotations.Nullable;
  * linear_integer_additive}); a non-segmented modifier interpolates linearly between its endpoint
  * multipliers across the band.
  *
- * <p>The craftability rule (REQ-INV-019) reuses this to find the lowest ingredient quality at which
+ * <p>The craftability rule (REQ-INV-048) reuses this to find the lowest ingredient quality at which
  * a slot's stats are not <em>worsened</em>: a multiplier below {@code 1.0} (neutral) degrades a
  * {@code higher}-is-better stat, above {@code 1.0} degrades a {@code lower}-is-better stat. Only
  * multipliers are known (no absolute base stat), so "neutral = ×1.0" is the only meaningful
@@ -135,7 +135,7 @@ final class BlueprintModifierMath {
 
   /**
    * Returns the lowest quality (0..1000) at which none of a slot's modifiers worsen their stat —
-   * the no-degradation quality floor (REQ-INV-019). Modifiers that worsen across the entire band
+   * the no-degradation quality floor (REQ-INV-048). Modifiers that worsen across the entire band
    * impose no floor (they are treated as inherently penalised and ignored), so an unusual recipe
    * never silently becomes uncraftable; the floor is the strictest reachable crossover among the
    * rest.

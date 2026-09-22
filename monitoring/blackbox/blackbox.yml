@@ -189,7 +189,7 @@ modules:
   # Same assertions for the API vhost of the mobile-client exposure (ADR-0135). Its records are
   # separate from the apex's, so the apex probes above prove nothing about them: a zone edit that
   # drops api.profit-base.online leaves both apex probes green while every app in the field loses
-  # the backend. Live since the phase-F cut-over (docs/API_VHOST_ROLLOUT_RUNBOOK.md); the jobs that
+  # the backend. Live since the phase-F cut-over (docs/archive/API_VHOST_ROLLOUT_RUNBOOK.md); the jobs that
   # drive them are blackbox-dns-api-a / -aaaa in prometheus.yml.
   #
   # api.profit-base.online is a CNAME to the apex, so these two are the modules the owner-bound

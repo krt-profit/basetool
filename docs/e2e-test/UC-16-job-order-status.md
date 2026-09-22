@@ -23,16 +23,16 @@ Der User ändert den Status über das Dropdown `#status-select` auf der Auftrags
 
 1. Navigiere zu `/orders/{id}`.
 2. Wähle `IN_PROGRESS` → das `change`-Event postet **sofort** an `POST /orders/{id}/status` (kein Modal bei nicht-terminalem Ziel).
-3. Navigiere neu und prüfe, dass `#status-select` den Wert `IN_PROGRESS` zeigt.
-4. Wähle `COMPLETED` → der **terminale** Wechsel öffnet erst das Warn-Modal (`#status-warning-modal`); erst das Bestätigen (`od-confirm-status`) postet.
-5. Navigiere neu und prüfe `COMPLETED`.
+3. Lies den Status über `GET /api/v1/orders/{id}` zurück; navigiere dann neu.
+4. Wähle `COMPLETED` → der **terminale** Wechsel öffnet erst das Warn-Modal (`#status-warning-modal`); erst das Bestätigen (`[data-trigger='od-confirm-status']`) postet.
+5. Lies den Status erneut über die API zurück.
 
 ## Erwartetes Ergebnis
 
-Nach jedem Wechsel zeigt `#status-select` den persistierten Status. Der terminale Wechsel trennt zusätzlich alle verknüpften Lagereinträge vom Auftrag (Backend) und nullt die Priorität.
+Nach jedem Wechsel liefert der Backend-Read-Back den neuen Status (`IN_PROGRESS`, dann `COMPLETED`). Das Warn-Modal ist vor dem Bestätigen sichtbar. (Dass der terminale Wechsel verknüpfte Lagereinträge trennt, ist Backend-Verhalten; dieser Test prüft es nicht.)
 
 ## Sonderfälle & Lehren
 
-- **AJAX + Reload:** Bei Erfolg lädt der Client nach ~1 s selbst neu (frischer `@Version`). Der Test navigiert stattdessen explizit nach jedem POST-Settle neu — so liest der nächste Wechsel einen aktuellen Stand und es gibt keinen Stale-Version-409. Auf den `…/status`-POST wird per `waitForResponse` gewartet.
+- **AJAX + Reload:** Bei Erfolg lädt der Client nach ~1 s selbst neu (frischer `@Version`). Eine Prüfung am neu geladenen `#status-select` würde unter CI-Last mit diesem Reload wettlaufen; der Test liest den Status deshalb über die API und navigiert vor dem nächsten Wechsel selbst neu, damit dieser einen aktuellen Stand und keine veraltete Version liest. Auf den Status-POST wird per `waitForResponse` gewartet.
 - **Terminal vs. nicht-terminal:** Nur `COMPLETED`/`REJECTED` öffnen das Warn-Modal (sie trennen Inventar — irreversibel); `IN_PROGRESS` postet direkt.
 - **Gating:** `#status-select` ist `hasRole('LOGISTICIAN')`-gegatet; ein einfaches Mitglied sieht nur den statischen Status-Badge (kein Dropdown). Das Frontend-Gate ist `isAuthenticated()`, das Backend-Gate `hasRole('LOGISTICIAN')`.

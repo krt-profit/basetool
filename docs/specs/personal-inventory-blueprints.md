@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-02.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
 > **Owner area:** INV/UI · **Related ADRs:** [ADR-0017](../adr/0017-default-blueprints-admin-curated-materialized.md), [ADR-0024](../adr/0024-opt-in-global-blueprint-sharing.md), [ADR-0035](../adr/0035-blueprint-craftability-from-own-stock.md), [ADR-0046](../adr/0046-blueprint-craftability-bridges-piece-item-ingredients.md)
 
 # Personal inventory — "Meine Blueprints" master-detail (V3)
@@ -38,7 +38,7 @@ cap (issue #823). The page controller pages the backend in chunks and concatenat
 page, so the facts subtitle ("N Blueprints"), the `.tab-count`, and the instant client-side filter
 all cover **every** owned blueprint, never a truncated first page. Loading the full set never blocks
 the render because the heavy per-row work stays off the critical path: the recipe is lazy per
-selection (REQ-INV-009) and craftability is one bulk async fetch (REQ-INV-019) — so "all are listed
+selection (REQ-INV-009) and craftability is one bulk async fetch (REQ-INV-048) — so "all are listed
 and searchable, only what you open / what the badge pass covers is computed".
 
 ### REQ-INV-009 — Detail pane on the existing lazy recipe endpoint, calculation unchanged
@@ -91,11 +91,14 @@ the admin-managed default set (REQ-INV-017). Provisioning MUST be idempotent and
 existing and future users:
 
 - a brand-new user receives the defaults synchronously when their `app_user` row is first created
-  (the grant runs in the same `UserReconciliationService.syncUser` transaction, so the rows are
-  committed before the first request returns);
-- a deploy / drift is reconciled by a startup backfill and a periodic sweep
-  (`DefaultBlueprintProvisioningTask`), both bulk `INSERT … SELECT … ON CONFLICT (owner_user_id,
-  product_key) DO NOTHING` so a re-run never duplicates;
+  — on whichever path creates it: the per-login `UserReconciliationService#syncUser(Jwt)` or the
+  scheduled Keycloak directory sync `UserReconciliationService#syncUser(KeycloakUserDto)`. The grant
+  runs in that same transaction, so the rows are committed before the first request returns;
+- a deploy / drift is reconciled by a startup backfill (`DefaultBlueprintBootstrap`) and a periodic
+  sweep (`DefaultBlueprintProvisioningTask`, job metrics under
+  `ScheduledJob.DEFAULT_BLUEPRINT_PROVISIONING`), both bulk `INSERT … SELECT … ON CONFLICT
+  (owner_user_id, product_key) DO NOTHING` over every user still present in Keycloak
+  (`in_keycloak = true`) so a re-run never duplicates;
 - adding a new default grants it to all existing users at once (REQ-INV-017).
 
 Granting MUST use the same normalized `product_key` the rest of the blueprint feature uses, so a
@@ -108,9 +111,10 @@ delete control for it (driven by a non-visible `removable` flag on the response,
 badge), and the delete endpoint MUST refuse a default product server-side
 (`error.personalBlueprint.defaultNotRemovable` → 409). Removing a product from the default set
 (REQ-INV-017) does NOT revoke the rows users already hold — they simply become ordinary, removable
-owned blueprints. Provisioning can be disabled per environment via
-`APP_DEFAULT_BLUEPRINTS_PROVISIONING_ENABLED`; the sweep interval is
-`APP_DEFAULT_BLUEPRINTS_PROVISIONING_INTERVAL` (default `PT1H`).
+owned blueprints. `APP_DEFAULT_BLUEPRINTS_PROVISIONING_ENABLED` (default `true`) switches off the
+startup seed + backfill and the periodic sweep per environment — the first-creation grant still
+runs; the sweep interval is `APP_DEFAULT_BLUEPRINTS_PROVISIONING_INTERVAL` (default `PT1H`). The
+hard account deletion ([REQ-DATA-008 in `data-persistence.md`](data-persistence.md)) removes a departing user's rows **including** the defaults.
 
 **Acceptance criteria:**
 
@@ -124,23 +128,30 @@ owned blueprints. Provisioning can be disabled per environment via
 **Code links:** [`DefaultBlueprintProvisioningService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/DefaultBlueprintProvisioningService.java),
 [`PersonalBlueprintRepository#grantDefaultBlueprintsToAllUsers`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/repository/PersonalBlueprintRepository.java),
 [`UserReconciliationService#syncUser`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/UserReconciliationService.java),
+[`DefaultBlueprintKeyService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/DefaultBlueprintKeyService.java)
+(cached default-key set behind the `removable` flag and the delete guard),
 [`DefaultBlueprintProvisioningTask`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/task/DefaultBlueprintProvisioningTask.java),
 [`PersonalBlueprintService#requireRemovable`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/PersonalBlueprintService.java).
 
 ### REQ-INV-017 — Admin curation of the default-blueprint set
 
 The default set lives in the `default_blueprint` table and is curated by administrators, so it can
-follow CIG's starter loadout without a code deploy. The set is **seeded once** on first boot from a
-curated starter list (`DefaultBlueprintCatalog`), guarded by a `defaultBlueprints.seeded`
+follow CIG's starter loadout without a code deploy. The set is **seeded once** on first boot by the
+`DefaultBlueprintBootstrap` `CommandLineRunner` (in the `service` package) from a curated starter
+list (`DefaultBlueprintCatalog`, eight products), guarded by a `defaultBlueprints.seeded`
 `SystemSetting` flag so a later admin removal is never resurrected; each starter name is resolved
 against the live blueprint catalog to stamp the canonical key / name / output item, and an
 unresolved name is still seeded (degraded) so the default is granted regardless.
 
 Administrators MUST be able to list the set, add a product (picked from the blueprint catalog
 type-ahead, resolved to a `product_key` + name + output item), and remove an entry, through an
-ADMIN-gated surface (`/api/v1/admin/default-blueprints`, `@PreAuthorize("hasRole('ADMIN')")`). A
-duplicate add MUST return 409. Adding MUST immediately grant the new default to all existing users
-(REQ-INV-016).
+ADMIN-gated surface (`/api/v1/admin/default-blueprints`, class-level
+`@PreAuthorize(Roles.HAS_ROLE_ADMIN)`). A duplicate add MUST return 409. Adding MUST immediately
+grant the new default to all existing users (REQ-INV-016).
+
+The admin UI is the ADMIN-gated page `/admin/default-blueprints` ("Standard-Blueprints" in the admin
+sidebar; `AdminDefaultBlueprintsPageController`): a blueprint-product type-ahead that stages picks
+into an add form, the current set, and a remove-confirm modal.
 
 The admin page (`/admin/default-blueprints`) performs both mutations **in place** (REQ-FE-001,
 ADR-0012): the add sends every staged product key in one `krtFetch.write` to the
@@ -175,10 +186,12 @@ fallback), `DefaultBlueprintsE2eTest` (in-place remove, no-reload marker).
 **Code links:** [`DefaultBlueprintService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/DefaultBlueprintService.java),
 [`AdminDefaultBlueprintController`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/AdminDefaultBlueprintController.java),
 [`DefaultBlueprintBootstrap`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/DefaultBlueprintBootstrap.java),
+[`DefaultBlueprintCatalog`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/DefaultBlueprintCatalog.java),
 [`V157__create_default_blueprint.sql`](../../backend/src/main/resources/db/migration/V157__create_default_blueprint.sql),
 [`AdminDefaultBlueprintsPageController`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/controller/AdminDefaultBlueprintsPageController.java),
 [`admin/default-blueprints.html`](../../frontend/src/main/resources/templates/admin/default-blueprints.html),
-[`admin-default-blueprints.js`](../../frontend/src/main/resources/static/js/admin-default-blueprints.js).
+[`admin-default-blueprints.js`](../../frontend/src/main/resources/static/js/admin-default-blueprints.js),
+[`AdminDefaultBlueprintsPageControllerMvcTest`](../../frontend/src/test/java/de/greluc/krt/profit/basetool/frontend/controller/AdminDefaultBlueprintsPageControllerMvcTest.java).
 
 ### REQ-INV-018 — Opt-in global blueprint sharing
 
@@ -233,7 +246,9 @@ and a global sharer is counted once.
 [`JobOrderItemBlueprintOwnersService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/JobOrderItemBlueprintOwnersService.java),
 [`V163__add_share_blueprints_globally_to_user.sql`](../../backend/src/main/resources/db/migration/V163__add_share_blueprints_globally_to_user.sql).
 
-### REQ-INV-019 — Craftability of own blueprints from "My Inventory" stock
+### REQ-INV-048 — Craftability of own blueprints from "My Inventory" stock
+
+> **Renumbered 2026-09-22:** this requirement was `REQ-INV-019` until 2026-09-22; that id also named the structural tag match for the scmdb.net export in [`blueprint-import-name-matching.md`](blueprint-import-name-matching.md), which keeps it.
 
 The blueprint view annotates each of the caller's owned blueprints with whether and how many times
 it can be crafted **right now** from the caller's own stock, the output stats that stock's quality
@@ -275,7 +290,8 @@ over existing data via `GET /api/v1/personal-blueprints/craftability?includeRefi
   material counted in whole units. The computation is done in the material's **own unit**
   on both sides — `InventoryItem.amount` and the folded-in refinery yield are already piece counts
   for a PIECE material, and the per-craft requirement is **rounded to a whole piece** (the same
-  rounding the job-order path applies, `JobOrderItemService.roundForQuantityType`), so a recipe never
+  rounding the job-order path applies, the shared `support.QuantityTypeRounding.roundForQuantityType`),
+  so a recipe never
   demands a fractional piece and the count stays in step with the rest of the app. The breakdown
   carries each material's `quantityType`, so the UI labels every amount "SCU" or "Stück" and formats
   pieces as whole numbers (matching the inventory views); SCU materials keep their fractional amount.
@@ -341,7 +357,9 @@ over existing data via `GET /api/v1/personal-blueprints/craftability?includeRefi
 [`PersonalInventoryBlueprintsPageController#craftability`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/controller/PersonalInventoryBlueprintsPageController.java),
 [`personal-inventory-blueprints-recipe.js`](../../frontend/src/main/resources/static/js/personal-inventory-blueprints-recipe.js).
 
-### REQ-INV-021 — Import preview: auto-selected top suggestion, honest include checkbox
+### REQ-INV-049 — Import preview: auto-selected top suggestion, honest include checkbox
+
+> **Renumbered 2026-09-22:** this requirement was `REQ-INV-021` until 2026-09-22; that id also named the seeded aliases for localised (German-suffix) client names in [`blueprint-import-name-matching.md`](blueprint-import-name-matching.md), which keeps it.
 
 In the JSON-import preview modal (REQ-INV-010) every parsed row carries an **include checkbox** that
 is the single source of truth for what "Anwenden" imports: a row is imported **iff** its checkbox is
@@ -349,7 +367,8 @@ ticked **and** it has resolved to a product. The two states must never disagree 
 carries a resolved `product_key`, an unresolved row is never ticked. The preview groups rows by match
 status:
 
-- **Auto-matched** (exact / alias / structural tag, REQ-INV-006/007/019) — carry their resolved
+- **Auto-matched** (exact / alias / structural tag — REQ-INV-006/047/019 of
+  [`blueprint-import-name-matching.md`](blueprint-import-name-matching.md)) — carry their resolved
   product and render ticked.
 - **Suggestions** (a fuzzy candidate set, no exact match) — **auto-select their top suggestion**: the
   row resolves to the highest-ranked candidate (the name already displayed) and renders ticked, so a
@@ -364,7 +383,8 @@ status:
 silently skipped them unless the user first clicked the suggestion button — even though the suggested
 name was already shown (issue #824). Tying the checkbox to a resolved product, and defaulting a
 suggestion to its top candidate, makes "ticked ⇒ will be imported as shown" always true. "Anwenden"
-still learns a `blueprint_external_alias` for every resolved pick (REQ-INV-020), so a confirmed
+still learns a `blueprint_external_alias` for every resolved pick (REQ-INV-020 in
+[`blueprint-import-name-matching.md`](blueprint-import-name-matching.md)), so a confirmed
 suggestion auto-matches on the next import.
 
 **Acceptance**
@@ -444,11 +464,11 @@ caller's **entire removable owned-blueprint set** in one action, so a user who w
   (REQ-INV-016) exactly as the per-row remove guard (`requireRemovable`) does: it deletes every owned
   row whose `product_key` is **not** in the `default_blueprint` set and leaves the defaults intact
   (they would only be re-provisioned anyway). A set of only defaults (or an empty set) clears nothing.
-- **Owner-scoped, JWT `sub`.** `DELETE /api/v1/personal-blueprints` derives the owner from the token,
-  never the request, and removes only that caller's rows. It returns the number of removed blueprints
-  (`PersonalBlueprintBulkDeleteResult`) so the UI can confirm the outcome. Implemented as one
-  set-based bulk delete (`PersonalBlueprintRepository#deleteRemovableByOwnerSub`) — no per-row
-  `@Version` churn.
+- **Owner-scoped, from the token.** `DELETE /api/v1/personal-blueprints` derives the owner from the
+  token (`@CurrentUserId`, the caller's `app_user.id`), never the request, and removes only that
+  caller's rows. It returns the number of removed blueprints (`PersonalBlueprintBulkDeleteResult`)
+  so the UI can confirm the outcome. Implemented as one set-based bulk delete
+  (`PersonalBlueprintRepository#deleteRemovableByOwnerUserId`) — no per-row `@Version` churn.
 - **Guarded, in-place, no reload.** The control opens a `.krt-modal--danger` confirm that names the
   consequence ("removes all your blueprints; defaults are kept; cannot be undone"). On confirm the
   form write goes through `krtFetch.submitForm` (the form-write standard, REQ-FE-002) and the
@@ -471,7 +491,7 @@ caller's **entire removable owned-blueprint set** in one action, so a user who w
 
 **Code links:** [`PersonalBlueprintController#deleteAll`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/PersonalBlueprintController.java),
 [`PersonalBlueprintService#deleteAllOwn`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/PersonalBlueprintService.java),
-[`PersonalBlueprintRepository#deleteRemovableByOwnerSub`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/repository/PersonalBlueprintRepository.java),
+[`PersonalBlueprintRepository#deleteRemovableByOwnerUserId`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/repository/PersonalBlueprintRepository.java),
 [`PersonalInventoryBlueprintsPageController#deleteAll`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/controller/PersonalInventoryBlueprintsPageController.java),
 [`personal-inventory-blueprints.js`](../../frontend/src/main/resources/static/js/personal-inventory-blueprints.js)
 (`submitDeleteAll`).
@@ -513,7 +533,7 @@ removable owned blueprints of **every** user at once — a maintenance/reset too
 
 ### REQ-INV-038 — SC Extractor release link in the add bar
 
-The JSON import (REQ-INV-021) consumes an export the member has to produce with the desktop
+The JSON import (REQ-INV-049) consumes an export the member has to produce with the desktop
 **Basetool SC Extractor** first, so the add bar carries the way to obtain that tool directly next
 to the import trigger it feeds — a member who has no extractor yet no longer has to leave the tool
 and search for it.
@@ -533,7 +553,7 @@ and search for it.
   mutation, so there is nothing to live-update and nothing to audit.
 - Label and tooltip come from the **shared** bundle keys `scExtractor.download.button` /
   `.title` (DE + EN) rather than a page-scoped key: the refinery create page carries the same
-  control next to its screenshot import (`REQ-REFINERY-019`,
+  control next to its screenshot import (`REQ-REFINERY-021`,
   [`refinery-screenshot-import.md`](refinery-screenshot-import.md)), and the two must not
   drift apart in wording or target URL.
 
