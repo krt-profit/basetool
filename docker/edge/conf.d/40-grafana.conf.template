@@ -18,11 +18,15 @@ server {
 
   location / {
     include /etc/nginx/edge/include/proxy.conf;
-    # Upstream TLS is NOT verified here: Grafana presents its own self-signed
-    # certificate (CN=grafana, issuer CN=grafana) rather than the shared
-    # Basetool one, so verifying would mean pinning a leaf that is regenerated
-    # whenever the container is recreated. The hop stays encrypted, and
-    # net-proxy-grafana carries exactly two members — the edge and Grafana.
+    # Upstream TLS verification (REQ-OBS-008): Grafana presents its own self-signed
+    # certificate (CN=grafana) rather than a leaf of the internal CA, so it is
+    # verified against THAT certificate, pinned, in include/upstream-grafana-tls.conf.
+    # render-and-run.sh puts the include here when EDGE_GRAFANA_UPSTREAM_VERIFY=on and a
+    # comment when it is off (the default until the owner switches it on). Corrected
+    # 2026-09-23: this comment used to say the certificate is regenerated whenever the
+    # container is recreated. It is not: it is a host file minted once per host
+    # (monitoring/README.md, step 3, 825 days), which is what makes pinning it workable.
+    ${EDGE_GRAFANA_UPSTREAM_TLS}
     # A VARIABLE upstream, not a literal one. With a literal name nginx resolves it
     # once at startup and caches the address forever, so a recreated container
     # leaves the edge pointing at an address nobody answers on until the edge is

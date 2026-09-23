@@ -421,7 +421,10 @@ holds the CA **and** the old shared certificate, so either side verifies
 **3. `certs/grafana.{crt,key}`** — Grafana's own **self-signed, per-host** leaf. `grafana.container`
 will not start without it. **Never restore it from another host's backup** (the archive carries the
 old host's pair — extract around it, or re-mint afterwards); nothing verifies that leaf, so a wrong
-one fails quietly.
+one fails quietly — **unless the edge verifies it** (`EDGE_GRAFANA_UPSTREAM_VERIFY=on`,
+[`deployment.md` → *The edge verifies Grafana*](../docs/deployment.md#the-edge-verifies-grafana)):
+then the edge pins this exact file, and after re-minting it **restart the edge as well as
+Grafana**, or the Grafana host answers `503`.
 
 ```bash
 cd /var/iri/monitoring/certs
