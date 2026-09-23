@@ -707,6 +707,11 @@ client ──► haproxy :80/:443 (host, v4+v6) ──send-proxy-v2──► edg
   recreates the edge whenever its on-disk config differs from the last applied snapshot. Validate
   locally before merging with `scripts/check-edge-nginx.sh` (renders every vhost through
   `render-and-run.sh` and runs `nginx -t`; CI runs it in `repo-lint.yml`).
+- **Compression happens at the edge only.** `nginx.conf` strips `Accept-Encoding` towards the
+  upstreams and gzips on the way out: HTML plus the `gzip_types` list (CSS, both JavaScript
+  labels, JSON, problem+json, the manifest, SVG, plain text), `gzip_vary on`, from 1 KB. The event
+  streams are deliberately not in the list, because gzip would buffer them. Until 2026-09-23 the
+  list was missing and only HTML left the edge compressed; `check-edge-nginx.sh` now asserts it.
 - **The API vhost's allow-list** is `docker/edge/include/api-allowlist.conf`, the source of truth
   (ADR-0135). `edge-deny-probe.yml` probes the public deny rules from outside every day.
 

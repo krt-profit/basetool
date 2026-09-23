@@ -36,6 +36,10 @@
 
 ### Changed
 
+- **Edge: Stylesheets, Skripte und JSON-Antworten werden jetzt komprimiert ausgeliefert.** Bisher
+  hat der Edge-Proxy nur HTML gepackt; CSS, JavaScript und API-Antworten gingen unkomprimiert
+  raus. Seiten übertragen dadurch weniger Daten.
+
 - **Backend: weniger Datenbanklast pro Anfrage.** Die Berechtigungen eines Mitglieds werden pro
   Anmeldesitzung zwischengespeichert statt pro Zugriffstoken, sodass die alle fünf Minuten
   erneuerten Tokens sie nicht mehr jedes Mal neu laden. Eine in Keycloak entzogene Rolle wirkt
