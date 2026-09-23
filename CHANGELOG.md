@@ -169,6 +169,10 @@
 
 ### Fixed
 
+- **Mein Inventar: die Gruppen-Checkbox ist auf Handy und Tablet wieder groß genug.** Seit der
+  Umstellung auf CSS-Layer war das Kästchen „alle auswählen“ einer Gruppe dort nur 26 statt 32 Pixel
+  hoch; jetzt gilt wieder die Mindestgröße für Touch-Bedienung.
+
 - **Images: der Start-Cache (AOT) baut im Release-Workflow und startet auf jeder CPU.** Der
   Release-Builder reichte OpenTelemetry-Variablen in das Cache-Training, an denen jeder Build
   scheiterte; und der Cache enthielt CPU-spezifischen Maschinencode, mit dem das Backend auf Rechnern
