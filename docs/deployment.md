@@ -416,9 +416,11 @@ Two phases, PR-based; no hand-pushed tag, no tag ever moved.
 
 The tag run **does not rebuild**: it cosign-verifies and re-tags the `:sha-<short>` digest `main`
 already built, so `:X.Y.Z` and `:sha-<short>` are the same bytes (REQ-OPS-021, ADR-0137). Any doubt
-falls back to a full build. A `main` push that changes no image input does the same with the previous
-`main` build (ADR-0210) — so an `:edge` or `:sha-<short>` image can carry an earlier commit's
-revision label and version chip; the release commit itself is always built. The tag is created with a short-lived token of the **`basetool-release`
+falls back to a full build. A `main` push does the same, per image, for every image whose inputs it
+did not change (ADR-0210) — so the three `:edge` / `:sha-<short>` images can carry different, earlier
+commits' revision labels, and the frontend's version chip can name an earlier commit; the release
+commit itself always builds all three, and `promote.yml` orders `:testing` against `:stable` by the
+config bundle's revision, which always names the published commit. The tag is created with a short-lived token of the **`basetool-release`
 GitHub App** (ADR-0201), minted from the secret `RELEASE_APP_PRIVATE_KEY`: the tag ruleset "Version"
 lets only that App and @greluc create `v*` tags, and an App token's events trigger
 `release-images.yml` where `GITHUB_TOKEN`'s would not. There is no fallback — without the key the

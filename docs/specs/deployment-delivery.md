@@ -957,7 +957,7 @@ and its measured revisions in [ADR-0085](../adr/0085-scale-user-sync-and-stack-c
   round-number bump, or "to be safe", without a measurement.
 - The sum of limits is recomputed and recorded whenever any limit changes.
 
-### REQ-OPS-021 — One build per change of the image inputs; the release tag and input-free main pushes re-tag
+### REQ-OPS-021 — Each image is built once per change of its inputs; the release tag and main pushes re-tag the rest
 
 A release fires `release-images.yml` **twice for one commit**: the release PR merges to `main`, then
 `release-publish.yml` tags that same merge commit `vX.Y.Z`. Both pushes are wanted — the first
@@ -1011,37 +1011,57 @@ scanned by the main run under the same SARIF categories. The `basetool-config` a
 images off the critical path, and leaving them alone keeps the reuse logic confined to the three
 app images.
 
-**A `main` push that changes no image input re-tags the previous `main` build** (CI-07, 2026-09-23,
-[ADR-0210](../adr/0210-a-main-push-that-changes-no-image-input-re-tags-the-previous-build.md)).
-Most of what lands on `main` — documentation, specs, tests, monitoring, compose, other workflows —
-changes no byte of an image, and each such push used to rebuild all three on six runners. The `plan`
-job's main path applies only to a `push` on `refs/heads/main`, and admits reuse only when **every**
-gate passes:
+**A `main` push rebuilds only the images whose inputs it changed, and re-tags the others from the
+previous `main` build** (CI-07, 2026-09-23, per module since the same day —
+[ADR-0210](../adr/0210-a-main-push-that-changes-no-image-input-re-tags-the-previous-build.md) and its
+amendment). Most of what lands on `main` changes no byte of most images, and each push used to rebuild
+all three on six runners. The `plan` job's main path applies only to a `push` on `refs/heads/main`.
 
-1. `.github/scripts/image_reuse_plan.py` finds **no image input** among the files changed between
-   `github.event.before` and the pushed commit. An image input is, precisely: every build-context path
-   a `COPY` in `docker/app/Dockerfile` reads (parsed, with `${MODULE}` expanded to all three modules —
-   today the Gradle wrapper and `gradle/` including the version catalog and
-   `verification-metadata.xml`, the root build scripts and `gradle.properties`, all six module build
-   scripts, the `src/main` of backend, frontend, ingest and logging-support, and
-   `frontend/oss-bundled-components.json`); the Dockerfile itself (which pins both base-image
-   digests); the root `.dockerignore`; `release-images.yml`; `.github/actions/setup-buildx/`; and
-   `.github/scripts/app_version.py`. A base that is missing, all-zero or not an ancestor of the pushed
-   commit is a build;
-2. the range contains **no release commit** (no new dated CHANGELOG section) — a release commit is
-   always built;
-3. `:sha-<short>` of the previous tip resolves for all three images, each index carries both
-   architectures, and each digest cosign-verifies against this workflow's identity pinned to
-   `refs/heads/main` (the tag path's gates 3–5);
-4. each candidate was **built within the last 7 days** (`org.opencontainers.image.created`), because
-   the runtime stage's `apk upgrade` makes an image only as patched as its build day.
+1. `.github/scripts/image_reuse_plan.py` sorts the files changed between `github.event.before` and
+   the pushed commit against the inputs derived from `docker/app/Dockerfile`'s `COPY` lines:
+   - a module's **own** inputs rebuild that module only: every `COPY` source written with `${MODULE}`
+     (today `<module>/src/main`) and `frontend/oss-bundled-components.json` (copied for every module,
+     read only by the frontend's `generateOssLicenses`);
+   - everything else is **shared** and rebuilds all three: the Gradle wrapper and `gradle/` (version
+     catalog, `verification-metadata.xml`), the root build scripts and `gradle.properties`, **all six
+     module build scripts** (Gradle configures every project for every build, and the frontend jar
+     embeds the Licensee reports of the backend, ingest and keycloak-spi classpaths),
+     `logging-support/src/main`, the Dockerfile itself (base-image digests), the root `.dockerignore`,
+     `release-images.yml`, `.github/actions/setup-buildx/` and `.github/scripts/app_version.py`.
 
-Reuse is decided for the three images together. `merge` applies `:edge` and this commit's
-`:sha-<short>` to the verified digests and signs them; `scan` is skipped (the digest was scanned when
-it was built, at most seven days earlier, and `promote.yml` rescans before any promotion). A
-re-tagged image's `org.opencontainers.image.revision` label, buildx provenance and the frontend's
-version chip name **the commit that built it** — whose bytes are, by gate 1, what the tagging commit
-would have built.
+   A base that is missing, all-zero or not an ancestor of the pushed commit rebuilds all three;
+2. a range containing a **release commit** (a new dated CHANGELOG section) rebuilds all three;
+3. each image the script would re-tag must, **on its own**, resolve under `:sha-<short>` of the
+   previous tip, carry both architectures, cosign-verify against this workflow's identity pinned to
+   `refs/heads/main` (the tag path's gates 3–5), and have been **built within the last 7 days**
+   (`org.opencontainers.image.created` — the runtime stage's `apk upgrade` makes an image only as
+   patched as its build day). An image that fails any of these is built instead; the others stay
+   re-tagged.
+
+`plan` emits the re-tagged modules, their verified digests and a `build` matrix of only the images to
+build; `scan` covers the built images; `merge` assembles the built ones, re-tags the others and signs
+all three. A failed build cell stops `merge` for **all three**, so a commit's `:sha-<short>` exists for
+every image or for none — which the next push's lookup relies on.
+
+**The three images of one `main` tag need not share a build.** A re-tagged image's
+`org.opencontainers.image.revision` label, buildx provenance and — for the frontend — version chip name
+the commit that **built** it, whose bytes are, by step 1, what the tagging commit would have built.
+What reads that, and why it stays correct:
+
+- **Releases are never mixed.** The release commit rebuilds all three (step 2) and the tag run
+  re-tags all three from that one commit or builds all three, so a release's images, labels and footer
+  all name the release.
+- **`promote.yml`'s `sync-testing`** orders `:testing` against `:stable` by the revision label of the
+  **`basetool-config`** bundle, not of an app image: the bundle is rebuilt by every run and never
+  re-tagged from another commit, so its label is always the commit the tag was published for. (Reading
+  `backend`, as it did until this change, could see the same older revision on both sides and move a
+  deliberately-ahead testing back.)
+- **`deploy.sh`** resolves and cosign-verifies each image's digest on its own and compares nothing
+  across images; a re-tagged digest carries the main-branch signature of the run that built it and of
+  the run that re-tagged it.
+- **The frontend's version chip** (`app_version.py`) may name an earlier commit than the `:edge` /
+  `:sha-<short>` tag it is deployed under — only outside releases, i.e. on a testing host fed from a
+  `main` build.
 
 The image build carries **no BuildKit layer cache**. `cache-to: type=gha,mode=max` wrote ~5.3 GB per
 release across six scopes; with CodeQL, the `ci.yml` Gradle caches and the Trivy DB the repository
@@ -1053,10 +1073,11 @@ produced artifact.
 
 **Acceptance**
 
-- [ ] A `plan` job decides build-vs-reuse before any build job starts, and emits `reuse=true` only
-  when all five gates above pass; every other outcome, including its own failure, yields a full build.
-- [ ] On a reuse run the `merge` job re-tags the digest `plan` **verified** (no second resolution
-  between check and use) and signs it; `build` and `scan` are skipped.
+- [ ] A `plan` job decides build-vs-reuse per image before any build job starts; on a tag push it
+  re-tags all three only when all five gates above pass for all three, and every other outcome
+  yields a full build (a failed `plan` tags nothing).
+- [ ] A re-tagged image's `merge` cell re-tags the digest `plan` **verified** (no second resolution
+  between check and use) and signs it; `build` and `scan` run only for the images being built.
 - [ ] A `workflow_dispatch` run always builds — on `main` or a release tag on `main`; any other ref
   is refused by `ref-guard` before anything is built (REQ-OPS-015, since 2026-09-22).
 - [ ] The BuildKit image the builds boot is pinned **by digest** in
@@ -1071,15 +1092,18 @@ produced artifact.
   limit — at the quota, a new cache consumer only degrades every existing one.
 - [ ] Trivy runs in its own job, not inside `build`: a failure of the scan action or of the SARIF
   upload must not skip `merge` and cost the release its tags and signature.
-- [x] A `main` push whose range changes no image input, contains no release commit, and whose
-  predecessor's three images verify and are at most 7 days old re-tags them; any other `main` push
-  builds. `image_reuse_plan.py --selftest` pins the git half and runs in `repo-lint.yml`; the plan
-  script was exercised against stubbed registry answers for every gate (2026-09-23), and
-  `image_reuse_plan.py --dry-run 30` replays the decision over recent `main` history (7 of 30 re-tag
-  on 2026-09-23).
+- [x] A `main` push rebuilds exactly the images whose own or shared inputs its range changed (all
+  three on a shared input or a release commit), and re-tags each other image whose predecessor
+  verifies and is at most 7 days old; an image that fails a gate is built. `image_reuse_plan.py
+  --selftest` pins the git half per module and runs in `repo-lint.yml`; the plan script was exercised
+  against stubbed registry answers for every gate, per image (2026-09-23); `image_reuse_plan.py
+  --dry-run 30` replays the decision over recent `main` history (2026-09-23: 36 of 90 module builds
+  re-tagged over the last 30 commits, 156 of 300 over the last 100).
+- [x] `promote.yml`'s `sync-testing` reads the `basetool-config` bundle's revision label, the one
+  label that always names the published commit.
 
 **Enforced by:** `.github/workflows/release-images.yml` (`plan`, `build`, `scan`, `merge`) ·
-`.github/scripts/image_reuse_plan.py` · **Decision:** [ADR-0137](../adr/0137-one-image-build-per-commit-and-no-buildkit-layer-cache.md),
+`.github/scripts/image_reuse_plan.py` · `.github/workflows/promote.yml` (`sync-testing`) · **Decision:** [ADR-0137](../adr/0137-one-image-build-per-commit-and-no-buildkit-layer-cache.md),
 [ADR-0210](../adr/0210-a-main-push-that-changes-no-image-input-re-tags-the-previous-build.md)
 
 ### REQ-OPS-022 — Non-production environments are fed by their own promotion channel
@@ -1118,8 +1142,10 @@ placed ahead of production is left where it is, which is what `promote-testing.y
 putting testing ahead, not keeping it level.
 
 **The ordering signal is the source commit, not the image's timestamp.** Each image carries
-`org.opencontainers.image.revision`; the job reads it from both `:testing` and the promoted tag
-and asks `git merge-base --is-ancestor`. Creation time looks like an equivalent signal and is not:
+`org.opencontainers.image.revision`; the job reads it — from the `basetool-config` bundle, whose
+label always names the published commit, because an app image's may name an older building commit
+(REQ-OPS-021, per-module reuse; the backend image was read until 2026-09-23) — from both `:testing`
+and the promoted tag and asks `git merge-base --is-ancestor`. Creation time looks like an equivalent signal and is not:
 the `workflow_dispatch` escape hatch rebuilds an **old** version, giving old code a new timestamp,
 and a timestamp comparison would then march testing backwards while reporting success.
 

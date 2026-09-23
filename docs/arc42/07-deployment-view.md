@@ -243,12 +243,14 @@ and trips `JvmStartupCacheRejected` (REQ-OPS-030,
 [ADR-0209](../adr/0209-the-images-ship-a-java-aot-cache-trained-eagerly-and-verified-at-build.md)).
 The entrypoint is `java` itself, in exec form — no shell between the runtime and the JVM.
 
-**A push builds only when it changes an image.** The release-tag run re-tags what `main` built for
-the same commit (ADR-0137), and a `main` push whose range touches no image input — the paths
-`docker/app/Dockerfile` copies, the Dockerfile, `.dockerignore`, the release workflow and its BuildKit
-and version inputs — re-tags the previous `main` build after verifying its signature, both
-architectures and an age of at most seven days (ADR-0210, REQ-OPS-021). Release commits always
-build.
+**A push builds only the images it changes.** The release-tag run re-tags what `main` built for
+the same commit (ADR-0137). A `main` push rebuilds an image only when its range touches that image's
+own inputs (`<module>/src/main`) or a shared one (build scripts, catalog, logging-support, the
+Dockerfile, `.dockerignore`, the release workflow and its BuildKit and version inputs), and re-tags
+each other image from the previous `main` build after verifying its signature, both architectures and
+an age of at most seven days (ADR-0210, REQ-OPS-021). Release commits rebuild all three. The images of
+one `main` tag can therefore come from different builds; `promote.yml` orders environments by the
+config bundle's revision for that reason.
 
 `deploy.sh` and the host's own `iri-*` units are **not** part of the config bundle: a bundle cannot
 rewrite the thing that applies bundles, so they arrive with the Ansible role. The Quadlet units do
