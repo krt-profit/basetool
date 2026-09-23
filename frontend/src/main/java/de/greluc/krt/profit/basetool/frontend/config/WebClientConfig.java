@@ -517,17 +517,18 @@ public class WebClientConfig {
                         new WriteTimeoutHandler(
                             httpProperties.writeTimeout().toMillis(), TimeUnit.MILLISECONDS)));
       } else {
-        // Request gzip on the regular request/response path: send `Accept-Encoding` and decompress
-        // transparently. The backend already advertises `server.compression.enabled=true` for
-        // application/json, so the heavy read payloads (the materials trade matrix, full order /
-        // hangar lists) travel the frontend↔backend hop compressed. NOT applied on the streaming
-        // path (see the `if (streaming)` branch): the SSE relay is `text/event-stream` — outside
+        // NO gzip on this hop (BE-PERF-14, ADR-0161 §8.5 amendment 2026-09-23): the client sends no
+        // `Accept-Encoding`, so the backend never compresses for it. Measured on the real embedded
+        // Tomcat: a 210 KB inventory page (a no-store family, the only kind Tomcat compresses at
+        // all) cost about 1.4 ms of server CPU to gzip and 0.2 ms to inflate here, and answered
+        // 1.6-3.2 ms SLOWER than uncompressed — the hop is a container bridge on one host, where
         // the
-        // backend's compression mime-types anyway — and per-event gzip would only buffer the
-        // stream.
-        // The in-memory codec limit is unaffected: it bounds the decompressed body, not the wire
-        // size.
-        httpClient = httpClient.compress(true).responseTimeout(httpProperties.responseTimeout());
+        // ten-fold byte saving buys nothing. The ETagged catalogue families (materials, missions,
+        // ...) were never compressed in the first place: Tomcat 11 refuses gzip for a response with
+        // a strong ETag, which the backend's ShallowEtagHeaderFilter sets on every one of them. The
+        // backend keeps `server.compression` for the callers behind the edge, which do ask for it.
+        // The in-memory codec limit bounds the body either way.
+        httpClient = httpClient.responseTimeout(httpProperties.responseTimeout());
         if (http2) {
           // NO channel-level ReadTimeoutHandler under HTTP/2, and this is not a nicety.
           //

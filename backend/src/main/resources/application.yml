@@ -58,6 +58,10 @@ server:
     # several times MORE bytes than the gzipped JSON it replaced, on the very hop the change exists
     # to make cheaper. Compressing both keeps the byte axis at parity and leaves CBOR's actual claim,
     # a cheaper parse, as the only variable.
+    # Corrected 2026-09-23 (BE-PERF-14, ADR-0161 amendment): this serves the callers behind the edge
+    # only. The frontend no longer asks for gzip on its hop - measured, it cost more than it saved -
+    # and Tomcat 11 never compresses a response carrying a strong ETag, which the ShallowEtagHeader
+    # filter sets on every GET of a no-cache family, so those go out uncompressed to everyone.
     mime-types: application/json,application/problem+json,application/cbor,text/html,text/plain,text/css,application/javascript,application/xml,image/svg+xml
 
 spring:

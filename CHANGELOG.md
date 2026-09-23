@@ -36,6 +36,10 @@
 
 ### Changed
 
+- **Webtool ↔ Backend: keine gzip-Kompression mehr auf der internen Verbindung.** Gemessen kostete
+  sie auf dem internen Weg mehr Zeit, als die kleineren Antworten sparten; das Webtool fragt sie
+  deshalb nicht mehr an. Für Aufrufer von außen ändert sich nichts (ADR-0161).
+
 - **Edge: Stylesheets, Skripte und JSON-Antworten werden jetzt komprimiert ausgeliefert.** Bisher
   hat der Edge-Proxy nur HTML gepackt; CSS, JavaScript und API-Antworten gingen unkomprimiert
   raus. Seiten übertragen dadurch weniger Daten.
