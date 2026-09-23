@@ -164,6 +164,12 @@
 
 ### Fixed
 
+- **Images: der Start-Cache (AOT) baut im Release-Workflow und startet auf jeder CPU.** Der
+  Release-Builder reichte OpenTelemetry-Variablen in das Cache-Training, an denen jeder Build
+  scheiterte; und der Cache enthielt CPU-spezifischen Maschinencode, mit dem das Backend auf Rechnern
+  mit anderer CPU beim Start abstürzte. Das Training entfernt die Variablen jetzt und speichert nur
+  noch Klassen und Profile.
+
 - **Admin: Eingabefehler im Formular „Persönliches Inventar“ gehen nicht mehr verloren.** Beim
   Anlegen oder Bearbeiten für ein Mitglied blieb das Fenster nach einem Fehler geschlossen und
   leer; jetzt öffnet es sich wieder mit den Eingaben und den Fehlermeldungen.

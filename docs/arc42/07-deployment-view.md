@@ -237,8 +237,9 @@ same anchored signer identity (REQ-OPS-015).
 the healthcheck. The build runs `:<module>:bootJar` — exactly the artefact that ships, none of the
 `check` gates, which CI runs — and bakes a Java **AOT cache** (`/app/app.aot`) from a training start
 that refreshes the whole Spring context against stubs for the database, Keycloak and Redis. A
-training run that does not complete, or a cache a JVM with the image's object layout would refuse,
-fails the image build; a deployment whose `JAVA_TOOL_OPTIONS` layout differs starts without the cache
+training run that does not complete, a cache a JVM with the image's object layout would refuse, or a
+cache that holds machine code (it would crash a host with another CPU than the build runner's), fails
+the image build; a deployment whose `JAVA_TOOL_OPTIONS` layout differs starts without the cache
 and trips `JvmStartupCacheRejected` (REQ-OPS-030,
 [ADR-0209](../adr/0209-the-images-ship-a-java-aot-cache-trained-eagerly-and-verified-at-build.md)).
 The entrypoint is `java` itself, in exec form — no shell between the runtime and the JVM.

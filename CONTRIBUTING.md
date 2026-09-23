@@ -230,6 +230,18 @@ give that bean's dependency a stub in the module's `case` branch of the training
 ones show the patterns — an unresolvable `aot-training.invalid` host, a JWK set URI instead of an
 issuer, a property that skips a startup call). ADR-0209 has the reasons.
 
+`docker build` uses the local default builder, which is **not** the one `release-images.yml` builds
+with: that is a `docker-container` BuildKit, and it hands every `RUN` step environment variables the
+default builder does not (its `OTEL_*` tracing variables broke the training run on 2026-09-23, and
+the training `RUN` now unsets them). When you change the training `RUN` or the base image, build once
+the way the release does:
+
+```bash
+docker buildx create --name release-like --driver docker-container
+docker buildx build --builder release-like -f docker/app/Dockerfile --build-arg MODULE=ingest .
+docker buildx rm release-like
+```
+
 Hard project rule: **always use the Gradle wrapper** (`./gradlew`).
 Never the IDE test runner; never `mvn`; never a system-installed Gradle.
 This is what CI runs, this is what every contributor's machine runs,
