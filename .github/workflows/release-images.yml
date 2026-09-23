@@ -138,6 +138,11 @@ on:
 # token endpoint for a `pull` scope in a job whose own push had just succeeded.
 # The tag run died between tagging and signing, which is the worst place for it:
 # `:1.5.36` existed, unsigned, and `deploy.sh` verifies signatures fail-closed.
+#
+# The price of a per-commit group is one queued run per `main` push; 2026-09-23's
+# ~35 merges queued 29 of them and starved PR CI. The group stays per commit, and
+# instead `plan` skips a main-push run whose commit is no longer main's tip when it
+# starts — never a release commit's (ADR-0137 amendment).
 concurrency:
   group: release-images-${{ github.sha }}
   cancel-in-progress: false
@@ -228,7 +233,11 @@ jobs:
   #
   #   MAIN PATH (CI-07, ADR-0210, per module since 2026-09-23) — a main push rebuilds
   #   only the images whose inputs its range changed, and re-tags the others from
-  #   `:sha-<short>` of the previous main tip (`github.event.before`). Which paths
+  #   `:sha-<short>` of the newest main ancestor that has images — normally the
+  #   previous tip (`github.event.before`), an older one when that run was skipped,
+  #   cancelled or failed (at most 20 back). Before any of that, a main-push run
+  #   whose commit is no longer main's tip SKIPS entirely, unless its range holds a
+  #   release commit (ADR-0137 amendment, 2026-09-23). Which paths
   #   feed which image is decided by .github/scripts/image_reuse_plan.py, derived
   #   from docker/app/Dockerfile's COPY lines: `<module>/src/main` (and the
   #   frontend's OSS component list) is a module's own; everything else the build
@@ -269,6 +278,12 @@ jobs:
       # commit's on the tag path, the previous main tip's on the main path — for the
       # step summary and for debugging a reuse that did not happen.
       source_tag: ${{ steps.decide.outputs.source_tag }}
+      # 'true' when this main-push run is SUPERSEDED — its commit is no longer the
+      # tip of main at plan time (ADR-0137 amendment, 2026-09-23). Every job after
+      # `plan` is then skipped and the run ends green: the tip's own run publishes
+      # the newer state, and building this one would only move `:edge` back.
+      # Anything but the literal 'true' (a failed plan included) means "run".
+      skip: ${{ steps.decide.outputs.skip }}
 
     steps:
       # Derive the `:sha-<short>` tag of THIS commit through metadata-action itself
@@ -346,6 +361,7 @@ jobs:
               printf 'digests=%s\n' "$2"
               printf 'build_matrix=%s\n' "$matrix"
               printf 'source_tag=%s\n' "${4:-}"
+              printf 'skip=false\n'
             } >> "$GITHUB_OUTPUT"
             {
               echo "### Build plan"
@@ -467,15 +483,83 @@ jobs:
             decide '["backend","frontend","ingest"]' "$digests" "release tag: all three app images exist, are dual-arch and carry the main-branch run's signature" "$SOURCE_TAG"
           fi
 
-          # MAIN PATH — rebuild what the range changed, re-tag the rest from the
-          # previous main tip, per module.
+          # MAIN PATH — first: is this run superseded? Then rebuild what the range
+          # changed and re-tag the rest from the newest main ancestor that has images,
+          # per module.
           if [ "$REF" = "refs/heads/main" ]; then
-            plan=$(python3 .github/scripts/image_reuse_plan.py --base "$BEFORE" --head "$SHA") \
+            # SUPERSEDED RUNS SKIP (ADR-0137 amendment, 2026-09-23). The concurrency
+            # group stays per commit — a release commit and its tag must never run in
+            # parallel (v1.5.36, above) — so every main push queues a run of its own,
+            # and on a busy day the queue outgrew the runners: 29 queued behind ~35
+            # merges starved PR CI and E2E. A run whose commit is no longer main's tip
+            # when it gets here produces nothing anyone deploys; the tip's run does.
+            # Never for a release commit (the tag run re-tags ITS images) — the script
+            # recognises one the same way the reuse decision does — and never for a
+            # tag push or `workflow_dispatch`, which cannot reach this branch anyway.
+            # Fetched explicitly, anonymously, like ref-guard: "tip" means main as of
+            # now, not as of the checkout.
+            tip=""
+            if git fetch --no-tags --quiet origin '+refs/heads/main:refs/remotes/origin/main'; then
+              tip=$(git rev-parse refs/remotes/origin/main)
+            fi
+            skipcheck=$(python3 .github/scripts/image_reuse_plan.py --skip-check --event "$EVENT_NAME" \
+                          --pushed-ref "$REF" --head "$SHA" --before "$BEFORE" --tip "$tip") \
+              || skipcheck='{"skip": false, "reason": "the skip check failed; building"}'
+            echo "skip check: ${skipcheck}"
+            if [ "$(jq -r '.skip' <<< "$skipcheck")" = "true" ]; then
+              {
+                printf 'reused_modules=[]\n'
+                printf 'digests={}\n'
+                printf 'build_matrix=[]\n'
+                printf 'source_tag=\n'
+                printf 'skip=true\n'
+              } >> "$GITHUB_OUTPUT"
+              {
+                echo "### Build plan: skipped — superseded"
+                echo ""
+                echo "$(jq -r '.reason' <<< "$skipcheck")."
+                echo ""
+                echo "Nothing is built, tagged or signed by this run; every job after plan is skipped."
+              } >> "$GITHUB_STEP_SUMMARY"
+              echo "::notice title=Release Images skipped::${SHA:0:12} is superseded by main's tip ${tip:0:12}; no image is built, tagged or signed by this run"
+              exit 0
+            fi
+
+            # THE REUSE BASE is the newest main ancestor whose three images exist,
+            # starting at the previous tip. Its run may have been skipped (above),
+            # cancelled or failed, and a missing base used to force a full rebuild of
+            # all three. `merge` tags all three or none, so "all three exist" is the
+            # mark of a finished run; the per-image gates below still verify each one.
+            # Bounded (image_reuse_plan.py, 20 commits): nothing further back is
+            # worth it, and the seven-day gate would refuse most of it.
+            width=$(( ${#SOURCE_TAG} - 4 ))
+            base=""
+            candidates=$(python3 .github/scripts/image_reuse_plan.py --candidates --before "$BEFORE" --head "$SHA") \
+              || candidates=""
+            for candidate in $candidates; do
+              complete=true
+              for module in $MODULES; do
+                if ! docker buildx imagetools inspect "${IMAGE_PREFIX}-${module}:sha-${candidate:0:${width}}" \
+                     --format '{{.Manifest.Digest}}' >/dev/null 2>&1; then
+                  complete=false
+                  break
+                fi
+              done
+              if [ "$complete" = true ]; then
+                base="$candidate"
+                break
+              fi
+              echo "no complete image set for ${candidate:0:12}; trying its parent"
+            done
+            if [ -z "$base" ]; then
+              decide '[]' '{}' "full build: no main ancestor of ${SHA:0:12} within the search bound has all three images" ""
+            fi
+            [ "$base" = "$BEFORE" ] || echo "::notice title=Reuse base::the previous tip ${BEFORE:0:12} has no images; reusing from ${base:0:12}"
+
+            plan=$(python3 .github/scripts/image_reuse_plan.py --base "$base" --head "$SHA") \
               || decide '[]' '{}' "full build: image_reuse_plan.py failed" ""
             echo "image_reuse_plan: $(jq -c '{rebuild, reuse, reason}' <<< "$plan")"
-            # The previous tip's tag, at the width metadata-action used for ours.
-            width=$(( ${#SOURCE_TAG} - 4 ))
-            previous="sha-${BEFORE:0:${width}}"
+            previous="sha-${base:0:${width}}"
             reused='[]'
             digests='{}'
             notes=""
@@ -827,7 +911,7 @@ jobs:
     # exists for all three images or for none, which the next push's reuse lookup
     # relies on. `fail-fast: false` on the build matrix means one failed cell shows
     # up here as `needs.build.result == 'failure'`, which this expression rejects.
-    if: ${{ always() && needs.plan.result == 'success' && (needs.build.result == 'success' || (needs.build.result == 'skipped' && needs.plan.outputs.build_matrix == '[]')) }}
+    if: ${{ always() && needs.plan.result == 'success' && needs.plan.outputs.skip != 'true' && (needs.build.result == 'success' || (needs.build.result == 'skipped' && needs.plan.outputs.build_matrix == '[]')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # The signing job: tags the index, cosign-signs it keyless (`id-token`) and records the SLSA
@@ -1168,7 +1252,12 @@ jobs:
   # need to be kept away from -- which is the line `build-keycloak-spi` below is split along.
   build-config:
     name: Build & sign config bundle
-    needs: ref-guard
+    # Waits for `plan` only to learn whether this run is superseded (then skipped,
+    # like everything after `plan`). A FAILED plan does not stop it — this job never
+    # depended on the reuse decision — hence `!cancelled()` and the explicit
+    # ref-guard check instead of the default `success()`.
+    needs: [ref-guard, plan]
+    if: ${{ !cancelled() && needs.ref-guard.result == 'success' && needs.plan.outputs.skip != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -1363,7 +1452,12 @@ jobs:
   # no Gradle at all. The second job keeps the old id and name, so nothing that refers to it moves.
   keycloak-spi-jar:
     name: Compile keycloak-spi provider JAR
-    needs: ref-guard
+    # Waits for `plan` only to learn whether this run is superseded (then skipped,
+    # like everything after `plan`). A FAILED plan does not stop it — this job never
+    # depended on the reuse decision — hence `!cancelled()` and the explicit
+    # ref-guard check instead of the default `success()`.
+    needs: [ref-guard, plan]
+    if: ${{ !cancelled() && needs.ref-guard.result == 'success' && needs.plan.outputs.skip != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:

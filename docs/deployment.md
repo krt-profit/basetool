@@ -425,7 +425,10 @@ falls back to a full build. A `main` push does the same, per image, for every im
 did not change (ADR-0210) — so the three `:edge` / `:sha-<short>` images can carry different, earlier
 commits' revision labels, and the frontend's version chip can name an earlier commit; the release
 commit itself always builds all three, and `promote.yml` orders `:testing` against `:stable` by the
-config bundle's revision, which always names the published commit. The tag is created with a short-lived token of the **`basetool-release`
+config bundle's revision, which always names the published commit. A `main`-push run whose commit
+has been superseded by a newer `main` push before it starts skips entirely (green, "skipped —
+superseded" in its summary), so a busy merge day no longer queues one full pipeline per merge; a
+skipped commit has no `:sha-<short>` tag. A release commit's run never skips. The tag is created with a short-lived token of the **`basetool-release`
 GitHub App** (ADR-0201), minted from the secret `RELEASE_APP_PRIVATE_KEY`: the tag ruleset "Version"
 lets only that App and @greluc create `v*` tags, and an App token's events trigger
 `release-images.yml` where `GITHUB_TOKEN`'s would not. There is no fallback — without the key the
