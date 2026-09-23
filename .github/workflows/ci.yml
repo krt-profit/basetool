@@ -106,6 +106,19 @@ jobs:
             exit 1
           fi
 
+      # Every shipped module's SBOM must list exactly its resolved runtime classpath, project
+      # dependencies included (REQ-OPS-025). Each `cyclonedxBom` is finalized by
+      # `verifyCyclonedxBom`, which fails on any difference in either direction, so this proves on
+      # the PR -- not first at release time -- that the plugin still sees every component, that a
+      # new `implementation(project(...))` reaches the BOM, and that the SBOM tasks stay
+      # configuration-cache compatible. The regenerated files are not committed from here; the
+      # committed BOMs are release artifacts and only release-prepare.yml refreshes them.
+      - name: Check the SBOMs against the resolved runtime classpath
+        run: >-
+          ./gradlew :backend:cyclonedxBom :frontend:cyclonedxBom
+          :ingest:cyclonedxBom :keycloak-spi:cyclonedxBom
+          --no-build-cache --stacktrace --configuration-cache
+
       - name: Upload JUnit test reports
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

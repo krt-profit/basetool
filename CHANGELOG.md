@@ -163,6 +163,11 @@
   Anlegen oder Bearbeiten für ein Mitglied blieb das Fenster nach einem Fehler geschlossen und
   leer; jetzt öffnet es sich wieder mit den Eingaben und den Fehlermeldungen.
 
+- **Lieferkette: die Release-SBOMs werden immer frisch erzeugt und gegen den Laufzeit-Klassenpfad
+  geprüft.** Eine neue Projekt-Abhängigkeit wie `logging-support` ließ die CycloneDX-Aufgabe
+  unverändert bzw. aus dem Build-Cache kommen, sodass die Stückliste sie verschweigen konnte; jetzt
+  scheitert die Erzeugung (Release und jeder PR), wenn eine Komponente fehlt oder zu viel ist.
+
 - **Sicherheit: die Sitzungs-Typliste kennt jetzt alle Werte einer echten Anmeldung.** Im Modus
   `enforce` hätte sie das ID-Token jedes Mitglieds abgelehnt (eine Adresse und Zahlen in den
   Token-Angaben) und damit alle abgemeldet. Produktion läuft mit `report` und war nicht betroffen.

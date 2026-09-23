@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-23.
 > **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md), [ADR-0075](../adr/0075-host-side-cosign-signature-verification.md), [ADR-0079](../adr/0079-redis-session-store-aof-and-maxmemory-noeviction.md), [ADR-0083](../adr/0083-deploy-bot-health-drift-targeted-restart.md), [ADR-0145](../adr/0145-build-provenance-anchored-outside-the-registry.md), [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md), [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md), [ADR-0187](../adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md), [ADR-0188](../adr/0188-the-host-bootstrap-is-an-ansible-role.md), [ADR-0189](../adr/0189-stateful-containers-run-as-their-own-uid.md), [ADR-0190](../adr/0190-every-container-but-keycloak-runs-read-only.md), [ADR-0196](../adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md)
 
 # Deployment delivery & promotion
@@ -1443,6 +1443,26 @@ build-system reference and the `^runtimeClasspath$` restriction are set once, in
 applies it — four copies of the same block had been maintained by hand until then. Verified at the
 move: the component lists of all four BOMs were identical before and after.
 
+**Always a fresh generation, and checked against the classpath (2026-09-23).** cyclonedx-gradle
+3.4.1 declares `cyclonedxDirectBom` cacheable, and the only input it gives the dependency graph is
+the set of resolved artifact **files**. A project dependency contributes no file there, so adding
+`implementation(project(":logging-support"))` to the three applications changed no input: the
+task reported `UP-TO-DATE` — or came `FROM-CACHE` out of a build cache, which the release workflow
+restores — and the BOM kept its old component list. Reproduced on `:ingest` in both directions
+(dependency removed, the BOM still listed it; added back, the BOM still did not) until
+`--rerun-tasks`. Two measures close it:
+
+- both SBOM tasks are **untracked** (`doNotTrackState` in the root `build.gradle.kts`), so they
+  execute on every invocation and never read or write the build cache; `release-prepare.yml`
+  additionally passes `--no-build-cache`, so a release stays fresh even if the build script
+  regresses;
+- every `cyclonedxBom` is finalized by **`verifyCyclonedxBom`**, which fails unless the written BOM
+  lists **exactly** the components of the module's resolved `runtimeClasspath` — every external
+  module at its resolved version and every project dependency — in both directions. It runs in
+  `release-prepare.yml` and, on every pull request, in `ci.yml` (with the configuration cache), so
+  a plugin upgrade that stops seeing a component fails the PR that brings it rather than the next
+  release.
+
 **Why an assertion and not a habit.** By v1.7.3 the set had drifted in both directions available to
 it, and neither drift failed anything:
 
@@ -1479,9 +1499,16 @@ Recorded here rather than left to look like an oversight.
   REQ-OPS-023 closed.
 - [ ] `check_sbom_coverage.py` runs on every pull request via `repo-lint.yml` and fails on any of
   the above.
+- [ ] `cyclonedxDirectBom` and `cyclonedxBom` are untracked, and `release-prepare.yml` regenerates
+  with `--no-build-cache`: a release SBOM is never `UP-TO-DATE` or `FROM-CACHE`.
+- [ ] `verifyCyclonedxBom` finalizes every `cyclonedxBom` and fails when the BOM's components differ
+  from the resolved `runtimeClasspath` in either direction; `ci.yml` runs it for all four modules on
+  every pull request, and `check_sbom_coverage.py` fails if the untracking, the finalizer or the
+  `--no-build-cache` flag is removed.
 
 **Enforced by:** `.github/scripts/check_sbom_coverage.py` · `.github/workflows/repo-lint.yml`
-(`sbom-coverage`) · `.github/workflows/release-prepare.yml` · `.github/workflows/release-publish.yml`
+(`sbom-coverage`) · `verifyCyclonedxBom` (root `build.gradle.kts`) · `.github/workflows/ci.yml` ·
+`.github/workflows/release-prepare.yml` · `.github/workflows/release-publish.yml`
 · **Related:** REQ-OPS-023 (their provenance), REQ-OPS-024 (what is scanned), REQ-OPS-029 (the
 release notes that have to name this same set)
 
