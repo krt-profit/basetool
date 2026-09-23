@@ -158,8 +158,10 @@
 
                 if (group.getAttribute('data-validate-not-past') === 'true') {
                     if (selectedDate < currentDate) {
-                        errorDiv.textContent =
-                            group.getAttribute('data-error-past') || 'Date cannot be in the past.';
+                        errorDiv.textContent = window.krtI18nText(
+                            group.getAttribute('data-error-past'),
+                            'data-error-past',
+                        );
                         errorDiv.style.display = '';
                     }
                 }
@@ -170,9 +172,10 @@
                     if (targetHidden && targetHidden.value) {
                         const targetDate = new Date(targetHidden.value);
                         if (selectedDate <= targetDate) {
-                            errorDiv.textContent =
-                                group.getAttribute('data-error-after') ||
-                                'End time must be after start time.';
+                            errorDiv.textContent = window.krtI18nText(
+                                group.getAttribute('data-error-after'),
+                                'data-error-after',
+                            );
                             errorDiv.style.display = '';
                         }
                     }

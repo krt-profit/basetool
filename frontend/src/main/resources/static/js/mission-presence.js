@@ -39,9 +39,9 @@
     const HEARTBEAT_MS = 60000;
     const SECTION_SELECTOR = '[data-panel-key]';
 
-    function i18n(key, fallback) {
+    function i18n(key) {
         const dict = window.MISSION_PRESENCE_I18N || {};
-        return dict[key] != null && dict[key] !== '' ? dict[key] : fallback || key;
+        return window.krtI18nText(dict[key], 'MISSION_PRESENCE_I18N[' + key + ']');
     }
 
     function MissionPresence(missionId, currentUserId) {
@@ -253,10 +253,10 @@
                 .filter(Boolean);
             let tooltip;
             if (editors.length === 1) {
-                tooltip = i18n('mission.presence.editing.solo', 'wird gerade bearbeitet von');
+                tooltip = i18n('mission.presence.editing.solo');
                 tooltip = tooltip + ' ' + (names[0] || '');
             } else {
-                tooltip = i18n('mission.presence.editing.multi', 'wird gerade bearbeitet von');
+                tooltip = i18n('mission.presence.editing.multi');
                 tooltip = tooltip + ' ' + names.join(', ');
             }
             indicator.setAttribute('title', tooltip);

@@ -161,7 +161,9 @@
             return;
         }
         if (!items || items.length === 0) {
-            renderMessage(i18n.noResults || 'Keine Treffer');
+            renderMessage(
+                window.krtI18nText(i18n.noResults, 'krtDefaultBlueprints.i18n.noResults'),
+            );
             return;
         }
         const host = resultsEl;
@@ -182,7 +184,11 @@
                 const variants = document.createElement('span');
                 variants.className = 'krt-pi-typeahead-variants';
                 variants.textContent =
-                    ' (' + item.variantCount + ' ' + (i18n.variants || 'Varianten') + ')';
+                    ' (' +
+                    item.variantCount +
+                    ' ' +
+                    window.krtI18nText(i18n.variants, 'krtDefaultBlueprints.i18n.variants') +
+                    ')';
                 label.appendChild(variants);
             }
             button.appendChild(label);
@@ -190,7 +196,12 @@
             const tag = document.createElement('span');
             tag.className = 'krt-pi-typeahead-tag';
             if (isDefault) {
-                tag.textContent = ' · ' + (i18n.alreadyDefault || 'Bereits Standard');
+                tag.textContent =
+                    ' · ' +
+                    window.krtI18nText(
+                        i18n.alreadyDefault,
+                        'krtDefaultBlueprints.i18n.alreadyDefault',
+                    );
             }
             button.appendChild(tag);
 
@@ -208,7 +219,7 @@
             hideResults();
             return;
         }
-        renderMessage(i18n.searching || 'Suche...');
+        renderMessage(window.krtI18nText(i18n.searching, 'krtDefaultBlueprints.i18n.searching'));
         const url = cfg.searchUrl + '?q=' + encodeURIComponent(q.trim()) + '&limit=25';
         window
             .fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
@@ -217,7 +228,9 @@
             })
             .then(renderResults)
             .catch(function () {
-                renderMessage(i18n.noResults || 'Keine Treffer');
+                renderMessage(
+                    window.krtI18nText(i18n.noResults, 'krtDefaultBlueprints.i18n.noResults'),
+                );
             });
     }
 
@@ -354,7 +367,10 @@
             ? /** @type {HTMLFormElement | null} */ (document.getElementById(formId))
             : null;
         if (deleteMessage) {
-            const base = i18n.removeBody || 'Wirklich entfernen?';
+            const base = window.krtI18nText(
+                i18n.removeBody,
+                'krtDefaultBlueprints.i18n.removeBody',
+            );
             deleteMessage.textContent = name ? base + ' (' + name + ')' : base;
         }
         deleteModal.style.display = 'flex';

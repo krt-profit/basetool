@@ -2,7 +2,7 @@ server:
   tomcat:
     # No Tomcat MBean registry (FE-PERF-07, 2026-09-22). It was enabled only so TomcatMetrics could
     # publish tomcat_threads_* for the "Spring Boot apps" dashboard (epic #936), but under virtual
-    # threads those gauges are always -1; the panel reads http_server_requests_active_seconds_gcount.
+    # threads those gauges are always -1; the panel reads http_server_requests_active_seconds_count.
     relaxed-query-chars: "{,},[,]"
     relaxed-path-chars: "{,},[,]"
     # Connector-level limits made explicit (M-3 from the performance audit). With
@@ -589,6 +589,12 @@ management:
       # enum (~7 values), so the added bucket cardinality is negligible.
       percentiles-histogram:
         "[http.server.requests]": true
+        # The in-flight long-task timers Micrometer derives from each observation
+        # (`<name>.active`) inherit the histogram by prefix, which exported ~50 bucket series per
+        # label set that nothing reads: the In-flight Requests panel reads only `_count`.
+        # Switched off for the `.active` timers alone; the latency histograms stay
+        # (ManagementPortIsolationTest).
+        "[http.server.requests.active]": false
         "[basetool.scheduled.job.duration]": true
       minimum-expected-value:
         "[http.server.requests]": 5ms

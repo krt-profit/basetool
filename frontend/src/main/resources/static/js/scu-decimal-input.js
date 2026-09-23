@@ -211,8 +211,8 @@
         }
         const i18n = root.krtScuI18n || {};
         return isIntegerMode(el)
-            ? i18n.piece || 'Please enter a whole number greater than 0.'
-            : i18n.scu || 'Please enter an amount greater than 0.';
+            ? window.krtI18nText(i18n.piece, 'krtScuI18n.piece')
+            : window.krtI18nText(i18n.scu, 'krtScuI18n.scu');
     }
 
     /**

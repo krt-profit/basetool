@@ -20,8 +20,9 @@
  *  - Loaded FIRST and WITHOUT `defer` (see fragments/head.html). A handler installed after the
  *    scripts it is meant to watch cannot observe their failures, and `defer` would install it
  *    after the entire head has been parsed and executed.
- *  - No new global. The module registers two window listeners and one document listener and
- *    exposes nothing.
+ *  - One global, and only one. The module registers two window listeners and one document
+ *    listener, and exposes `window.krtI18nText` (below): the check every script runs on a
+ *    localized string, which reports a missing one through this beacon.
  *  - Per-session token bucket. The reporter is self-triggerable — an error inside a rAF/scroll/
  *    input handler repeats at frame rate — so the budget is capped and, crucially, PERSISTED in
  *    sessionStorage: a page that throws during load and a user who hammers F5 must not reset it.
@@ -74,6 +75,7 @@
     const KIND_UNHANDLED_REJECTION = 'unhandled_rejection';
     const KIND_RESOURCE_ERROR = 'resource_error';
     const KIND_CSP_VIOLATION = 'csp_violation';
+    const KIND_I18N_MISSING = 'i18n_missing';
 
     // Client-side cap per free-text field. The server truncates again — this one only keeps the
     // request small; the server's is the one that is actually a guarantee.
@@ -389,4 +391,41 @@
             /* one broken handler must never become two */
         }
     });
+
+    // Keys already reported on this page view, so a missing string rendered in a loop (a list row,
+    // a re-rendered status line) costs one report and one token, not one per render.
+    const reportedI18nKeys = new Set();
+
+    /**
+     * Returns a localized string, or makes its absence visible.
+     *
+     * Every browser script takes its wording from the page (a th:inline bootstrap dictionary, a
+     * window.krt*I18n object, a data-* attribute) and passes it through here. A non-empty string is
+     * returned as it is. Anything else means the page did not provide the key: the function reports
+     * it once per page view as an `i18n_missing` client error (message = the key name, which is a
+     * fixed identifier and never user data) and returns the key name itself, so the gap shows in
+     * the UI instead of hiding behind a hardcoded default (owner decision 2026-09-23).
+     *
+     * @param {unknown} value the localized string the page provided, if any
+     * @param {string} key the name that identifies the string: `DICTIONARY.property` for a
+     *     bootstrap object or `data-attribute` for a markup attribute
+     * @returns {string} the localized string, or the key name when it is missing
+     */
+    function i18nText(value, key) {
+        if (typeof value === 'string' && value !== '') {
+            return value;
+        }
+        const name = String(key);
+        if (!reportedI18nKeys.has(name)) {
+            reportedI18nKeys.add(name);
+            try {
+                report(KIND_I18N_MISSING, name, null, null, null);
+            } catch (_reportFailed) {
+                /* reporting a missing string must never break the caller */
+            }
+        }
+        return name;
+    }
+
+    window.krtI18nText = i18nText;
 })();

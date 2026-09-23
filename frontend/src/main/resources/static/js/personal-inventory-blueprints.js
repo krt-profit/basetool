@@ -190,7 +190,7 @@
         resultsEl.hidden = false;
         resultsEl.innerHTML =
             '<div class="krt-pi-typeahead-loading">' +
-            escapeHtml(i18n().searching || 'Suche...') +
+            escapeHtml(window.krtI18nText(i18n().searching, 'krtBlueprintsI18n.searching')) +
             '</div>';
         fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
             .then(function (resp) {
@@ -207,7 +207,7 @@
         if (!items || items.length === 0) {
             resultsEl.innerHTML =
                 '<div class="krt-pi-typeahead-empty">' +
-                escapeHtml(i18n().noResults || 'Keine Treffer') +
+                escapeHtml(window.krtI18nText(i18n().noResults, 'krtBlueprintsI18n.noResults')) +
                 '</div>';
             return;
         }
@@ -223,9 +223,13 @@
             // sink sees is a literal or an escapeHtml / escapeAttr result (FE-SEC-05).
             let meta = escapeHtml(it.manufacturerName || '');
             if (blocked) {
-                meta = escapeHtml(i18n().owned || 'Bereits vorhanden');
+                meta = escapeHtml(window.krtI18nText(i18n().owned, 'krtBlueprintsI18n.owned'));
             } else if (it.variantCount && it.variantCount > 1) {
-                meta = escapeHtml(it.variantCount + ' ' + (i18n().variants || 'Varianten'));
+                meta = escapeHtml(
+                    it.variantCount +
+                        ' ' +
+                        window.krtI18nText(i18n().variants, 'krtBlueprintsI18n.variants'),
+                );
             }
             let disabledAttr = '';
             if (blocked) {
@@ -291,7 +295,10 @@
         } else {
             // DS staging chip: the canonical squared .chip (chip--primary), not the bespoke
             // .krt-bp-chip orange-border box. The inline remove × keeps its i18n accessible name.
-            const removeLabel = i18n().chipRemove || 'Entfernen';
+            const removeLabel = window.krtI18nText(
+                i18n().chipRemove,
+                'krtBlueprintsI18n.chipRemove',
+            );
             staged.forEach(function (name, key) {
                 html +=
                     '<span class="chip chip--primary" data-key="' +
@@ -401,11 +408,11 @@
                 onSuccess(result) {
                     const res = result || {};
                     const msg =
-                        (i18n().addedLabel || 'added') +
+                        window.krtI18nText(i18n().addedLabel, 'krtBlueprintsI18n.addedLabel') +
                         ': ' +
                         (res.added || 0) +
                         ', ' +
-                        (i18n().skippedLabel || 'skipped') +
+                        window.krtI18nText(i18n().skippedLabel, 'krtBlueprintsI18n.skippedLabel') +
                         ': ' +
                         ((res.skippedAlreadyOwned || 0) + (res.skippedUnresolved || 0));
                     if (window.showFrontendSuccessToast) {

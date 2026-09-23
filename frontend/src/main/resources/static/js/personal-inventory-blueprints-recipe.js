@@ -230,7 +230,9 @@
         nameEl.textContent = name;
         const formatted = formatAcquired(acquired);
         acquiredEl.textContent = formatted
-            ? (i18n().acquiredLabel || 'Erhalten am') + ' ' + formatted
+            ? window.krtI18nText(i18n().acquiredLabel, 'krtBlueprintsRecipeI18n.acquiredLabel') +
+              ' ' +
+              formatted
             : '';
 
         // The pane's edit/remove buttons reuse the existing bp-open-edit/bp-open-delete
@@ -277,7 +279,13 @@
             return;
         }
         clear(recipeEl);
-        recipeEl.appendChild(el('div', 'krt-bp-recipe-loading', i18n().loading || 'Loading...'));
+        recipeEl.appendChild(
+            el(
+                'div',
+                'krt-bp-recipe-loading',
+                window.krtI18nText(i18n().loading, 'krtBlueprintsRecipeI18n.loading'),
+            ),
+        );
         fetch(resolveUrl(endpoints().recipe, id), {
             credentials: 'same-origin',
             headers: { Accept: 'application/json' },
@@ -306,7 +314,13 @@
             return;
         }
         clear(recipeEl);
-        recipeEl.appendChild(el('div', 'krt-bp-recipe-error', i18n().error || 'Error.'));
+        recipeEl.appendChild(
+            el(
+                'div',
+                'krt-bp-recipe-error',
+                window.krtI18nText(i18n().error, 'krtBlueprintsRecipeI18n.error'),
+            ),
+        );
     }
 
     /* -------------------------------------------------------------- rendering */
@@ -320,7 +334,11 @@
         const flat = recipe.ingredients || [];
         if (groups.length === 0 && flat.length === 0) {
             recipeEl.appendChild(
-                el('div', 'krt-bp-recipe-empty', i18n().empty || 'No recipe data.'),
+                el(
+                    'div',
+                    'krt-bp-recipe-empty',
+                    window.krtI18nText(i18n().empty, 'krtBlueprintsRecipeI18n.empty'),
+                ),
             );
             return;
         }
@@ -329,9 +347,9 @@
             const hint =
                 recipe.variantCount +
                 ' ' +
-                (i18n().variants || 'variants') +
+                window.krtI18nText(i18n().variants, 'krtBlueprintsRecipeI18n.variants') +
                 ' · ' +
-                (i18n().exampleRecipe || 'example recipe');
+                window.krtI18nText(i18n().exampleRecipe, 'krtBlueprintsRecipeI18n.exampleRecipe');
             recipeEl.appendChild(el('p', 'krt-bp-recipe-variants', hint));
         }
 
@@ -448,7 +466,7 @@
             range.value = String(defaultQ);
             range.setAttribute(
                 'aria-label',
-                (i18n().qualityAria || 'Quality') +
+                window.krtI18nText(i18n().qualityAria, 'krtBlueprintsRecipeI18n.qualityAria') +
                     (firstIngredientName ? ' ' + firstIngredientName : ''),
             );
             qrow.appendChild(range);
@@ -520,7 +538,11 @@
             metaParts.push(ing.quantityUnits + 'x');
         }
         if (ing.minQuality != null) {
-            metaParts.push((i18n().minQuality || 'min. quality') + ' ' + ing.minQuality);
+            metaParts.push(
+                window.krtI18nText(i18n().minQuality, 'krtBlueprintsRecipeI18n.minQuality') +
+                    ' ' +
+                    ing.minQuality,
+            );
         }
         if (metaParts.length > 0) {
             const small = document.createElement('small');
@@ -532,13 +554,16 @@
 
     function betterWhenText(bw) {
         if (bw === 'higher') {
-            return i18n().betterHigher || 'higher is better';
+            return window.krtI18nText(i18n().betterHigher, 'krtBlueprintsRecipeI18n.betterHigher');
         }
         if (bw === 'lower') {
-            return i18n().betterLower || 'lower is better';
+            return window.krtI18nText(i18n().betterLower, 'krtBlueprintsRecipeI18n.betterLower');
         }
         if (bw === 'neutral') {
-            return i18n().betterNeutral || 'neutral';
+            return window.krtI18nText(
+                i18n().betterNeutral,
+                'krtBlueprintsRecipeI18n.betterNeutral',
+            );
         }
         return null;
     }
@@ -604,7 +629,9 @@
     // The unit label for a material's quantityType ('PIECE' -> Stück, anything else -> SCU). Mirrors
     // the unit-aware rendering every other inventory surface uses (inventory-index.html et al.).
     function unitLabel(quantityType) {
-        return quantityType === 'PIECE' ? i18n().unitPiece || 'Stück' : i18n().unitScu || 'SCU';
+        return quantityType === 'PIECE'
+            ? window.krtI18nText(i18n().unitPiece, 'krtBlueprintsRecipeI18n.unitPiece')
+            : i18n().unitScu || 'SCU';
     }
 
     // Formats a quantity in its material's own unit: whole pieces for PIECE, the trimmed 2-decimal
@@ -704,7 +731,10 @@
                 }
             } else {
                 badge.classList.add('is-missing');
-                badge.textContent = i18n().badgeMissing || 'fehlt';
+                badge.textContent = window.krtI18nText(
+                    i18n().badgeMissing,
+                    'krtBlueprintsRecipeI18n.badgeMissing',
+                );
             }
         });
     }
@@ -721,11 +751,21 @@
             return;
         }
         detailCraftEl.hidden = false;
-        detailCraftEl.appendChild(el('h2', 'section-title', i18n().craftTitle || 'Craftbarkeit'));
+        detailCraftEl.appendChild(
+            el(
+                'h2',
+                'section-title',
+                window.krtI18nText(i18n().craftTitle, 'krtBlueprintsRecipeI18n.craftTitle'),
+            ),
+        );
 
         if (!data.recipeResolved) {
             detailCraftEl.appendChild(
-                el('p', 'krt-bp-craft-note', i18n().noRecipe || 'No recipe.'),
+                el(
+                    'p',
+                    'krt-bp-craft-note',
+                    window.krtI18nText(i18n().noRecipe, 'krtBlueprintsRecipeI18n.noRecipe'),
+                ),
             );
             return;
         }
@@ -734,7 +774,10 @@
                 el(
                     'p',
                     'krt-bp-craft-note',
-                    i18n().itemNotEvaluated || 'Only ITEM ingredients — not evaluated.',
+                    window.krtI18nText(
+                        i18n().itemNotEvaluated,
+                        'krtBlueprintsRecipeI18n.itemNotEvaluated',
+                    ),
                 ),
             );
             return;
@@ -742,7 +785,13 @@
 
         const count = refineryOn ? data.craftableWithRefinery : data.craftable;
         const summary = el('div', 'krt-bp-craft-summary');
-        summary.appendChild(el('span', 'krt-bp-craft-label', i18n().craftableLabel || 'Craftbar'));
+        summary.appendChild(
+            el(
+                'span',
+                'krt-bp-craft-label',
+                window.krtI18nText(i18n().craftableLabel, 'krtBlueprintsRecipeI18n.craftableLabel'),
+            ),
+        );
         const countEl = el(
             'span',
             'krt-bp-craft-count chip ' + (count > 0 ? 'chip--success' : 'chip--warning'),
@@ -755,7 +804,10 @@
                 countEl.appendChild(mark);
             }
         } else {
-            countEl.textContent = i18n().notCraftable || 'Nicht craftbar';
+            countEl.textContent = window.krtI18nText(
+                i18n().notCraftable,
+                'krtBlueprintsRecipeI18n.notCraftable',
+            );
         }
         summary.appendChild(countEl);
         const limit = refineryOn
@@ -766,7 +818,9 @@
                 el(
                     'span',
                     'krt-bp-craft-limit',
-                    (i18n().limitedBy || 'limitiert durch') + ' ' + limit,
+                    window.krtI18nText(i18n().limitedBy, 'krtBlueprintsRecipeI18n.limitedBy') +
+                        ' ' +
+                        limit,
                 ),
             );
         }
@@ -795,7 +849,14 @@
                     el(
                         'span',
                         'krt-bp-craft-mat-q',
-                        eff != null ? (i18n().qualityShort || 'Q') + ' ' + Math.round(eff) : '–',
+                        eff != null
+                            ? window.krtI18nText(
+                                  i18n().qualityShort,
+                                  'krtBlueprintsRecipeI18n.qualityShort',
+                              ) +
+                                  ' ' +
+                                  Math.round(eff)
+                            : '–',
                     ),
                 );
                 if (missing > 0) {

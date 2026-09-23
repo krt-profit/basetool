@@ -229,6 +229,23 @@
       page would be five copies of one sentence, and the previous behaviour — echoing the backend's
       own English `detail` into a German toast — is exactly what this replaces.
     -->
+    <!--
+      The page-wide defaults krt-fetch.js falls back to when a caller passes no localized string of
+      its own: the success / failure toast of a write and the optimistic-lock conflict dialog. They
+      replaced literal German defaults in the script (2026-09-23); a key missing here renders as its
+      name and is reported as an `i18n_missing` client error (window.krtI18nText).
+    -->
+    <script th:inline="javascript" th:attr="nonce=${cspNonce}">
+        window.krtFetchI18n = {
+            saved: /*[[#{frontend.ajax.saved}]]*/ 'Saved.',
+            saveFailed: /*[[#{frontend.ajax.saveFailed}]]*/ 'Save failed.',
+            conflictTitle: /*[[#{frontend.ajax.conflict.title}]]*/ 'Conflict',
+            conflictDetail: /*[[#{frontend.ajax.conflict.detail}]]*/ 'Please reload the page.',
+            conflictReload: /*[[#{frontend.ajax.conflict.reload}]]*/ 'Load current values',
+            conflictDismiss: /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Close',
+            conflictQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Load current values?'
+        };
+    </script>
     <script th:inline="javascript" th:attr="nonce=${cspNonce}">
         window.krtOwnerPickerI18n = {
             required: /*[[#{ownerPicker.error.required}]]*/ 'Please choose an org unit for this entry.'

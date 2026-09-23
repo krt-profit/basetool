@@ -63,24 +63,24 @@
 
     /**
      * The localized strings the picker renders, injected as the page global `herkunftI18n` by the
-     * template's th:inline bootstrap block. The fallback keeps the module usable (English-ish) if a
-     * page forgot to declare it.
+     * template's th:inline bootstrap block. There is no literal fallback (2026-09-23): a string the
+     * page did not declare renders as its key name and is reported as an `i18n_missing` client
+     * error (window.krtI18nText).
      *
      * @returns {object} the active string bundle
      */
     function i18n() {
-        return (
-            window.herkunftI18n || {
-                order: 'Order',
-                mission: 'Mission',
-                rest: 'From rest: {0}',
-                min: 'Assign at least {0} to tags',
-                proceedsTitle: 'Sale proceeds',
-                personal: 'Personal: {0}',
-                auec: 'aUEC',
-                auto: 'Filled in automatically: only tag, no rest',
-            }
-        );
+        const d = window.herkunftI18n || {};
+        return {
+            order: window.krtI18nText(d.order, 'herkunftI18n.order'),
+            mission: window.krtI18nText(d.mission, 'herkunftI18n.mission'),
+            rest: window.krtI18nText(d.rest, 'herkunftI18n.rest'),
+            min: window.krtI18nText(d.min, 'herkunftI18n.min'),
+            proceedsTitle: window.krtI18nText(d.proceedsTitle, 'herkunftI18n.proceedsTitle'),
+            personal: window.krtI18nText(d.personal, 'herkunftI18n.personal'),
+            auec: window.krtI18nText(d.auec, 'herkunftI18n.auec'),
+            auto: window.krtI18nText(d.auto, 'herkunftI18n.auto'),
+        };
     }
 
     /**

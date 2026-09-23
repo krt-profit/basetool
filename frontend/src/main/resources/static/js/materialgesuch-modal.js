@@ -87,7 +87,7 @@
         const counter = q('[data-mg-charcount]');
         if (ta && counter) {
             counter.textContent = fmt(
-                i18n.charCounter || '{0} / 20.000',
+                window.krtI18nText(i18n.charCounter, 'materialgesuchI18n.charCounter'),
                 ta.value.length.toLocaleString('de-DE'),
             );
         }
@@ -99,7 +99,9 @@
         const unit = q('[data-mg-qty-unit]');
         const input = q('[data-mg-qty]');
         if (unit) {
-            unit.textContent = isPiece ? i18n.unitPiece || 'Stück' : i18n.unitScu || 'SCU';
+            unit.textContent = isPiece
+                ? window.krtI18nText(i18n.unitPiece, 'materialgesuchI18n.unitPiece')
+                : i18n.unitScu || 'SCU';
         }
         if (input) {
             input.step = isPiece ? '1' : '0.001';
@@ -311,7 +313,9 @@
         let html = '';
         materialItems.forEach(function (it) {
             const unit =
-                it.quantityType === 'PIECE' ? i18n.unitPiece || 'Stück' : i18n.unitScu || 'SCU';
+                it.quantityType === 'PIECE'
+                    ? window.krtI18nText(i18n.unitPiece, 'materialgesuchI18n.unitPiece')
+                    : i18n.unitScu || 'SCU';
             html +=
                 '<li class="krt-combobox__option" role="option" data-material-id="' +
                 escapeAttr(it.id) +

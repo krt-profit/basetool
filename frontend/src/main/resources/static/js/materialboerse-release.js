@@ -109,7 +109,7 @@
             return (
                 n.toLocaleString('de-DE', { maximumFractionDigits: 0 }) +
                 ' ' +
-                (i18n.unitPiece || 'Stk')
+                window.krtI18nText(i18n.unitPiece, 'materialboerseI18n.unitPiece')
             );
         }
         return (
@@ -141,7 +141,9 @@
         const maxNum = max == null || max === '' ? NaN : Number(max);
         state.available = isNaN(maxNum) ? null : maxNum;
         if (unit) {
-            unit.textContent = isPiece ? i18n.unitPiece || 'Stück' : i18n.unitScu || 'SCU';
+            unit.textContent = isPiece
+                ? window.krtI18nText(i18n.unitPiece, 'materialboerseI18n.unitPiece')
+                : i18n.unitScu || 'SCU';
         }
         if (input) {
             input.step = isPiece ? '1' : '0.001';
@@ -159,7 +161,7 @@
             hint.textContent =
                 state.available != null
                     ? fmt(
-                          i18n.amountMax || 'max. {0} verfügbar',
+                          window.krtI18nText(i18n.amountMax, 'materialboerseI18n.amountMax'),
                           formatAmount(state.available, state.quantityType),
                       )
                     : '';
@@ -202,7 +204,7 @@
         const counter = q('[data-mb-charcount]');
         if (ta && counter) {
             counter.textContent = fmt(
-                i18n.charCounter || '{0} / 20.000',
+                window.krtI18nText(i18n.charCounter, 'materialboerseI18n.charCounter'),
                 ta.value.length.toLocaleString('de-DE'),
             );
         }

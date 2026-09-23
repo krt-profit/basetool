@@ -43,8 +43,14 @@
 
     const DATA_URL = config.getAttribute('data-data-url');
     const I18N = {
-        material: config.getAttribute('data-label-material') || 'Material',
-        unsorted: config.getAttribute('data-label-unsorted') || 'Unsortiert',
+        material: window.krtI18nText(
+            config.getAttribute('data-label-material'),
+            'data-label-material',
+        ),
+        unsorted: window.krtI18nText(
+            config.getAttribute('data-label-unsorted'),
+            'data-label-unsorted',
+        ),
         unsortedSentinel: 'Unsortiert',
         noResults: config.getAttribute('data-label-no-results') || '',
         illegal: config.getAttribute('data-label-illegal') || '',

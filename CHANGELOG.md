@@ -42,6 +42,10 @@
   
 ### Added
 
+- **Einsätze: die Mitglieder-Suche bei Teilnehmer und Partyleiter sagt, wenn es mehr Treffer gibt.**
+  Beide Listen zeigen höchstens 50 Namen und darunter „Weiter tippen, um die Liste einzugrenzen…",
+  statt still alle Treffer zu laden.
+
 - **App: Einsatzleitung kann wieder Mitglieder zu einem Einsatz hinzufügen.** Dafür gibt es einen
   eigenen, nur für Verwalter freigegebenen Weg, der ein Mitglied ausschließlich per ID einträgt
   (`POST …/participants/by-id/slim`); die allgemeinen Anmelde-Wege bleiben für die App gesperrt.
@@ -57,6 +61,13 @@
   Deploy-Timer eine Stunde lang nichts prüft.
 
 ### Changed
+
+- **Lager: Mehrfachfilter sind auf beiden Seiten gleich beschriftet.** Sind keine oder alle
+  Einträge angehakt, steht dort „Alle", sonst der Name oder „N ausgewählt". „Mein Lager" zeigte bei
+  allen angehakten Einträgen bisher „N ausgewählt".
+
+- **Oberfläche: fehlende Übersetzungen fallen auf.** Fehlt einer Seite ein Text, zeigt sie den
+  Schlüsselnamen statt eines fest eingebauten Ersatztexts und meldet die Lücke ans Monitoring.
 
 - **UEX-Abgleich: ein fehlerhafter Datensatz kostet nur noch sich selbst.** Preise, Rohstoffe,
   Raffinerie-Ausbeuten und Universumsdaten werden nach dem Abruf in kleinen, getrennten Paketen

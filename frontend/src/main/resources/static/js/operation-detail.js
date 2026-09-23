@@ -298,7 +298,9 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     function insertLink() {
         const s = input.selectionStart,
             e = input.selectionEnd;
-        const sel = input.value.slice(s, e) || 'Text';
+        const sel =
+            input.value.slice(s, e) ||
+            window.krtI18nText(OPS_DETAIL_MSG.linkText, 'OPS_DETAIL_MSG.linkText');
         input.setRangeText('[' + sel + '](https://)', s, e, 'end');
         input.focus();
     }

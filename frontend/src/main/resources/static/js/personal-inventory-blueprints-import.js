@@ -122,7 +122,10 @@
     function handoffNotFound() {
         if (window.showFrontendErrorToast) {
             window.showFrontendErrorToast(
-                i18n().handoffNotFound || i18n().error || 'Import link expired.',
+                window.krtI18nText(
+                    i18n().handoffNotFound || i18n().error,
+                    'krtBlueprintsImportI18n.handoffNotFound',
+                ),
             );
         }
     }
@@ -170,23 +173,29 @@
         if (!bodyEl) return;
         if (summaryEl) {
             summaryEl.textContent =
-                (i18n().summary || 'Entries') +
+                window.krtI18nText(i18n().summary, 'krtBlueprintsImportI18n.summary') +
                 ': ' +
                 (preview.total || 0) +
                 ' · ' +
-                (i18n().groupMatched || 'Matched') +
+                window.krtI18nText(i18n().groupMatched, 'krtBlueprintsImportI18n.groupMatched') +
                 ': ' +
                 ((preview.matched || 0) + (preview.matchedByAlias || 0)) +
                 ' · ' +
-                (i18n().groupSuggested || 'Suggested') +
+                window.krtI18nText(
+                    i18n().groupSuggested,
+                    'krtBlueprintsImportI18n.groupSuggested',
+                ) +
                 ': ' +
                 (preview.suggested || 0) +
                 ' · ' +
-                (i18n().groupUnmatched || 'Unmatched') +
+                window.krtI18nText(
+                    i18n().groupUnmatched,
+                    'krtBlueprintsImportI18n.groupUnmatched',
+                ) +
                 ': ' +
                 (preview.unmatched || 0) +
                 ' · ' +
-                (i18n().groupOwned || 'Owned') +
+                window.krtI18nText(i18n().groupOwned, 'krtBlueprintsImportI18n.groupOwned') +
                 ': ' +
                 (preview.alreadyOwned || 0);
         }
@@ -273,7 +282,9 @@
             } else if (isOwned) {
                 html +=
                     '<span class="krt-bp-imp-owned">' +
-                    escapeHtml(i18n().ownedLabel || 'Already owned') +
+                    escapeHtml(
+                        window.krtI18nText(i18n().ownedLabel, 'krtBlueprintsImportI18n.ownedLabel'),
+                    ) +
                     '</span>';
             } else {
                 appendSearchControl(entry);
@@ -303,7 +314,12 @@
                 ' value="' +
                 escapeAttr(suggestions.length > 0 ? suggestions[0].productName : '') +
                 '" placeholder="' +
-                escapeAttr(i18n().searchPlaceholder || 'Search...') +
+                escapeAttr(
+                    window.krtI18nText(
+                        i18n().searchPlaceholder,
+                        'krtBlueprintsImportI18n.searchPlaceholder',
+                    ),
+                ) +
                 '">' +
                 '<div class="krt-bp-imp-results krt-pi-typeahead-results" hidden></div>';
             if (suggestions.length > 0) {
@@ -331,7 +347,7 @@
         if (!html)
             html =
                 '<p class="krt-bp-staging-empty">' +
-                escapeHtml(i18n().nothing || 'Nothing to import.') +
+                escapeHtml(window.krtI18nText(i18n().nothing, 'krtBlueprintsImportI18n.nothing')) +
                 '</p>';
         bodyEl.innerHTML = html;
         bindRowSearch();
@@ -394,7 +410,9 @@
         if (!items || items.length === 0) {
             results.innerHTML =
                 '<div class="krt-pi-typeahead-empty">' +
-                escapeHtml(i18n().noResults || 'No matches') +
+                escapeHtml(
+                    window.krtI18nText(i18n().noResults, 'krtBlueprintsImportI18n.noResults'),
+                ) +
                 '</div>';
             results.hidden = false;
             return;
@@ -488,21 +506,33 @@
                 onSuccess(result) {
                     const res = result || {};
                     const msg =
-                        (i18n().applied || 'Import complete.') +
+                        window.krtI18nText(i18n().applied, 'krtBlueprintsImportI18n.applied') +
                         ' ' +
-                        (i18n().addedLabel || 'added') +
+                        window.krtI18nText(
+                            i18n().addedLabel,
+                            'krtBlueprintsImportI18n.addedLabel',
+                        ) +
                         ': ' +
                         (res.added || 0) +
                         ', ' +
-                        (i18n().updatedLabel || 'updated') +
+                        window.krtI18nText(
+                            i18n().updatedLabel,
+                            'krtBlueprintsImportI18n.updatedLabel',
+                        ) +
                         ': ' +
                         (res.acquiredAtUpdated || 0) +
                         ', ' +
-                        (i18n().aliasesLabel || 'aliases') +
+                        window.krtI18nText(
+                            i18n().aliasesLabel,
+                            'krtBlueprintsImportI18n.aliasesLabel',
+                        ) +
                         ': ' +
                         (res.aliasesLearned || 0) +
                         ', ' +
-                        (i18n().skippedLabel || 'skipped') +
+                        window.krtI18nText(
+                            i18n().skippedLabel,
+                            'krtBlueprintsImportI18n.skippedLabel',
+                        ) +
                         ': ' +
                         (res.skipped || 0);
                     if (window.showFrontendSuccessToast) {
@@ -531,7 +561,9 @@
 
     function toastError() {
         if (window.showFrontendErrorToast)
-            window.showFrontendErrorToast(i18n().error || 'Import failed.');
+            window.showFrontendErrorToast(
+                window.krtI18nText(i18n().error, 'krtBlueprintsImportI18n.error'),
+            );
     }
 
     /* ----------------------------------------------------------------- modal */

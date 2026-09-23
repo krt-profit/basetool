@@ -117,8 +117,8 @@ const ORG_STRUCTURE_CHART_SECTION = 'chart';
         const holder = document.getElementById('os-i18n');
         const data = holder ? holder.dataset : {};
         return {
-            saved: data.saved || 'Saved',
-            error: data.error || 'Action failed',
+            saved: window.krtI18nText(data.saved, 'data-saved'),
+            error: window.krtI18nText(data.error, 'data-error'),
             // Surfaced when an in-place section swap bails (e.g. an expired session bounced to the
             // login page); the stale section is then left untouched rather than overwritten.
             refreshError: data.refreshError || '',

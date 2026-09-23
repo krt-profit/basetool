@@ -25,7 +25,8 @@
  * differing only in the data-trigger prefix, the route root and the post-write refresh — and had to
  * prefix their module state (`adminBookOutItemId`, …) so a page loading both would not collide.
  *
- * Covers: the material-group / stack tree with its per-user localStorage expansion (REQ-INV-002,
+ * Covers: the multi-select filter dropdowns (one header behaviour on both pages); the
+ * material-group / stack tree with its per-user localStorage expansion (REQ-INV-002,
  * REQ-INV-030) and the lazy, paginated stack-entry load; the book-out (Ausbuchen: DISCARD / SELL)
  * modal including the terminal lookup for a sale; the amount <-> target-amount coupling of the
  * book-out and Umbuchen modals, the Umbuchen close and its target-OrgUnit picker (#1328); the
@@ -449,6 +450,144 @@
             if (!headerRow) return;
             const page = parseInt(btn.getAttribute('data-page') ?? '', 10);
             loadStackEntries(headerRow, isNaN(page) ? 0 : page);
+        }
+
+        // ===================== Multi-select filter dropdowns =================================
+        // One behaviour on both Lager pages (owner decision 2026-09-23): the header reads the
+        // "all" label when no box or every box is ticked (both mean "no filter"), the one ticked
+        // option's own label, or "<n> <selected>". The labels come from the header's
+        // data-all / data-selected attributes (filter.all / filter.selected in the bundles).
+
+        /**
+         * Opens one multi-select dropdown and closes every other one; a second click closes it.
+         *
+         * @param {string | null} id the dropdown's element id
+         */
+        function toggleMultiSelect(id) {
+            const el = id ? document.getElementById(id) : null;
+            if (!el) return;
+            const isOpened = el.classList.contains('open');
+            document.querySelectorAll('.multi-select-options').forEach(function (opt) {
+                opt.classList.remove('open');
+            });
+            if (!isOpened) el.classList.add('open');
+        }
+
+        /**
+         * The checkboxes of one multi-select family.
+         *
+         * @param {string | null} checkClass the family's checkbox class
+         * @returns {HTMLCollectionOf<HTMLInputElement>} the checkboxes (none for a null class)
+         */
+        function familyBoxes(checkClass) {
+            return /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
+                document.getElementsByClassName(checkClass || '')
+            );
+        }
+
+        /**
+         * Writes a multi-select header's summary.
+         *
+         * @param {HTMLCollectionOf<HTMLInputElement>} checkboxes the family's checkboxes
+         * @param {string | null} headerId the dropdown header id
+         */
+        function updateSelectedText(checkboxes, headerId) {
+            const header = headerId ? document.getElementById(headerId) : null;
+            const headerSpan = /** @type {HTMLElement | null} */ (
+                header ? header.querySelector('.selected-text') : null
+            );
+            if (!header || !headerSpan) return;
+            let count = 0;
+            /** @type {string | null} */
+            let firstChecked = null;
+            for (let i = 0; i < checkboxes.length; i++) {
+                if (checkboxes[i].checked) {
+                    count++;
+                    const label = /** @type {HTMLElement | null} */ (
+                        checkboxes[i].previousElementSibling
+                    );
+                    if (!firstChecked && label) firstChecked = label.innerText;
+                }
+            }
+            if (count === 0 || count === checkboxes.length) {
+                headerSpan.innerText = window.krtI18nText(
+                    header.getAttribute('data-all'),
+                    'data-all',
+                );
+            } else if (count === 1) {
+                headerSpan.innerText = firstChecked || '';
+            } else {
+                headerSpan.innerText =
+                    count +
+                    ' ' +
+                    window.krtI18nText(header.getAttribute('data-selected'), 'data-selected');
+            }
+        }
+
+        /**
+         * Applies a family's select-all box to every checkbox of the family.
+         *
+         * @param {string | null} allId the select-all checkbox id
+         * @param {string | null} checkClass the family's checkbox class
+         * @param {string | null} headerId the dropdown header id
+         */
+        function toggleSelectAll(allId, checkClass, headerId) {
+            const allBox = allId ? input(allId) : null;
+            const isAllChecked = !!(allBox && allBox.checked);
+            const checkboxes = familyBoxes(checkClass);
+            for (let i = 0; i < checkboxes.length; i++) checkboxes[i].checked = isAllChecked;
+            updateSelectedText(checkboxes, headerId);
+        }
+
+        /**
+         * Re-syncs a family's select-all box (checked only when the family has boxes and all of
+         * them are ticked) and its header text.
+         *
+         * @param {string | null} allId the select-all checkbox id
+         * @param {string | null} checkClass the family's checkbox class
+         * @param {string | null} headerId the dropdown header id
+         */
+        function updateSelectState(allId, checkClass, headerId) {
+            const checkboxes = familyBoxes(checkClass);
+            let allChecked = checkboxes.length > 0;
+            for (let i = 0; i < checkboxes.length; i++) {
+                if (!checkboxes[i].checked) {
+                    allChecked = false;
+                    break;
+                }
+            }
+            const allBox = allId ? input(allId) : null;
+            if (allBox) allBox.checked = allChecked;
+            updateSelectedText(checkboxes, headerId);
+        }
+
+        /**
+         * The values of a family's ticked boxes.
+         *
+         * @param {string} className the family's checkbox class
+         * @returns {string[]} the ticked values
+         */
+        function collectChecked(className) {
+            const boxes = familyBoxes(className);
+            /** @type {string[]} */
+            const values = [];
+            for (let i = 0; i < boxes.length; i++) {
+                if (boxes[i].checked) values.push(boxes[i].value);
+            }
+            return values;
+        }
+
+        /**
+         * Closes every open multi-select dropdown on a click outside a dropdown.
+         *
+         * @param {MouseEvent} e the document click
+         */
+        function closeMultiSelectsOnOutsideClick(e) {
+            const target = /** @type {Element} */ (e.target);
+            if (target && target.closest && target.closest('.multi-select-container')) return;
+            document.querySelectorAll('.multi-select-options.open').forEach(function (opt) {
+                opt.classList.remove('open');
+            });
         }
 
         // ===================== Cross-feature live-sync (#1309) ================================
@@ -1367,6 +1506,7 @@
          */
         function bind() {
             document.addEventListener('DOMContentLoaded', restoreExpandedTree);
+            document.addEventListener('click', closeMultiSelectsOnOutsideClick);
             if (window.krtEvents && typeof window.krtEvents.on === 'function') {
                 window.krtEvents.on('click', trigger('toggle-group'), toggleGroup);
                 window.krtEvents.on('click', trigger('toggle-stack'), toggleStack);
@@ -1431,6 +1571,10 @@
             closeUmbuchenModal,
             setUmbuchenCurrentOwningOrgUnit,
             refreshUmbuchenTransferOrgUnitPicker,
+            toggleMultiSelect,
+            toggleSelectAll,
+            updateSelectState,
+            collectChecked,
             bind,
         };
     }

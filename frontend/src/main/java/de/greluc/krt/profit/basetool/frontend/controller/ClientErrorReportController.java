@@ -67,7 +67,7 @@ import org.springframework.web.bind.annotation.RestController;
  *   <li>{@code source} additionally loses its query string and fragment <em>server-side</em>, so a
  *       token or search term smuggled into a script URL never reaches the log even if the client
  *       half is bypassed.
- *   <li>{@code kind} is resolved against {@link #ALLOWED_KINDS} — the three {@code MetricNames}
+ *   <li>{@code kind} is resolved against {@link #ALLOWED_KINDS} — the five {@code MetricNames}
  *       literals — and a report matching none of them is rejected without creating a meter. Echoing
  *       a client-supplied tag value would be an unbounded, attacker-chosen label (REQ-OBS-006).
  *   <li>The user identity comes from the MDC ({@code CorrelationIdFilter} puts the {@code sub}
@@ -114,7 +114,8 @@ public class ClientErrorReportController {
           MetricNames.CLIENT_ERROR_SCRIPT_ERROR,
           MetricNames.CLIENT_ERROR_UNHANDLED_REJECTION,
           MetricNames.CLIENT_ERROR_RESOURCE_ERROR,
-          MetricNames.CLIENT_ERROR_CSP_VIOLATION);
+          MetricNames.CLIENT_ERROR_CSP_VIOLATION,
+          MetricNames.CLIENT_ERROR_I18N_MISSING);
 
   private final MeterRegistry meterRegistry;
 
@@ -130,7 +131,7 @@ public class ClientErrorReportController {
    * @param line the 1-based line number within {@code source}, or {@code null} when the browser did
    *     not supply one (promise rejections never do)
    * @param column the 1-based column number within {@code source}, or {@code null}
-   * @param kind the browser-error class; only the four {@link #ALLOWED_KINDS} literals are
+   * @param kind the browser-error class; only the five {@link #ALLOWED_KINDS} literals are
    *     accepted, any other value causes the whole report to be rejected
    */
   public record ClientErrorReport(

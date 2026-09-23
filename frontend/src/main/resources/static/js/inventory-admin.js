@@ -56,39 +56,6 @@ const adminLager = /** @type {KrtInventoryApi} */ (window.krtInventory).createLa
 });
 
 /**
- * Opens one multi-select filter dropdown and closes every other one; a second click closes it.
- *
- * @param {string | null} id the dropdown's element id
- */
-function toggleMultiSelect(id) {
-    const el = id ? document.getElementById(id) : null;
-    if (!el) return;
-    const isOpened = el.classList.contains('open');
-
-    document.querySelectorAll('.multi-select-options').forEach(function (opt) {
-        opt.classList.remove('open');
-    });
-
-    if (!isOpened) {
-        el.classList.add('open');
-    }
-}
-
-/**
- * The localized "all" / "n selected" labels a multi-select header carries as data attributes.
- *
- * @param {string | null} headerId the dropdown header's element id
- * @returns {{ allText: string, selectedTextStr: string }} the labels
- */
-function adminFilterTranslations(headerId) {
-    const header = headerId ? document.getElementById(headerId) : null;
-    return {
-        allText: (header && header.getAttribute('data-all')) || 'Alle',
-        selectedTextStr: (header && header.getAttribute('data-selected')) || 'gewählt',
-    };
-}
-
-/**
  * A checkbox by id (the select-all box of a multi-select family).
  *
  * @param {string | null} id the element id
@@ -96,112 +63,6 @@ function adminFilterTranslations(headerId) {
  */
 function adminCheckbox(id) {
     return id ? /** @type {HTMLInputElement | null} */ (document.getElementById(id)) : null;
-}
-
-/**
- * Applies a family's select-all box to every checkbox of the family.
- *
- * @param {string | null} allId the select-all checkbox id
- * @param {string} checkClass the family's checkbox class
- * @param {string | null} headerId the dropdown header id
- */
-function toggleSelectAll(allId, checkClass, headerId) {
-    const allBox = adminCheckbox(allId);
-    const isAllChecked = !!(allBox && allBox.checked);
-    const checkboxes = /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
-        document.getElementsByClassName(checkClass)
-    );
-    for (let i = 0; i < checkboxes.length; i++) {
-        checkboxes[i].checked = isAllChecked;
-    }
-    updateSelectedText(checkboxes, headerId);
-}
-
-/**
- * Re-syncs a family's select-all box and header text with its checkboxes.
- *
- * @param {string | null} allId the select-all checkbox id
- * @param {string} checkClass the family's checkbox class
- * @param {string | null} headerId the dropdown header id
- */
-function updateSelectState(allId, checkClass, headerId) {
-    const checkboxes = /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
-        document.getElementsByClassName(checkClass)
-    );
-    let allChecked = true;
-    for (let i = 0; i < checkboxes.length; i++) {
-        if (!checkboxes[i].checked) {
-            allChecked = false;
-            break;
-        }
-    }
-    const allBox = adminCheckbox(allId);
-    if (allBox) allBox.checked = allChecked;
-    updateSelectedText(checkboxes, headerId);
-}
-
-/**
- * Writes a multi-select header's summary: "all" when none or every box is checked, the one
- * checked label, or "n selected".
- *
- * @param {HTMLCollectionOf<HTMLInputElement>} checkboxes the family's checkboxes
- * @param {string | null} headerId the dropdown header id
- */
-function updateSelectedText(checkboxes, headerId) {
-    const translations = adminFilterTranslations(headerId);
-    let count = 0;
-    const total = checkboxes.length;
-    /** @type {string | null} */
-    let firstChecked = null;
-    for (let i = 0; i < checkboxes.length; i++) {
-        if (checkboxes[i].checked) {
-            count++;
-            const label = /** @type {HTMLElement | null} */ (checkboxes[i].previousElementSibling);
-            if (!firstChecked && label) firstChecked = label.innerText;
-        }
-    }
-
-    const header = headerId ? document.getElementById(headerId) : null;
-    const headerSpan = /** @type {HTMLElement | null} */ (
-        header ? header.querySelector('.selected-text') : null
-    );
-    if (!headerSpan) return;
-    if (count === total || count === 0) {
-        headerSpan.innerText = translations.allText;
-    } else if (count === 1) {
-        headerSpan.innerText = firstChecked || '';
-    } else {
-        headerSpan.innerText = count + ' ' + translations.selectedTextStr;
-    }
-}
-
-document.addEventListener('click', function (e) {
-    const target = /** @type {Element} */ (e.target);
-    if (!target.closest('.multi-select-container')) {
-        document.querySelectorAll('.multi-select-options').forEach(function (opt) {
-            if (opt.classList.contains('open')) {
-                opt.classList.remove('open');
-            }
-        });
-    }
-});
-
-/**
- * The values of a family's checked boxes.
- *
- * @param {string} className the family's checkbox class
- * @returns {string[]} the checked values
- */
-function collectChecked(className) {
-    const boxes = /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
-        document.getElementsByClassName(className)
-    );
-    /** @type {string[]} */
-    const values = [];
-    for (let i = 0; i < boxes.length; i++) {
-        if (boxes[i].checked) values.push(boxes[i].value);
-    }
-    return values;
 }
 
 // ===================== Per-browser filter persistence (REQ-UI-017) =============================
@@ -310,7 +171,7 @@ function applyAdminSavedSelection(saved, checkClass, allId, headerId) {
         boxes[i].checked = on;
         if (on) any = true;
     }
-    updateSelectState(allId, checkClass, headerId);
+    adminLager.updateSelectState(allId, checkClass, headerId);
     return any;
 }
 
@@ -411,11 +272,11 @@ function filterInventory() {
     // widgets, or a collapsed panel starts hiding an active filter.
     if (window.krtFilterPanel) window.krtFilterPanel.refresh('globalFilterPanel');
     const itemsView = adminLager.lagerIsItemsView();
-    const activeMats = collectChecked('matCheck');
-    const activeGameItems = collectChecked('gameItemCheck');
-    const activeLocations = collectChecked('locCheck');
-    const activeJobOrders = collectChecked('jobOrderCheck');
-    const activeMissions = collectChecked('missionCheck');
+    const activeMats = adminLager.collectChecked('matCheck');
+    const activeGameItems = adminLager.collectChecked('gameItemCheck');
+    const activeLocations = adminLager.collectChecked('locCheck');
+    const activeJobOrders = adminLager.collectChecked('jobOrderCheck');
+    const activeMissions = adminLager.collectChecked('missionCheck');
 
     const minQualitySelect = /** @type {HTMLSelectElement | null} */ (
         document.getElementById('minQuality')
@@ -571,19 +432,19 @@ function resetInventoryFilter() {
     );
     if (minQualitySelect) minQualitySelect.value = '';
     if (document.getElementById('materialHeader'))
-        updateSelectState('matAll', 'matCheck', 'materialHeader');
+        adminLager.updateSelectState('matAll', 'matCheck', 'materialHeader');
     if (document.getElementById('gameItemHeader'))
-        updateSelectState('gameItemAll', 'gameItemCheck', 'gameItemHeader');
+        adminLager.updateSelectState('gameItemAll', 'gameItemCheck', 'gameItemHeader');
     if (document.getElementById('locationHeader'))
-        updateSelectState('locAll', 'locCheck', 'locationHeader');
+        adminLager.updateSelectState('locAll', 'locCheck', 'locationHeader');
     if (document.getElementById('itemLocationHeader'))
-        updateSelectState('itemLocAll', 'locCheck', 'itemLocationHeader');
+        adminLager.updateSelectState('itemLocAll', 'locCheck', 'itemLocationHeader');
     if (document.getElementById('jobOrderHeader'))
-        updateSelectState('jobOrderAll', 'jobOrderCheck', 'jobOrderHeader');
+        adminLager.updateSelectState('jobOrderAll', 'jobOrderCheck', 'jobOrderHeader');
     if (document.getElementById('itemJobOrderHeader'))
-        updateSelectState('itemJobOrderAll', 'jobOrderCheck', 'itemJobOrderHeader');
+        adminLager.updateSelectState('itemJobOrderAll', 'jobOrderCheck', 'itemJobOrderHeader');
     if (document.getElementById('missionHeader'))
-        updateSelectState('missionAll', 'missionCheck', 'missionHeader');
+        adminLager.updateSelectState('missionAll', 'missionCheck', 'missionHeader');
     filterInventory();
 }
 
@@ -597,14 +458,14 @@ document.addEventListener('DOMContentLoaded', function () {
             document.getElementsByClassName('matCheck')
         ).length > 0
     ) {
-        updateSelectState('matAll', 'matCheck', 'materialHeader');
+        adminLager.updateSelectState('matAll', 'matCheck', 'materialHeader');
     }
     if (
         /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
             document.getElementsByClassName('gameItemCheck')
         ).length > 0
     ) {
-        updateSelectState('gameItemAll', 'gameItemCheck', 'gameItemHeader');
+        adminLager.updateSelectState('gameItemAll', 'gameItemCheck', 'gameItemHeader');
     }
     if (
         /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
@@ -614,9 +475,9 @@ document.addEventListener('DOMContentLoaded', function () {
         // Same shared-class / per-view-ids shape as jobOrderCheck below: the location filter
         // renders in both views, with item-prefixed ids in the items view.
         if (document.getElementById('itemLocationHeader')) {
-            updateSelectState('itemLocAll', 'locCheck', 'itemLocationHeader');
+            adminLager.updateSelectState('itemLocAll', 'locCheck', 'itemLocationHeader');
         } else {
-            updateSelectState('locAll', 'locCheck', 'locationHeader');
+            adminLager.updateSelectState('locAll', 'locCheck', 'locationHeader');
         }
     }
     if (
@@ -627,9 +488,9 @@ document.addEventListener('DOMContentLoaded', function () {
         // The material and the items view render different header/all ids for the shared
         // jobOrderCheck class (unique ids in the template source); exactly one pair exists.
         if (document.getElementById('itemJobOrderHeader')) {
-            updateSelectState('itemJobOrderAll', 'jobOrderCheck', 'itemJobOrderHeader');
+            adminLager.updateSelectState('itemJobOrderAll', 'jobOrderCheck', 'itemJobOrderHeader');
         } else {
-            updateSelectState('jobOrderAll', 'jobOrderCheck', 'jobOrderHeader');
+            adminLager.updateSelectState('jobOrderAll', 'jobOrderCheck', 'jobOrderHeader');
         }
     }
     if (
@@ -637,7 +498,7 @@ document.addEventListener('DOMContentLoaded', function () {
             document.getElementsByClassName('missionCheck')
         ).length > 0
     ) {
-        updateSelectState('missionAll', 'missionCheck', 'missionHeader');
+        adminLager.updateSelectState('missionAll', 'missionCheck', 'missionHeader');
     }
     // After the restore, never before it: the count chip reads the widgets, so they must see the restored selection
     // rather than the bare server-rendered one.
@@ -970,10 +831,10 @@ function submitUmbuchen(event) {
 // CSP-safe delegated bindings (replaces the 28 inline on*= handlers across this template).
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('click', 'inv-admin-toggle-multi', function (el) {
-        toggleMultiSelect(el.getAttribute('data-multi-target'));
+        adminLager.toggleMultiSelect(el.getAttribute('data-multi-target'));
     });
     window.krtEvents.on('change', 'inv-admin-toggle-all', function (el) {
-        toggleSelectAll(
+        adminLager.toggleSelectAll(
             el.getAttribute('data-all-id'),
             el.getAttribute('data-check-class'),
             el.getAttribute('data-header-id'),
@@ -981,7 +842,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         filterInventory();
     });
     window.krtEvents.on('change', 'inv-admin-update-state', function (el) {
-        updateSelectState(
+        adminLager.updateSelectState(
             el.getAttribute('data-all-id'),
             el.getAttribute('data-check-class'),
             el.getAttribute('data-header-id'),

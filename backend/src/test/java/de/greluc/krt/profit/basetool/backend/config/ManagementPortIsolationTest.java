@@ -169,7 +169,7 @@ class ManagementPortIsolationTest {
 
   /**
    * Pins why {@code server.tomcat.threads.*} is deliberately not configured and why the "Spring
-   * Boot apps" dashboard reads {@code http_server_requests_active_seconds_gcount} instead of {@code
+   * Boot apps" dashboard reads {@code http_server_requests_active_seconds_count} instead of {@code
    * tomcat_threads_busy_threads} (FE-PERF-07).
    *
    * <p>With {@code spring.threads.virtual.enabled=true} Spring Boot hands the connector an external
@@ -203,6 +203,33 @@ class ManagementPortIsolationTest {
         .isInstanceOf(VirtualThreadExecutor.class);
     assertThat(scrape)
         .as("the in-flight request gauge the dashboard's concurrency panel reads")
-        .contains("http_server_requests_active_seconds_gcount{");
+        .contains("http_server_requests_active_seconds_count{");
+  }
+
+  /**
+   * The in-flight timer carries no histogram, while the latency timer keeps its buckets.
+   *
+   * <p>{@code management.metrics.distribution.percentiles-histogram[http.server.requests]} matches
+   * the derived {@code http.server.requests.active} long-task timer by prefix, which exported about
+   * fifty {@code _bucket} series per label set that no panel or rule reads. The {@code .active} key
+   * switches it off for that timer alone; the p95 latency panels still need the buckets of {@code
+   * http.server.requests} itself.
+   *
+   * @throws Exception if a probe request fails to send
+   */
+  @Test
+  void theInFlightTimerCarriesNoHistogramWhileTheLatencyTimerKeepsIt() throws Exception {
+    // Any request on the application connector records an http.server.requests sample and
+    // registers the active-requests long-task timer.
+    get(appPort, "/actuator/health");
+
+    String scrape = get(managementPort, "/actuator/prometheus").body();
+
+    assertThat(scrape)
+        .as("no bucket series for the in-flight long-task timer")
+        .doesNotContain("http_server_requests_active_seconds_bucket");
+    assertThat(scrape)
+        .as("the latency timer keeps the buckets the p95 panels compute from")
+        .contains("http_server_requests_seconds_bucket{");
   }
 }

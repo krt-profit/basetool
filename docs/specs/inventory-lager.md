@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-23.
 > **Owner area:** INV · **Related ADRs:** ADR-0003, ADR-0097, ADR-0098, ADR-0101, ADR-0104,
 > ADR-0120, ADR-0124
 
@@ -928,6 +928,11 @@ holds verbatim on both.
   REQ-UI-017 persists, so a dimension added there is counted automatically rather than quietly
   missing from the chip. A multi-select with **all** boxes ticked counts as no filter, matching what
   that state already means everywhere else on this page.
+- **A multi-select says what it filters, in the same words on both pages** (owner decision
+  2026-09-23). Its header reads „Alle" (`filter.all`) when no box or every box is ticked — both mean
+  no filter —, the option's own name when exactly one is ticked, and „N ausgewählt"
+  (`filter.selected`) otherwise. The helper lives once in `inventory-common.js`; before, "Mein
+  Lager" said „N ausgewählt" with every box ticked while "Globales Lager" said „Alle".
 - **Rendered expanded, collapsed by script.** The server always emits the panel open; `hidden` is
   the collapse mechanism and the script applies it on load, so a client without JavaScript keeps
   working filters (REQ-FE-021).
@@ -955,9 +960,12 @@ holds verbatim on both.
 - [ ] Selecting a filter, resetting the filters, and a restored REQ-UI-017 selection all leave the
   chip's number equal to the number of active dimensions; at zero the chip is hidden.
 - [ ] A multi-select with every box ticked leaves the chip hidden.
+- [ ] On both pages a multi-select header reads „Alle" with none or every box ticked, the option's
+  name with one, and „N ausgewählt" otherwise.
 - [ ] Toggling the panel performs no navigation and no fetch — the table below is untouched.
 
-**Enforced by:** `InventoryPageControllerMvcTest`
+**Enforced by:** `InventoryPageControllerMvcTest` · `InventoryMultiSelectLabelE2eTest` (the header
+summary on both pages)
 (`viewMyInventory_rendersTheFilterRowInsideACollapsiblePanel`,
 `viewAllInventory_rendersTheFilterRowInsideACollapsiblePanel`),
 `InventoryFilterPanelCollapseE2eTest` · **Code:**

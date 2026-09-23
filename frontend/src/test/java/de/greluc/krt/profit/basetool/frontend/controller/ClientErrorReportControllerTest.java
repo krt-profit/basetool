@@ -87,7 +87,7 @@ class ClientErrorReportControllerTest {
 
   /** Matches one {@code const KIND_… = '…';} declaration in the beacon and captures the value. */
   private static final Pattern BEACON_KIND_DECLARATION =
-      Pattern.compile("const KIND_[A-Z_]+ = '([a-z_]+)';");
+      Pattern.compile("const KIND_[A-Z0-9_]+ = '([a-z0-9_]+)';");
 
   /**
    * Matches one property key inside the captured object literal, in both spellings: {@code name:
@@ -290,6 +290,28 @@ class ClientErrorReportControllerTest {
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
     assertThat(counterFor(MetricNames.CLIENT_ERROR_CSP_VIOLATION)).isEqualTo(1.0d);
+  }
+
+  @Test
+  void i18nMissingReport_isCountedUnderItsOwnKind() {
+    // Owner decision 2026-09-23: a script that finds no localized string renders the key name and
+    // reports it; the report carries only that key name as its message.
+    ResponseEntity<Void> response =
+        controller.report(
+            new ClientErrorReport(
+                "herkunftI18n.rest", null, null, null, MetricNames.CLIENT_ERROR_I18N_MISSING));
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+    assertThat(counterFor(MetricNames.CLIENT_ERROR_I18N_MISSING)).isEqualTo(1.0d);
+  }
+
+  @Test
+  void beaconExposesTheMissingTranslationCheck() throws IOException {
+    // Every script's localized strings run through window.krtI18nText, which reports a gap as
+    // i18n_missing and renders the key name instead of a hardcoded default.
+    String beacon = readBeaconModule();
+    assertThat(beacon).contains("window.krtI18nText = i18nText;");
+    assertThat(beacon).contains("report(KIND_I18N_MISSING, name, null, null, null);");
   }
 
   @Test

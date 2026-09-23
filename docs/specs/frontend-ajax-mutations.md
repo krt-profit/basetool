@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-23.
 > **Owner area:** FE/UI · **Related ADRs:** ADR-0012, ADR-0013, ADR-0031, ADR-0053, ADR-0069, ADR-0071, ADR-0085, ADR-0089, ADR-0094, ADR-0100, ADR-0106, ADR-0125, ADR-0126, ADR-0130, ADR-0143, ADR-0165
 
 # Frontend AJAX mutations — krtFetch, krtCsrf & fragment swaps
@@ -1439,6 +1439,16 @@ selected at all when booking stock into the Lager; `/inventory/item-search` and 
 relay fetched *exactly* the render cap, with the same silent effect from the 51st match on.
 `PickerSearchLimitsParityTest` reads the shipped JS and `fragments/head.html` off the classpath and
 pins both halves against the constants so they cannot drift apart again.
+
+**The user searches follow the same rule** (2026-09-23). `/users/search` and `/users/search-bank`
+fetch `PickerSearch.PAGE_SIZE` (51) rows. They used to fetch 1000, because the mission page's two
+free-text autocompletes (participant add and party lead, `mission-detail.js`) rendered every row
+they received and had no hint. A smaller page would have capped them silently. Both
+autocompletes now render at most 50 rows (`USER_SEARCH_RENDER_CAP`, pinned by the parity test).
+When a 51st row arrives they append the same non-selectable „Weiter tippen, um die Liste
+einzugrenzen…" row as the comboboxes (`krtComboboxI18n.hint`, `.autocomplete-notice`).
+`UserProxyControllerTest` pins the page size, and `MissionUserAutocompleteOverflowE2eTest` checks the
+cap and the hint against a stubbed relay.
 
 **A kind may raise its render cap when its catalog is small and bounded.** Only `remote-locations`
 does (`maxResults: 200`, mirrored by `PickerSearch.LOCATION_RENDER_CAP`): one row per live UEX city

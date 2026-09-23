@@ -125,7 +125,9 @@
 
     function toastError() {
         if (window.showFrontendErrorToast)
-            window.showFrontendErrorToast(i18n().error || 'Import failed.');
+            window.showFrontendErrorToast(
+                window.krtI18nText(i18n().error, 'krtP4kImportI18n.error'),
+            );
     }
 
     function toastOk(msg) {
@@ -207,7 +209,9 @@
         const file = selectedFile();
         if (!file) {
             if (window.showFrontendErrorToast)
-                window.showFrontendErrorToast(i18n().pickFirst || 'Please choose a file first.');
+                window.showFrontendErrorToast(
+                    window.krtI18nText(i18n().pickFirst, 'krtP4kImportI18n.pickFirst'),
+                );
             return;
         }
         if (!window.krtFetch) return;
@@ -241,7 +245,7 @@
                     if (result.ok && !gated) toastError();
                     return;
                 }
-                toastOk(i18n().toastUploaded || 'Catalog uploaded.');
+                toastOk(window.krtI18nText(i18n().toastUploaded, 'krtP4kImportI18n.toastUploaded'));
                 resetFile();
                 loadJobs();
             });
@@ -331,14 +335,18 @@
                     '<button type="button" class="btn btn-ghost" data-action="view" data-job-id="' +
                     escapeAttr(job.id) +
                     '">' +
-                    escapeHtml(i18n().actionView || 'Details') +
+                    escapeHtml(
+                        window.krtI18nText(i18n().actionView, 'krtP4kImportI18n.actionView'),
+                    ) +
                     '</button>';
                 if (job.kind === 'PREVIEW') {
                     html +=
                         ' <button type="button" class="btn btn--cta" data-action="apply" data-job-id="' +
                         escapeAttr(job.id) +
                         '">' +
-                        escapeHtml(i18n().actionApply || 'Apply') +
+                        escapeHtml(
+                            window.krtI18nText(i18n().actionApply, 'krtP4kImportI18n.actionApply'),
+                        ) +
                         '</button>';
                 }
             }
@@ -348,19 +356,24 @@
     }
 
     function kindLabel(job) {
-        return job.kind === 'APPLY' ? i18n().kindApply || 'Apply' : i18n().kindPreview || 'Preview';
+        return job.kind === 'APPLY'
+            ? window.krtI18nText(i18n().kindApply, 'krtP4kImportI18n.kindApply')
+            : window.krtI18nText(i18n().kindPreview, 'krtP4kImportI18n.kindPreview');
     }
 
     function statusLabel(job) {
         switch (job.status) {
             case 'PENDING':
-                return i18n().statusPending || 'Queued';
+                return window.krtI18nText(i18n().statusPending, 'krtP4kImportI18n.statusPending');
             case 'RUNNING':
-                return i18n().statusRunning || 'Running';
+                return window.krtI18nText(i18n().statusRunning, 'krtP4kImportI18n.statusRunning');
             case 'SUCCEEDED':
-                return i18n().statusSucceeded || 'Done';
+                return window.krtI18nText(
+                    i18n().statusSucceeded,
+                    'krtP4kImportI18n.statusSucceeded',
+                );
             case 'FAILED':
-                return i18n().statusFailed || 'Failed';
+                return window.krtI18nText(i18n().statusFailed, 'krtP4kImportI18n.statusFailed');
             default:
                 return job.status || '';
         }
@@ -389,10 +402,18 @@
     }
 
     function summaryText(job) {
-        if (job.status === 'FAILED') return job.errorMessage || i18n().statusFailed || 'Failed';
+        if (job.status === 'FAILED')
+            return (
+                job.errorMessage ||
+                window.krtI18nText(i18n().statusFailed, 'krtP4kImportI18n.statusFailed')
+            );
         if (job.status === 'SUCCEEDED')
-            return String(createdTotal(job.result)) + ' ' + (i18n().colCreated || 'Created');
-        return i18n().summaryRunning || 'Processing...';
+            return (
+                String(createdTotal(job.result)) +
+                ' ' +
+                window.krtI18nText(i18n().colCreated, 'krtP4kImportI18n.colCreated')
+            );
+        return window.krtI18nText(i18n().summaryRunning, 'krtP4kImportI18n.summaryRunning');
     }
 
     function findJob(id) {
@@ -434,20 +455,29 @@
         const modeEl = $('krt-p4k-mode');
         if (modeEl)
             modeEl.textContent = result.dryRun
-                ? i18n().modeDryRun || 'Preview'
-                : i18n().modeApplied || 'Applied';
+                ? window.krtI18nText(i18n().modeDryRun, 'krtP4kImportI18n.modeDryRun')
+                : window.krtI18nText(i18n().modeApplied, 'krtP4kImportI18n.modeApplied');
         const seedingEl = $('krt-p4k-seeding');
         if (seedingEl)
             seedingEl.textContent = result.seedingEnabled
-                ? i18n().seedingOn || 'on'
-                : i18n().seedingOff || 'off';
+                ? window.krtI18nText(i18n().seedingOn, 'krtP4kImportI18n.seedingOn')
+                : window.krtI18nText(i18n().seedingOff, 'krtP4kImportI18n.seedingOff');
 
         const rows = [
-            [i18n().rowManufacturers || 'Manufacturers', result.manufacturers],
-            [i18n().rowItems || 'Items', result.items],
-            [i18n().rowShips || 'Ships', result.ships],
-            [i18n().rowCommodities || 'Commodities', result.commodities],
-            [i18n().rowBlueprints || 'Blueprints', result.blueprints],
+            [
+                window.krtI18nText(i18n().rowManufacturers, 'krtP4kImportI18n.rowManufacturers'),
+                result.manufacturers,
+            ],
+            [window.krtI18nText(i18n().rowItems, 'krtP4kImportI18n.rowItems'), result.items],
+            [window.krtI18nText(i18n().rowShips, 'krtP4kImportI18n.rowShips'), result.ships],
+            [
+                window.krtI18nText(i18n().rowCommodities, 'krtP4kImportI18n.rowCommodities'),
+                result.commodities,
+            ],
+            [
+                window.krtI18nText(i18n().rowBlueprints, 'krtP4kImportI18n.rowBlueprints'),
+                result.blueprints,
+            ],
         ];
         const body = $('krt-p4k-rows');
         // Accumulated from literals and escapeHtml calls only (FE-SEC-05); declared at function
@@ -543,7 +573,12 @@
                     if (result.ok && !gated) toastError();
                     return;
                 }
-                toastOk(i18n().toastApplyStarted || 'Apply started.');
+                toastOk(
+                    window.krtI18nText(
+                        i18n().toastApplyStarted,
+                        'krtP4kImportI18n.toastApplyStarted',
+                    ),
+                );
                 if (applyPanelEl) applyPanelEl.hidden = true;
                 applyTargetId = null;
                 loadJobs();

@@ -85,11 +85,12 @@ Two binding rules shape every UI change:
   write outside `krtFetch` fails `:frontend:lintJs` (REQ-FE-002), and so does an HTML sink that is
   neither escaped through `escapeHtml` / `escapeAttr` nor a server fragment inserted through
   `krtFetch.setTrustedHtml` (REQ-FE-022, `eslint-plugin-no-unsanitized`).
-- **Only cacheable routes are buffered for an ETag** (2026-09-22, FE-PERF-03). The frontend's
-  `ShallowEtagHeaderFilter` covers the static asset trees, the web app manifest and
-  `assetlinks.json` — the responses with a cacheable `Cache-Control` of their own. Everything else
-  is `no-store`, where no ETag can be issued, so pages, fragments and the SSE relay stream
-  unbuffered. A new publicly cacheable route joins `EtagConfig.ETAG_URL_PATTERNS` (ADR-0161).
+- **An ETag only where it pays** (FE-PERF-03, 2026-09-22; assets out 2026-09-23). The frontend's
+  `ShallowEtagHeaderFilter` covers the web app manifest and `assetlinks.json` — publicly
+  cacheable and not content-hashed. The static assets are hashed, `immutable` and revalidate by
+  `Last-Modified`; everything else is `no-store`, where no ETag can be issued. So assets, pages,
+  fragments and the SSE relay all leave unbuffered. A new publicly cacheable, non-hashed route
+  joins `EtagConfig.ETAG_URL_PATTERNS` (ADR-0161).
 
 Authority: [`ui-design-system.md`](../specs/ui-design-system.md),
 [`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md) (`REQ-FE-*`),
@@ -146,10 +147,18 @@ UTF-8.
 A browser script gets its wording from the page, never from a literal: a `th:inline` bootstrap
 dictionary (`bookOutI18n`, `ORDER_HANDOVER_I18N`, …, declared in `types/thymeleaf-bootstrap.d.ts`
 and the module's `/* global */` header), a `window.krt*I18n` object from `fragments/head.html`, or
-`data-*` attributes on an element the fragment renders. A literal after `||` is tolerated only as the
-defensive default for a page that forgot its dictionary. The last primary literals — the book-out
+`data-*` attributes on an element the fragment renders. The last primary literals — the book-out
 terminal picker, the order handover row and file name, the special-command modal titles, the admin
 chip — moved into the bundles on 2026-09-23 (FE-SIMP-03).
+
+**A missing string fails visibly, never silently** (owner decision 2026-09-23). There are no literal
+defaults after `||` any more: a script passes each string through `window.krtI18nText(value, key)`
+(installed by `krt-client-error.js`, the first script of every page). A string the page did not
+provide renders as its key name (`DICT.property` / `data-attribute`) and is reported once per page
+view as an `i18n_missing` client error, counted in `basetool_client_error_total`. The defaults
+`krtFetch` applies when a caller passes no toast or conflict text come from `window.krtFetchI18n`
+in `fragments/head.html`. `I18nDictionaryCoverageTest` fails the build when a key a script names
+is missing from the pages that declare its dictionary, and when a literal fallback comes back.
 
 ## 8.11 Configuration
 

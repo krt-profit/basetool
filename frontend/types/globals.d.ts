@@ -96,7 +96,7 @@ interface KrtCsrfApi {
 
 /** Localized strings for the 409 optimistic-lock conflict dialog. */
 interface KrtConflictStrings {
-    /** Dialog title; defaults to "Konflikt". */
+    /** Dialog title; defaults to `krtFetchI18n.conflictTitle`. */
     title?: string;
     /** The question asked before reloading the current values. */
     reloadQuestion?: string;
@@ -120,7 +120,7 @@ interface KrtSendOpts {
     sectionLabel?: string;
     /** Already-localized prefix for the error and conflict toasts. */
     conflictSectionLabel?: string;
-    /** Already-localized success text; defaults to "Gespeichert.". */
+    /** Already-localized success text; defaults to `krtFetchI18n.saved`. */
     successMessage?: string;
     /** Set false to suppress the success toast entirely. */
     toast?: boolean;
@@ -241,6 +241,11 @@ interface KrtSectionWriteConfig {
      * bootstrap block that defines it runs after this factory is instantiated.
      */
     dict(): KrtI18nDict | null | undefined;
+    /**
+     * The dictionary's global name, used in the key a missing string is rendered and
+     * reported as (`NAME[key]`, see `Window.krtI18nText`).
+     */
+    dictName?: string;
     /** Message-key prefixes used to derive the per-section localized strings. */
     keys: Record<string, string>;
     /** Maps a section key to its swap container and Thymeleaf fragment value. */
@@ -525,6 +530,21 @@ interface KrtInventoryLager {
     setUmbuchenCurrentOwningOrgUnit(orgUnitId: string | null): void;
     /** Fills the Umbuchen target-OrgUnit picker from the selected target user's memberships. */
     refreshUmbuchenTransferOrgUnitPicker(): void;
+    /** Opens one multi-select filter dropdown and closes the others; a second click closes it. */
+    toggleMultiSelect(id: string | null): void;
+    /** Applies a family's select-all box to all its checkboxes and rewrites the header summary. */
+    toggleSelectAll(allId: string | null, checkClass: string | null, headerId: string | null): void;
+    /**
+     * Re-syncs a family's select-all box and header summary: "all" when none or every box is
+     * ticked, the one ticked label, or "<n> <selected>".
+     */
+    updateSelectState(
+        allId: string | null,
+        checkClass: string | null,
+        headerId: string | null,
+    ): void;
+    /** The values of a family's ticked checkboxes. */
+    collectChecked(className: string): string[];
     /** Installs the shared delegated handlers, the book-out submit and the initial tree restore. */
     bind(): void;
 }
@@ -659,6 +679,15 @@ interface KrtFilterPanelApi {
 }
 
 interface Window {
+    // --- installed by krt-client-error.js (the first script of every page)
+    /**
+     * Returns `value` when it is a non-empty string; otherwise reports `key` once per page view as
+     * an `i18n_missing` client error and returns the key name, so a missing translation shows in
+     * the UI instead of hiding behind a hardcoded default. `key` is `DICTIONARY.property` for a
+     * bootstrap object or `data-attribute` for a markup attribute (`I18nDictionaryCoverageTest`).
+     */
+    krtI18nText(value: unknown, key: string): string;
+
     // --- installed by krt-fetch.js
     krtFetch: KrtFetchApi;
     krtCsrf: KrtCsrfApi;
@@ -733,6 +762,11 @@ interface Window {
      * instruction instead of the backend's English `detail` (REQ-ORG-023).
      */
     krtOwnerPickerI18n?: KrtI18nDict;
+    /**
+     * The page-wide krtFetch defaults from `fragments/head.html` — the write success / failure
+     * toast and the conflict dialog — used when a caller passes no string of its own.
+     */
+    krtFetchI18n?: KrtI18nDict;
 
     /**
      * Returns `url` when it is a same-origin absolute path, otherwise

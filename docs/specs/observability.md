@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-23.
 > **Owner area:** OBS · **Related:** [`security-and-access.md`](security-and-access.md), [ADR-0204](../adr/0204-backend-and-ingest-call-http-through-restclient-without-webflux.md) (outbound clients of backend and ingest), [`org-unit-tenancy.md`](org-unit-tenancy.md), [ADR-0072](../adr/0072-monitoring-stack-prometheus-grafana.md), [ADR-0095](../adr/0095-ship-app-container-stdout-to-loki.md), [ADR-0162](../adr/0162-edge-is-native-nginx-with-a-separate-acme-client.md) (native edge, NPM retired), [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md) (rootless Podman), monitoring epic [#936](https://github.com/krt-profit/basetool/issues/936) · **Operator doc:** [`monitoring/README.md`](../../monitoring/README.md)
 >
 > **Runtime.** Since the 2026-09-22 cutover production runs rootless Podman under Quadlet on Rocky
@@ -1461,7 +1461,7 @@ the boot run carries the last run's values over and re-reads only the reboot fla
   `03-spring-apps.json`: per-pool heap, GC pause max by action/cause, thread states, open FDs vs max,
   per-app CPU.
 - Request concurrency (FE-PERF-07, 2026-09-22): the `03-spring-apps.json` "In-flight Requests"
-  panel plots `sum by (application) (http_server_requests_active_seconds_gcount)` — the active count
+  panel plots `sum by (application) (http_server_requests_active_seconds_count)` — the active count
   of Spring MVC's `http.server.requests` long-task timer. It replaced "Tomcat Busy Threads": all
   three apps run Tomcat on virtual threads (`spring.threads.virtual.enabled`), which gives the
   connector an external `VirtualThreadExecutor`, so `tomcat_threads_*` read a constant `-1` and
@@ -1469,6 +1469,15 @@ the boot run carries the last run's values over and re-reads only the reboot fla
   (`server.tomcat.mbeanregistry.enabled`, enabled only to feed that panel) are gone;
   `accept-count` / `max-connections` act before the executor and stay. `ManagementPortIsolationTest`
   (backend and frontend) pins the executor type and the gauge's presence.
+  **No histogram on the in-flight timers** (owner decision 2026-09-23): the
+  `percentiles-histogram[http.server.requests]` key matched the derived `.active` long-task timer
+  by prefix and exported about fifty `_bucket` series per label set that nothing read. A
+  more specific `[http.server.requests.active]: false` (backend, frontend, ingest; the frontend also
+  `[http.client.requests.active]: false`) switches it off for those timers alone; without a
+  histogram the timer is a summary whose `_count` is the number of in-flight requests, which is the
+  series the panel reads. The latency histograms are unchanged. `ManagementPortIsolationTest`
+  asserts no `http_server_requests_active_seconds_bucket` while `http_server_requests_seconds_bucket`
+  is still exported.
 - `basetool_http_error_total{code}` counter at the `GlobalExceptionHandler` 409/401/403 methods
   (`OPTIMISTIC_LOCK` = optimistic-locking regression indicator, `PESSIMISTIC_LOCK`,
   `UNAUTHENTICATED`, `ACCESS_DENIED`) plus two filter-level codes that bypass the advice and are
@@ -1964,7 +1973,8 @@ Two frontend meters were added by the 2026-08 logging audit:
   (`baseline-tune:`) and errs low.
 - `basetool_client_error_total{kind}` — counter minted by `ClientErrorReportController` for each
   accepted browser-error beacon (REQ-OBS-001). `kind` is resolved **server-side** against exactly
-  four literals — `script_error`, `unhandled_rejection`, `resource_error`, `csp_violation` — and a
+  five literals — `script_error`, `unhandled_rejection`, `resource_error`, `csp_violation`,
+  `i18n_missing` — and a
   beacon carrying
   anything else is rejected with 400 and creates **no** series: the endpoint is reachable by every
   authenticated user, so accepting the client's own string would hand a caller unbounded label
@@ -1983,6 +1993,12 @@ Two frontend meters were added by the 2026-08 logging audit:
   trailing window is present whenever the 1 h window is. The spike hour sits inside its own
   denominator, capping the achievable ratio at 24. Per `kind` so one class stepping up is not diluted
   by the others. The `> 20` floor is unbaselined (`baseline-tune:`).
+  `i18n_missing` (2026-09-23) is reported by `window.krtI18nText`, the check every browser script
+  runs its localized strings through since the literal fallbacks were removed: a string the page
+  did not provide renders as its key name and is reported once per page view, `message` = that key
+  name (`DICT.property` or `data-attribute`, never user data). A step in this kind after a deploy
+  is a dictionary entry or `data-*` attribute that went missing; `I18nDictionaryCoverageTest`
+  catches the ones a literal call site names before they ship.
   `csp_violation` (FE-SEC-04, 2026-09-22) is the beacon's `securitypolicyviolation` listener: the CSP
   is enforcing and has **no `report-uri`**, so before it a template that shipped an inline script or
   style without the nonce, or a page that began loading from a host the policy does not allow, was

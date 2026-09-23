@@ -53,7 +53,8 @@ public final class PickerSearch {
   public static final int RENDER_CAP = 50;
 
   /**
-   * Page size for the open-ended catalogue relays (materials, bookable game items, bank accounts):
+   * Page size for the open-ended catalogue relays (materials, bookable game items, bank accounts)
+   * and the user searches ({@code /users/search}, {@code /users/search-bank}, since 2026-09-23):
    * one more than {@link #RENDER_CAP}, so the combobox renders a full page and announces the rest
    * via the hint. These catalogues run to thousands of rows, so browsing them whole is not the goal
    * — typing is, and the hint is what makes that discoverable.
