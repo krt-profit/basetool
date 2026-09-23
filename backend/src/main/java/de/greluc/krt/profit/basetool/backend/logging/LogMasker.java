@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.logging;
 
+import de.greluc.krt.profit.basetool.logging.PiiMaskingPatternLayout;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

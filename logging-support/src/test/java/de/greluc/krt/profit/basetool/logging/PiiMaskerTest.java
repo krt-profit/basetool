@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.logging;
+package de.greluc.krt.profit.basetool.logging;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -29,10 +29,11 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit tests for {@link PiiMasker} — the regex-based PII / secret masker used by every log
- * appender. Previously had no dedicated test file (97% line / 25% branch). A regex bug here
- * silently leaks PII into the centralized log file, which is exactly the failure mode the project's
- * "Never log names, emails or tokens" rule is designed to prevent.
+ * Unit tests for {@link PiiMasker} — the regex-based PII / secret masker behind every log appender
+ * of all three applications. A regex bug here silently leaks PII into the centralized log files of
+ * every module at once, which is exactly the failure mode the project's "Never log names, emails or
+ * tokens" rule is designed to prevent. Until ADR-0205 the backend and the ingest gateway each kept
+ * their own copy of this test (the frontend kept none); both are folded in here.
  *
  * <p>The masker is a pure static function: tests are framework-free.
  */
@@ -98,6 +99,16 @@ class PiiMaskerTest {
     }
 
     @Test
+    void realShapedJwt_replacedExactly() {
+      // A realistic HS256 token rather than the minimal shape above - carried over from the
+      // former ingest copy of this test.
+      String jwt =
+          "eyJhbGciOiJIUzI1NiIsInR5cCI.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZ"
+              + ".SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c";
+      assertEquals("relaying JWT_***", PiiMasker.mask("relaying " + jwt));
+    }
+
+    @Test
     void shortJwtSegments_doNotMatch() {
       // Each segment must be at least 5 characters. "eyJ12.eyJ34.56" is below
       // the minimum-segment length and MUST NOT be matched as a JWT.
@@ -139,6 +150,15 @@ class PiiMaskerTest {
     void multipleEmails_allReplaced() {
       String masked = PiiMasker.mask("from: a@b.co to: c@d.co");
       assertEquals("from: ***@***.*** to: ***@***.***", masked);
+    }
+
+    @Test
+    void atSignWithoutTld_leftAloneWithoutQuadraticBacktracking() {
+      // The domain pattern requires a TLD label; a bare '@' string is not an address and must not
+      // be mangled. This is also the shape that used to backtrack quadratically (security audit
+      // L5) - carried over from the former ingest copy of this test.
+      String line = "queue@" + "a".repeat(200);
+      assertEquals(line, PiiMasker.mask(line));
     }
 
     @Test

@@ -29,9 +29,9 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PromotionCategoryResponse
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionCategoryWriteRequest;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionCategoryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionTopicRepository;
-import de.greluc.krt.profit.basetool.backend.support.LogSafe;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
+import de.greluc.krt.profit.basetool.logging.LogSafe;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;

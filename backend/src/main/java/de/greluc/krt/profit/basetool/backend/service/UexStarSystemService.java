@@ -23,7 +23,7 @@ import de.greluc.krt.profit.basetool.backend.dto.uex.UexStarSystemDto;
 import de.greluc.krt.profit.basetool.backend.integration.UexClient;
 import de.greluc.krt.profit.basetool.backend.model.StarSystem;
 import de.greluc.krt.profit.basetool.backend.repository.StarSystemRepository;
-import de.greluc.krt.profit.basetool.backend.support.LogSafe;
+import de.greluc.krt.profit.basetool.logging.LogSafe;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

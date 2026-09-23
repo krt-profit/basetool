@@ -17,42 +17,39 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.frontend.logging;
+package de.greluc.krt.profit.basetool.logging;
 
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Makes a user-supplied string safe to put in a log line.
+ * Makes a client- or user-supplied string safe to put in a log line, in all three applications.
  *
- * <p>Frontend counterpart of the backend {@code LogSafe}, kept module-local by the same
- * no-shared-module convention as {@link PiiMasker} and {@link LogMasker}. The realistic actor here
- * is an <em>authenticated squadron member</em> — or a guest holding an edit link — typing into a
- * search box, a filter field or a form input, not the open internet. That is precisely why the
- * guard is needed rather than optional: the UI layer echoes such text into log lines (a failed form
- * submit, a rejected filter, a backend error relayed to the user), and a member could otherwise
- * paste a newline followed by a fabricated {@code ERROR ---} prefix and have it read as a genuine
- * second log line while someone triages an incident (CWE-117). Neither the logback pattern nor the
- * maskers strip a {@code \n}.
+ * <p>Who types the text differs per module, and none of them is harmless. In the <b>ingest</b>
+ * gateway — the only internet-reachable module — it is the desktop extractor's free-text provenance
+ * fields ({@code tool} / {@code toolVersion}). In the <b>backend</b> and the <b>frontend</b> it is
+ * an authenticated squadron member, or a guest holding an edit link, typing into a search box, a
+ * filter field or a form input. Such text is echoed into log lines (a rejected search term, a
+ * validation failure, a relayed backend error), and without this guard a pasted newline followed by
+ * a fabricated {@code ERROR ---} prefix would read as a genuine second log line while someone
+ * triages an incident (CWE-117). A JSON string may legitimately contain {@code \n}, and neither the
+ * logback pattern nor {@link PiiMasker} strips it.
  *
- * <p>Complements the two maskers instead of replacing either. {@link PiiMasker} removes <em>secrets
- * and PII</em> from a line that already reached the appender; {@link LogMasker} redacts a
- * <em>known-sensitive value</em> at the call site; this removes <em>structure-breaking
- * characters</em> from free text before it is handed to the logger. A value that is both sensitive
- * and user-supplied needs a masker <em>and</em> this.
+ * <p>Complements the maskers instead of replacing either. {@link PiiMasker} removes <em>secrets and
+ * PII</em> from a line that already reached the appender; the backend's and frontend's {@code
+ * LogMasker} redacts a <em>known-sensitive value</em> at the call site; this removes
+ * <em>structure-breaking characters</em> from free text before it is handed to the logger. A value
+ * that is both sensitive and user-supplied needs a masker <em>and</em> this.
  *
  * <p>Sanitising does not make a forbidden value loggable: REQ-OBS-004 still bans callsigns, names,
  * e-mail addresses, tokens and client IPs outright, whatever they were run through first.
+ *
+ * <p>This class has no dependency of its own, so the backend's ADR-0047 package-cycle rule — which
+ * used to pin the backend copy to its {@code support} leaf — is satisfied from outside the backend
+ * altogether (ADR-0205).
  */
 public final class LogSafe {
-  // >>> LOGSAFE-MIRROR BEGIN
-  // Everything between the two MIRROR markers is a hand-maintained mirror and must stay
-  // byte-identical in the backend, frontend and ingest copies of this class; only the package line
-  // and the class Javadoc above are module-local. The no-shared-module convention (the same one
-  // PiiMasker and LogMasker follow) rules out extracting it, and the backend copy is additionally
-  // pinned to the support leaf by the ADR-0047 cycle rule — so LogSafeTest compares the three
-  // regions mechanically instead, and an edit to one copy that is not propagated fails the build.
 
   /** Rendered for a {@code null} or blank input, so the log line keeps a stable field count. */
   public static final String NONE = "none";
@@ -121,5 +118,4 @@ public final class LogSafe {
   private static boolean isLineBreaking(char c) {
     return Character.isISOControl(c) || c == LINE_SEPARATOR || c == PARAGRAPH_SEPARATOR;
   }
-  // <<< LOGSAFE-MIRROR END
 }

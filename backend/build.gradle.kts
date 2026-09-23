@@ -24,6 +24,9 @@ version = "0.0.1-SNAPSHOT"
 // register its afterEvaluate hook that late.
 evaluationDependsOn(":test-support")
 
+// The same for :logging-support, which this module depends on at runtime (ADR-0205).
+evaluationDependsOn(":logging-support")
+
 description = "backend"
 
 java {
@@ -101,6 +104,9 @@ dependencies {
   implementation(libs.semver4j.core)
   // Structured JSON logging (LogstashEncoder) for production profile in logback-spring.xml.
   implementation(libs.logstash.logback.encoder)
+  // The one implementation of LogSafe and the PII maskers the logback configuration names
+  // (ADR-0205). `implementation`, not `testImplementation`: it ships inside the boot JAR.
+  implementation(project(":logging-support"))
 
   // MapStruct for compile-time mappers
   implementation(libs.mapstruct.core)
@@ -253,22 +259,6 @@ tasks.named<org.cyclonedx.gradle.CyclonedxDirectTask>("cyclonedxDirectBom") {
 //
 // Declared file by file rather than as whole source trees: this must invalidate on the handful of
 // files the assertions actually read, not on every Java change in two other modules.
-// The six sources `LogSafeTest` compares. The guard exists once per module and asserts that the
-// marked region of all three `LogSafe.java` implementations, and the expectation table in all
-// three test classes, are byte-identical — so a sanitiser fix in one module cannot leave the other
-// two logging what it strips. Every module declares the whole set rather than only the four that
-// live elsewhere: two are already covered here by `classes`/`testClasses`, listing them costs
-// nothing, and the three build files then carry the identical list instead of three different
-// subsets a reader has to reason about.
-val logSafeMirrorSources =
-  listOf(
-    "backend/src/main/java/de/greluc/krt/profit/basetool/backend/support/LogSafe.java",
-    "frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/logging/LogSafe.java",
-    "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/logging/LogSafe.java",
-    "backend/src/test/java/de/greluc/krt/profit/basetool/backend/support/LogSafeTest.java",
-    "frontend/src/test/java/de/greluc/krt/profit/basetool/frontend/logging/LogSafeTest.java",
-    "ingest/src/test/java/de/greluc/krt/profit/basetool/ingest/logging/LogSafeTest.java",
-  )
 
 // Where the CI step drops the previous release's openapi.json for the second half of
 // REQ-API-009's schema diff (ADR-0136, ADR-0161 8.4). The path is ALWAYS handed to the test JVM;
@@ -331,19 +321,6 @@ tasks.named<Test>("test") {
   inputs
     .file(rootProject.file("docker/edge/include/api-allowlist.conf"))
     .withPropertyName("apiVhostAllowList")
-    .withPathSensitivity(PathSensitivity.RELATIVE)
-
-  // The same defect a third time, and here it was never theoretical. `crossModuleParitySources`
-  // covers the `ObservationPrivacyFilter` trio and nothing else, so `LogSafeTest` read four files
-  // outside this module that reached the task through neither the classpath nor a declaration. It
-  // matters more here than in `frontend`: that module runs `bootBuildInfo`, whose fresh
-  // `build.time` lands on the test runtime classpath and re-ran `:frontend:test` unconditionally,
-  // accidentally covering its copy of the same gap. `backend` runs no `bootBuildInfo`, so
-  // `:backend:test` genuinely did report UP-TO-DATE after a cross-module `LogSafe` edit and the
-  // mirror assertion genuinely was skipped — a live false green, not a latent one.
-  inputs
-    .files(logSafeMirrorSources.map { rootProject.file(it) })
-    .withPropertyName("logSafeMirrorSources")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 
   // `LiveSyncTopicRegistryParityTest` reads the frontend's `LiveSyncTopicClass` enum as source and

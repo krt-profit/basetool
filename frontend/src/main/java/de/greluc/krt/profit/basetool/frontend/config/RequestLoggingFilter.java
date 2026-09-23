@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.config;
 
-import de.greluc.krt.profit.basetool.frontend.logging.LogSafe;
+import de.greluc.krt.profit.basetool.logging.LogSafe;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

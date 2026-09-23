@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.frontend.websocket;
 
-import de.greluc.krt.profit.basetool.frontend.logging.LogSafe;
 import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.frontend.service.LiveSyncPresenceService;
 import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
+import de.greluc.krt.profit.basetool.logging.LogSafe;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;

@@ -38,6 +38,9 @@ plugins {
 // register its afterEvaluate hook that late.
 evaluationDependsOn(":test-support")
 
+// The same for :logging-support, which this module depends on at runtime (ADR-0205).
+evaluationDependsOn(":logging-support")
+
 description = "frontend"
 
 // ---------------------------------------------------------------------------
@@ -275,6 +278,9 @@ dependencies {
   // Version is resolved by the Spring Boot BOM (no version.ref here).
   implementation(libs.micrometer.context.propagation)
   implementation(libs.logstash.logback.encoder)
+  // The one implementation of LogSafe and the PII maskers the logback configuration names
+  // (ADR-0205). `implementation`, not `testImplementation`: it ships inside the boot JAR.
+  implementation(project(":logging-support"))
 
   compileOnly("org.projectlombok:lombok")
   annotationProcessor("org.projectlombok:lombok")
@@ -569,23 +575,6 @@ sourceSets.named("main") { resources.srcDir(generateOssLicenses) }
 // this module's classes, which are already on the test runtime classpath.
 val backendDtoMirrorDir = "backend/src/main/java/de/greluc/krt/profit/basetool/backend/model/dto"
 
-// The six sources `LogSafeTest` compares: the guard exists once per module and asserts that the
-// marked region of all three `LogSafe.java` implementations, and the expectation table in all
-// three test classes, are byte-identical — so a sanitiser fix in one module cannot leave the other
-// two logging what it strips. The whole set is declared rather than only the four that live
-// elsewhere: two are already covered here by `classes`/`testClasses`, listing them costs nothing,
-// and the three build files then carry the identical list instead of three different subsets a
-// reader has to reason about.
-val logSafeMirrorSources =
-  listOf(
-    "backend/src/main/java/de/greluc/krt/profit/basetool/backend/support/LogSafe.java",
-    "frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/logging/LogSafe.java",
-    "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/logging/LogSafe.java",
-    "backend/src/test/java/de/greluc/krt/profit/basetool/backend/support/LogSafeTest.java",
-    "frontend/src/test/java/de/greluc/krt/profit/basetool/frontend/logging/LogSafeTest.java",
-    "ingest/src/test/java/de/greluc/krt/profit/basetool/ingest/logging/LogSafeTest.java",
-  )
-
 tasks.named<Test>("test") {
   inputs
     .files(rootProject.fileTree(backendDtoMirrorDir) { include("*.java") })
@@ -610,11 +599,6 @@ tasks.named<Test>("test") {
   inputs
     .file(rootProject.file("backend/src/main/resources/application-prod.yml"))
     .withPropertyName("backendProdConfig")
-    .withPathSensitivity(PathSensitivity.RELATIVE)
-
-  inputs
-    .files(logSafeMirrorSources.map { rootProject.file(it) })
-    .withPropertyName("logSafeMirrorSources")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 
   // The committed test TLS material (ADR-0139). The two HTTP/2 tests handshake against it through
