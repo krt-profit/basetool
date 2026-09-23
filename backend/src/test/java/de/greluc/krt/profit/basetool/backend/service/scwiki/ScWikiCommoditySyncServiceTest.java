@@ -35,7 +35,10 @@ import de.greluc.krt.profit.basetool.backend.model.SyncSourceSystem;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.service.MaterialExternalAliasService;
 import de.greluc.krt.profit.basetool.backend.service.SyncReportService;
+import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,23 +65,36 @@ class ScWikiCommoditySyncServiceTest {
   @Mock private SyncReportService syncReportService;
 
   private ScWikiProperties properties;
+
+  /** The configured keys, relative to the record's prefix; {@link #rebuild()} binds them. */
+  private final Map<String, Object> config = new HashMap<>();
+
   private ScWikiCommoditySyncService service;
 
   @BeforeEach
   void setUp() {
-    properties = new ScWikiProperties();
-    properties.setCommoditySyncEnabled(true);
+    config.putAll(Map.of("commodity-sync-enabled", true));
+    rebuild();
+    lenient().when(syncReportService.beginRun()).thenReturn(UUID.randomUUID());
+  }
+
+  /**
+   * Binds the properties record from {@link #config} and builds the object under test over it. The
+   * record is immutable (BE-MOD-04), so a test that changes a key rebuilds.
+   */
+  private void rebuild() {
+    properties = BoundProperties.bind(ScWikiProperties.class, config);
     service =
         new ScWikiCommoditySyncService(
             scWikiClient, properties, materialRepository, aliasService, syncReportService);
-    lenient().when(syncReportService.beginRun()).thenReturn(UUID.randomUUID());
   }
 
   // ─── feature flag + empty response ──────────────────────────────────────
 
   @Test
   void syncCommodities_isNoOp_whenFeatureFlagOff() {
-    properties.setCommoditySyncEnabled(false);
+    config.put("commodity-sync-enabled", false);
+    rebuild();
 
     service.syncCommodities();
 

@@ -25,7 +25,6 @@ import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.context.PropertyPlaceholderAutoConfiguration;
-import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Configuration;
@@ -44,8 +43,10 @@ class LoggingPropertiesTest {
           .withUserConfiguration(Config.class);
 
   @Configuration
+  // Registers LoggingProperties alone. A @ConfigurationPropertiesScan here would also bind every
+  // other properties record of the package — KeycloakSyncProperties among them, whose required
+  // credentials this context does not configure.
   @EnableConfigurationProperties(LoggingProperties.class)
-  @ConfigurationPropertiesScan
   static class Config {}
 
   @Test

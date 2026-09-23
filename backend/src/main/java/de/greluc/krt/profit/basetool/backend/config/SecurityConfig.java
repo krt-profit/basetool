@@ -34,6 +34,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +46,7 @@ import org.springframework.context.MessageSource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
@@ -53,7 +55,9 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
@@ -69,6 +73,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
+import org.springframework.security.web.header.writers.StaticHeadersWriter;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.cors.CorsConfiguration;
@@ -272,8 +277,7 @@ public class SecurityConfig {
   @NotNull
   static OAuth2TokenValidator<Jwt> audienceValidator(List<String> expectedAudiences) {
     return new JwtClaimValidator<List<String>>(
-        JwtClaimNames.AUD,
-        aud -> aud != null && !java.util.Collections.disjoint(aud, expectedAudiences));
+        JwtClaimNames.AUD, aud -> aud != null && !Collections.disjoint(aud, expectedAudiences));
   }
 
   /**
@@ -399,7 +403,7 @@ public class SecurityConfig {
   public SecurityFilterChain filterChain(
       HttpSecurity http,
       JwtAuthenticationConverter jwtAuthenticationConverter,
-      @NotNull org.springframework.core.env.Environment env,
+      @NotNull Environment env,
       SecurityProblemResponseHandler securityProblemResponseHandler,
       MessageSource messageSource,
       ProblemResponseFactory problemResponseFactory,
@@ -414,7 +418,7 @@ public class SecurityConfig {
       ClientAttribution clientAttribution)
       throws Exception {
 
-    boolean isTest = java.util.Arrays.asList(env.getActiveProfiles()).contains("test");
+    boolean isTest = env.matchesProfiles("test");
 
     // REQ-SEC-028: the consent boundary is ARMED BY DEFAULT and stood down only under the `test`
     // profile, mirroring the CSRF carve-out below. The alternative — a property that must be set to
@@ -444,9 +448,7 @@ public class SecurityConfig {
       // and have no session cookie to attack. The test profile is gated by
       // Spring profile activation and is never enabled in deployed environments.
       // lgtm[java/spring-disabled-csrf-protection]
-      http.csrf(
-          org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer
-              ::disable);
+      http.csrf(AbstractHttpConfigurer::disable);
     } else {
       // L-2: pin the CSRF cookie's Secure + SameSite attributes explicitly. Spring's default
       // CookieCsrfTokenRepository does not set SameSite, leaving the browser to fall back to
@@ -509,7 +511,7 @@ public class SecurityConfig {
               headers.httpStrictTransportSecurity(
                   hsts -> hsts.includeSubDomains(true).preload(true).maxAgeInSeconds(31_536_000L));
               headers.addHeaderWriter(
-                  new org.springframework.security.web.header.writers.StaticHeadersWriter(
+                  new StaticHeadersWriter(
                       "Permissions-Policy",
                       // L-3: explicit deny for every browser feature the app does not use, so
                       // an injected iframe / shared context cannot opt-in.
@@ -857,10 +859,7 @@ public class SecurityConfig {
         // endpoint. Pinning STATELESS makes the contract explicit: a future bug that introduces
         // {@code @SessionAttributes} or {@code request.getSession(true)} on a permitAll POST is
         // caught at startup rather than silently creating a session per anonymous caller.
-        .sessionManagement(
-            sm ->
-                sm.sessionCreationPolicy(
-                    org.springframework.security.config.http.SessionCreationPolicy.STATELESS));
+        .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
     return http.build();
   }

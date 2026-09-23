@@ -152,7 +152,7 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
           AND (t.hidden = false OR t.hidden IS NULL)
           ORDER BY p.priceSell DESC NULLS LAST, t.name ASC
       """)
-  java.util.List<MaterialSellingTerminalDto> findSellingTerminalsByMaterialId(
+  List<MaterialSellingTerminalDto> findSellingTerminalsByMaterialId(
       @Param("materialId") UUID materialId);
 
   /**
@@ -244,7 +244,7 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
           WHERE (t.hidden = false OR t.hidden IS NULL)
           AND t.isAutoLoad = true
       """)
-  java.util.List<MaterialPrice> findAllAutoLoadPrices();
+  List<MaterialPrice> findAllAutoLoadPrices();
 
   /**
    * Same as {@link #findAllAutoLoadPrices} but restricted to terminals in the given star systems -
@@ -260,8 +260,8 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
           AND t.isAutoLoad = true
           AND t.starSystemName IN :starSystems
       """)
-  java.util.List<MaterialPrice> findAllAutoLoadPricesInSystems(
-      @Param("starSystems") java.util.Collection<String> starSystems);
+  List<MaterialPrice> findAllAutoLoadPricesInSystems(
+      @Param("starSystems") Collection<String> starSystems);
 
   /**
    * The (material, terminal) key and id of every commodity price row. One query for the whole

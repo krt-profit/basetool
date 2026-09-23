@@ -37,7 +37,10 @@ import de.greluc.krt.profit.basetool.backend.model.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.model.SyncEventType;
 import de.greluc.krt.profit.basetool.backend.repository.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.service.SyncReportService;
+import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,21 +65,34 @@ class ScWikiManufacturerSyncServiceTest {
   @Mock private SyncReportService syncReportService;
 
   private ScWikiProperties properties;
+
+  /** The configured keys, relative to the record's prefix; {@link #rebuild()} binds them. */
+  private final Map<String, Object> config = new HashMap<>();
+
   private ScWikiManufacturerSyncService service;
 
   @BeforeEach
   void setUp() {
-    properties = new ScWikiProperties();
-    properties.setManufacturerSyncEnabled(true);
+    config.putAll(Map.of("manufacturer-sync-enabled", true));
+    rebuild();
+    lenient().when(syncReportService.beginRun()).thenReturn(UUID.randomUUID());
+  }
+
+  /**
+   * Binds the properties record from {@link #config} and builds the object under test over it. The
+   * record is immutable (BE-MOD-04), so a test that changes a key rebuilds.
+   */
+  private void rebuild() {
+    properties = BoundProperties.bind(ScWikiProperties.class, config);
     service =
         new ScWikiManufacturerSyncService(
             scWikiClient, properties, manufacturerRepository, syncReportService);
-    lenient().when(syncReportService.beginRun()).thenReturn(UUID.randomUUID());
   }
 
   @Test
   void syncManufacturers_isNoOp_whenFlagOff() {
-    properties.setManufacturerSyncEnabled(false);
+    config.put("manufacturer-sync-enabled", false);
+    rebuild();
 
     service.syncManufacturers();
 

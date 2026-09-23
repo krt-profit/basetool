@@ -152,7 +152,7 @@ public class ScWikiBlueprintSyncService {
    *     304 Not Modified} (unchanged) list
    */
   public int syncBlueprints() {
-    if (!Boolean.TRUE.equals(properties.getBlueprintSyncEnabled())) {
+    if (!Boolean.TRUE.equals(properties.blueprintSyncEnabled())) {
       log.info(
           "SC Wiki blueprint sync invoked but disabled "
               + "(krt.scwiki.blueprint-sync-enabled=false) — skipping.");
@@ -162,7 +162,7 @@ public class ScWikiBlueprintSyncService {
     log.info("Starting SC Wiki blueprint sync...");
     ScWikiClient.FetchResult<ScWikiBlueprintDto> listResult =
         scWikiClient.fetchAllPagesResult(
-            properties.getBlueprintsEndpoint(),
+            properties.blueprintsEndpoint(),
             new ParameterizedTypeReference<ScWikiResponseDto<ScWikiBlueprintDto>>() {},
             "blueprints");
     if (listResult.notModified()) {
@@ -209,7 +209,7 @@ public class ScWikiBlueprintSyncService {
         scWikiClient.paceForRateLimit();
         ScWikiBlueprintDto detail =
             scWikiClient.fetchOne(
-                properties.getBlueprintsEndpoint() + "/" + listDto.uuid(),
+                properties.blueprintsEndpoint() + "/" + listDto.uuid(),
                 ScWikiBlueprintDto.class,
                 "blueprint");
         if (detail == null) {

@@ -130,7 +130,7 @@ public class ScWikiCommoditySyncService {
    */
   @Transactional
   public int syncCommodities() {
-    if (!Boolean.TRUE.equals(properties.getCommoditySyncEnabled())) {
+    if (!Boolean.TRUE.equals(properties.commoditySyncEnabled())) {
       log.info(
           "SC Wiki commodity sync invoked but disabled "
               + "(krt.scwiki.commodity-sync-enabled=false) — skipping.");
@@ -140,7 +140,7 @@ public class ScWikiCommoditySyncService {
     log.info("Starting SC Wiki commodity merge...");
     ScWikiClient.FetchResult<ScWikiCommodityDto> fetchResult =
         scWikiClient.fetchAllPagesResult(
-            properties.getCommoditiesEndpoint(),
+            properties.commoditiesEndpoint(),
             new ParameterizedTypeReference<ScWikiResponseDto<ScWikiCommodityDto>>() {},
             "commodities");
     if (fetchResult.notModified()) {
