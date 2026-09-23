@@ -48,149 +48,149 @@
  * parent planet (jump points, raw Lagrange) keep the default neutral header.
  */
 .matrix-table th.col-terminal.planet-hurston {
-    background-color: #3a2519;
+    background-color: var(--krt-planet-hurston);
 }
 .matrix-table th.col-terminal.planet-crusader {
-    background-color: #3a2c26;
+    background-color: var(--krt-planet-crusader);
 }
 .matrix-table th.col-terminal.planet-arccorp {
-    background-color: #3a2c1a;
+    background-color: var(--krt-planet-arccorp);
 }
 .matrix-table th.col-terminal.planet-microtech {
-    background-color: #1f2c3a;
+    background-color: var(--krt-planet-microtech);
 }
 .matrix-table th.col-terminal.planet-pyro-1 {
-    background-color: #3a3019;
+    background-color: var(--krt-planet-pyro-1);
 }
 .matrix-table th.col-terminal.planet-pyro-2 {
-    background-color: #2a2018;
+    background-color: var(--krt-planet-pyro-2);
 }
 .matrix-table th.col-terminal.planet-pyro-3 {
-    background-color: #3a1f1a;
+    background-color: var(--krt-planet-pyro-3);
 }
 .matrix-table th.col-terminal.planet-pyro-4 {
-    background-color: #1a2a2a;
+    background-color: var(--krt-planet-pyro-4);
 }
 .matrix-table th.col-terminal.planet-pyro-5 {
-    background-color: #2a1a2a;
+    background-color: var(--krt-planet-pyro-5);
 }
 .matrix-table th.col-terminal.planet-pyro-6 {
-    background-color: #2a2a18;
+    background-color: var(--krt-planet-pyro-6);
 }
 .matrix-table th.col-terminal.planet-terra {
-    background-color: #1a323a;
+    background-color: var(--krt-planet-terra);
 }
 .matrix-table th.col-terminal.planet-delamar {
-    background-color: #262626;
+    background-color: var(--krt-planet-delamar);
 }
 .matrix-table th.col-terminal.planet-hash-0 {
-    background-color: #3a2020;
+    background-color: var(--krt-planet-hash-0);
 }
 .matrix-table th.col-terminal.planet-hash-1 {
-    background-color: #3a2c20;
+    background-color: var(--krt-planet-hash-1);
 }
 .matrix-table th.col-terminal.planet-hash-2 {
-    background-color: #3a3a20;
+    background-color: var(--krt-planet-hash-2);
 }
 .matrix-table th.col-terminal.planet-hash-3 {
-    background-color: #2c3a20;
+    background-color: var(--krt-planet-hash-3);
 }
 .matrix-table th.col-terminal.planet-hash-4 {
-    background-color: #203a20;
+    background-color: var(--krt-planet-hash-4);
 }
 .matrix-table th.col-terminal.planet-hash-5 {
-    background-color: #203a2c;
+    background-color: var(--krt-planet-hash-5);
 }
 .matrix-table th.col-terminal.planet-hash-6 {
-    background-color: #203a3a;
+    background-color: var(--krt-planet-hash-6);
 }
 .matrix-table th.col-terminal.planet-hash-7 {
-    background-color: #202c3a;
+    background-color: var(--krt-planet-hash-7);
 }
 .matrix-table th.col-terminal.planet-hash-8 {
-    background-color: #20203a;
+    background-color: var(--krt-planet-hash-8);
 }
 .matrix-table th.col-terminal.planet-hash-9 {
-    background-color: #2c203a;
+    background-color: var(--krt-planet-hash-9);
 }
 .matrix-table th.col-terminal.planet-hash-10 {
-    background-color: #3a203a;
+    background-color: var(--krt-planet-hash-10);
 }
 .matrix-table th.col-terminal.planet-hash-11 {
-    background-color: #3a202c;
+    background-color: var(--krt-planet-hash-11);
 }
 
 .matrix-table td.col-terminal.planet-hurston {
-    box-shadow: inset 2px 0 0 0 #7a4a2e;
+    box-shadow: inset 2px 0 0 0 var(--krt-planet-hurston-stripe);
 }
 .matrix-table td.col-terminal.planet-crusader {
-    box-shadow: inset 2px 0 0 0 #c97a6a;
+    box-shadow: inset 2px 0 0 0 var(--krt-planet-crusader-stripe);
 }
 .matrix-table td.col-terminal.planet-arccorp {
-    box-shadow: inset 2px 0 0 0 #b5722b;
+    box-shadow: inset 2px 0 0 0 var(--krt-planet-arccorp-stripe);
 }
 .matrix-table td.col-terminal.planet-microtech {
-    box-shadow: inset 2px 0 0 0 #5a8fb8;
+    box-shadow: inset 2px 0 0 0 var(--krt-planet-microtech-stripe);
 }
 .matrix-table td.col-terminal.planet-pyro-1 {
-    box-shadow: inset 2px 0 0 0 #b89538;
+    box-shadow: inset 2px 0 0 0 var(--krt-planet-pyro-1-stripe);
 }
 .matrix-table td.col-terminal.planet-pyro-2 {
-    box-shadow: inset 2px 0 0 0 #8a6f4a;
+    box-shadow: inset 2px 0 0 0 var(--krt-planet-pyro-2-stripe);
 }
 .matrix-table td.col-terminal.planet-pyro-3 {
-    box-shadow: inset 2px 0 0 0 #b8503a;
+    box-shadow: inset 2px 0 0 0 var(--krt-planet-pyro-3-stripe);
 }
 .matrix-table td.col-terminal.planet-pyro-4 {
-    box-shadow: inset 2px 0 0 0 #4a8a8a;
+    box-shadow: inset 2px 0 0 0 var(--krt-planet-pyro-4-stripe);
 }
 .matrix-table td.col-terminal.planet-pyro-5 {
-    box-shadow: inset 2px 0 0 0 #8a4a8a;
+    box-shadow: inset 2px 0 0 0 var(--krt-planet-pyro-5-stripe);
 }
 .matrix-table td.col-terminal.planet-pyro-6 {
-    box-shadow: inset 2px 0 0 0 #8a8a3a;
+    box-shadow: inset 2px 0 0 0 var(--krt-planet-pyro-6-stripe);
 }
 .matrix-table td.col-terminal.planet-terra {
-    box-shadow: inset 2px 0 0 0 #3a8aa8;
+    box-shadow: inset 2px 0 0 0 var(--krt-planet-terra-stripe);
 }
 .matrix-table td.col-terminal.planet-delamar {
-    box-shadow: inset 2px 0 0 0 #7a7a7a;
+    box-shadow: inset 2px 0 0 0 var(--krt-planet-delamar-stripe);
 }
 .matrix-table td.col-terminal.planet-hash-0 {
-    box-shadow: inset 2px 0 0 0 #a85050;
+    box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-0-stripe);
 }
 .matrix-table td.col-terminal.planet-hash-1 {
-    box-shadow: inset 2px 0 0 0 #a87850;
+    box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-1-stripe);
 }
 .matrix-table td.col-terminal.planet-hash-2 {
-    box-shadow: inset 2px 0 0 0 #a8a850;
+    box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-2-stripe);
 }
 .matrix-table td.col-terminal.planet-hash-3 {
-    box-shadow: inset 2px 0 0 0 #78a850;
+    box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-3-stripe);
 }
 .matrix-table td.col-terminal.planet-hash-4 {
-    box-shadow: inset 2px 0 0 0 #50a850;
+    box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-4-stripe);
 }
 .matrix-table td.col-terminal.planet-hash-5 {
-    box-shadow: inset 2px 0 0 0 #50a878;
+    box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-5-stripe);
 }
 .matrix-table td.col-terminal.planet-hash-6 {
-    box-shadow: inset 2px 0 0 0 #50a8a8;
+    box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-6-stripe);
 }
 .matrix-table td.col-terminal.planet-hash-7 {
-    box-shadow: inset 2px 0 0 0 #5078a8;
+    box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-7-stripe);
 }
 .matrix-table td.col-terminal.planet-hash-8 {
-    box-shadow: inset 2px 0 0 0 #5050a8;
+    box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-8-stripe);
 }
 .matrix-table td.col-terminal.planet-hash-9 {
-    box-shadow: inset 2px 0 0 0 #7850a8;
+    box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-9-stripe);
 }
 .matrix-table td.col-terminal.planet-hash-10 {
-    box-shadow: inset 2px 0 0 0 #a850a8;
+    box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-10-stripe);
 }
 .matrix-table td.col-terminal.planet-hash-11 {
-    box-shadow: inset 2px 0 0 0 #a85078;
+    box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-11-stripe);
 }
 
 .matrix-table .row-system th {

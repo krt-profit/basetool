@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-23.
 > **Owner area:** UI · **Related ADRs:**
 > [0053](../adr/0053-standardize-user-selection-on-searchable-combobox.md) (searchable user pickers, REQ-UI-012) ·
 > [0093](../adr/0093-eliminate-inline-style-attributes-csp-style-src-attr-none.md) (no inline `style=""`, REQ-UI-013) ·
@@ -46,10 +46,15 @@ components in `krt-components.css`.
   renamed or dropped, painting the stale colour instead of failing visibly. 97 such fallbacks
   (84 in `personal-inventory.css`) were removed on 2026-09-22 (FE-MOD-01); every one named a token
   that resolves, so none of them changed a rendered colour.
+- [x] Categorical palettes are tokens too. The price matrix's planet tints (header fill + body-cell
+  stripe for the canonical planets and the twelve `PlanetColorResolver` hash buckets) are the
+  `--krt-planet-<p>` / `--krt-planet-<p>-stripe` tokens on `:root` in `styles.css` (2026-09-23,
+  unchanged colours); `materials-overview.css` holds no hex value at all.
 
 **Enforced by:** design review, plus one lint rule: `declaration-property-value-disallowed-list`
 in `frontend/.stylelintrc.json` and `.stylelintrc.templates.json` fails `:frontend:lintCss` /
-`:frontend:lintCssInline` on a hex fallback inside `var()` (2026-09-22). Otherwise the web-asset
+`:frontend:lintCssInline` on a hex fallback inside `var()` (2026-09-22), and an override applies
+`color-no-hex` to `materials-overview.css` (2026-09-23). Otherwise the web-asset
 linters gate syntax and style only; no rule checks that a value uses a token.
 
 ### REQ-UI-002 — Brand colour & logo

@@ -85,6 +85,60 @@
     --color-warning: #ffd23f; /* same value as Search and Rescue */
     --color-info: #355ddc; /* same value as Forschung */
     --color-secondary: #ffd23f; /* cross-squadron / foreign-link highlight */
+
+    /* Planet-system tints (price matrix, materials-overview.css). A terminal column is tinted by
+       its effective UEX planet: --krt-planet-<p> fills the column header, --krt-planet-<p>-stripe
+       is the 2px left stripe of its body cells. Canonical planets are hand-picked; hash-0..11 are
+       the twelve buckets PlanetColorResolver assigns an unknown planet. A categorical palette,
+       not brand colour: use it only for planet identity. */
+    --krt-planet-hurston: #3a2519;
+    --krt-planet-hurston-stripe: #7a4a2e;
+    --krt-planet-crusader: #3a2c26;
+    --krt-planet-crusader-stripe: #c97a6a;
+    --krt-planet-arccorp: #3a2c1a;
+    --krt-planet-arccorp-stripe: #b5722b;
+    --krt-planet-microtech: #1f2c3a;
+    --krt-planet-microtech-stripe: #5a8fb8;
+    --krt-planet-pyro-1: #3a3019;
+    --krt-planet-pyro-1-stripe: #b89538;
+    --krt-planet-pyro-2: #2a2018;
+    --krt-planet-pyro-2-stripe: #8a6f4a;
+    --krt-planet-pyro-3: #3a1f1a;
+    --krt-planet-pyro-3-stripe: #b8503a;
+    --krt-planet-pyro-4: #1a2a2a;
+    --krt-planet-pyro-4-stripe: #4a8a8a;
+    --krt-planet-pyro-5: #2a1a2a;
+    --krt-planet-pyro-5-stripe: #8a4a8a;
+    --krt-planet-pyro-6: #2a2a18;
+    --krt-planet-pyro-6-stripe: #8a8a3a;
+    --krt-planet-terra: #1a323a;
+    --krt-planet-terra-stripe: #3a8aa8;
+    --krt-planet-delamar: #262626;
+    --krt-planet-delamar-stripe: #7a7a7a;
+    --krt-planet-hash-0: #3a2020;
+    --krt-planet-hash-0-stripe: #a85050;
+    --krt-planet-hash-1: #3a2c20;
+    --krt-planet-hash-1-stripe: #a87850;
+    --krt-planet-hash-2: #3a3a20;
+    --krt-planet-hash-2-stripe: #a8a850;
+    --krt-planet-hash-3: #2c3a20;
+    --krt-planet-hash-3-stripe: #78a850;
+    --krt-planet-hash-4: #203a20;
+    --krt-planet-hash-4-stripe: #50a850;
+    --krt-planet-hash-5: #203a2c;
+    --krt-planet-hash-5-stripe: #50a878;
+    --krt-planet-hash-6: #203a3a;
+    --krt-planet-hash-6-stripe: #50a8a8;
+    --krt-planet-hash-7: #202c3a;
+    --krt-planet-hash-7-stripe: #5078a8;
+    --krt-planet-hash-8: #20203a;
+    --krt-planet-hash-8-stripe: #5050a8;
+    --krt-planet-hash-9: #2c203a;
+    --krt-planet-hash-9-stripe: #7850a8;
+    --krt-planet-hash-10: #3a203a;
+    --krt-planet-hash-10-stripe: #a850a8;
+    --krt-planet-hash-11: #3a202c;
+    --krt-planet-hash-11-stripe: #a85078;
     --color-danger-hover: #d41a25;
     --color-success-hover: #2ebc3d;
 
