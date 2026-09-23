@@ -2,37 +2,6 @@
 
 ## [Unreleased]
 
-### Fixed
-
-- **Einsätze: „Leiter" in der Kopfzeile zeigt wieder den Einsatzleiter.** Das Backend schickte die
-  Einsatzleiter-Markierung der geplanten Rolle eines Teilnehmers nicht mit, deshalb stand dort immer
-  der Besitzer des Einsatzes, auch wenn ein Einsatzleiter eingetragen war.
-
-- **Netty auf 4.2.18.Final angehoben (Sicherheitsupdate).** Schließt CVE-2026-89044 (Request
-  Smuggling über einen fehlerhaften `Transfer-Encoding`-Header) in Backend, Webtool und Ingest.
-  Keine Funktionsänderung.
-
-- **Oberfläche: die letzten fest verdrahteten Texte kommen aus den Sprachdateien.** Die
-  Terminal-Auswahl beim Ausbuchen, die Lagereintrag-Zeile und der Dateiname des
-  Übergabeprotokolls im Auftrag, die Titel des Spezialkommando-Dialogs und der ADMIN-Hinweis
-  erschienen in der englischen Oberfläche bisher auf Deutsch.
-
-- **Monitoring: „In-flight Requests" statt „Tomcat Busy Threads".** Das Panel im
-  Spring-Apps-Dashboard stand unter virtuellen Threads immer bei -1; es zeigt jetzt die gerade
-  bearbeiteten Requests je Anwendung. Die wirkungslosen `server.tomcat.threads.*`-Einstellungen
-  sind entfernt.
-
-- **Monitoring: Container-Limits werden wieder gelesen.** Der cgroup-Collector las seit der
-  Podman-Umstellung die Unit statt des Containers und sah deshalb kein Speicher-, pids- oder
-  CPU-Limit: Die Alarme `ContainerMemoryHigh`, `ContainerPidsHigh` und `ContainerCpuThrottledHigh`
-  konnten nicht auslösen, und drei Panels im Container-Dashboard blieben leer. Podmans
-  Healthcheck-Units erscheinen dort außerdem nicht mehr als Hex-Container.
-
-- **Einsätze: Besitzerwechsel meldet jetzt einen Konflikt, wenn jemand anderes den Besitzer
-  inzwischen geändert hat.** Bisher gewann still der spätere von zwei gleichzeitigen Wechseln; jetzt
-  kommt der bekannte Konflikt-Dialog mit „Aktuelle Werte laden". Ein zweiter Wechsel auf derselben
-  Seite funktioniert ohne Neuladen.
-
 ### Removed
 
 - **API: die 17 veralteten Einsatz-Schnittstellen sind vorzeitig entfernt.** Angekündigt war der
@@ -67,6 +36,11 @@
 
 ### Changed
 
+- **Backend: weniger Datenbanklast pro Anfrage.** Die Berechtigungen eines Mitglieds werden pro
+  Anmeldesitzung zwischengespeichert statt pro Zugriffstoken, sodass die alle fünf Minuten
+  erneuerten Tokens sie nicht mehr jedes Mal neu laden. Eine in Keycloak entzogene Rolle wirkt
+  weiterhin beim nächsten Token (ADR-0174).
+  
 - **Intern: eine gemeinsame Log-Bereinigung für Backend, Webtool und Ingest.** Maskierung von
   Tokens und E-Mail-Adressen sowie der Schutz gegen gefälschte Logzeilen liegen jetzt einmal im
   neuen Modul `logging-support` statt dreifach kopiert (ADR-0205). Keine Funktionsänderung.
@@ -143,6 +117,35 @@
   `IngestAudienceGateOff`, solange die Audience-Prüfung aus ist.
 
 ### Fixed
+
+- **Einsätze: „Leiter" in der Kopfzeile zeigt wieder den Einsatzleiter.** Das Backend schickte die
+  Einsatzleiter-Markierung der geplanten Rolle eines Teilnehmers nicht mit, deshalb stand dort immer
+  der Besitzer des Einsatzes, auch wenn ein Einsatzleiter eingetragen war.
+
+- **Netty auf 4.2.18.Final angehoben (Sicherheitsupdate).** Schließt CVE-2026-89044 (Request
+  Smuggling über einen fehlerhaften `Transfer-Encoding`-Header) in Backend, Webtool und Ingest.
+  Keine Funktionsänderung.
+
+- **Oberfläche: die letzten fest verdrahteten Texte kommen aus den Sprachdateien.** Die
+  Terminal-Auswahl beim Ausbuchen, die Lagereintrag-Zeile und der Dateiname des
+  Übergabeprotokolls im Auftrag, die Titel des Spezialkommando-Dialogs und der ADMIN-Hinweis
+  erschienen in der englischen Oberfläche bisher auf Deutsch.
+
+- **Monitoring: „In-flight Requests" statt „Tomcat Busy Threads".** Das Panel im
+  Spring-Apps-Dashboard stand unter virtuellen Threads immer bei -1; es zeigt jetzt die gerade
+  bearbeiteten Requests je Anwendung. Die wirkungslosen `server.tomcat.threads.*`-Einstellungen
+  sind entfernt.
+
+- **Monitoring: Container-Limits werden wieder gelesen.** Der cgroup-Collector las seit der
+  Podman-Umstellung die Unit statt des Containers und sah deshalb kein Speicher-, pids- oder
+  CPU-Limit: Die Alarme `ContainerMemoryHigh`, `ContainerPidsHigh` und `ContainerCpuThrottledHigh`
+  konnten nicht auslösen, und drei Panels im Container-Dashboard blieben leer. Podmans
+  Healthcheck-Units erscheinen dort außerdem nicht mehr als Hex-Container.
+
+- **Einsätze: Besitzerwechsel meldet jetzt einen Konflikt, wenn jemand anderes den Besitzer
+  inzwischen geändert hat.** Bisher gewann still der spätere von zwei gleichzeitigen Wechseln; jetzt
+  kommt der bekannte Konflikt-Dialog mit „Aktuelle Werte laden". Ein zweiter Wechsel auf derselben
+  Seite funktioniert ohne Neuladen.
 
 - **Einsätze und Operationen: Suche und Zeitraumfilter funktionieren mit Sonderzeichen.** Ein `&`,
   `#` oder `+` im Suchbegriff veränderte bisher die Anfrage ans Backend, und der Datumsfilter der

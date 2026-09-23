@@ -234,7 +234,8 @@ groups:
 
   - name: caches
     # Caffeine cache health. recordStats() is enabled on every cache (backend + frontend
-    # CacheConfig), so Micrometer exports cache_gets_total{result}, cache_evictions_total{cause}
+    # CacheConfig, plus the backend's hand-built `jwt-authorities` cache in
+    # CustomJwtGrantedAuthoritiesConverter, ADR-0174 amendment 1), so Micrometer exports cache_gets_total{result}, cache_evictions_total{cause}
     # and cache_size with a bounded (application, cache) label set (REQ-OBS-005/-006, CACHE-OBS-1).
     rules:
       - alert: CacheSizeEvictionsHigh

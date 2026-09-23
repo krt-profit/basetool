@@ -30,10 +30,19 @@ import de.greluc.krt.profit.basetool.backend.support.AuthoritiesCacheProperties;
 import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.binder.cache.CaffeineCacheMetrics;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -94,8 +103,25 @@ public class CustomJwtGrantedAuthoritiesConverter
 
   private static final long RETRY_BACKOFF_MILLIS = 50L;
 
-  /** Upper bound on distinct cached {@code (sub, issuedAt)} entries. */
+  /** Upper bound on distinct cached {@code (sub, session, azp, claims)} entries. */
   private static final long AUTHORITIES_CACHE_MAX_SIZE = 10_000;
+
+  /**
+   * The {@code cache} tag the memoisation is published under ({@code cache_gets_total{result}},
+   * {@code cache_size}, {@code cache_evictions_total}), next to the Spring-managed caches of {@code
+   * CacheConfig} — so the Spring-apps dashboard's hit-ratio panels and the {@code CacheHitRatioLow}
+   * / {@code CacheSizeEvictionsHigh} alerts cover it without a rule of their own.
+   */
+  static final String AUTHORITIES_CACHE_NAME = "jwt-authorities";
+
+  /**
+   * Claims that change on every token the same session is issued and carry nothing the assembly
+   * reads, so they stay out of the claims fingerprint: with them in it every refresh would be a
+   * miss again, which is exactly the defect keying on {@code sid} removes (BE-PERF-08). {@code sid}
+   * and {@code azp} are left in — they are part of the key anyway — and so is every other claim,
+   * because a fingerprint that forgot one the assembly reads would serve a stale answer.
+   */
+  private static final Set<String> PER_TOKEN_CLAIMS = Set.of("iat", "exp", "nbf", "jti");
 
   private final UserReconciliationService userReconciliationService;
   private final IngestGatewayProperties ingestGatewayProperties;
@@ -103,18 +129,22 @@ public class CustomJwtGrantedAuthoritiesConverter
   private final OrgUnitCascadeService orgUnitCascadeService;
 
   /**
-   * Per-{@code (sub, token issued-at)} memoisation of the fully-assembled authority collection
-   * (#1141). The resource-server authorities converter runs on <em>every</em> authenticated API
-   * call — every fragment refetch, every live-sync coalesce burst, every check-in — and each miss
-   * pays {@link UserReconciliationService#syncUser(Jwt)} (a write-capable transaction) plus a
-   * handful of SELECTs (user load, {@code user_roles}, the role catalogue read once with its
-   * permissions, and the membership read) — since {@code 9ab1bb135} the roles are no longer looked
-   * up one realm role at a time (corrected 2026-09-22). Keying on the token's {@code issuedAt}
-   * means a fresh login always misses and re-reads, so a re-authentication picks up new authorities
-   * immediately; within one token's life the configured {@link AuthoritiesCacheProperties#getTtl()
-   * TTL} bounds staleness. Only successful results are cached (an exception propagates uncached),
-   * the cached value is an immutable copy so a downstream mutation cannot corrupt it, and a token
-   * missing {@code sub} or {@code issuedAt} bypasses the cache entirely (always recomputed).
+   * Per-session memoisation of the fully-assembled authority collection (#1141, ADR-0174). The
+   * resource-server authorities converter runs on <em>every</em> authenticated API call — every
+   * fragment refetch, every live-sync coalesce burst, every check-in — and each miss pays {@link
+   * UserReconciliationService#syncUser(Jwt)} (a write-capable transaction) plus a handful of
+   * SELECTs (user load, {@code user_roles}, the role catalogue read once with its permissions, and
+   * the membership read).
+   *
+   * <p>Keyed on the Keycloak session ({@code sid}) rather than on the token's {@code issuedAt}
+   * since 2026-09-23 (BE-PERF-08, ADR-0174 amendment): a refreshed access token of the same session
+   * is a hit, so the configured {@link AuthoritiesCacheProperties#ttl() TTL} — not the five-minute
+   * access-token lifespan — decides how often the storm runs. A fresh login is a new session and
+   * misses; a token whose content changed (a Keycloak role granted or revoked, a renamed account)
+   * misses through the claims fingerprint in the key. Only successful results are cached (an
+   * exception propagates uncached), the cached value is an immutable copy so a downstream mutation
+   * cannot corrupt it, and a token with neither {@code sid} nor {@code issuedAt}, or without {@code
+   * sub}, bypasses the cache entirely (always recomputed).
    */
   private final Cache<String, Collection<GrantedAuthority>> authoritiesCache;
 
@@ -135,13 +165,16 @@ public class CustomJwtGrantedAuthoritiesConverter
    *     (REQ-ORG-015); never {@code null}.
    * @param authoritiesCacheProperties supplies the memoisation TTL, validated at startup to be
    *     positive and at most {@link AuthoritiesCacheProperties#MAX_TTL}; never {@code null}.
+   * @param meterRegistry the registry the cache's hit / miss / eviction / size meters are bound to
+   *     under {@code cache=}{@value #AUTHORITIES_CACHE_NAME}; never {@code null}.
    */
   public CustomJwtGrantedAuthoritiesConverter(
       @NonNull UserReconciliationService userReconciliationService,
       @NonNull IngestGatewayProperties ingestGatewayProperties,
       @NonNull OrgUnitMembershipRepository orgUnitMembershipRepository,
       @NonNull OrgUnitCascadeService orgUnitCascadeService,
-      @NonNull AuthoritiesCacheProperties authoritiesCacheProperties) {
+      @NonNull AuthoritiesCacheProperties authoritiesCacheProperties,
+      @NonNull MeterRegistry meterRegistry) {
     this.userReconciliationService = userReconciliationService;
     this.ingestGatewayProperties = ingestGatewayProperties;
     this.orgUnitMembershipRepository = orgUnitMembershipRepository;
@@ -150,15 +183,17 @@ public class CustomJwtGrantedAuthoritiesConverter
         Caffeine.newBuilder()
             .maximumSize(AUTHORITIES_CACHE_MAX_SIZE)
             .expireAfterWrite(authoritiesCacheProperties.ttl())
+            .recordStats()
             .build();
+    CaffeineCacheMetrics.monitor(meterRegistry, authoritiesCache, AUTHORITIES_CACHE_NAME);
   }
 
   /**
-   * Resolves the authorities for {@code jwt}, memoised per {@code (sub, issuedAt)} for the
-   * configured {@link AuthoritiesCacheProperties#getTtl() TTL} (#1141). On a cache hit the whole
-   * {@link #assembleAuthorities(Jwt)} pipeline — {@code syncUser} and its query storm — is skipped;
-   * on a miss (or an unkeyable token) it is assembled fresh and, when keyable, cached as an
-   * immutable copy.
+   * Resolves the authorities for {@code jwt}, memoised per {@code (sub, session, azp, claims)} for
+   * the configured {@link AuthoritiesCacheProperties#ttl() TTL} (#1141, ADR-0174). On a cache hit
+   * the whole {@link #assembleAuthorities(Jwt)} pipeline — {@code syncUser} and its query storm —
+   * is skipped; on a miss (or an unkeyable token) it is assembled fresh and, when keyable, cached
+   * as an immutable copy.
    *
    * @param jwt the validated Keycloak access token; never {@code null}.
    * @return the authorities Spring Security checks against {@code @PreAuthorize}.
@@ -180,33 +215,115 @@ public class CustomJwtGrantedAuthoritiesConverter
   }
 
   /**
-   * Builds the {@code (sub, issuedAt, azp)} memoisation key, or {@code null} when {@code sub} or
-   * {@code iat} is absent — in which case {@link #convert(Jwt)} bypasses the cache and always
-   * recomputes. Keying on the token's issued-at guarantees a freshly-issued token (re-login,
-   * refresh) is a distinct key and therefore a miss, so authority changes take effect on
-   * re-authentication.
+   * Builds the memoisation key {@code sub | session | azp | claims-fingerprint}, or {@code null} to
+   * bypass the cache for this token.
+   *
+   * <p><strong>Session.</strong> The Keycloak session id ({@code sid}) when the token carries one —
+   * every access token refreshed within one login shares it, so a refresh is a hit and the TTL
+   * alone bounds staleness (BE-PERF-08). A token without {@code sid} (a client-credentials grant,
+   * which has no user session) falls back to its {@code issuedAt}, exactly the pre-2026-09-23 key;
+   * a token with neither, or without {@code sub}, is not cached at all.
    *
    * <p><strong>{@code azp} belongs in the key because the assembly reads it.</strong> Since
-   * REQ-SEC-036 / ADR-0141 the authority set is no longer a pure function of {@code (sub, iat)}:
-   * {@link #assembleAuthorities} branches on the authorized party twice - the ingest-gateway
+   * REQ-SEC-036 / ADR-0141 the authority set is not a pure function of the subject: {@link
+   * #assembleAuthorities} branches on the authorized party twice - the ingest-gateway
    * short-circuit, and the partial-role-scope client list that decides whether a client's role
-   * claim may replace the stored set. {@code iat} is a NumericDate in <em>seconds</em>, so two
-   * tokens for the same person minted by different clients within one wall-clock second collided on
-   * this key and the first one to arrive decided the authorities for both - which is precisely the
-   * admin-demotion (and, mirrored, admin-elevation) that REQ-SEC-036 exists to prevent. A
-   * memoisation key must be a superset of the inputs the memoised computation reads.
+   * claim may replace the stored set. Two clients of the same person must never share an entry, or
+   * the first to arrive decides the authorities for both - precisely the admin-demotion (and,
+   * mirrored, admin-elevation) REQ-SEC-036 exists to prevent. A memoisation key must be a superset
+   * of the inputs the memoised computation reads.
+   *
+   * <p><strong>The claims fingerprint keeps a role change as fast as before.</strong> With {@code
+   * issuedAt} in the key, every refreshed token re-read everything, so a realm role granted or
+   * revoked in Keycloak took effect at the next refresh. A session-scoped key alone would serve the
+   * old answer until the TTL ran out. The fingerprint is a SHA-256 over every claim except the four
+   * that change per token ({@link #PER_TOKEN_CLAIMS}), so a refresh whose content is unchanged hits
+   * and one carrying different roles, a renamed account or a new e-mail address misses.
    *
    * @param jwt the access token.
    * @return the cache key, or {@code null} to bypass caching for this token.
    */
   @Nullable
-  private static String authoritiesCacheKey(@NonNull Jwt jwt) {
+  static String authoritiesCacheKey(@NonNull Jwt jwt) {
     String sub = jwt.getSubject();
-    Instant issuedAt = jwt.getIssuedAt();
-    if (sub == null || issuedAt == null) {
+    if (sub == null) {
       return null;
     }
-    return sub + '|' + issuedAt.toEpochMilli() + '|' + jwt.getClaimAsString("azp");
+    String sid = jwt.getClaimAsString("sid");
+    String session;
+    if (sid != null && !sid.isBlank()) {
+      session = "sid:" + sid;
+    } else {
+      Instant issuedAt = jwt.getIssuedAt();
+      if (issuedAt == null) {
+        return null;
+      }
+      session = "iat:" + issuedAt.toEpochMilli();
+    }
+    return sub + '|' + session + '|' + jwt.getClaimAsString("azp") + '|' + claimsFingerprint(jwt);
+  }
+
+  /**
+   * Hashes the token's claims, minus {@link #PER_TOKEN_CLAIMS}, into a hex SHA-256 digest.
+   *
+   * <p>The input is an unambiguous canonical rendering: map keys sorted, every value tagged with
+   * its kind and every string length-prefixed, so no two different claim sets can render to the
+   * same text — a collision here would hand one token's authorities to a differently-roled token of
+   * the same session.
+   *
+   * @param jwt the access token.
+   * @return the lower-case hex digest of the canonical claim rendering.
+   */
+  private static String claimsFingerprint(@NonNull Jwt jwt) {
+    Map<String, Object> claims = new TreeMap<>(jwt.getClaims());
+    claims.keySet().removeAll(PER_TOKEN_CLAIMS);
+    StringBuilder canonical = new StringBuilder(512);
+    appendCanonical(canonical, claims);
+    try {
+      byte[] digest =
+          MessageDigest.getInstance("SHA-256")
+              .digest(canonical.toString().getBytes(StandardCharsets.UTF_8));
+      return HexFormat.of().formatHex(digest);
+    } catch (NoSuchAlgorithmException e) {
+      // Every Java platform is required to provide SHA-256 (MessageDigest Javadoc).
+      throw new IllegalStateException("SHA-256 is unavailable", e);
+    }
+  }
+
+  /**
+   * Appends an unambiguous rendering of one claim value: {@code m{k=v;…}} for a map with sorted
+   * keys, {@code l[v;…]} for a collection in iteration order, {@code s<len>:text} for anything else
+   * rendered through {@link String#valueOf(Object)}, and {@code n} for {@code null}.
+   *
+   * @param out the buffer to append to.
+   * @param value the claim value; may be {@code null}.
+   */
+  private static void appendCanonical(@NonNull StringBuilder out, @Nullable Object value) {
+    if (value == null) {
+      out.append('n');
+    } else if (value instanceof Map<?, ?> map) {
+      Map<String, Object> sorted = new TreeMap<>();
+      map.forEach((k, v) -> sorted.put(String.valueOf(k), v));
+      out.append("m{");
+      sorted.forEach(
+          (k, v) -> {
+            appendCanonical(out, k);
+            out.append('=');
+            appendCanonical(out, v);
+            out.append(';');
+          });
+      out.append('}');
+    } else if (value instanceof Collection<?> collection) {
+      out.append("l[");
+      for (Object element : collection) {
+        appendCanonical(out, element);
+        out.append(';');
+      }
+      out.append(']');
+    } else {
+      String text = String.valueOf(value);
+      out.append('s').append(text.length()).append(':').append(text);
+    }
   }
 
   /**

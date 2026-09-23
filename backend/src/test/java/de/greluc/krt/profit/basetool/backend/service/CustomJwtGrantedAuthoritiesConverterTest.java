@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -45,10 +46,13 @@ import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -101,6 +105,12 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   @Spy
   private final AuthoritiesCacheProperties authoritiesCacheProperties =
       BoundProperties.defaults(AuthoritiesCacheProperties.class);
+
+  /**
+   * A real registry, not a mock: the converter binds its cache meters in the constructor, and the
+   * hit / miss counts are asserted below.
+   */
+  @Spy private final MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
   @InjectMocks private CustomJwtGrantedAuthoritiesConverter converter;
 
@@ -248,8 +258,8 @@ class CustomJwtGrantedAuthoritiesConverterTest {
 
   @Test
   void convert_freshlyIssuedToken_missesCache_reassembles() {
-    // A re-login / token refresh carries a new issuedAt, so the key differs and the authorities are
-    // re-read — a role/approval change takes effect on re-authentication (#1141).
+    // A token WITHOUT a session id (a client-credentials grant has none) falls back to the
+    // pre-BE-PERF-08 key: a new issuedAt is a new key, so the authorities are re-read (#1141).
     when(jwt.getSubject()).thenReturn("sub-1");
     when(jwt.getIssuedAt())
         .thenReturn(Instant.ofEpochSecond(1_700_000_000L), Instant.ofEpochSecond(1_700_000_300L));
@@ -274,6 +284,169 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     converter.convert(jwt);
 
     verify(userReconciliationService, times(2)).syncUser(jwt);
+  }
+
+  /**
+   * BE-PERF-08: a refreshed access token of the same Keycloak session is a HIT. Before, {@code
+   * issuedAt} in the key made every refresh — every five minutes — rerun the whole storm, so a TTL
+   * longer than the token lifespan bought nothing.
+   */
+  @Test
+  void convert_refreshedTokenOfTheSameSession_isServedFromTheCache() {
+    when(userReconciliationService.syncUser(any(Jwt.class)))
+        .thenReturn(ReconciledUser.of(userWithNoRoles()));
+    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
+
+    converter.convert(token("session-1", "basetool-frontend", 1_700_000_000L, "KRT Member"));
+    converter.convert(token("session-1", "basetool-frontend", 1_700_000_300L, "KRT Member"));
+
+    verify(userReconciliationService, times(1)).syncUser(any(Jwt.class));
+  }
+
+  /**
+   * The guarantee the session key must not cost: a realm role granted or revoked in Keycloak takes
+   * effect on the next refreshed token, exactly as it did while {@code issuedAt} was in the key.
+   * The refreshed token carries the new role list, the claims fingerprint differs, and the
+   * authorities are re-assembled — here the revocation is observable in the result, not only in the
+   * call count.
+   */
+  @Test
+  void convert_refreshedTokenWithChangedRoles_missesAndReflectsTheChangeImmediately() {
+    Jwt before = token("session-1", "basetool-frontend", 1_700_000_000L, "Admin", "KRT Member");
+    Jwt after = token("session-1", "basetool-frontend", 1_700_000_300L, "KRT Member");
+    when(userReconciliationService.syncUser(before))
+        .thenReturn(
+            new ReconciledUser(
+                userWithNoRoles(), Set.of(namedRole("Admin"), namedRole("KRT Member"))));
+    when(userReconciliationService.syncUser(after))
+        .thenReturn(new ReconciledUser(userWithNoRoles(), Set.of(namedRole("KRT Member"))));
+    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
+
+    Collection<String> first =
+        converter.convert(before).stream().map(GrantedAuthority::getAuthority).toList();
+    Collection<String> second =
+        converter.convert(after).stream().map(GrantedAuthority::getAuthority).toList();
+
+    assertTrue(first.contains("ROLE_ADMIN"));
+    assertFalse(second.contains("ROLE_ADMIN"), "a revoked realm role must bite on the refresh");
+    verify(userReconciliationService).syncUser(before);
+    verify(userReconciliationService).syncUser(after);
+  }
+
+  /** A new login is a new Keycloak session and therefore a miss, whatever the claims say. */
+  @Test
+  void convert_newSession_misses() {
+    when(userReconciliationService.syncUser(any(Jwt.class)))
+        .thenReturn(ReconciledUser.of(userWithNoRoles()));
+    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
+
+    converter.convert(token("session-1", "basetool-frontend", 1_700_000_000L, "KRT Member"));
+    converter.convert(token("session-2", "basetool-frontend", 1_700_000_000L, "KRT Member"));
+
+    verify(userReconciliationService, times(2)).syncUser(any(Jwt.class));
+  }
+
+  /**
+   * REQ-SEC-036: two clients of the same person never share an entry, even inside one Keycloak
+   * session and with otherwise identical claims — the partial-scope client must not inherit the web
+   * client's authorities, nor the other way round.
+   */
+  @Test
+  void convert_sameSessionDifferentAzp_neverShareAnEntry() {
+    when(userReconciliationService.syncUser(any(Jwt.class)))
+        .thenReturn(ReconciledUser.of(userWithNoRoles()));
+    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
+
+    converter.convert(token("session-1", "basetool-frontend", 1_700_000_000L, "KRT Member"));
+    converter.convert(token("session-1", "basetool-android", 1_700_000_000L, "KRT Member"));
+
+    verify(userReconciliationService, times(2)).syncUser(any(Jwt.class));
+  }
+
+  /**
+   * The per-token claims stay out of the fingerprint (a new {@code jti} and {@code exp} on every
+   * refresh would otherwise make every refresh a miss again), while every other claim is in it.
+   */
+  @Test
+  void authoritiesCacheKey_ignoresPerTokenClaimsButNotTheRest() {
+    Jwt first = token("session-1", "basetool-frontend", 1_700_000_000L, "KRT Member");
+    Jwt refreshed =
+        Jwt.withTokenValue("t2")
+            .header("alg", "none")
+            .claims(claims -> claims.putAll(first.getClaims()))
+            .issuedAt(Instant.ofEpochSecond(1_700_000_300L))
+            .expiresAt(Instant.ofEpochSecond(1_700_000_600L))
+            .claim("jti", "another-token-id")
+            .build();
+    Jwt renamed =
+        Jwt.withTokenValue("t3")
+            .header("alg", "none")
+            .claims(claims -> claims.putAll(first.getClaims()))
+            .claim("preferred_username", "renamed")
+            .build();
+
+    assertEquals(
+        CustomJwtGrantedAuthoritiesConverter.authoritiesCacheKey(first),
+        CustomJwtGrantedAuthoritiesConverter.authoritiesCacheKey(refreshed));
+    assertNotEquals(
+        CustomJwtGrantedAuthoritiesConverter.authoritiesCacheKey(first),
+        CustomJwtGrantedAuthoritiesConverter.authoritiesCacheKey(renamed));
+  }
+
+  /**
+   * The memoisation is observable: a hit and a miss land on {@code cache_gets_total} under {@code
+   * cache="jwt-authorities"}, the series the Spring-apps dashboard and {@code CacheHitRatioLow}
+   * already read for every other cache.
+   */
+  @Test
+  void convert_publishesHitsAndMissesUnderTheCacheMeters() {
+    when(userReconciliationService.syncUser(any(Jwt.class)))
+        .thenReturn(ReconciledUser.of(userWithNoRoles()));
+    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
+
+    converter.convert(token("session-1", "basetool-frontend", 1_700_000_000L, "KRT Member"));
+    converter.convert(token("session-1", "basetool-frontend", 1_700_000_300L, "KRT Member"));
+
+    assertEquals(1.0, cacheGets("hit"));
+    assertEquals(1.0, cacheGets("miss"));
+  }
+
+  /**
+   * Reads one {@code cache.gets} counter of the authorities cache.
+   *
+   * @param result {@code hit} or {@code miss}
+   * @return the counter value
+   */
+  private double cacheGets(String result) {
+    return meterRegistry
+        .get("cache.gets")
+        .tag("cache", CustomJwtGrantedAuthoritiesConverter.AUTHORITIES_CACHE_NAME)
+        .tag("result", result)
+        .functionCounter()
+        .count();
+  }
+
+  /**
+   * A real, Keycloak-shaped access token for the session-key tests.
+   *
+   * @param sid the Keycloak session id
+   * @param azp the authorized party
+   * @param issuedAtEpochSecond the token's {@code iat}
+   * @param realmRoles the realm roles the token carries
+   * @return the token
+   */
+  private static Jwt token(String sid, String azp, long issuedAtEpochSecond, String... realmRoles) {
+    return Jwt.withTokenValue("token-" + sid + '-' + azp + '-' + issuedAtEpochSecond)
+        .header("alg", "none")
+        .subject("sub-1")
+        .claim("sid", sid)
+        .claim("azp", azp)
+        .claim("jti", "jti-" + issuedAtEpochSecond)
+        .claim("preferred_username", "member")
+        .claim("realm_access", Map.of("roles", List.of(realmRoles)))
+        .issuedAt(Instant.ofEpochSecond(issuedAtEpochSecond))
+        .expiresAt(Instant.ofEpochSecond(issuedAtEpochSecond + 300))
+        .build();
   }
 
   @Test
