@@ -147,10 +147,18 @@ UTF-8.
 A browser script gets its wording from the page, never from a literal: a `th:inline` bootstrap
 dictionary (`bookOutI18n`, `ORDER_HANDOVER_I18N`, …, declared in `types/thymeleaf-bootstrap.d.ts`
 and the module's `/* global */` header), a `window.krt*I18n` object from `fragments/head.html`, or
-`data-*` attributes on an element the fragment renders. A literal after `||` is tolerated only as the
-defensive default for a page that forgot its dictionary. The last primary literals — the book-out
+`data-*` attributes on an element the fragment renders. The last primary literals — the book-out
 terminal picker, the order handover row and file name, the special-command modal titles, the admin
 chip — moved into the bundles on 2026-09-23 (FE-SIMP-03).
+
+**A missing string fails visibly, never silently** (owner decision 2026-09-23). There are no literal
+defaults after `||` any more: a script passes each string through `window.krtI18nText(value, key)`
+(installed by `krt-client-error.js`, the first script of every page). A string the page did not
+provide renders as its key name (`DICT.property` / `data-attribute`) and is reported once per page
+view as an `i18n_missing` client error, counted in `basetool_client_error_total`. The defaults
+`krtFetch` applies when a caller passes no toast or conflict text come from `window.krtFetchI18n`
+in `fragments/head.html`. `I18nDictionaryCoverageTest` fails the build when a key a script names
+is missing from the pages that declare its dictionary, and when a literal fallback comes back.
 
 ## 8.11 Configuration
 

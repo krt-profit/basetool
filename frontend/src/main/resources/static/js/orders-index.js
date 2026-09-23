@@ -234,8 +234,8 @@ function updateSquadronHeaderText() {
     const boxes = squadronBoxes();
     if (!header || !textEl || boxes.length === 0) return;
     const checked = boxes.filter((b) => b.checked);
-    const dataAll = header.getAttribute('data-all') || 'All';
-    const dataSelected = header.getAttribute('data-selected') || 'selected';
+    const dataAll = window.krtI18nText(header.getAttribute('data-all'), 'data-all');
+    const dataSelected = window.krtI18nText(header.getAttribute('data-selected'), 'data-selected');
     if (checked.length === boxes.length) {
         textEl.textContent = dataAll;
     } else if (checked.length === 1) {

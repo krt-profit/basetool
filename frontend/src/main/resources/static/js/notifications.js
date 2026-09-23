@@ -64,18 +64,21 @@
         const holder = document.getElementById('notification-i18n');
         const data = holder ? holder.dataset : {};
         return {
-            loading: data.loading || 'Loading...',
-            empty: data.empty || 'No notifications',
-            markRead: data.markRead || 'Mark read',
-            deleteLabel: data.delete || 'Delete',
-            deleted: data.deleted || 'Notification deleted',
-            allRead: data.allRead || 'All marked read',
-            cleared: data.cleared || 'Read notifications cleared',
-            confirmClearTitle: data.confirmClearTitle || 'Clear read notifications',
-            confirmClearBody: data.confirmClearBody || 'Delete all read notifications?',
-            confirmOk: data.confirmOk || 'Delete',
-            confirmCancel: data.confirmCancel || 'Cancel',
-            error: data.error || 'Action failed',
+            loading: window.krtI18nText(data.loading, 'data-loading'),
+            empty: window.krtI18nText(data.empty, 'data-empty'),
+            markRead: window.krtI18nText(data.markRead, 'data-mark-read'),
+            deleteLabel: window.krtI18nText(data.delete, 'data-delete'),
+            deleted: window.krtI18nText(data.deleted, 'data-deleted'),
+            allRead: window.krtI18nText(data.allRead, 'data-all-read'),
+            cleared: window.krtI18nText(data.cleared, 'data-cleared'),
+            confirmClearTitle: window.krtI18nText(
+                data.confirmClearTitle,
+                'data-confirm-clear-title',
+            ),
+            confirmClearBody: window.krtI18nText(data.confirmClearBody, 'data-confirm-clear-body'),
+            confirmOk: window.krtI18nText(data.confirmOk, 'data-confirm-ok'),
+            confirmCancel: window.krtI18nText(data.confirmCancel, 'data-confirm-cancel'),
+            error: window.krtI18nText(data.error, 'data-error'),
         };
     }
 

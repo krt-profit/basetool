@@ -175,7 +175,13 @@
         const opts = config || {};
         const data = select.dataset;
         const texts = {
-            noResults: opts.noResultsText || data.comboboxNoResults || 'No matches',
+            noResults:
+                opts.noResultsText ||
+                data.comboboxNoResults ||
+                window.krtI18nText(
+                    (window.krtComboboxI18n || {}).noResults,
+                    'krtComboboxI18n.noResults',
+                ),
             hint: opts.hintText || data.comboboxHint || '',
             invalid: opts.invalidText || data.comboboxInvalid || '',
             loading: opts.loadingText || data.comboboxLoading || '',

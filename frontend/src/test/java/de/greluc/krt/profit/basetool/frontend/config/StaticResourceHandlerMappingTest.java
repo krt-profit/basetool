@@ -145,8 +145,8 @@ class StaticResourceHandlerMappingTest {
    *
    * <p>The assets are content-hashed and {@code immutable}; an ETag there would only buffer every
    * font, image and script in memory. A tree added to {@link EtagConfig#ETAG_URL_PATTERNS} fails
-   * here, and so does a return to {@code /*}, which would put the buffer back in front of every page
-   * render and the notification stream.
+   * here, and so does a return to {@code /*}, which would put the buffer back in front of every
+   * page render and the notification stream.
    */
   @Test
   void noAssetTreeIsInsideTheEtagFilterScope() {
@@ -160,7 +160,9 @@ class StaticResourceHandlerMappingTest {
 
     assertTrue(
         EtagConfig.ETAG_URL_PATTERNS.stream().noneMatch(servletPatterns::contains),
-        () -> "asset trees must stay outside the ETag filter; found: " + EtagConfig.ETAG_URL_PATTERNS);
+        () ->
+            "asset trees must stay outside the ETag filter; found: "
+                + EtagConfig.ETAG_URL_PATTERNS);
     assertFalse(
         EtagConfig.ETAG_URL_PATTERNS.contains("/*"),
         "the ETag filter buffers every response it covers; it must not cover every route again");

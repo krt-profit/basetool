@@ -1052,8 +1052,8 @@ groups:
       # (no series a day ago -> no right-hand side -> the rule silently never fires), whereas the
       # trailing window exists whenever the 1h window does. The spike hour is part of its own
       # denominator, which caps the achievable ratio at 24 and keeps the trigger honest. Per `kind`
-      # (four bounded literals since FE-SEC-04 added csp_violation) so one class stepping up is not
-      # diluted by the others.
+      # (five bounded literals: FE-SEC-04 added csp_violation, 2026-09-23 i18n_missing) so one class
+      # stepping up is not diluted by the others.
       # baseline-tune: >20 reports/h of one kind AND >3x that kind's own daily average, held 30m.
       - alert: ClientErrorSpike
         expr: |
@@ -1065,7 +1065,7 @@ groups:
           severity: warning
         annotations:
           summary: "Browser client errors stepped up ({{ $labels.kind }})"
-          description: "The frontend's client-error beacon has reported {{ $labels.kind }} failures well above their own daily baseline for 30 minutes — the browser half of a page is throwing, which produces no server-side error of any kind. Check what shipped in the last frontend deploy; a script_error / unhandled_rejection step means a krtFetch handler is dying (live update silently stops working on that surface), a resource_error step means an asset the templates still reference is 404ing, a csp_violation step means a template or script now does something the Content-Security-Policy blocks (an inline script or style without the nonce, a new third-party host) and that part of the page silently does not work. Raise ClientErrorReportController to DEBUG via /actuator/loggers to get the message and script URL for the duration of the investigation."
+          description: "The frontend's client-error beacon has reported {{ $labels.kind }} failures well above their own daily baseline for 30 minutes — the browser half of a page is throwing, which produces no server-side error of any kind. Check what shipped in the last frontend deploy; a script_error / unhandled_rejection step means a krtFetch handler is dying (live update silently stops working on that surface), a resource_error step means an asset the templates still reference is 404ing, a csp_violation step means a template or script now does something the Content-Security-Policy blocks (an inline script or style without the nonce, a new third-party host) and that part of the page silently does not work, an i18n_missing step means a page stopped providing a localized string a script reads (the UI now shows the key name). Raise ClientErrorReportController to DEBUG via /actuator/loggers to get the message and script URL for the duration of the investigation."
 
       # (#1041 item 19) Discord SPI precheck abuse. The endpoint sits outside /api/**, the rate
       # limiter AND the http_error funnel, so secret-guessing was previously log-only. A sustained

@@ -229,13 +229,13 @@ public final class MetricNames {
   /**
    * Counter {@code basetool_client_error_total} — tag {@code kind} ({@link
    * #CLIENT_ERROR_SCRIPT_ERROR} / {@link #CLIENT_ERROR_UNHANDLED_REJECTION} / {@link
-   * #CLIENT_ERROR_RESOURCE_ERROR} / {@link #CLIENT_ERROR_CSP_VIOLATION}); browser-side failures
-   * reported by the client error beacon. A JS exception that kills a {@code krtFetch} handler
-   * produces no server-side signal whatsoever — the request that never happens cannot be counted —
-   * so a deploy that breaks the client half of a live-update surface is otherwise invisible until a
-   * user reports it.
+   * #CLIENT_ERROR_RESOURCE_ERROR} / {@link #CLIENT_ERROR_CSP_VIOLATION} / {@link
+   * #CLIENT_ERROR_I18N_MISSING}); browser-side failures reported by the client error beacon. A JS
+   * exception that kills a {@code krtFetch} handler produces no server-side signal whatsoever — the
+   * request that never happens cannot be counted — so a deploy that breaks the client half of a
+   * live-update surface is otherwise invisible until a user reports it.
    *
-   * <p>The {@code kind} tag is resolved <em>server-side</em> against the four literals below and
+   * <p>The {@code kind} tag is resolved <em>server-side</em> against the five literals below and
    * the beacon's value is discarded when it matches none of them: the endpoint is reachable without
    * a session, so echoing a client-supplied kind would be an unbounded, attacker-controlled label
    * (REQ-OBS-006). The message, stack, script URL and user agent never reach a tag or a log line.
@@ -313,8 +313,9 @@ public final class MetricNames {
   /**
    * Tag key: the browser-error class on {@link #CLIENT_ERROR} ({@link #CLIENT_ERROR_SCRIPT_ERROR} /
    * {@link #CLIENT_ERROR_UNHANDLED_REJECTION} / {@link #CLIENT_ERROR_RESOURCE_ERROR} / {@link
-   * #CLIENT_ERROR_CSP_VIOLATION}). Resolved server-side against exactly those four literals — a
-   * beacon payload that matches none of them contributes no series at all (REQ-OBS-006).
+   * #CLIENT_ERROR_CSP_VIOLATION} / {@link #CLIENT_ERROR_I18N_MISSING}). Resolved server-side
+   * against exactly those five literals — a beacon payload that matches none of them contributes no
+   * series at all (REQ-OBS-006).
    */
   public static final String TAG_KIND = "kind";
 
@@ -543,6 +544,14 @@ public final class MetricNames {
    * ever hearing of it. Only the violated directive and the blocked <em>origin</em> travel.
    */
   public static final String CLIENT_ERROR_CSP_VIOLATION = "csp_violation";
+
+  /**
+   * Browser error kind: a script asked for a localized string its page did not provide, reported by
+   * {@code window.krtI18nText} (owner decision 2026-09-23). The script then renders the key name
+   * instead of a hardcoded default, and the message carries only that key name. A step in this kind
+   * after a deploy is a dictionary entry or {@code data-*} attribute that went missing.
+   */
+  public static final String CLIENT_ERROR_I18N_MISSING = "i18n_missing";
 
   /**
    * Gauge {@code basetool_tracing_enabled} — {@code 1} while this module is configured to emit

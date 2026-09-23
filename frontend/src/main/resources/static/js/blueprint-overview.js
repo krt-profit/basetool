@@ -37,7 +37,13 @@
     function renderOwners(panel, owners) {
         clear(panel);
         if (!owners || owners.length === 0) {
-            panel.appendChild(el('div', 'bp-owners-empty', i18n().empty || 'No owners.'));
+            panel.appendChild(
+                el(
+                    'div',
+                    'bp-owners-empty',
+                    window.krtI18nText(i18n().empty, 'krtBlueprintOverview.i18n.empty'),
+                ),
+            );
             return;
         }
         const list = el('ul', 'bp-owners-list');
@@ -49,7 +55,7 @@
                 const hint = el(
                     'span',
                     'bp-owner-external',
-                    i18n().notMember || '(not a unit member)',
+                    window.krtI18nText(i18n().notMember, 'krtBlueprintOverview.i18n.notMember'),
                 );
                 const tip = i18n().notMemberHint;
                 if (tip) {
@@ -66,13 +72,25 @@
         // Reset the loaded flag so the next expand retries the fetch.
         panel.setAttribute('data-loaded', 'false');
         clear(panel);
-        panel.appendChild(el('div', 'bp-owners-error', i18n().error || 'Could not load owners.'));
+        panel.appendChild(
+            el(
+                'div',
+                'bp-owners-error',
+                window.krtI18nText(i18n().error, 'krtBlueprintOverview.i18n.error'),
+            ),
+        );
     }
 
     function loadOwners(productKey, panel) {
         panel.setAttribute('data-loaded', 'true');
         clear(panel);
-        panel.appendChild(el('div', 'bp-owners-loading', i18n().loading || 'Loading...'));
+        panel.appendChild(
+            el(
+                'div',
+                'bp-owners-loading',
+                window.krtI18nText(i18n().loading, 'krtBlueprintOverview.i18n.loading'),
+            ),
+        );
         fetch(ownersUrl(productKey), {
             credentials: 'same-origin',
             headers: { Accept: 'application/json' },

@@ -233,11 +233,11 @@ function clearBulkSelection() {
 // shows. Resolves to the array of matching entry ids.
 function fetchAllMatchingEntryIds() {
     const itemsView = myLager.lagerIsItemsView();
-    const activeMaterials = collectMyChecked('matCheck');
-    const activeGameItems = collectMyChecked('gameItemCheck');
-    const activeLocations = collectMyChecked('locCheck');
-    const activeJobOrders = collectMyChecked('jobOrderCheck');
-    const activeMissions = collectMyChecked('missionCheck');
+    const activeMaterials = myLager.collectChecked('matCheck');
+    const activeGameItems = myLager.collectChecked('gameItemCheck');
+    const activeLocations = myLager.collectChecked('locCheck');
+    const activeJobOrders = myLager.collectChecked('jobOrderCheck');
+    const activeMissions = myLager.collectChecked('missionCheck');
     const minQualitySelect = /** @type {HTMLSelectElement | null} */ (
         document.getElementById('minQuality')
     );
@@ -616,35 +616,6 @@ function submitBulkRebook(event) {
 }
 
 /**
- * Opens one multi-select filter dropdown and closes every other one; a second click closes it.
- *
- * @param {string | null} id the dropdown's element id
- */
-function toggleMultiSelect(id) {
-    const el = id ? document.getElementById(id) : null;
-    if (!el) return;
-    const isOpened = el.classList.contains('open');
-    document.querySelectorAll('.multi-select-options').forEach(function (opt) {
-        opt.classList.remove('open');
-    });
-    if (!isOpened) el.classList.add('open');
-}
-
-/**
- * The localized "all" / "n selected" labels a multi-select header carries as data attributes.
- *
- * @param {string | null} headerId the dropdown header's element id
- * @returns {{ allText: string, selectedTextStr: string }} the labels
- */
-function getMsTranslations(headerId) {
-    const header = headerId ? document.getElementById(headerId) : null;
-    return {
-        allText: header ? header.getAttribute('data-all') || 'Alle' : 'Alle',
-        selectedTextStr: header ? header.getAttribute('data-selected') || 'gewählt' : 'gewählt',
-    };
-}
-
-/**
  * A checkbox of this page by id (the select-all box of a multi-select family, a personal flag).
  *
  * @param {string | null} id the element id
@@ -652,104 +623,6 @@ function getMsTranslations(headerId) {
  */
 function myCheckbox(id) {
     return id ? /** @type {HTMLInputElement | null} */ (document.getElementById(id)) : null;
-}
-
-/**
- * Applies a family's select-all box to every checkbox of the family.
- *
- * @param {string | null} allId the select-all checkbox id
- * @param {string} checkClass the family's checkbox class
- * @param {string | null} headerId the dropdown header id
- */
-function toggleSelectAll(allId, checkClass, headerId) {
-    const allBox = myCheckbox(allId);
-    const isAllChecked = !!(allBox && allBox.checked);
-    const checkboxes = /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
-        document.getElementsByClassName(checkClass)
-    );
-    for (let i = 0; i < checkboxes.length; i++) checkboxes[i].checked = isAllChecked;
-    updateMsSelectedText(checkboxes, headerId);
-}
-
-/**
- * Re-syncs a family's select-all box and header text with its checkboxes.
- *
- * @param {string | null} allId the select-all checkbox id
- * @param {string} checkClass the family's checkbox class
- * @param {string | null} headerId the dropdown header id
- */
-function updateSelectState(allId, checkClass, headerId) {
-    const checkboxes = /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
-        document.getElementsByClassName(checkClass)
-    );
-    let allChecked = checkboxes.length > 0;
-    for (let i = 0; i < checkboxes.length; i++) {
-        if (!checkboxes[i].checked) {
-            allChecked = false;
-            break;
-        }
-    }
-    const allEl = myCheckbox(allId);
-    if (allEl) allEl.checked = allChecked;
-    updateMsSelectedText(checkboxes, headerId);
-}
-
-/**
- * Writes a multi-select header's summary: "all" when none is checked, the one checked label, or
- * "n selected".
- *
- * @param {HTMLCollectionOf<HTMLInputElement>} checkboxes the family's checkboxes
- * @param {string | null} headerId the dropdown header id
- */
-function updateMsSelectedText(checkboxes, headerId) {
-    const translations = getMsTranslations(headerId);
-    let count = 0;
-    /** @type {string | null} */
-    let firstChecked = null;
-    for (let i = 0; i < checkboxes.length; i++) {
-        if (checkboxes[i].checked) {
-            count++;
-            const label = /** @type {HTMLElement | null} */ (checkboxes[i].previousElementSibling);
-            if (!firstChecked && label) {
-                firstChecked = label.innerText;
-            }
-        }
-    }
-    const header = headerId ? document.getElementById(headerId) : null;
-    const headerSpan = /** @type {HTMLElement | null} */ (
-        header ? header.querySelector('.selected-text') : null
-    );
-    if (!headerSpan) return;
-    if (count === 0) headerSpan.innerText = translations.allText;
-    else if (count === 1) headerSpan.innerText = firstChecked || '';
-    else headerSpan.innerText = count + ' ' + translations.selectedTextStr;
-}
-
-document.addEventListener('click', function (e) {
-    const target = /** @type {Element} */ (e.target);
-    if (!target.closest('.multi-select-container')) {
-        document.querySelectorAll('.multi-select-options').forEach(function (opt) {
-            if (opt.classList.contains('open')) opt.classList.remove('open');
-        });
-    }
-});
-
-/**
- * The values of a family's checked boxes.
- *
- * @param {string} className the family's checkbox class
- * @returns {string[]} the checked values
- */
-function collectMyChecked(className) {
-    const boxes = /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
-        document.getElementsByClassName(className)
-    );
-    /** @type {string[]} */
-    const values = [];
-    for (let i = 0; i < boxes.length; i++) {
-        if (boxes[i].checked) values.push(boxes[i].value);
-    }
-    return values;
 }
 
 // The "Nur persönliche" / "Nur nicht-persönliche" toggles are mutually exclusive: checking one
@@ -904,7 +777,7 @@ function applyMySavedSelection(saved, checkClass, allId, headerId) {
         boxes[i].checked = on;
         if (on) any = true;
     }
-    updateSelectState(allId, checkClass, headerId);
+    myLager.updateSelectState(allId, checkClass, headerId);
     return any;
 }
 
@@ -1026,11 +899,11 @@ function filterMyInventory() {
     // widgets, or a collapsed panel starts hiding an active filter.
     if (window.krtFilterPanel) window.krtFilterPanel.refresh('myFilterPanel');
     const itemsView = myLager.lagerIsItemsView();
-    const activeMaterials = collectMyChecked('matCheck');
-    const activeGameItems = collectMyChecked('gameItemCheck');
-    const activeLocations = collectMyChecked('locCheck');
-    const activeJobOrders = collectMyChecked('jobOrderCheck');
-    const activeMissions = collectMyChecked('missionCheck');
+    const activeMaterials = myLager.collectChecked('matCheck');
+    const activeGameItems = myLager.collectChecked('gameItemCheck');
+    const activeLocations = myLager.collectChecked('locCheck');
+    const activeJobOrders = myLager.collectChecked('jobOrderCheck');
+    const activeMissions = myLager.collectChecked('missionCheck');
     const minQualitySelect = /** @type {HTMLSelectElement | null} */ (
         document.getElementById('minQuality')
     );
@@ -1119,19 +992,19 @@ function resetMyInventoryFilter() {
         },
     );
     if (document.getElementById('materialHeader'))
-        updateSelectState('matAll', 'matCheck', 'materialHeader');
+        myLager.updateSelectState('matAll', 'matCheck', 'materialHeader');
     if (document.getElementById('gameItemHeader'))
-        updateSelectState('gameItemAll', 'gameItemCheck', 'gameItemHeader');
+        myLager.updateSelectState('gameItemAll', 'gameItemCheck', 'gameItemHeader');
     if (document.getElementById('locationHeader'))
-        updateSelectState('locAll', 'locCheck', 'locationHeader');
+        myLager.updateSelectState('locAll', 'locCheck', 'locationHeader');
     if (document.getElementById('itemLocationHeader'))
-        updateSelectState('itemLocAll', 'locCheck', 'itemLocationHeader');
+        myLager.updateSelectState('itemLocAll', 'locCheck', 'itemLocationHeader');
     if (document.getElementById('jobOrderHeader'))
-        updateSelectState('jobOrderAll', 'jobOrderCheck', 'jobOrderHeader');
+        myLager.updateSelectState('jobOrderAll', 'jobOrderCheck', 'jobOrderHeader');
     if (document.getElementById('itemJobOrderHeader'))
-        updateSelectState('itemJobOrderAll', 'jobOrderCheck', 'itemJobOrderHeader');
+        myLager.updateSelectState('itemJobOrderAll', 'jobOrderCheck', 'itemJobOrderHeader');
     if (document.getElementById('missionHeader'))
-        updateSelectState('missionAll', 'missionCheck', 'missionHeader');
+        myLager.updateSelectState('missionAll', 'missionCheck', 'missionHeader');
     filterMyInventory();
 }
 
@@ -1209,14 +1082,14 @@ document.addEventListener('DOMContentLoaded', function () {
             document.getElementsByClassName('matCheck')
         ).length > 0
     ) {
-        updateSelectState('matAll', 'matCheck', 'materialHeader');
+        myLager.updateSelectState('matAll', 'matCheck', 'materialHeader');
     }
     if (
         /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
             document.getElementsByClassName('gameItemCheck')
         ).length > 0
     ) {
-        updateSelectState('gameItemAll', 'gameItemCheck', 'gameItemHeader');
+        myLager.updateSelectState('gameItemAll', 'gameItemCheck', 'gameItemHeader');
     }
     if (
         /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
@@ -1226,9 +1099,9 @@ document.addEventListener('DOMContentLoaded', function () {
         // Same shared-class / per-view-ids shape as jobOrderCheck below: the location filter
         // renders in both views, with item-prefixed ids in the items view.
         if (document.getElementById('itemLocationHeader')) {
-            updateSelectState('itemLocAll', 'locCheck', 'itemLocationHeader');
+            myLager.updateSelectState('itemLocAll', 'locCheck', 'itemLocationHeader');
         } else {
-            updateSelectState('locAll', 'locCheck', 'locationHeader');
+            myLager.updateSelectState('locAll', 'locCheck', 'locationHeader');
         }
     }
     if (
@@ -1239,9 +1112,9 @@ document.addEventListener('DOMContentLoaded', function () {
         // The material and the items view render different header/all ids for the shared
         // jobOrderCheck class (unique ids in the template source); exactly one pair exists.
         if (document.getElementById('itemJobOrderHeader')) {
-            updateSelectState('itemJobOrderAll', 'jobOrderCheck', 'itemJobOrderHeader');
+            myLager.updateSelectState('itemJobOrderAll', 'jobOrderCheck', 'itemJobOrderHeader');
         } else {
-            updateSelectState('jobOrderAll', 'jobOrderCheck', 'jobOrderHeader');
+            myLager.updateSelectState('jobOrderAll', 'jobOrderCheck', 'jobOrderHeader');
         }
     }
     if (
@@ -1249,7 +1122,7 @@ document.addEventListener('DOMContentLoaded', function () {
             document.getElementsByClassName('missionCheck')
         ).length > 0
     ) {
-        updateSelectState('missionAll', 'missionCheck', 'missionHeader');
+        myLager.updateSelectState('missionAll', 'missionCheck', 'missionHeader');
     }
     // After the restore, so the count reflects the widgets the user will actually see rather than
     // the bare server-rendered ones. The collapse state itself is krt-filter-panel.js's and was
@@ -1567,10 +1440,10 @@ function submitUmbuchen(event) {
 // CSP-safe delegated bindings (replaces the 34 inline on*= handlers across this template).
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('click', 'inv-my-toggle-multi', function (el) {
-        toggleMultiSelect(el.getAttribute('data-multi-target'));
+        myLager.toggleMultiSelect(el.getAttribute('data-multi-target'));
     });
     window.krtEvents.on('change', 'inv-my-toggle-all', function (el) {
-        toggleSelectAll(
+        myLager.toggleSelectAll(
             el.getAttribute('data-all-id'),
             el.getAttribute('data-check-class'),
             el.getAttribute('data-header-id'),
@@ -1578,7 +1451,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         filterMyInventory();
     });
     window.krtEvents.on('change', 'inv-my-update-state', function (el) {
-        updateSelectState(
+        myLager.updateSelectState(
             el.getAttribute('data-all-id'),
             el.getAttribute('data-check-class'),
             el.getAttribute('data-header-id'),

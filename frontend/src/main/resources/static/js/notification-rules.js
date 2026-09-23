@@ -100,13 +100,19 @@
             const holder = document.getElementById('rule-i18n');
             const data = holder ? holder.dataset : /** @type {DOMStringMap} */ ({});
             return {
-                confirmDeleteTitle: data.confirmDeleteTitle || 'Delete rule',
-                confirmDeleteBody: data.confirmDeleteBody || 'Delete this rule?',
-                confirmOk: data.confirmOk || 'Delete',
-                confirmCancel: data.confirmCancel || 'Cancel',
-                saved: data.saved || 'Saved',
-                deleted: data.deleted || 'Deleted',
-                error: data.error || 'Action failed',
+                confirmDeleteTitle: window.krtI18nText(
+                    data.confirmDeleteTitle,
+                    'data-confirm-delete-title',
+                ),
+                confirmDeleteBody: window.krtI18nText(
+                    data.confirmDeleteBody,
+                    'data-confirm-delete-body',
+                ),
+                confirmOk: window.krtI18nText(data.confirmOk, 'data-confirm-ok'),
+                confirmCancel: window.krtI18nText(data.confirmCancel, 'data-confirm-cancel'),
+                saved: window.krtI18nText(data.saved, 'data-saved'),
+                deleted: window.krtI18nText(data.deleted, 'data-deleted'),
+                error: window.krtI18nText(data.error, 'data-error'),
                 unknownValue: data.unknownValue || '{0}',
             };
         }

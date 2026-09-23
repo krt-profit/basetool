@@ -305,15 +305,15 @@
             const hours = Math.floor((Date.now() - then) / 3600000);
             let text;
             if (hours < 1) {
-                text = i18n.agoNow || 'gerade eben';
+                text = window.krtI18nText(i18n.agoNow, 'materialboerseI18n.agoNow');
             } else if (hours < 24) {
-                text = fmt(i18n.agoHours || 'vor {0} Std', hours);
+                text = fmt(window.krtI18nText(i18n.agoHours, 'materialboerseI18n.agoHours'), hours);
             } else {
                 const days = Math.round(hours / 24);
                 text =
                     days === 1
-                        ? i18n.agoDayOne || 'vor 1 Tag'
-                        : fmt(i18n.agoDays || 'vor {0} Tagen', days);
+                        ? window.krtI18nText(i18n.agoDayOne, 'materialboerseI18n.agoDayOne')
+                        : fmt(window.krtI18nText(i18n.agoDays, 'materialboerseI18n.agoDays'), days);
             }
             el.textContent = text;
         });

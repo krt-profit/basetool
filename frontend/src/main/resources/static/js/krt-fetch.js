@@ -53,8 +53,29 @@
      * so a missing/blank localized message degrades to a neutral default instead
      * of rendering "undefined".
      */
-    function text(value, fallback) {
-        return value != null && value !== '' ? value : fallback;
+    /**
+     * A caller-supplied localized string, or the page-wide default for it. The defaults live in
+     * `window.krtFetchI18n` (fragments/head.html, from the bundles); a missing one is rendered as its
+     * key name and reported through `krtI18nText` rather than replaced by a hardcoded literal.
+     *
+     * @param {unknown} value the caller's already-localized string, if any
+     * @param {string} fallbackValue the page-wide default the caller did not override
+     * @param {string} key the default's name, `krtFetchI18n.<property>`
+     * @returns {string} the string to show
+     */
+    function text(value, fallbackValue, key) {
+        return typeof value === 'string' && value !== ''
+            ? value
+            : window.krtI18nText(fallbackValue, key);
+    }
+
+    /**
+     * The page-wide krtFetch defaults, never null.
+     *
+     * @returns {KrtI18nDict} the dictionary fragments/head.html declares
+     */
+    function defaults() {
+        return window.krtFetchI18n || {};
     }
 
     // ---------------------------------------------------------------- krtCsrf
@@ -449,7 +470,11 @@
     async function handleProblem(response, problem, opts) {
         const options = opts || {};
         const prefix = options.conflictSectionLabel ? options.conflictSectionLabel + ': ' : '';
-        const genericError = text(options.errorMessage, 'Speichern fehlgeschlagen.');
+        const genericError = text(
+            options.errorMessage,
+            defaults().saveFailed,
+            'krtFetchI18n.saveFailed',
+        );
         if (response.status === 409) {
             const code =
                 problem && typeof problem === 'object' && problem.code
@@ -461,14 +486,34 @@
                 const detail =
                     problem && problem.detail
                         ? problem.detail
-                        : text(conflict.reloadDetailFallback, 'Bitte Seite neu laden.');
+                        : text(
+                              conflict.reloadDetailFallback,
+                              defaults().conflictDetail,
+                              'krtFetchI18n.conflictDetail',
+                          );
                 errorToast(prefix + detail);
                 if (typeof window.showKrtConfirm === 'function') {
                     const ok = await window.showKrtConfirm(
-                        text(conflict.title, 'Konflikt'),
-                        text(conflict.reloadQuestion, 'Aktuelle Werte laden?'),
-                        text(conflict.reloadLabel, 'Aktuelle Werte laden'),
-                        text(conflict.dismissLabel, 'Schliessen'),
+                        text(
+                            conflict.title,
+                            defaults().conflictTitle,
+                            'krtFetchI18n.conflictTitle',
+                        ),
+                        text(
+                            conflict.reloadQuestion,
+                            defaults().conflictQuestion,
+                            'krtFetchI18n.conflictQuestion',
+                        ),
+                        text(
+                            conflict.reloadLabel,
+                            defaults().conflictReload,
+                            'krtFetchI18n.conflictReload',
+                        ),
+                        text(
+                            conflict.dismissLabel,
+                            defaults().conflictDismiss,
+                            'krtFetchI18n.conflictDismiss',
+                        ),
                     );
                     if (ok) {
                         window.location.reload();
@@ -508,10 +553,7 @@
             return null;
         }
         const i18n = window.krtOwnerPickerI18n;
-        return text(
-            i18n && i18n.required,
-            'Bitte oben eine Organisationseinheit auswählen, der dieser Eintrag gehören soll.',
-        );
+        return window.krtI18nText(i18n && i18n.required, 'krtOwnerPickerI18n.required');
     }
 
     /**
@@ -623,7 +665,9 @@
                     }
                 }
                 if (!handled) {
-                    errorToast(text(opts.errorMessage, 'Speichern fehlgeschlagen.'));
+                    errorToast(
+                        text(opts.errorMessage, defaults().saveFailed, 'krtFetchI18n.saveFailed'),
+                    );
                 }
                 return { ok: false, status: 0, body: null };
             }
@@ -665,7 +709,9 @@
             }
             if (opts.toast !== false) {
                 const label = opts.sectionLabel ? opts.sectionLabel + ': ' : '';
-                successToast(label + text(opts.successMessage, 'Gespeichert.'));
+                successToast(
+                    label + text(opts.successMessage, defaults().saved, 'krtFetchI18n.saved'),
+                );
             }
             if (typeof opts.onSuccess === 'function') {
                 try {
@@ -1121,13 +1167,14 @@
      *
      * config:
      *  - dict()               getter for the page's already-localized i18n dictionary
-     *  - keys                 dictionary keys + fallbacks: saveSectionPrefix, conflictSectionPrefix,
-     *                         successKey/successFallback, errorKey/errorFallback,
-     *                         conflictTitleKey/conflictTitleFallback,
-     *                         reloadLabelKey/reloadLabelFallback,
-     *                         dismissLabelKey/dismissLabelFallback,
-     *                         reloadQuestionKey/reloadQuestionFallback,
-     *                         reloadDetailKey/reloadDetailFallback, refreshErrorKey
+     *  - dictName             the dictionary's global name, used in the key a missing string is
+     *                         rendered and reported as (`NAME[key]`)
+     *  - keys                 dictionary keys: saveSectionPrefix, conflictSectionPrefix, successKey,
+     *                         errorKey, conflictTitleKey, reloadLabelKey, dismissLabelKey,
+     *                         reloadQuestionKey, reloadDetailKey, refreshErrorKey. There are no
+     *                         literal fallbacks (2026-09-23): a key the dictionary lacks renders as
+     *                         its name and is reported (`krtI18nText`); a key the config omits
+     *                         leaves write()'s page-wide krtFetchI18n default in place
      *  - sections             sectionKey -> { container, fragmentValue } map for refresh()
      *  - pageUrl()            getter for the page's base URL; null while the entity has no id —
      *                         refresh() then resolves false for that section without fetching
@@ -1139,7 +1186,7 @@
      * Returns:
      *  - write(opts)          {@link write} with the section's localized sectionLabel /
      *                         conflictSectionLabel / successMessage / errorMessage / conflict
-     *                         strings derived from opts.sectionKey via the dict (with fallbacks)
+     *                         strings derived from opts.sectionKey via the dict
      *  - refresh(sectionKeys, opts)  re-renders one or more sections in place via {@link swap}
      *                         (history:false, preserveScroll:true); accepts a single key or an
      *                         array; returns a Promise resolving when all swaps complete so
@@ -1151,8 +1198,19 @@
         return {
             write(opts) {
                 const dict = config.dict() || {};
-                function t(key, fallback) {
-                    return dict[key] != null && dict[key] !== '' ? dict[key] : fallback;
+                /**
+                 * The page dictionary's string for `key`, visibly reported when missing; undefined
+                 * for a key the config does not name, so write() applies its own default.
+                 *
+                 * @param {string | undefined} key the dictionary key
+                 * @returns {string | undefined} the localized string
+                 */
+                function t(key) {
+                    if (!key) return undefined;
+                    return window.krtI18nText(
+                        dict[key],
+                        (config.dictName || 'dict') + '[' + key + ']',
+                    );
                 }
                 const key = opts.sectionKey || '';
                 const k = config.keys;
@@ -1163,16 +1221,20 @@
                         // other; distinct sections keep distinct keys and stay concurrent. A caller
                         // can override with an explicit opts.serialize (e.g. a per-row scope).
                         serialize: opts.serialize || (key ? 'section:' + key : undefined),
-                        sectionLabel: t(k.saveSectionPrefix + key, key),
-                        conflictSectionLabel: t(k.conflictSectionPrefix + key, key),
-                        successMessage: t(k.successKey, k.successFallback),
-                        errorMessage: t(k.errorKey, k.errorFallback),
+                        sectionLabel: k.saveSectionPrefix
+                            ? t(k.saveSectionPrefix + key)
+                            : undefined,
+                        conflictSectionLabel: k.conflictSectionPrefix
+                            ? t(k.conflictSectionPrefix + key)
+                            : undefined,
+                        successMessage: t(k.successKey),
+                        errorMessage: t(k.errorKey),
                         conflict: {
-                            title: t(k.conflictTitleKey, k.conflictTitleFallback),
-                            reloadLabel: t(k.reloadLabelKey, k.reloadLabelFallback),
-                            dismissLabel: t(k.dismissLabelKey, k.dismissLabelFallback),
-                            reloadQuestion: t(k.reloadQuestionKey, k.reloadQuestionFallback),
-                            reloadDetailFallback: t(k.reloadDetailKey, k.reloadDetailFallback),
+                            title: t(k.conflictTitleKey),
+                            reloadLabel: t(k.reloadLabelKey),
+                            dismissLabel: t(k.dismissLabelKey),
+                            reloadQuestion: t(k.reloadQuestionKey),
+                            reloadDetailFallback: t(k.reloadDetailKey),
                         },
                     }),
                 );

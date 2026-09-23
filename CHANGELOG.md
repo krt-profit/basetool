@@ -54,6 +54,13 @@
 
 ### Changed
 
+- **Lager: Mehrfachfilter sind auf beiden Seiten gleich beschriftet.** Sind keine oder alle
+  Einträge angehakt, steht dort „Alle", sonst der Name oder „N ausgewählt". „Mein Lager" zeigte bei
+  allen angehakten Einträgen bisher „N ausgewählt".
+
+- **Oberfläche: fehlende Übersetzungen fallen auf.** Fehlt einer Seite ein Text, zeigt sie den
+  Schlüsselnamen statt eines fest eingebauten Ersatztexts und meldet die Lücke ans Monitoring.
+
 - **UEX-Abgleich: ein fehlerhafter Datensatz kostet nur noch sich selbst.** Preise, Rohstoffe,
   Raffinerie-Ausbeuten und Universumsdaten werden nach dem Abruf in kleinen, getrennten Paketen
   gespeichert; bisher verwarf ein einziger abgelehnter Datensatz den ganzen Abgleich, und während UEX

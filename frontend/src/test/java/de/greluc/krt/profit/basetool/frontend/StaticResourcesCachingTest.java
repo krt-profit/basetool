@@ -71,8 +71,8 @@ class StaticResourcesCachingTest {
   }
 
   /**
-   * A static asset stays outside the ETag filter (owner decision 2026-09-23): it keeps its year-long
-   * {@code immutable} cache header and its {@code Last-Modified}, answers an {@code
+   * A static asset stays outside the ETag filter (owner decision 2026-09-23): it keeps its
+   * year-long {@code immutable} cache header and its {@code Last-Modified}, answers an {@code
    * If-Modified-Since} with a {@code 304} from the resource handler itself, and carries no ETag —
    * the header only the filter adds, so its absence is the proof the body was not buffered for one.
    *

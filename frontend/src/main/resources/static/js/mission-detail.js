@@ -118,6 +118,7 @@ function crossPublishToParentOperation(keys) {
 }
 
 const missionSeam = window.krtFetch.sectionWrite({
+    dictName: 'MISSION_SUBRES_I18N',
     dict() {
         return window.MISSION_SUBRES_I18N || {};
     },
@@ -125,19 +126,12 @@ const missionSeam = window.krtFetch.sectionWrite({
         saveSectionPrefix: 'mission.save.section.',
         conflictSectionPrefix: 'mission.conflict.section.',
         successKey: 'mission.save.section.ok',
-        successFallback: 'Gespeichert.',
         errorKey: 'mission.save.section.error',
-        errorFallback: 'Speichern fehlgeschlagen.',
         conflictTitleKey: 'mission.conflict.toast.title',
-        conflictTitleFallback: 'Konflikt',
         reloadLabelKey: 'mission.conflict.action.reload',
-        reloadLabelFallback: 'Aktuelle Werte laden',
         dismissLabelKey: 'mission.conflict.action.dismiss',
-        dismissLabelFallback: 'Schliessen',
         reloadQuestionKey: 'mission.conflict.action.reload.question',
-        reloadQuestionFallback: 'Aktuelle Werte laden?',
         reloadDetailKey: 'mission.conflict.toast.detail',
-        reloadDetailFallback: 'Bitte Seite neu laden.',
         refreshErrorKey: 'mission.section.refresh.error',
     },
     sections: MISSION_SECTIONS,
@@ -315,10 +309,10 @@ window.krtLiveSync.createReceiver({
         id: 'mission-livesync-pill',
         label() {
             const dict = window.MISSION_LIVESYNC_I18N || {};
-            return dict['mission.livesync.updates_available'] != null &&
-                dict['mission.livesync.updates_available'] !== ''
-                ? dict['mission.livesync.updates_available']
-                : 'Aktualisierungen verfügbar';
+            return window.krtI18nText(
+                dict['mission.livesync.updates_available'],
+                'MISSION_LIVESYNC_I18N[mission.livesync.updates_available]',
+            );
         },
     },
 });
@@ -425,18 +419,23 @@ window.krtLiveSync.createReceiver({
         if (!sid || stepsVersion() === null) {
             return;
         }
-        const msg =
-            (window.MISSION_STEP_I18N && window.MISSION_STEP_I18N.delete_confirm) ||
-            'Delete this step?';
+        const msg = window.krtI18nText(
+            window.MISSION_STEP_I18N && window.MISSION_STEP_I18N.delete_confirm,
+            'MISSION_STEP_I18N.delete_confirm',
+        );
         const ok = await window.showKrtConfirm(
             msg,
             msg,
-            (window.MISSION_SUBRES_I18N &&
-                window.MISSION_SUBRES_I18N['mission.conflict.action.reload']) ||
-                'OK',
-            (window.MISSION_SUBRES_I18N &&
-                window.MISSION_SUBRES_I18N['mission.conflict.action.dismiss']) ||
-                'Cancel',
+            window.krtI18nText(
+                window.MISSION_SUBRES_I18N &&
+                    window.MISSION_SUBRES_I18N['mission.conflict.action.reload'],
+                'MISSION_SUBRES_I18N[mission.conflict.action.reload]',
+            ),
+            window.krtI18nText(
+                window.MISSION_SUBRES_I18N &&
+                    window.MISSION_SUBRES_I18N['mission.conflict.action.dismiss'],
+                'MISSION_SUBRES_I18N[mission.conflict.action.dismiss]',
+            ),
         );
         if (!ok) {
             return;
@@ -628,9 +627,10 @@ window.krtLiveSync.createReceiver({
         if (objectivesVersion() === null) {
             return;
         }
-        const title =
-            (window.MISSION_OBJECTIVE_I18N && window.MISSION_OBJECTIVE_I18N.default_title) ||
-            'New goal';
+        const title = window.krtI18nText(
+            window.MISSION_OBJECTIVE_I18N && window.MISSION_OBJECTIVE_I18N.default_title,
+            'MISSION_OBJECTIVE_I18N.default_title',
+        );
         writeObjective({
             method: 'POST',
             url: '/missions/' + mid() + '/objectives/ajax',
@@ -670,18 +670,23 @@ window.krtLiveSync.createReceiver({
         if (!oid || objectivesVersion() === null) {
             return;
         }
-        const msg =
-            (window.MISSION_OBJECTIVE_I18N && window.MISSION_OBJECTIVE_I18N.delete_confirm) ||
-            'Delete this goal?';
+        const msg = window.krtI18nText(
+            window.MISSION_OBJECTIVE_I18N && window.MISSION_OBJECTIVE_I18N.delete_confirm,
+            'MISSION_OBJECTIVE_I18N.delete_confirm',
+        );
         const ok = await window.showKrtConfirm(
             msg,
             msg,
-            (window.MISSION_SUBRES_I18N &&
-                window.MISSION_SUBRES_I18N['mission.conflict.action.reload']) ||
-                'OK',
-            (window.MISSION_SUBRES_I18N &&
-                window.MISSION_SUBRES_I18N['mission.conflict.action.dismiss']) ||
-                'Cancel',
+            window.krtI18nText(
+                window.MISSION_SUBRES_I18N &&
+                    window.MISSION_SUBRES_I18N['mission.conflict.action.reload'],
+                'MISSION_SUBRES_I18N[mission.conflict.action.reload]',
+            ),
+            window.krtI18nText(
+                window.MISSION_SUBRES_I18N &&
+                    window.MISSION_SUBRES_I18N['mission.conflict.action.dismiss'],
+                'MISSION_SUBRES_I18N[mission.conflict.action.dismiss]',
+            ),
         );
         if (!ok) {
             return;
@@ -1433,16 +1438,23 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!fid) {
                 return;
             }
-            const msg = dict.delete_confirm || 'Delete this frequency?';
+            const msg = window.krtI18nText(
+                dict.delete_confirm,
+                'MISSION_CUSTOM_FREQ_I18N.delete_confirm',
+            );
             const ok = await window.showKrtConfirm(
                 msg,
                 msg,
-                (window.MISSION_SUBRES_I18N &&
-                    window.MISSION_SUBRES_I18N['mission.conflict.action.reload']) ||
-                    'OK',
-                (window.MISSION_SUBRES_I18N &&
-                    window.MISSION_SUBRES_I18N['mission.conflict.action.dismiss']) ||
-                    'Cancel',
+                window.krtI18nText(
+                    window.MISSION_SUBRES_I18N &&
+                        window.MISSION_SUBRES_I18N['mission.conflict.action.reload'],
+                    'MISSION_SUBRES_I18N[mission.conflict.action.reload]',
+                ),
+                window.krtI18nText(
+                    window.MISSION_SUBRES_I18N &&
+                        window.MISSION_SUBRES_I18N['mission.conflict.action.dismiss'],
+                    'MISSION_SUBRES_I18N[mission.conflict.action.dismiss]',
+                ),
             );
             if (!ok) {
                 return;
@@ -2392,7 +2404,10 @@ async function saveActualTimeInPlace(field, nowDate) {
         );
         if (typeof window.showFrontendErrorToast === 'function') {
             window.showFrontendErrorToast(
-                window.MSG_MISSION_ACTUAL_TIME_ERROR || 'Fehler beim Speichern.',
+                window.krtI18nText(
+                    window.MSG_MISSION_ACTUAL_TIME_ERROR,
+                    'MSG_MISSION_ACTUAL_TIME_ERROR',
+                ),
             );
         }
         return;
@@ -2457,12 +2472,16 @@ async function changeMissionOwner() {
     const ownerConfirmed = await window.showKrtConfirm(
         MSG_CONFIRM_OWNER_CHANGE,
         MSG_CONFIRM_OWNER_CHANGE,
-        (window.MISSION_SUBRES_I18N &&
-            window.MISSION_SUBRES_I18N['mission.conflict.action.reload']) ||
-            'OK',
-        (window.MISSION_SUBRES_I18N &&
-            window.MISSION_SUBRES_I18N['mission.conflict.action.dismiss']) ||
-            'Abbrechen',
+        window.krtI18nText(
+            window.MISSION_SUBRES_I18N &&
+                window.MISSION_SUBRES_I18N['mission.conflict.action.reload'],
+            'MISSION_SUBRES_I18N[mission.conflict.action.reload]',
+        ),
+        window.krtI18nText(
+            window.MISSION_SUBRES_I18N &&
+                window.MISSION_SUBRES_I18N['mission.conflict.action.dismiss'],
+            'MISSION_SUBRES_I18N[mission.conflict.action.dismiss]',
+        ),
     );
     if (!ownerConfirmed) {
         return;
@@ -2565,12 +2584,16 @@ async function changeMissionOwningOrgUnit() {
     const confirmed = await window.showKrtConfirm(
         MSG_CONFIRM_OWNING_ORG_UNIT_CHANGE,
         MSG_CONFIRM_OWNING_ORG_UNIT_CHANGE,
-        (window.MISSION_SUBRES_I18N &&
-            window.MISSION_SUBRES_I18N['mission.conflict.action.reload']) ||
-            'OK',
-        (window.MISSION_SUBRES_I18N &&
-            window.MISSION_SUBRES_I18N['mission.conflict.action.dismiss']) ||
-            'Abbrechen',
+        window.krtI18nText(
+            window.MISSION_SUBRES_I18N &&
+                window.MISSION_SUBRES_I18N['mission.conflict.action.reload'],
+            'MISSION_SUBRES_I18N[mission.conflict.action.reload]',
+        ),
+        window.krtI18nText(
+            window.MISSION_SUBRES_I18N &&
+                window.MISSION_SUBRES_I18N['mission.conflict.action.dismiss'],
+            'MISSION_SUBRES_I18N[mission.conflict.action.dismiss]',
+        ),
     );
     if (!confirmed) {
         return;
@@ -2636,12 +2659,16 @@ async function removeMissionManager(userId) {
         typeof MSG_CONFIRM_MANAGER_REMOVE !== 'undefined'
             ? MSG_CONFIRM_MANAGER_REMOVE
             : 'Verwalter entfernen?',
-        (window.MISSION_SUBRES_I18N &&
-            window.MISSION_SUBRES_I18N['mission.conflict.action.reload']) ||
-            'OK',
-        (window.MISSION_SUBRES_I18N &&
-            window.MISSION_SUBRES_I18N['mission.conflict.action.dismiss']) ||
-            'Abbrechen',
+        window.krtI18nText(
+            window.MISSION_SUBRES_I18N &&
+                window.MISSION_SUBRES_I18N['mission.conflict.action.reload'],
+            'MISSION_SUBRES_I18N[mission.conflict.action.reload]',
+        ),
+        window.krtI18nText(
+            window.MISSION_SUBRES_I18N &&
+                window.MISSION_SUBRES_I18N['mission.conflict.action.dismiss'],
+            'MISSION_SUBRES_I18N[mission.conflict.action.dismiss]',
+        ),
     );
     if (!removeConfirmed) return;
     try {
@@ -3033,10 +3060,10 @@ if (document.readyState === 'loading') {
         if (dirty && typeof window.showKrtConfirm === 'function') {
             const i18n = window.MISSION_TAB_I18N || {};
             const go = await window.showKrtConfirm(
-                i18n['unsaved.title'] || 'Unsaved changes',
-                i18n['unsaved.message'] || 'Unsaved changes will be lost. Switch anyway?',
-                i18n['unsaved.continue'] || 'Switch tab',
-                i18n['unsaved.cancel'] || 'Cancel',
+                window.krtI18nText(i18n['unsaved.title'], 'MISSION_TAB_I18N[unsaved.title]'),
+                window.krtI18nText(i18n['unsaved.message'], 'MISSION_TAB_I18N[unsaved.message]'),
+                window.krtI18nText(i18n['unsaved.continue'], 'MISSION_TAB_I18N[unsaved.continue]'),
+                window.krtI18nText(i18n['unsaved.cancel'], 'MISSION_TAB_I18N[unsaved.cancel]'),
             );
             if (!go) return;
             dirty = false;
@@ -3130,11 +3157,17 @@ if (document.readyState === 'loading') {
     const form = document.getElementById('mission-form');
     if (!form || form.dataset.missionEdit !== 'true') return;
     const D = window.MISSION_SUBRES_I18N || {};
-    function msg(key, fallback) {
-        return D[key] != null && D[key] !== '' ? D[key] : fallback;
+    /**
+     * The mission dictionary's string for `key`, rendered as its name and reported when missing.
+     *
+     * @param {string} key the MISSION_SUBRES_I18N key
+     * @returns {string} the localized string
+     */
+    function msg(key) {
+        return window.krtI18nText(D[key], 'MISSION_SUBRES_I18N[' + key + ']');
     }
-    const SAVED = msg('mission.save.section.ok', 'Gespeichert.');
-    const FAILED = msg('mission.save.section.error', 'Speichern fehlgeschlagen.');
+    const SAVED = msg('mission.save.section.ok');
+    const FAILED = msg('mission.save.section.error');
 
     function writeVersions(v) {
         if (!v) return;
@@ -3168,10 +3201,10 @@ if (document.readyState === 'loading') {
             if (typeof window.showKrtConfirm === 'function') {
                 window
                     .showKrtConfirm(
-                        msg('mission.conflict.toast.title', 'Konflikt'),
-                        msg('mission.conflict.action.reload.question', ''),
-                        msg('mission.conflict.action.reload', ''),
-                        msg('mission.conflict.action.dismiss', ''),
+                        msg('mission.conflict.toast.title'),
+                        msg('mission.conflict.action.reload.question'),
+                        msg('mission.conflict.action.reload'),
+                        msg('mission.conflict.action.dismiss'),
                     )
                     .then(function (ok) {
                         if (ok) window.location.reload();
@@ -3190,7 +3223,7 @@ if (document.readyState === 'loading') {
             window.showFrontendErrorToast(
                 ownerRequired ||
                     (problem && problem.detail) ||
-                    msg('mission.conflict.toast.detail', FAILED),
+                    msg('mission.conflict.toast.detail'),
             );
         }
     }

@@ -201,7 +201,12 @@
         const uexId = hiddenUexId ? hiddenUexId.value : '';
         if (!uexId) {
             if (window.showFrontendErrorToast) {
-                window.showFrontendErrorToast(i18n.locationRequired || i18n.errorCreate || 'Error');
+                window.showFrontendErrorToast(
+                    window.krtI18nText(
+                        i18n.locationRequired || i18n.errorCreate,
+                        'krtPersonalInventoryI18n.locationRequired',
+                    ),
+                );
             }
             return;
         }
@@ -441,7 +446,12 @@
         resultsEl.hidden = false;
         resultsEl.innerHTML =
             '<div class="krt-pi-typeahead-loading">' +
-            escapeHtml((window.krtPersonalInventoryI18n || {}).searching || 'Suche...') +
+            escapeHtml(
+                window.krtI18nText(
+                    (window.krtPersonalInventoryI18n || {}).searching,
+                    'krtPersonalInventoryI18n.searching',
+                ),
+            ) +
             '</div>';
         fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
             .then(function (resp) {
@@ -458,7 +468,12 @@
         if (!items || items.length === 0) {
             resultsEl.innerHTML =
                 '<div class="krt-pi-typeahead-empty">' +
-                escapeHtml((window.krtPersonalInventoryI18n || {}).noResults || 'Keine Treffer') +
+                escapeHtml(
+                    window.krtI18nText(
+                        (window.krtPersonalInventoryI18n || {}).noResults,
+                        'krtPersonalInventoryI18n.noResults',
+                    ),
+                ) +
                 '</div>';
             return;
         }
@@ -496,8 +511,10 @@
             html +=
                 '<div class="krt-pi-typeahead-more">' +
                 escapeHtml(
-                    (window.krtPersonalInventoryI18n || {}).moreResults ||
-                        'Weitere Treffer vorhanden - Suche verfeinern',
+                    window.krtI18nText(
+                        (window.krtPersonalInventoryI18n || {}).moreResults,
+                        'krtPersonalInventoryI18n.moreResults',
+                    ),
                 ) +
                 '</div>';
         }
