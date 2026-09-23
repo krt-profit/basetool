@@ -1032,11 +1032,22 @@ all three on six runners. The `plan` job's main path applies only to a `push` on
    A base that is missing, all-zero or not an ancestor of the pushed commit rebuilds all three;
 2. a range containing a **release commit** (a new dated CHANGELOG section) rebuilds all three;
 3. each image the script would re-tag must, **on its own**, resolve under `:sha-<short>` of the
-   previous tip, carry both architectures, cosign-verify against this workflow's identity pinned to
+   **reuse base** — the newest first-parent ancestor from `github.event.before` (at most 20 commits
+   back) whose three images all exist, so a skipped, cancelled or failed predecessor run does not force
+   a full build; the diff of steps 1–2 is taken against that base; no base within the bound is a full
+   build — carry both architectures, cosign-verify against this workflow's identity pinned to
    `refs/heads/main` (the tag path's gates 3–5), and have been **built within the last 7 days**
    (`org.opencontainers.image.created` — the runtime stage's `apk upgrade` makes an image only as
    patched as its build day). An image that fails any of these is built instead; the others stay
    re-tagged.
+
+**A superseded `main`-push run skips entirely** (ADR-0137 amendment, 2026-09-23). The concurrency
+group stays per commit, so every push to `main` queues a run; when `plan` starts and the pushed commit
+is already a strict ancestor of `origin/main`'s tip, `plan` sets `skip=true` and every later job
+(`build`, `scan`, `merge`, `build-config`, `keycloak-spi-jar`, `build-keycloak-spi`) is skipped, the run
+green, with the reason in the job summary. Never for a range containing a release commit, a tag push or
+`workflow_dispatch`, and never when the tip cannot be read or is not a descendant (force push).
+Decided by `image_reuse_plan.py --skip-check`.
 
 `plan` emits the re-tagged modules, their verified digests and a `build` matrix of only the images to
 build; `scan` covers the built images; `merge` assembles the built ones, re-tags the others and signs
@@ -1101,6 +1112,11 @@ produced artifact.
   re-tagged over the last 30 commits, 156 of 300 over the last 100).
 - [x] `promote.yml`'s `sync-testing` reads the `basetool-config` bundle's revision label, the one
   label that always names the published commit.
+- [x] A `main`-push run whose commit is no longer `main`'s tip at plan time skips every job after
+  `plan` and ends green, except for a range with a release commit; `workflow_dispatch` and tag pushes
+  never skip. `image_reuse_plan.py --selftest` covers each branch of the skip decision and of the
+  reuse-base search; the plan script was exercised against stubbed git/registry answers for both
+  (2026-09-23).
 
 **Enforced by:** `.github/workflows/release-images.yml` (`plan`, `build`, `scan`, `merge`) ·
 `.github/scripts/image_reuse_plan.py` · `.github/workflows/promote.yml` (`sync-testing`) · **Decision:** [ADR-0137](../adr/0137-one-image-build-per-commit-and-no-buildkit-layer-cache.md),
