@@ -146,6 +146,11 @@ services:
     # the base template's environment.
     environment:
       SERVER_HTTP2_ENABLED: "false"
+      # The whole Playwright suite runs against the session type allow-list ENFORCED (REQ-SEC-067),
+      # although production ships `report`: every login, token refresh, flash redirect and live-sync
+      # handshake in the suite is then a real session read under the strictest mode, which is the
+      # evidence the production switch to `enforce` rests on.
+      APP_SESSION_TYPE_ALLOW_LIST: enforce
     extra_hosts: !override []
     volumes: !override
       # Same reason as backend-dev above: `user: "0:0"` plus `cap_drop: [ALL]` plus an /app/logs

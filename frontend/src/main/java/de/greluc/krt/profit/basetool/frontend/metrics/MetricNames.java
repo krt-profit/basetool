@@ -206,6 +206,20 @@ public final class MetricNames {
   public static final String SESSION_VALUE_DROPPED = "basetool.session.value.dropped";
 
   /**
+   * Counter {@code basetool_session_type_refused_total} — tag {@code mode} ({@code report} / {@code
+   * enforce}); bumped when a session value names a class outside {@code SessionTypeAllowList}
+   * (REQ-SEC-067).
+   *
+   * <p>Under {@code report} the value is read anyway and the counter says "enforcing would drop
+   * something": it rises once per class and deserialization slot per frontend lifetime, because
+   * Jackson caches the deserializer it resolved, so it answers whether a class occurs rather than
+   * how often. Under {@code enforce} the value is refused, the attribute is also counted on {@link
+   * #SESSION_VALUE_DROPPED}, and this counter rises on every refused read. The class name is
+   * logged, never tagged — a type id comes out of a stored payload and is unbounded (REQ-OBS-011).
+   */
+  public static final String SESSION_TYPE_REFUSED = "basetool.session.type.refused";
+
+  /**
    * Counter {@code basetool_session_unmappable_total} — tag {@code missing_key}; bumped every time
    * a session hash in Redis is non-empty but lacks one of the three fields {@code
    * RedisSessionMapper} requires, so {@code SessionAttributeDiagnosticMapper} answers {@code null}
@@ -331,6 +345,12 @@ public final class MetricNames {
    * class name, which would be an unbounded label.
    */
   public static final String TAG_CAUSE = "cause";
+
+  /**
+   * Tag key: the session type allow-list mode on {@link #SESSION_TYPE_REFUSED} — {@code report} or
+   * {@code enforce}, a closed set of two literals ({@code off} never counts).
+   */
+  public static final String TAG_MODE = "mode";
 
   /**
    * Tag key: which required session-hash field was absent on {@link #SESSION_UNMAPPABLE} — {@code

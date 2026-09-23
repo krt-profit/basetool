@@ -11,6 +11,11 @@
   
 ### Added
 
+- **Sicherheit: Sitzungsdaten dürfen nur noch bekannte Klassen enthalten.** Das Webtool liest einen
+  in Redis gespeicherten Sitzungswert nur, wenn dessen Typ auf einer festen Liste steht. Neue
+  Variable `APP_SESSION_TYPE_ALLOW_LIST` (`report` als Vorgabe: nichts ändert sich, Abweichungen
+  werden nur gezählt; `enforce` lehnt sie ab). Für Mitglieder unsichtbar.
+
 - **Einsätze: die Mitglieder-Suche bei Teilnehmer und Partyleiter sagt, wenn es mehr Treffer gibt.**
   Beide Listen zeigen höchstens 50 Namen und darunter „Weiter tippen, um die Liste einzugrenzen…",
   statt still alle Treffer zu laden.
