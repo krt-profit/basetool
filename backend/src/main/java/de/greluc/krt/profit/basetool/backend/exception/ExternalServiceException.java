@@ -50,7 +50,7 @@ public final class ExternalServiceException extends AppException {
 
   /**
    * Creates an {@code ExternalServiceException} that wraps the original failure (network exception,
-   * {@code WebClientResponseException}, …). The cause is logged server-side; the client receives a
+   * {@code RestClientResponseException}, …). The cause is logged server-side; the client receives a
    * generic localized detail to avoid leaking upstream implementation details.
    *
    * @param message human-readable summary for the server log
