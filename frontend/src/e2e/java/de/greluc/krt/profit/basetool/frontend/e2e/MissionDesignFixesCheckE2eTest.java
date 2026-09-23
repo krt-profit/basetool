@@ -19,9 +19,10 @@
 
 package de.greluc.krt.profit.basetool.frontend.e2e;
 
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
+
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
-import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import java.nio.file.Paths;
@@ -44,11 +45,20 @@ class MissionDesignFixesCheckE2eTest {
   private static Playwright playwright;
   private static Browser browser;
 
-  /** Boots a headless Chromium for the walk-through. */
+  /**
+   * Skips the class unless {@code MISSION_FIX_CHECK=true}, then boots the headless browser of the
+   * configured engine ({@code -Pe2e.browser}) through {@link E2eSupport#launchBrowser}. The
+   * assumption runs <em>before</em> any browser launch: a CI matrix cell installs only its own
+   * engine, so an unconditional launch of a hard-coded one fails the whole class with a {@code
+   * DriverException} instead of skipping it.
+   */
   @BeforeAll
   static void setUp() {
+    assumeTrue(
+        "true".equals(System.getenv("MISSION_FIX_CHECK")),
+        "ad-hoc harness: set MISSION_FIX_CHECK=true against an already running local stack");
     playwright = Playwright.create();
-    browser = playwright.chromium().launch(new BrowserType.LaunchOptions().setHeadless(true));
+    browser = E2eSupport.launchBrowser(playwright, false);
   }
 
   /** Releases the browser and driver process. */
@@ -65,10 +75,6 @@ class MissionDesignFixesCheckE2eTest {
   /** Probes all five review fixes per tab on a 1880px viewport; captures screenshots. */
   @Test
   void walkMissionTabs() {
-    if (!"true".equals(System.getenv("MISSION_FIX_CHECK"))) {
-      System.out.println("[fix-check] MISSION_FIX_CHECK env missing - skipping");
-      return;
-    }
     String baseUrl = System.getenv().getOrDefault("E2E_BASE_URL", "https://localhost:18081");
     String missionId =
         System.getenv().getOrDefault("MISSION_ID", "75117606-d758-4ee3-8597-7938bb2850f2");
