@@ -23,7 +23,7 @@ ARG MODULE
 # L-8: pin the base image to its multi-arch index digest (not just the floating tag) so builds are
 # bit-reproducible and the SLSA provenance stays sound. Dependabot bumps the tag + digest together
 # (one `docker` entry for this directory in .github/dependabot.yml).
-FROM eclipse-temurin:25-jdk-alpine@sha256:09349d79941fd53bb3d487b393ca118d8853c08c09193f416fe6a8718df9e732 AS build
+FROM eclipse-temurin:25-jdk-alpine@sha256:541729c21f9308a68cebbe5a0627e4cd465dfe8980fc03bac0b2feaee57daafd AS build
 ARG MODULE
 # Application version string forwarded to Gradle as `-PappVersion=...`. Only the frontend reads it
 # (its `bootBuildInfo` stamps it into META-INF/build-info.properties, which the sidebar's version
@@ -116,7 +116,7 @@ RUN java -Djarmode=tools -jar app.jar extract --layers --destination extracted
 # renders with its 14 embedded Type-1 fonts (no fontconfig / freetype), no Tomcat APR connector,
 # pure-Java PostgreSQL and Redis clients, Reactor Netty and Lettuce. The first native library that
 # needs glibc ends this: switch back to `25-jre-jammy`. L-8: digest-pinned (see the build stage).
-FROM eclipse-temurin:25-jre-alpine@sha256:3137541deb3cac6626b5d9a4a2187bc0d6a34312f858bd2c67dd01e732e6b682 AS runtime
+FROM eclipse-temurin:25-jre-alpine@sha256:2ca9adf44f5c29d28ecd26cf92d75cc0c66b7f32bfd839a4439e363a8b428af8 AS runtime
 WORKDIR /app
 
 # Non-root runtime user with a fixed UID/GID so host bind mounts (the log directory) can be
