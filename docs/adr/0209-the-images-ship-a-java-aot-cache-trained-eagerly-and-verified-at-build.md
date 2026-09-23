@@ -1,6 +1,6 @@
 # ADR-0209 — The images ship a Java AOT cache, trained on an eager context refresh and verified at build time
 
-- **Status:** Accepted
+- **Status:** Accepted — amended 2026-09-23 (Amendment 1: the training run unsets the release builder's `OTEL_*` variables and stores no machine code)
 - **Date:** 2026-09-23
 - **Deciders:** @greluc (IMG-MOD-11, IMG-PERF-12, IMG-CI-13 and IMG-SIMP-14 approved with the
   improvement audit of 2026-09-22; "adopt the AOT cache only if readiness is not worse")
@@ -160,3 +160,39 @@ build grows by about half a minute for the backend and not at all for the other 
   built or run far beyond a startup cache, and none was asked for.
 - **Warn instead of failing the build** on a training or acceptance failure. A warning printed inside
   a BuildKit step reaches no one — it is exactly how the half-trained archives went unnoticed.
+
+## Amendment 1 (2026-09-23) — nothing from the build machine goes into the cache
+
+Two failures, found the day this ADR shipped, both invisible to the local builds its measurements
+were taken with:
+
+- **The release builder's tracing variables.** `release-images.yml` builds with a
+  `docker-container` BuildKit, and that builder hands every `RUN` step `OTEL_TRACES_EXPORTER=otlp`,
+  `OTEL_EXPORTER_OTLP_TRACES_PROTOCOL=grpc` and
+  `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=unix:///dev/otel-grpc.sock`. Spring Boot read them and built a
+  gRPC span exporter, which rejects a `unix://` endpoint, so every module's training refresh died at
+  `otlpGrpcSpanExporter` and the first release build of this Dockerfile failed in all six build jobs.
+  Docker Desktop's default builder, `docker build` in `e2e.yml` and every measurement above inject
+  nothing. **The training `RUN` now unsets every `OTEL_*` variable** before the JVM starts — all of
+  them, not the three by name, so a BuildKit that adds a fourth cannot bring the failure back.
+- **Machine code in the cache.** Creating a cache switches JDK 25's `AOTAdapterCaching` on by
+  ergonomics, so the cache also held the interpreter/compiled-code adapters — machine code generated
+  for the CPU of the runner that built the image (723 entries in the ingest cache). The first E2E run
+  on `main` with these images crashed the backend at start on 10 of 16 runners with `SIGILL` in
+  `~AdapterBlob`, after `Saved blob's name … is different from the expected name` and `Failed to link
+  AdapterHandlerEntry … in the AOT code cache`; the six runners that started it share the build
+  runner's CPU, and nothing guarantees that a host does. **Training now runs with `-XX:-AOTAdapterCaching
+  -XX:-AOTStubCaching`**, and the verifying start logs `aot+codecache+init` and **fails the build unless
+  the JVM reports `AOT Code Cache is empty`** — so a Temurin update that starts caching another kind of
+  code is refused rather than shipped. What stays in the cache — parsed and linked classes and method
+  profiles — is data and does not depend on the CPU.
+
+Neither failure reached a host: no image from this Dockerfile had been published.
+
+Readiness does not suffer. A bare context start of the ingest image (`spring.context.exit=onRefresh`,
+seven alternating runs, median, including `docker run`): **7.54 s without a cache, 4.85 s with the
+cache as first shipped, 4.75 s with the amended cache.** The adapters were never where the gain came
+from. The cache sizes are unchanged within 1 % (ingest 117.6 MB, backend 194.1 MB).
+
+`CONTRIBUTING.md` (*Building an app image*) now tells a contributor who changes the training `RUN`
+or the base image to build once with a `docker-container` builder, which is the one release uses.

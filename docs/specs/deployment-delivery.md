@@ -1783,6 +1783,15 @@ on two different collectors).
   (verified 2026-09-23 with two deliberately broken ingest builds — a verifying start under the
   other layout, and a training run without its JWK-set stub — each failed with its `[AOT] FAILED`
   message).
+- [x] The training run succeeds under the release builder (a `docker-container` BuildKit), not only
+  under the local default one: every `OTEL_*` variable BuildKit injects into the `RUN` step is unset
+  before the JVM starts (ADR-0209 Amendment 1; verified 2026-09-23 by building the ingest image with
+  such a builder — `origin/main`'s Dockerfile fails at `otlpGrpcSpanExporter`, the fixed one passes).
+- [x] The cache holds no machine code, so an image trained on one CPU starts on any other: training
+  runs with `-XX:-AOTAdapterCaching -XX:-AOTStubCaching`, and the image build fails unless the
+  verifying start reports `AOT Code Cache is empty` (ADR-0209 Amendment 1; verified 2026-09-23 — the
+  image from `origin/main` loaded 723 code entries, the fixed one none, and a build with adapter
+  caching switched back on failed at that check).
 - [x] `JvmStartupCacheRejected` fires on the JVM's rejection lines and stays silent on an accepted
   start (`check-loki-rule-signatures.py`, run in `repo-lint.yml`).
 - [x] No memory limit and no `MaxRAMPercentage` changed in the same unit of work.
