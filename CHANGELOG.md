@@ -43,6 +43,10 @@
 
 ### Changed
 
+- **Webtool ↔ Backend: keine gzip-Kompression mehr auf der internen Verbindung.** Gemessen kostete
+  sie auf dem internen Weg mehr Zeit, als die kleineren Antworten sparten; das Webtool fragt sie
+  deshalb nicht mehr an. Für Aufrufer von außen ändert sich nichts (ADR-0161).
+  
 - **App-Live-Sync: ein hängendes Handy bremst niemanden mehr aus.** Das Backend schreibt
   Änderungsmeldungen an die App jetzt pro Verbindung im Hintergrund statt im Request dessen, der die
   Änderung gemacht hat. Eine Verbindung, die nicht mehr liest, verliert höchstens eigene Meldungen

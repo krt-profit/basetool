@@ -1,6 +1,6 @@
 # ADR-0161 — REST/JSON over HTTP stays the wire format; gRPC is rejected as a migration
 
-- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-09-10 (`350a0499c`): REST/JSON stayed, and the five §8 improvements shipped with it (`app.http.backend-protocol`, `app.http.codec`, the narrowed ETag, the DTO generator, the schema diff).
+- **Status:** Accepted — amended 2026-09-23 (§8.5: no gzip on the internal hop, see the end) — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-09-10 (`350a0499c`): REST/JSON stayed, and the five §8 improvements shipped with it (`app.http.backend-protocol`, `app.http.codec`, the narrowed ETag, the DTO generator, the schema diff).
 - **Date:** 2026-09-10
 - **Deciders:** @greluc (pending)
 - **Related:** [`WIRE_PROTOCOL_EVALUATION.md`](../archive/WIRE_PROTOCOL_EVALUATION.md) (the full analysis) ·
@@ -277,3 +277,59 @@ mission-detail and the materials matrix, and `http_client_requests_seconds` p95 
   hand-maintained, and an ETag buffer being paid for on every API response with no client able to
   redeem it. The question was worth asking; the answer is not "everything is fine", it is "the wins are
   elsewhere, and cheaper".
+
+## Amendment — 2026-09-23: §8.5 measured — no gzip on the internal hop
+
+*Improvement audit 2026-09, finding BE-PERF-14 (measure first), approved by @greluc.*
+
+**What was measured, and how.** No production access was used. A throwaway harness started the
+backend on a real embedded Tomcat (the `test` profile, so `server.compression` exactly as in
+`application.yml`: enabled, 1 KiB threshold, JSON and CBOR on the MIME list), seeded 400 materials
+and 400 inventory rows, and fetched two representative list endpoints 200 times per variant after
+60 warm-up calls, over plain HTTP/1.1 on loopback — the shape of the hop, which in production is a
+container bridge on one host. JFR (`jdk.ExecutionSample`, `jdk.NativeMethodSample` at 1 ms) ran for
+each window; because the deflater is a native method it barely registers there (under 0.2 % of
+samples), so the compression cost was also timed directly on the bodies the server sent. Two passes
+ran; the table is the second, the first differed only by JIT warm-up.
+
+| Family (endpoint, 200 requests each, pass 2 of 2) | Encoding | Bytes / response | Mean | p95 |
+| --- | --- | ---: | ---: | ---: |
+| ETagged catalogue — `GET /api/v1/materials?size=200` | CBOR, `Accept-Encoding: gzip` | 181 636 (not compressed) | 9.7 ms | 11.6 ms |
+| | CBOR, no `Accept-Encoding` | 181 636 | 11.3 ms | 15.3 ms |
+| | JSON, `Accept-Encoding: gzip` | 215 657 (not compressed) | 10.9 ms | 13.4 ms |
+| | JSON, no `Accept-Encoding` | 215 657 | 11.1 ms | 14.1 ms |
+| no-store family — `GET /api/v1/inventory/all?size=400` | CBOR, gzip | 21 431 | 33.6 ms | 41.7 ms |
+| | CBOR, identity | 210 892 | 30.4 ms | 35.9 ms |
+| | JSON, gzip | 21 286 | 36.7 ms | 44.7 ms |
+| | JSON, identity | 248 587 | 35.0 ms | 43.4 ms |
+
+Direct cost of the compression itself, JDK default level (what Tomcat uses), per response: gzip of the
+210–250 KB inventory body **1.4 ms** of CPU, inflate on the client **0.19–0.21 ms**; of the
+180–215 KB catalogue body 0.9–1.3 ms (never paid, see below).
+
+**Two findings, one of them a correction.**
+
+1. **The ETagged families were never compressed.** Tomcat 11.0.25 refuses gzip for any response that
+   carries a *strong* ETag (`CompressionConfig.useCompression`; the old `noCompressionStrongETag`
+   switch is gone), and the backend's `ShallowEtagHeaderFilter` puts a strong ETag on every `GET` of a
+   `no-cache, must-revalidate` family — missions, materials, locations, orders and the rest of the
+   catalogue. Sent `Accept-Encoding: gzip`, they answer identity. So the premise of this section's
+   *"compressing both keeps the byte axis at parity"* never held for them: the 1.87 MB catalogue
+   document behind that argument has crossed the hop raw since the day CBOR shipped. Only the
+   **no-store** families (`NoStoreApiScopes`: bank, users, inventory, hangar, refinery orders, …),
+   which carry no ETag, and non-`GET` responses were ever compressed.
+2. **Where it was paid, gzip cost more than it saved.** On the no-store family it made a request
+   1.6–3.2 ms slower and cost about 1.6 ms of CPU across both ends per response, for a ten-fold byte
+   saving that is worth nothing on a single-host bridge.
+
+**Decision.** The frontend's regular backend connector no longer asks for gzip (`WebClientConfig`:
+no `compress(true)`, so no `Accept-Encoding`); the SSE connector never did. The backend is unchanged —
+`server.compression` stays for callers that ask, i.e. the public API vhost's clients behind the
+edge. The internal hop now carries identity for every family, which is what the ETagged families
+already did. `WebClientCompressionTest` pins that neither connector advertises gzip.
+
+**What this does not settle.** An ETagged family is not compressed by the backend for an external
+caller either. Whether the public API vhost compresses JSON is the edge's job — its missing
+`gzip_types` is fixed in the coordinator's edge PR (#2021), not here. Switching the backend's ETags to
+weak (`setWriteWeakETag(true)`) would let Tomcat compress them; that is a separate decision, recorded
+as an open question rather than made on the side.
