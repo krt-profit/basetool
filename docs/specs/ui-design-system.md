@@ -10,7 +10,8 @@
 > [0191](../adr/0191-touch-drags-the-crew-board-through-pointer-events.md) (REQ-UI-009) ·
 > [0177](../adr/0177-the-app-has-exactly-one-dialog-shape.md) (REQ-UI-013) ·
 > [0197](../adr/0197-shipped-dependencies-pass-a-gpl-compatible-licence-gate-and-are-listed-on-a-public-page.md) (REQ-UI-021) ·
-> **Next free id:** `REQ-UI-024` · **Visual source of truth:** the design
+> [0212](../adr/0212-every-stylesheet-sits-in-a-cascade-layer.md) (REQ-UI-024) ·
+> **Next free id:** `REQ-UI-025` · **Visual source of truth:** the design
 > skill [`.claude/skills/das-kartell-design/README.md`](../../.claude/skills/das-kartell-design/README.md)
 > (+ [`colors_and_type.css`](../../.claude/skills/das-kartell-design/colors_and_type.css)).
 
@@ -247,8 +248,9 @@ with `data-trigger="open-modal-display"` and **close with the single standardize
 `mission-detail.html` dialogs (handled in `mission-detail.js`); new dialogs never use it. The overlay's hidden default comes from
 the **global** `.krt-modal-overlay { display:none }` in `styles.css` (loaded on every page;
 `bank.css` duplicates it as defense-in-depth), so the fragment injects no inline style. A modal is
-made visible by adding the `krtm-modal-open` class (`display:flex`, in `inline-migration.css` which
-is loaded last so it wins) — at runtime via `open-modal-display` (which toggles `classList`, not an
+made visible by adding the `krtm-modal-open` class (`display:flex`, in the `utilities` cascade layer,
+so it wins over every component, page and migrated rule — REQ-UI-024; until 2026-09-23 it won by
+being loaded last) — at runtime via `open-modal-display` (which toggles `classList`, not an
 inline `style.display`) or a server-rendered `th:classappend`; the global default must never be
 `display:flex`, or a page whose scoped stylesheet fails to load would render every closed modal open
 on load (#1003 WebKit flake). A page script that **closes** a modal after an in-place AJAX write
@@ -1104,10 +1106,10 @@ A rendered page carries what the browser needs and nothing a developer wrote for
   drops at parse time. A plain `<!-- … -->` is sent with every response. The star-slash pair may not
   appear inside one — it closes the block early and renders the rest; write `* /`.
 - **Page CSS lives in `static/css/pages/<page>.css`**, linked by a `<link rel="stylesheet">` in the
-  place the page's `<style>` block used to stand — so a head stylesheet still sits between
-  `styles.css` and `inline-migration.css`, a body one after both, and the cascade order is the one
-  the page always had. A template carries no `<style>` element. Each file belongs to exactly one
-  template.
+  place the page's `<style>` block used to stand. A template carries no `<style>` element. Each file
+  belongs to exactly one template. Its rules sit in the `page` cascade layer (REQ-UI-024), so where
+  the link stands no longer decides what it beats. Until 2026-09-23 it did: the link kept the page's
+  load order.
 - **The icon sprite stays inline, by measurement.** After the two rules above it is 16.2 KB raw and
   2.4 KB gzipped per page; a separate file would save those 2.4 KB per navigation at the cost of a
   second request before the first icon paints, a content-hashed URL in every `<use href>` of the
@@ -1144,6 +1146,73 @@ tests, `SingleModalShapeTest` (which now also reads the page stylesheets — and
 legacy `.modal` rules the inline blocks had hidden from it), `:frontend:lintCssInline`,
 `:frontend:prettierCheck` · **Related:** REQ-UI-009, REQ-UI-013, REQ-SEC-031 (`no-store` pages),
 ADR-0093 (nonce-gated style blocks), ADR-0168 (asset trees)
+
+### REQ-UI-024 — Every stylesheet sits in a cascade layer; the layer decides, not the load order
+
+Precedence between two stylesheets is decided by the **cascade layer** each rule sits in, declared
+in this order at the top of every file:
+
+```css
+@layer base, components, page, migration, utilities;
+```
+
+| Layer | Holds |
+| --- | --- |
+| `base` | `@font-face` and the `:root` design tokens (`styles.css`) |
+| `components` | the rest of `styles.css`: the design system's components and helpers |
+| `page` | every page / area stylesheet (`bank.css`, …, `css/pages/*.css`), and the few design-system declarations that must keep beating one (the block at the end of `styles.css`) |
+| `migration` | `inline-migration.css`: one class per former inline `style="…"` |
+| `utilities` | the two runtime state classes, `krtm-hidden` and `krtm-modal-open` |
+
+Between layers the order decides, before specificity. Inside a layer, specificity and source order
+decide as before. So:
+
+- **A page stylesheet beats the design system with an ordinary rule.** No specificity bump
+  (`main .form-group select`, `div.page-wrapper`, `.btn.btn-xs2`) and no `!important`: 27 page
+  `!important`s existed only to win against `styles.css` and were removed.
+- **A design-system declaration that has to keep beating page CSS goes into the page-layer block at
+  the end of `styles.css`**, with a comment naming what it beats. Inside that layer, specificity
+  against the page stylesheets decides exactly as it did under load order. It does not go into
+  `utilities`: that would also let it beat the page rules that deliberately out-specify it
+  (`.krt-personal-inventory .form-group select`) and every migrated inline class.
+- **A migrated inline style wins against page and component CSS**, as the inline `style=""` it
+  replaced did (ADR-0093). Under load order it lost to any rule with higher specificity. That changed
+  what a few elements look like, and the owner accepted each change (listed below).
+- **The state classes win outright.** `krtm-hidden` hides whatever display a component, page or
+  migrated rule sets. The co-located `.x.krtm-hidden` re-assertions are gone.
+- **`head.html`'s link order is no longer part of the contract.** `inline-migration.css` still loads
+  last, but only because it always did.
+
+**Accepted visible corrections (owner decision 2026-09-23).** In each case a migrated inline style
+now wins over a page rule that had out-specified it:
+
+| Where | Element | Before → after |
+| --- | --- | --- |
+| Bank, Bank-Anträge, Berechtigungen, Kontenverwaltung, Staffelbank, Admin-Bank, Bank- und Audit-Log | sub-line under the page greeting | 17.6 px → 12.8 px, top margin 0.25 rem |
+| Spezialkommandos (admin), Organigramm | sub-line under the page greeting | grey 1 → grey 2 (text), top margin 0.5 rem |
+| Missionsdaten (admin), Lager-Eingabe, Auftrag anlegen | checkbox labels | block → flex row, gap 0.5 rem, weight 400 |
+| Raffinerieauftrag anlegen | read-only inputs | surface and border of the migrated read-only style |
+| Persönliches Inventar | one field group | margin-bottom of its migrated class |
+
+**Measured, not assumed.** Every page route in `FrontendPageRoutes.PAGES`, logged in as admin, at
+375 and 1280 px, with the stylesheets as they were and as they are, in the same stack at the same
+moment: computed style of every element and a full-page pixel diff, with the winning rule of each
+changed property attributed through the DevTools protocol. Result: 26 of 140 measurements differ in
+pixels, on 13 routes, and two more routes (Missionsdaten, Persönliches Inventar) differ only in
+computed values, with no pixel difference (fields in a closed dialog, and sub-pixel widths). Every difference is an accepted correction above or a
+knock-on of one; no declaration changed hands between the design system and a page stylesheet.
+
+**Acceptance**
+
+- [x] Every stylesheet under `static/css` starts with the layer order and puts all its rules in one
+  of the five layers.
+- [x] No page stylesheet uses `!important` against a component rule; the two that remain beat a
+  migrated class (the Lager filter rows).
+- [x] No change a user can see beyond the accepted corrections above.
+
+**Enforced by:** `CascadeLayerOrderTest` (the order line and the layer of every file) ·
+`SingleModalShapeTest` and `TouchClassLayoutE2eTest` read rules inside `@layer` blocks ·
+**Related:** ADR-0212, ADR-0093, ADR-0176, REQ-UI-023
 
 ## Out of scope
 

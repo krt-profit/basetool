@@ -2,252 +2,256 @@
  * (FE-PERF-02). Linked in the same place the block stood, so the cascade order is
  * unchanged. */
 
-/*
+@layer base, components, page, migration, utilities;
+
+@layer page {
+    /*
  * Classes for the handover-row and inventory-expand markup that orders-detail.js builds
  * via innerHTML. They replace the former inline style="" attributes on those elements:
  * an inline style inside a JS innerHTML string is blocked by the CSP style-src-attr 'none'
  * pin just like a template one (ADR-0093). Visibility of the SCU hints and the withdraw
  * button toggles the runtime .krtm-hidden class instead of clearing an inline style.
  */
-.od-remove-btn {
-    padding: 0.5rem;
-}
-.od-inv-cell {
-    padding: 1rem;
-    background: var(--color-surface-input);
-}
-.od-inv-note {
-    font-style: italic;
-    color: var(--color-gray-2-text);
-}
-.od-inv-th {
-    background: var(--color-gray-4);
-    font-size: 0.85rem;
-}
-.od-inv-panel {
-    background: var(--color-surface-input);
-    border: 1px solid var(--color-gray-3);
-    border-top: none;
-}
-.od-inv-table {
-    margin: 0;
-    border: none;
-    background: transparent;
-}
-.od-inv-unlink-btn {
-    padding: 0.1rem 0.5rem;
-    font-size: 0.8rem;
-    min-height: 44px;
-}
+    .od-remove-btn {
+        padding: 0.5rem;
+    }
+    .od-inv-cell {
+        padding: 1rem;
+        background: var(--color-surface-input);
+    }
+    .od-inv-note {
+        font-style: italic;
+        color: var(--color-gray-2-text);
+    }
+    .od-inv-th {
+        background: var(--color-gray-4);
+        font-size: 0.85rem;
+    }
+    .od-inv-panel {
+        background: var(--color-surface-input);
+        border: 1px solid var(--color-gray-3);
+        border-top: none;
+    }
+    .od-inv-table {
+        margin: 0;
+        border: none;
+        background: transparent;
+    }
+    .od-inv-unlink-btn {
+        padding: 0.1rem 0.5rem;
+        font-size: 0.8rem;
+        min-height: 44px;
+    }
 
-/* Kennzahlen-Band (KPI strip, REQ-ORDERS-026): derived-total tiles between the
+    /* Kennzahlen-Band (KPI strip, REQ-ORDERS-026): derived-total tiles between the
    overview card and the tabs. Page-scoped so it does not collide with the page-scoped
    .kpi-total in bank.css. Collapses to 2 / 1 columns on narrow devices. */
-.kpi-band {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
-    margin-bottom: var(--space-6);
-}
-.kpi-band .kpi-total {
-    background: var(--color-bg-dark-gray);
-    border: var(--border-hairline);
-    border-left: 4px solid var(--color-primary);
-    padding: 10px 14px;
-}
-.kpi-band .kpi-label {
-    font-size: 0.62rem;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--color-gray-2-text);
-    font-weight: var(--fw-bold);
-}
-.kpi-band .kpi-value {
-    font-family: var(--font-headline);
-    font-weight: var(--fw-bold);
-    font-size: 1.2rem;
-    color: var(--color-white);
-    margin-top: 2px;
-    font-variant-numeric: tabular-nums;
-}
-.kpi-band .kpi-unit {
-    font-size: 0.8rem;
-    color: var(--color-gray-2-text);
-}
-@media (width <= 768px) {
     .kpi-band {
-        grid-template-columns: repeat(2, 1fr);
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        margin-bottom: var(--space-6);
     }
-}
-@media (width <= 460px) {
-    .kpi-band {
-        grid-template-columns: 1fr;
+    .kpi-band .kpi-total {
+        background: var(--color-bg-dark-gray);
+        border: var(--border-hairline);
+        border-left: 4px solid var(--color-primary);
+        padding: 10px 14px;
     }
-}
+    .kpi-band .kpi-label {
+        font-size: 0.62rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--color-gray-2-text);
+        font-weight: var(--fw-bold);
+    }
+    .kpi-band .kpi-value {
+        font-family: var(--font-headline);
+        font-weight: var(--fw-bold);
+        font-size: 1.2rem;
+        color: var(--color-white);
+        margin-top: 2px;
+        font-variant-numeric: tabular-nums;
+    }
+    .kpi-band .kpi-unit {
+        font-size: 0.8rem;
+        color: var(--color-gray-2-text);
+    }
+    @media (width <= 768px) {
+        .kpi-band {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+    @media (width <= 460px) {
+        .kpi-band {
+            grid-template-columns: 1fr;
+        }
+    }
 
-/* Mini progress bars. .progress-mini is the block bar inside a KPI tile; .mini-bar is
+    /* Mini progress bars. .progress-mini is the block bar inside a KPI tile; .mini-bar is
    the inline bar in table cells (Hergestellt / Geliefert). Fill widths are applied
    CSP-safely from data-krtm-width by inline-style-apply.js (ADR-0093). */
-.progress-mini {
-    height: 7px;
-    background: var(--color-surface-input);
-    border: var(--border-hairline);
-    overflow: hidden;
-}
-.progress-mini > i {
-    display: block;
-    height: 100%;
-    background: var(--color-success);
-}
-.mini-bar {
-    display: inline-flex;
-    vertical-align: middle;
-    width: 88px;
-    height: 5px;
-    margin-right: 6px;
-    background: var(--color-surface-input);
-    border: var(--border-hairline);
-    overflow: hidden;
-}
-.mini-bar > i {
-    display: block;
-    height: 100%;
-    background: var(--color-primary);
-}
-.mini-bar > i.is-complete {
-    background: var(--color-success);
-}
+    .progress-mini {
+        height: 7px;
+        background: var(--color-surface-input);
+        border: var(--border-hairline);
+        overflow: hidden;
+    }
+    .progress-mini > i {
+        display: block;
+        height: 100%;
+        background: var(--color-success);
+    }
+    .mini-bar {
+        display: inline-flex;
+        vertical-align: middle;
+        width: 88px;
+        height: 5px;
+        margin-right: 6px;
+        background: var(--color-surface-input);
+        border: var(--border-hairline);
+        overflow: hidden;
+    }
+    .mini-bar > i {
+        display: block;
+        height: 100%;
+        background: var(--color-primary);
+    }
+    .mini-bar > i.is-complete {
+        background: var(--color-success);
+    }
 
-/* Collapsible "Bedarf je Stück" sub-row in the Herstellung table — mirrors the bank
+    /* Collapsible "Bedarf je Stück" sub-row in the Herstellung table — mirrors the bank
    request table's Notiz/Begründung detail row. The chevron button toggles the sub-row
    (orders-detail.js od-toggle-demand); page-scoped so it never leaks to other tables. */
-.od-prod-expand-col {
-    width: 1.8rem;
-}
-.od-prod-expand-cell {
-    padding-left: 4px;
-    padding-right: 4px;
-    text-align: center;
-}
-.od-prod-toggle {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 2px;
-    background: none;
-    border: 0;
-    color: var(--color-primary);
-    cursor: pointer;
-}
-.od-prod-toggle:focus-visible {
-    outline: 2px solid var(--color-primary);
-    outline-offset: 1px;
-}
-.od-prod-chevron {
-    width: 0.85em;
-    height: 0.85em;
-    flex: 0 0 auto;
-    color: var(--color-primary);
-    transition: transform 0.15s ease;
-}
-[aria-expanded='true'] .od-prod-chevron {
-    transform: rotate(90deg);
-}
-.od-prod-demand-cell {
-    padding: 8px 12px 10px 2.4rem;
-    background: var(--color-surface-input);
-}
-.od-prod-demand-body {
-    display: flex;
-    gap: 10px;
-    font-size: 0.8rem;
-}
-.od-prod-demand-label {
-    flex: 0 0 7rem;
-    padding-top: 1px;
-    color: var(--color-gray-2-text);
-    font-size: 0.66rem;
-    font-weight: var(--fw-bold);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-}
-.od-prod-demand-value {
-    color: var(--color-white);
-}
-/* Earmarked warehouse stock, rendered inline in the item expand row beneath the
+    .od-prod-expand-col {
+        width: 1.8rem;
+    }
+    .od-prod-expand-cell {
+        padding-left: 4px;
+        padding-right: 4px;
+        text-align: center;
+    }
+    .od-prod-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2px;
+        background: none;
+        border: 0;
+        color: var(--color-primary);
+        cursor: pointer;
+    }
+    .od-prod-toggle:focus-visible {
+        outline: 2px solid var(--color-primary);
+        outline-offset: 1px;
+    }
+    .od-prod-chevron {
+        width: 0.85em;
+        height: 0.85em;
+        flex: 0 0 auto;
+        color: var(--color-primary);
+        transition: transform 0.15s ease;
+    }
+    [aria-expanded='true'] .od-prod-chevron {
+        transform: rotate(90deg);
+    }
+    .od-prod-demand-cell {
+        padding: 8px 12px 10px 2.4rem;
+        background: var(--color-surface-input);
+    }
+    .od-prod-demand-body {
+        display: flex;
+        gap: 10px;
+        font-size: 0.8rem;
+    }
+    .od-prod-demand-label {
+        flex: 0 0 7rem;
+        padding-top: 1px;
+        color: var(--color-gray-2-text);
+        font-size: 0.66rem;
+        font-weight: var(--fw-bold);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+    }
+    .od-prod-demand-value {
+        color: var(--color-white);
+    }
+    /* Earmarked warehouse stock, rendered inline in the item expand row beneath the
    per-unit demand (REQ-ORDERS-028). The reused label becomes a block heading above a
    compact table. */
-.od-item-stock-inline {
-    margin-top: 10px;
-}
-.od-item-stock-inline .od-prod-demand-label {
-    display: block;
-    flex: none;
-    margin-bottom: 4px;
-}
-.od-item-stock-inline .data-table {
-    font-size: 0.8rem;
-}
+    .od-item-stock-inline {
+        margin-top: 10px;
+    }
+    .od-item-stock-inline .od-prod-demand-label {
+        display: block;
+        flex: none;
+        margin-bottom: 4px;
+    }
+    .od-item-stock-inline .data-table {
+        font-size: 0.8rem;
+    }
 
-/* Tab panes (mission-detail pattern): hidden by default, shown when the JS controller
+    /* Tab panes (mission-detail pattern): hidden by default, shown when the JS controller
    (orders-detail.js) adds .on to the active pane. Scoped to .tab-panes so it never
    reaches the mission-detail page's own .tab-pane rules. */
-.tab-panes {
-    border: var(--border-hairline);
-    border-top: none;
-    background: var(--color-bg-dark-gray);
-}
-.tab-panes .tab-pane {
-    display: none;
-    padding: 16px 16px 18px;
-}
-.tab-panes .tab-pane.on {
-    display: block;
-}
-.tab-panes .tab-pane > :first-child {
-    margin-top: 0;
-}
+    .tab-panes {
+        border: var(--border-hairline);
+        border-top: none;
+        background: var(--color-bg-dark-gray);
+    }
+    .tab-panes .tab-pane {
+        display: none;
+        padding: 16px 16px 18px;
+    }
+    .tab-panes .tab-pane.on {
+        display: block;
+    }
+    .tab-panes .tab-pane > :first-child {
+        margin-top: 0;
+    }
 
-/* Herstellung modal: one row per linked inventory entry (source + amount input) inside
+    /* Herstellung modal: one row per linked inventory entry (source + amount input) inside
    each material's reconciliation card. */
-.od-prod-entry {
-    display: grid;
-    grid-template-columns: 1fr 110px;
-    gap: 12px;
-    align-items: center;
-    padding: 8px 0;
-}
-.od-prod-entry + .od-prod-entry {
-    border-top: var(--border-hairline);
-}
-.od-prod-src {
-    font-size: 0.86rem;
-    color: var(--color-gray-1);
-}
-.od-prod-src small {
-    color: var(--color-gray-2-text);
-}
-.od-prod-entry input {
-    width: 100%;
-    min-height: 44px;
-}
-/* "Nicht ausbuchen" opt-out: a compact checkbox row under each material's head. When
+    .od-prod-entry {
+        display: grid;
+        grid-template-columns: 1fr 110px;
+        gap: 12px;
+        align-items: center;
+        padding: 8px 0;
+    }
+    .od-prod-entry + .od-prod-entry {
+        border-top: var(--border-hairline);
+    }
+    .od-prod-src {
+        font-size: 0.86rem;
+        color: var(--color-gray-1);
+    }
+    .od-prod-src small {
+        color: var(--color-gray-2-text);
+    }
+    .od-prod-entry input {
+        width: 100%;
+        min-height: 44px;
+    }
+    /* "Nicht ausbuchen" opt-out: a compact checkbox row under each material's head. When
    ticked the card is flagged .od-prod-skipped and its stock inputs are dimmed. */
-.od-prod-skip {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 8px 0 4px;
-    font-size: 0.86rem;
-    color: var(--color-gray-1);
-    cursor: pointer;
-}
-.od-prod-skip input {
-    width: 18px;
-    min-height: 18px;
-    accent-color: var(--color-primary);
-    cursor: pointer;
-}
-.od-prod-skipped [data-prod-entries] {
-    opacity: 0.45;
+    .od-prod-skip {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 8px 0 4px;
+        font-size: 0.86rem;
+        color: var(--color-gray-1);
+        cursor: pointer;
+    }
+    .od-prod-skip input {
+        width: 18px;
+        min-height: 18px;
+        accent-color: var(--color-primary);
+        cursor: pointer;
+    }
+    .od-prod-skipped [data-prod-entries] {
+        opacity: 0.45;
+    }
 }

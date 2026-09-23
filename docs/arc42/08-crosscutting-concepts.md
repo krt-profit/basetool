@@ -126,6 +126,10 @@ Two binding rules shape every UI change:
   `.krt-modal-overlay` is a `<dialog>` opened by `window.krtModal` with `showModal()`: top layer,
   inert page, Escape, focus in and back. Transient overlays go into the open dialog
   (`krtModal.layerRoot()`). (REQ-UI-013, ADR-0177, `DialogA11yE2eTest`.)
+- **The cascade layer decides, not the load order** (FE-MOD-02, 2026-09-23). Every stylesheet
+  declares `@layer base, components, page, migration, utilities;` and keeps its rules inside its
+  layer: page CSS beats the design system without specificity bumps, a migrated inline class beats
+  both, and the two state classes win outright (REQ-UI-024, ADR-0212, `CascadeLayerOrderTest`).
 
 Authority: [`ui-design-system.md`](../specs/ui-design-system.md),
 [`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md) (`REQ-FE-*`),

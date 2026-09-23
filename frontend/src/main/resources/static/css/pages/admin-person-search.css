@@ -2,13 +2,17 @@
  * (FE-PERF-02). Linked in the same place the block stood, so the cascade order is
  * unchanged. */
 
-.ps-snippet {
-    font-family: var(--font-body);
-    color: var(--color-gray-1);
-    word-break: break-word;
-    max-width: 46rem;
-}
-.ps-where {
-    color: var(--color-gray-2-text);
-    font-size: 0.8rem;
+@layer base, components, page, migration, utilities;
+
+@layer page {
+    .ps-snippet {
+        font-family: var(--font-body);
+        color: var(--color-gray-1);
+        word-break: break-word;
+        max-width: 46rem;
+    }
+    .ps-where {
+        color: var(--color-gray-2-text);
+        font-size: 0.8rem;
+    }
 }

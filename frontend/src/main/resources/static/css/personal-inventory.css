@@ -5,1051 +5,1054 @@
  * Touch targets >= 44px; responsive across 4 device classes.
  */
 
-.krt-personal-inventory-header {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-}
+@layer base, components, page, migration, utilities;
 
-.krt-personal-inventory-header h1 {
-    font-family: var(--font-headline);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--color-primary);
-    margin: 0;
-}
+@layer page {
+    .krt-personal-inventory-header {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
 
-.krt-personal-inventory-header .krt-subtitle {
-    font-family: Lato, sans-serif;
-    font-weight: var(--fw-thin);
-    color: var(--color-gray-1);
-    margin: 0;
-    max-width: 80ch;
-}
+    .krt-personal-inventory-header h1 {
+        font-family: var(--font-headline);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--color-primary);
+        margin: 0;
+    }
 
-.krt-personal-inventory {
-    /* The wrapping .hud-box owns the surface treatment (hairline + corner brackets +
+    .krt-personal-inventory-header .krt-subtitle {
+        font-family: Lato, sans-serif;
+        font-weight: var(--fw-thin);
+        color: var(--color-gray-1);
+        margin: 0;
+        max-width: 80ch;
+    }
+
+    .krt-personal-inventory {
+        /* The wrapping .hud-box owns the surface treatment (hairline + corner brackets +
        translucent fill). This rule only carries the page's content padding; a solid fill
        and a full orange border here would override the quieter .hud-box look and make the
        page read louder than the rest of the modernised app (DS hygiene, REQ-UI-002). */
-    padding: 1.25rem;
-}
+        padding: 1.25rem;
+    }
 
-.krt-admin-banner {
-    background-color: rgb(231 126 35 / 12%);
-    border: 1px solid var(--color-primary);
-    color: var(--color-primary);
-    font-family: var(--font-headline);
-    font-weight: var(--fw-bold);
-    text-transform: uppercase;
-    letter-spacing: 0.18em;
-    padding: 0.6rem 1rem;
-    text-align: center;
-    margin-bottom: 1rem;
-    box-shadow: 0 0 16px rgb(231 126 35 / 35%) inset;
-}
-.krt-admin-banner::before {
-    content: '\25B2  ';
-}
-.krt-admin-banner::after {
-    content: '  \25B2';
-}
+    .krt-admin-banner {
+        background-color: rgb(231 126 35 / 12%);
+        border: 1px solid var(--color-primary);
+        color: var(--color-primary);
+        font-family: var(--font-headline);
+        font-weight: var(--fw-bold);
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        padding: 0.6rem 1rem;
+        text-align: center;
+        margin-bottom: 1rem;
+        box-shadow: 0 0 16px rgb(231 126 35 / 35%) inset;
+    }
+    .krt-admin-banner::before {
+        content: '\25B2  ';
+    }
+    .krt-admin-banner::after {
+        content: '  \25B2';
+    }
 
-.krt-pi-actionbar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
-    align-items: center;
-    margin: 1rem 0;
-}
-.krt-pi-actionbar .btn {
-    min-height: 44px;
-}
-
-.krt-pi-userform {
-    display: flex;
-    gap: 0.75rem;
-    align-items: center;
-    flex-wrap: wrap;
-    margin-bottom: 1rem;
-}
-
-.krt-pi-userform select {
-    min-height: 44px;
-    background-color: var(--color-surface-input);
-    border: 1px solid var(--color-gray-3);
-    color: var(--color-gray-1);
-    /* Reserve right space for the SVG arrow injected by styles.css */
-    padding: 0.4rem 2rem 0.4rem 0.6rem;
-    min-width: 240px;
-}
-
-.krt-pi-userform label {
-    /* Form labels stay neutral; orange is reserved for action + identity (REQ-UI-002). */
-    color: var(--color-gray-1);
-    font-family: Lato, sans-serif;
-    font-weight: var(--fw-bold);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    font-size: var(--fs-xs);
-}
-
-.krt-pi-filter {
-    margin-left: auto;
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-}
-
-.krt-pi-search-input {
-    min-height: 44px;
-    background-color: var(--color-surface-input);
-    border: 1px solid var(--color-gray-3);
-    color: var(--color-gray-1);
-    padding: 0.4rem 0.6rem;
-    min-width: 220px;
-}
-
-.krt-pi-table-wrapper {
-    overflow-x: auto;
-}
-.krt-pi-table {
-    width: 100%;
-}
-
-.krt-pi-table td.krt-pi-empty,
-.data-table td.krt-pi-empty {
-    text-align: center;
-    color: var(--color-gray-2);
-    padding: 1.25rem;
-}
-
-.krt-pi-actions {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-}
-.krt-pi-actions .btn {
-    min-height: 44px;
-}
-
-/* HUD-style location marker (triangle for SPACE_STATION, ring for CITY). */
-.krt-pi-location-marker {
-    display: inline-block;
-    width: 12px;
-    height: 12px;
-    margin-right: 0.4rem;
-    vertical-align: middle;
-}
-
-.krt-pi-loc-city {
-    border: 2px solid var(--color-primary);
-    border-radius: 50%;
-    background: transparent;
-}
-
-.krt-pi-loc-station {
-    width: 0;
-    height: 0;
-    border-left: 7px solid transparent;
-    border-right: 7px solid transparent;
-    border-bottom: 12px solid var(--color-primary);
-    background: transparent;
-}
-
-/* Forms inside list section AND modals (Personal Inventory). */
-.krt-personal-inventory .form-group,
-#krt-pi-modal .form-group,
-#krt-pi-delete-modal .form-group {
-    margin-bottom: 1.25rem;
-}
-.krt-personal-inventory .form-group input,
-.krt-personal-inventory .form-group textarea,
-#krt-pi-modal .form-group input,
-#krt-pi-modal .form-group textarea {
-    width: 100%;
-    min-height: 44px;
-    background-color: var(--color-surface-input);
-    border: 1px solid var(--color-gray-3);
-    color: var(--color-gray-1);
-    font-family: Lato, sans-serif;
-    padding: 0.5rem;
-    box-sizing: border-box;
-    margin-left: 0;
-    display: block;
-}
-
-/* Select elements need extra right padding for the SVG arrow from styles.css */
-.krt-personal-inventory .form-group select,
-#krt-pi-modal .form-group select {
-    width: 100%;
-    min-height: 44px;
-    background-color: var(--color-surface-input);
-    border: 1px solid var(--color-gray-3);
-    color: var(--color-gray-1);
-    font-family: Lato, sans-serif;
-    padding: 0.5rem 2rem 0.5rem 0.5rem;
-    box-sizing: border-box;
-    margin-left: 0;
-    display: block;
-}
-
-.krt-personal-inventory .form-group label,
-#krt-pi-modal .form-group label {
-    display: block;
-    /* Neutral label; the input value is the brightest element, not the label (REQ-UI-002). */
-    color: var(--color-gray-1);
-    font-family: Lato, sans-serif;
-    font-weight: var(--fw-bold);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    font-size: var(--fs-xs);
-    margin: 0 0 0.4rem;
-    padding: 0;
-    text-align: left;
-}
-
-.krt-pi-help {
-    color: var(--color-gray-2);
-    font-size: var(--fs-xs);
-    display: block;
-    margin-top: 0.25rem;
-}
-
-#krt-pi-modal #krt-pi-form,
-#krt-pi-modal #krt-pi-form .form-group {
-    text-align: left;
-}
-
-.krt-danger {
-    background-color: var(--color-danger) !important;
-    border-color: var(--color-danger) !important;
-    color: #fff !important;
-}
-
-.krt-pi-error-box {
-    background-color: rgb(163 0 10 / 20%);
-    border: 1px solid var(--color-danger);
-    padding: 0.6rem 0.9rem;
-    margin-bottom: 1rem;
-}
-.krt-pi-error-box ul {
-    margin: 0;
-    padding-left: 1.25rem;
-    color: var(--color-danger);
-}
-
-/* Typeahead dropdown. */
-.krt-pi-typeahead {
-    position: relative;
-}
-
-.krt-pi-typeahead-results {
-    position: absolute;
-    z-index: 1100;
-    left: 0;
-    right: 0;
-    top: 100%;
-    background-color: var(--color-bg-dark-gray);
-    border: 1px solid var(--color-primary);
-    max-height: 300px;
-    overflow-y: auto;
-    box-shadow: 0 6px 14px rgb(0 0 0 / 50%);
-}
-
-.krt-pi-typeahead-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    width: 100%;
-    text-align: left;
-    background: transparent;
-    border: none;
-    color: var(--color-gray-1);
-    padding: 0.6rem 0.8rem;
-    font-family: Lato, sans-serif;
-    cursor: pointer;
-    min-height: 44px;
-}
-
-.krt-pi-typeahead-item:hover,
-.krt-pi-typeahead-item:focus {
-    background-color: var(--color-surface-input);
-    color: var(--color-primary);
-}
-.krt-pi-typeahead-name {
-    font-weight: var(--fw-bold);
-}
-.krt-pi-typeahead-meta {
-    color: var(--color-gray-2);
-    font-size: 0.85rem;
-    margin-left: auto;
-}
-
-.krt-pi-typeahead-loading,
-.krt-pi-typeahead-empty {
-    padding: 0.75rem 1rem;
-    color: var(--color-gray-2);
-    font-style: italic;
-}
-
-/* REQ-FE-016: truncation hint appended when a result fills the requested cap. */
-.krt-pi-typeahead-more {
-    padding: 0.75rem 1rem;
-    color: var(--color-gray-2-text);
-    font-style: italic;
-    border-top: 1px solid var(--color-gray-3);
-}
-
-.visually-hidden {
-    position: absolute !important;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-    border: 0;
-}
-
-/* Responsive: 4 device classes. */
-
-/* Smartphone <= 768px */
-@media (width <= 768px) {
     .krt-pi-actionbar {
-        flex-direction: column;
-        align-items: stretch;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        align-items: center;
+        margin: 1rem 0;
     }
-    .krt-pi-filter {
-        margin-left: 0;
-        flex-direction: column;
-        align-items: stretch;
+    .krt-pi-actionbar .btn {
+        min-height: 44px;
     }
 
-    .krt-pi-filter .krt-pi-search-input,
-    .krt-pi-filter .btn {
-        width: 100%;
-    }
     .krt-pi-userform {
-        flex-direction: column;
-        align-items: stretch;
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
     }
+
     .krt-pi-userform select {
-        min-width: 0;
-        width: 100%;
+        min-height: 44px;
+        background-color: var(--color-surface-input);
+        border: 1px solid var(--color-gray-3);
+        color: var(--color-gray-1);
+        /* Reserve right space for the SVG arrow injected by styles.css */
+        padding: 0.4rem 2rem 0.4rem 0.6rem;
+        min-width: 240px;
     }
+
+    .krt-pi-userform label {
+        /* Form labels stay neutral; orange is reserved for action + identity (REQ-UI-002). */
+        color: var(--color-gray-1);
+        font-family: Lato, sans-serif;
+        font-weight: var(--fw-bold);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: var(--fs-xs);
+    }
+
+    .krt-pi-filter {
+        margin-left: auto;
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+    .krt-pi-search-input {
+        min-height: 44px;
+        background-color: var(--color-surface-input);
+        border: 1px solid var(--color-gray-3);
+        color: var(--color-gray-1);
+        /* No padding of its own: the base text-input rule has always set it (FE-MOD-02). */
+        min-width: 220px;
+    }
+
     .krt-pi-table-wrapper {
         overflow-x: auto;
     }
-    .krt-pi-actions {
-        flex-direction: column;
-    }
-    .krt-pi-actions .btn {
+    .krt-pi-table {
         width: 100%;
     }
-}
 
-/* Tablet 768-1024px */
-@media (width >= 769px) and (width <= 1024px) {
-    .krt-pi-table th,
-    .krt-pi-table td {
-        padding: 0.45rem 0.6rem;
+    .krt-pi-table td.krt-pi-empty,
+    .data-table td.krt-pi-empty {
+        text-align: center;
+        color: var(--color-gray-2);
+        padding: 1.25rem;
     }
-}
 
-/* Desktop 1024-1600px (default body styling) */
+    .krt-pi-actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+    .krt-pi-actions .btn {
+        min-height: 44px;
+    }
 
-/* Ultra Wide Desktop >= 1600px */
-@media (width >= 1600px) {
-    .krt-personal-inventory {
-        padding: 1.5rem 2rem;
+    /* HUD-style location marker (triangle for SPACE_STATION, ring for CITY). */
+    .krt-pi-location-marker {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        margin-right: 0.4rem;
+        vertical-align: middle;
     }
-    .krt-personal-inventory-header .krt-subtitle {
-        max-width: 100ch;
-    }
-    .krt-pi-table {
-        table-layout: fixed;
-    }
-}
 
-/* ------------------------------------------------------------------ *
+    .krt-pi-loc-city {
+        border: 2px solid var(--color-primary);
+        border-radius: 50%;
+        background: transparent;
+    }
+
+    .krt-pi-loc-station {
+        width: 0;
+        height: 0;
+        border-left: 7px solid transparent;
+        border-right: 7px solid transparent;
+        border-bottom: 12px solid var(--color-primary);
+        background: transparent;
+    }
+
+    /* Forms inside list section AND modals (Personal Inventory). */
+    .krt-personal-inventory .form-group,
+    #krt-pi-modal .form-group,
+    #krt-pi-delete-modal .form-group {
+        margin-bottom: 1.25rem;
+    }
+    .krt-personal-inventory .form-group input,
+    .krt-personal-inventory .form-group textarea,
+    #krt-pi-modal .form-group input,
+    #krt-pi-modal .form-group textarea {
+        width: 100%;
+        min-height: 44px;
+        background-color: var(--color-surface-input);
+        border: 1px solid var(--color-gray-3);
+        color: var(--color-gray-1);
+        font-family: Lato, sans-serif;
+        padding: 0.5rem;
+        box-sizing: border-box;
+        margin-left: 0;
+        display: block;
+    }
+
+    /* Select elements need extra right padding for the SVG arrow from styles.css */
+    .krt-personal-inventory .form-group select,
+    #krt-pi-modal .form-group select {
+        width: 100%;
+        min-height: 44px;
+        background-color: var(--color-surface-input);
+        border: 1px solid var(--color-gray-3);
+        color: var(--color-gray-1);
+        font-family: Lato, sans-serif;
+        padding: 0.5rem 2rem 0.5rem 0.5rem;
+        box-sizing: border-box;
+        margin-left: 0;
+        display: block;
+    }
+
+    .krt-personal-inventory .form-group label,
+    #krt-pi-modal .form-group label {
+        display: block;
+        /* Neutral label; the input value is the brightest element, not the label (REQ-UI-002). */
+        color: var(--color-gray-1);
+        font-family: Lato, sans-serif;
+        font-weight: var(--fw-bold);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-size: var(--fs-xs);
+        margin: 0 0 0.4rem;
+        padding: 0;
+        text-align: left;
+    }
+
+    .krt-pi-help {
+        color: var(--color-gray-2);
+        font-size: var(--fs-xs);
+        display: block;
+        margin-top: 0.25rem;
+    }
+
+    #krt-pi-modal #krt-pi-form,
+    #krt-pi-modal #krt-pi-form .form-group {
+        text-align: left;
+    }
+
+    .krt-danger {
+        background-color: var(--color-danger);
+        border-color: var(--color-danger);
+        color: #fff;
+    }
+
+    .krt-pi-error-box {
+        background-color: rgb(163 0 10 / 20%);
+        border: 1px solid var(--color-danger);
+        padding: 0.6rem 0.9rem;
+        margin-bottom: 1rem;
+    }
+    .krt-pi-error-box ul {
+        margin: 0;
+        padding-left: 1.25rem;
+        color: var(--color-danger);
+    }
+
+    /* Typeahead dropdown. */
+    .krt-pi-typeahead {
+        position: relative;
+    }
+
+    .krt-pi-typeahead-results {
+        position: absolute;
+        z-index: 1100;
+        left: 0;
+        right: 0;
+        top: 100%;
+        background-color: var(--color-bg-dark-gray);
+        border: 1px solid var(--color-primary);
+        max-height: 300px;
+        overflow-y: auto;
+        box-shadow: 0 6px 14px rgb(0 0 0 / 50%);
+    }
+
+    .krt-pi-typeahead-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        width: 100%;
+        text-align: left;
+        background: transparent;
+        border: none;
+        color: var(--color-gray-1);
+        padding: 0.6rem 0.8rem;
+        font-family: Lato, sans-serif;
+        cursor: pointer;
+        min-height: 44px;
+    }
+
+    .krt-pi-typeahead-item:hover,
+    .krt-pi-typeahead-item:focus {
+        background-color: var(--color-surface-input);
+        color: var(--color-primary);
+    }
+    .krt-pi-typeahead-name {
+        font-weight: var(--fw-bold);
+    }
+    .krt-pi-typeahead-meta {
+        color: var(--color-gray-2);
+        font-size: 0.85rem;
+        margin-left: auto;
+    }
+
+    .krt-pi-typeahead-loading,
+    .krt-pi-typeahead-empty {
+        padding: 0.75rem 1rem;
+        color: var(--color-gray-2);
+        font-style: italic;
+    }
+
+    /* REQ-FE-016: truncation hint appended when a result fills the requested cap. */
+    .krt-pi-typeahead-more {
+        padding: 0.75rem 1rem;
+        color: var(--color-gray-2-text);
+        font-style: italic;
+        border-top: 1px solid var(--color-gray-3);
+    }
+
+    .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+        border: 0;
+    }
+
+    /* Responsive: 4 device classes. */
+
+    /* Smartphone <= 768px */
+    @media (width <= 768px) {
+        .krt-pi-actionbar {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .krt-pi-filter {
+            margin-left: 0;
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .krt-pi-filter .krt-pi-search-input,
+        .krt-pi-filter .btn {
+            width: 100%;
+        }
+        .krt-pi-userform {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .krt-pi-userform select {
+            min-width: 0;
+            width: 100%;
+        }
+        .krt-pi-table-wrapper {
+            overflow-x: auto;
+        }
+        .krt-pi-actions {
+            flex-direction: column;
+        }
+        .krt-pi-actions .btn {
+            width: 100%;
+        }
+    }
+
+    /* Tablet 768-1024px */
+    @media (width >= 769px) and (width <= 1024px) {
+        .krt-pi-table th,
+        .krt-pi-table td {
+            padding: 0.45rem 0.6rem;
+        }
+    }
+
+    /* Desktop 1024-1600px (default body styling) */
+
+    /* Ultra Wide Desktop >= 1600px */
+    @media (width >= 1600px) {
+        .krt-personal-inventory {
+            padding: 1.5rem 2rem;
+        }
+        .krt-personal-inventory-header .krt-subtitle {
+            max-width: 100ch;
+        }
+        .krt-pi-table {
+            table-layout: fixed;
+        }
+    }
+
+    /* ------------------------------------------------------------------ *
  * Blueprints sub-page (#327, Phase 5): multi-select staging chips.   *
  * Reuses the krt-pi-* table / modal / typeahead base. The in-page    *
  * Items | Blueprints tabs use the shared .tab-nav DS component.      *
  * ------------------------------------------------------------------ */
 
-.krt-bp-section-title {
-    font-family: var(--font-headline);
-    font-weight: var(--fw-bold);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    /* Neutral section heading; orange is reserved for action + identity (REQ-UI-002). */
-    color: var(--color-gray-1);
-    font-size: 1rem;
-    margin: 0 0 1rem;
-}
+    .krt-bp-section-title {
+        font-family: var(--font-headline);
+        font-weight: var(--fw-bold);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        /* Neutral section heading; orange is reserved for action + identity (REQ-UI-002). */
+        color: var(--color-gray-1);
+        font-size: 1rem;
+        margin: 0 0 1rem;
+    }
 
-/* Search result staging states. */
-.krt-bp-result-owned {
-    opacity: 0.55;
-    cursor: not-allowed;
-}
+    /* Search result staging states. */
+    .krt-bp-result-owned {
+        opacity: 0.55;
+        cursor: not-allowed;
+    }
 
-.krt-bp-result-staged {
-    background-color: var(--color-surface-input);
-    color: var(--color-primary);
-}
+    .krt-bp-result-staged {
+        background-color: var(--color-surface-input);
+        color: var(--color-primary);
+    }
 
-.krt-bp-result-staged::after {
-    content: '\2713';
-    margin-left: 0.5rem;
-    color: var(--color-primary);
-}
+    .krt-bp-result-staged::after {
+        content: '\2713';
+        margin-left: 0.5rem;
+        color: var(--color-primary);
+    }
 
-/* Selection staging area + chips. */
-.krt-bp-staging {
-    margin-top: 1.25rem;
-}
+    /* Selection staging area + chips. */
+    .krt-bp-staging {
+        margin-top: 1.25rem;
+    }
 
-.krt-bp-staging-label {
-    display: block;
-    /* Neutral label; orange is reserved for action + identity (REQ-UI-002). */
-    color: var(--color-gray-1);
-    font-family: Lato, sans-serif;
-    font-weight: var(--fw-bold);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    font-size: var(--fs-xs);
-    margin-bottom: 0.5rem;
-}
+    .krt-bp-staging-label {
+        display: block;
+        /* Neutral label; orange is reserved for action + identity (REQ-UI-002). */
+        color: var(--color-gray-1);
+        font-family: Lato, sans-serif;
+        font-weight: var(--fw-bold);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-size: var(--fs-xs);
+        margin-bottom: 0.5rem;
+    }
 
-.krt-bp-chip-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    min-height: 44px;
-    align-items: center;
-}
+    .krt-bp-chip-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        min-height: 44px;
+        align-items: center;
+    }
 
-.krt-bp-staging-empty {
-    color: var(--color-gray-2);
-    font-style: italic;
-}
+    .krt-bp-staging-empty {
+        color: var(--color-gray-2);
+        font-style: italic;
+    }
 
-.krt-bp-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    background-color: var(--color-surface-input);
-    border: 1px solid var(--color-primary);
-    color: var(--color-gray-1);
-    padding: 0.3rem 0.3rem 0.3rem 0.7rem;
-    font-family: Lato, sans-serif;
-    font-size: 0.9rem;
-}
-
-.krt-bp-chip-remove {
-    min-width: 28px;
-    min-height: 28px;
-    background: transparent;
-    border: none;
-    color: var(--color-gray-1);
-    font-size: 1.2rem;
-    line-height: 1;
-    cursor: pointer;
-    padding: 0 0.3rem;
-}
-
-.krt-bp-chip-remove:hover,
-.krt-bp-chip-remove:focus {
-    color: var(--color-primary);
-    outline: none;
-}
-
-/* Staging selections render as the canonical DS .chip (chip--primary). The inline remove
-   affordance is sized down to fit the compact squared chip and inherits the chip's hue. */
-.krt-bp-chip-list .chip .krt-bp-chip-remove {
-    min-width: 1.25rem;
-    min-height: 1.25rem;
-    padding: 0;
-    font-size: 1rem;
-    color: inherit;
-}
-
-.krt-bp-dash {
-    color: var(--color-gray-2);
-}
-
-.krt-bp-edit-product {
-    color: var(--color-primary);
-    font-weight: var(--fw-bold);
-    margin: 0 0 1rem;
-}
-
-#krt-bp-edit-modal .form-group input,
-#krt-bp-edit-modal .form-group textarea {
-    width: 100%;
-    min-height: 44px;
-    background-color: var(--color-surface-input);
-    border: 1px solid var(--color-gray-3);
-    color: var(--color-gray-1);
-    font-family: Lato, sans-serif;
-    padding: 0.5rem;
-    box-sizing: border-box;
-    display: block;
-}
-
-#krt-bp-edit-modal .form-group label {
-    display: block;
-    /* Neutral label; orange is reserved for action + identity (REQ-UI-002). */
-    color: var(--color-gray-1);
-    font-family: Lato, sans-serif;
-    font-weight: var(--fw-bold);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    font-size: var(--fs-xs);
-    margin: 0 0 0.4rem;
-    text-align: left;
-}
-
-@media (width <= 768px) {
     .krt-bp-chip {
-        width: 100%;
-        justify-content: space-between;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        background-color: var(--color-surface-input);
+        border: 1px solid var(--color-primary);
+        color: var(--color-gray-1);
+        padding: 0.3rem 0.3rem 0.3rem 0.7rem;
+        font-family: Lato, sans-serif;
+        font-size: 0.9rem;
     }
-    .krt-bp-search .krt-pi-typeahead-results {
-        position: static;
-    }
-}
 
-/* ------------------------------------------------------------------ *
+    .krt-bp-chip-remove {
+        min-width: 28px;
+        min-height: 28px;
+        background: transparent;
+        border: none;
+        color: var(--color-gray-1);
+        font-size: 1.2rem;
+        line-height: 1;
+        cursor: pointer;
+        padding: 0 0.3rem;
+    }
+
+    .krt-bp-chip-remove:hover,
+    .krt-bp-chip-remove:focus {
+        color: var(--color-primary);
+        outline: none;
+    }
+
+    /* Staging selections render as the canonical DS .chip (chip--primary). The inline remove
+   affordance is sized down to fit the compact squared chip and inherits the chip's hue. */
+    .krt-bp-chip-list .chip .krt-bp-chip-remove {
+        min-width: 1.25rem;
+        min-height: 1.25rem;
+        padding: 0;
+        font-size: 1rem;
+        color: inherit;
+    }
+
+    .krt-bp-dash {
+        color: var(--color-gray-2);
+    }
+
+    .krt-bp-edit-product {
+        color: var(--color-primary);
+        font-weight: var(--fw-bold);
+        margin: 0 0 1rem;
+    }
+
+    #krt-bp-edit-modal .form-group input,
+    #krt-bp-edit-modal .form-group textarea {
+        width: 100%;
+        min-height: 44px;
+        background-color: var(--color-surface-input);
+        border: 1px solid var(--color-gray-3);
+        color: var(--color-gray-1);
+        font-family: Lato, sans-serif;
+        padding: 0.5rem;
+        box-sizing: border-box;
+        display: block;
+    }
+
+    #krt-bp-edit-modal .form-group label {
+        display: block;
+        /* Neutral label; orange is reserved for action + identity (REQ-UI-002). */
+        color: var(--color-gray-1);
+        font-family: Lato, sans-serif;
+        font-weight: var(--fw-bold);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-size: var(--fs-xs);
+        margin: 0 0 0.4rem;
+        text-align: left;
+    }
+
+    @media (width <= 768px) {
+        .krt-bp-chip {
+            width: 100%;
+            justify-content: space-between;
+        }
+        .krt-bp-search .krt-pi-typeahead-results {
+            position: static;
+        }
+    }
+
+    /* ------------------------------------------------------------------ *
  * SCMDB import (#327, Phase 6): trigger, preview modal, resolve rows. *
  * ------------------------------------------------------------------ */
 
-.krt-bp-addbar-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    flex-wrap: wrap;
-}
+    .krt-bp-addbar-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
 
-.krt-bp-addbar-head .krt-bp-section-title {
-    margin-bottom: 0;
-}
+    .krt-bp-addbar-head .krt-bp-section-title {
+        margin-bottom: 0;
+    }
 
-.krt-bp-import-trigger .btn {
-    min-height: 44px;
-}
+    .krt-bp-import-trigger .btn {
+        min-height: 44px;
+    }
 
-.krt-bp-import-summary {
-    color: var(--color-gray-1);
-    margin: 0 0 0.75rem;
-}
+    .krt-bp-import-summary {
+        color: var(--color-gray-1);
+        margin: 0 0 0.75rem;
+    }
 
-.krt-bp-import-toolbar {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-    margin-bottom: 0.75rem;
-}
+    .krt-bp-import-toolbar {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        margin-bottom: 0.75rem;
+    }
 
-.krt-bp-import-toolbar .btn {
-    min-height: 44px;
-}
+    .krt-bp-import-toolbar .btn {
+        min-height: 44px;
+    }
 
-.krt-bp-import-body {
-    max-height: 60vh;
-    overflow-y: auto;
-    text-align: left;
-}
+    .krt-bp-import-body {
+        max-height: 60vh;
+        overflow-y: auto;
+        text-align: left;
+    }
 
-.krt-bp-imp-group {
-    margin-bottom: 1.25rem;
-}
+    .krt-bp-imp-group {
+        margin-bottom: 1.25rem;
+    }
 
-.krt-bp-imp-group-title {
-    font-family: var(--font-headline);
-    font-weight: var(--fw-bold);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--color-primary);
-    font-size: 0.9rem;
-    margin: 0 0 0.5rem;
-    border-bottom: 1px solid var(--color-gray-3);
-    padding-bottom: 0.3rem;
-}
+    .krt-bp-imp-group-title {
+        font-family: var(--font-headline);
+        font-weight: var(--fw-bold);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--color-primary);
+        font-size: 0.9rem;
+        margin: 0 0 0.5rem;
+        border-bottom: 1px solid var(--color-gray-3);
+        padding-bottom: 0.3rem;
+    }
 
-.krt-bp-imp-row {
-    display: grid;
-    grid-template-columns: 44px minmax(120px, 1fr) minmax(160px, 2fr) minmax(120px, 1fr);
-    gap: 0.6rem;
-    align-items: center;
-    padding: 0.45rem 0;
-    border-bottom: 1px solid rgb(40 40 40 / 60%);
-}
-
-.krt-bp-imp-include-cell {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 44px;
-}
-
-.krt-bp-imp-include {
-    width: 20px;
-    height: 20px;
-}
-
-.krt-bp-imp-external {
-    color: var(--color-gray-1);
-    overflow-wrap: anywhere;
-}
-
-.krt-bp-imp-resolution {
-    display: flex;
-    flex-direction: column;
-    gap: 0.3rem;
-    position: relative;
-}
-
-.krt-bp-imp-product {
-    color: var(--color-primary);
-    font-weight: var(--fw-bold);
-}
-
-.krt-bp-imp-owned {
-    color: var(--color-gray-2);
-    font-style: italic;
-}
-
-.krt-bp-imp-date {
-    color: var(--color-gray-2);
-    font-size: 0.8rem;
-}
-
-.krt-bp-imp-search-wrap {
-    position: relative;
-    display: block;
-}
-
-.krt-bp-imp-search,
-.krt-bp-imp-note {
-    width: 100%;
-    min-height: 44px;
-    background-color: var(--color-surface-input);
-    border: 1px solid var(--color-gray-3);
-    color: var(--color-gray-1);
-    font-family: Lato, sans-serif;
-    padding: 0.4rem 0.5rem;
-    box-sizing: border-box;
-}
-
-.krt-bp-imp-results {
-    z-index: 1200;
-}
-
-.krt-bp-imp-suggestions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.3rem;
-}
-
-.krt-bp-imp-suggestion {
-    background: transparent;
-    border: 1px solid var(--color-gray-3);
-    color: var(--color-gray-1);
-    padding: 0.2rem 0.5rem;
-    font-size: 0.8rem;
-    cursor: pointer;
-    min-height: var(--touch-target-dense);
-}
-
-.krt-bp-imp-suggestion:hover,
-.krt-bp-imp-suggestion:focus {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-    outline: none;
-}
-
-@media (width <= 768px) {
     .krt-bp-imp-row {
-        grid-template-columns: 44px 1fr;
-        grid-auto-rows: auto;
+        display: grid;
+        grid-template-columns: 44px minmax(120px, 1fr) minmax(160px, 2fr) minmax(120px, 1fr);
+        gap: 0.6rem;
+        align-items: center;
+        padding: 0.45rem 0;
+        border-bottom: 1px solid rgb(40 40 40 / 60%);
     }
 
-    .krt-bp-imp-resolution,
+    .krt-bp-imp-include-cell {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+    }
+
+    .krt-bp-imp-include {
+        width: 20px;
+        height: 20px;
+    }
+
+    .krt-bp-imp-external {
+        color: var(--color-gray-1);
+        overflow-wrap: anywhere;
+    }
+
+    .krt-bp-imp-resolution {
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+        position: relative;
+    }
+
+    .krt-bp-imp-product {
+        color: var(--color-primary);
+        font-weight: var(--fw-bold);
+    }
+
+    .krt-bp-imp-owned {
+        color: var(--color-gray-2);
+        font-style: italic;
+    }
+
+    .krt-bp-imp-date {
+        color: var(--color-gray-2);
+        font-size: 0.8rem;
+    }
+
+    .krt-bp-imp-search-wrap {
+        position: relative;
+        display: block;
+    }
+
+    .krt-bp-imp-search,
     .krt-bp-imp-note {
-        grid-column: 1 / -1;
+        width: 100%;
+        min-height: 44px;
+        background-color: var(--color-surface-input);
+        border: 1px solid var(--color-gray-3);
+        color: var(--color-gray-1);
+        font-family: Lato, sans-serif;
+        padding: 0.4rem 0.5rem;
+        box-sizing: border-box;
     }
-}
 
-/* ------------------------------------------------------------------ *
+    .krt-bp-imp-results {
+        z-index: 1200;
+    }
+
+    .krt-bp-imp-suggestions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.3rem;
+    }
+
+    .krt-bp-imp-suggestion {
+        background: transparent;
+        border: 1px solid var(--color-gray-3);
+        color: var(--color-gray-1);
+        padding: 0.2rem 0.5rem;
+        font-size: 0.8rem;
+        cursor: pointer;
+        min-height: var(--touch-target-dense);
+    }
+
+    .krt-bp-imp-suggestion:hover,
+    .krt-bp-imp-suggestion:focus {
+        border-color: var(--color-primary);
+        color: var(--color-primary);
+        outline: none;
+    }
+
+    @media (width <= 768px) {
+        .krt-bp-imp-row {
+            grid-template-columns: 44px 1fr;
+            grid-auto-rows: auto;
+        }
+
+        .krt-bp-imp-resolution,
+        .krt-bp-imp-note {
+            grid-column: 1 / -1;
+        }
+    }
+
+    /* ------------------------------------------------------------------ *
  * Expandable recipe detail: ingredients ("Zutaten") + per-quality    *
  * stat sliders ("Stat-Beitrag nach Zutat-Qualitaet"), mirroring the  *
  * admin /admin/blueprints view but lazy-loaded per owned row.        *
  * ------------------------------------------------------------------ */
 
-.krt-bp-recipe-toggle-col {
-    width: 3rem;
-}
-.krt-bp-recipe-toggle-cell {
-    width: 3rem;
-    text-align: center;
-}
-
-.krt-bp-recipe-toggle {
-    min-width: 44px;
-    min-height: 44px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    border: 1px solid var(--color-gray-3);
-    /* Corners are sharp everywhere except pills + circular controls (REQ-UI-007). */
-    border-radius: var(--radius-none);
-    color: var(--color-primary);
-    cursor: pointer;
-}
-
-.krt-bp-recipe-toggle:hover,
-.krt-bp-recipe-toggle:focus {
-    border-color: var(--color-primary);
-    background: rgb(231 126 35 / 12%);
-    outline: none;
-}
-
-.krt-bp-recipe-caret {
-    display: inline-block;
-    font-size: 0.85rem;
-    line-height: 1;
-    transition: transform 0.15s ease;
-}
-
-.krt-bp-recipe-toggle[aria-expanded='true'] .krt-bp-recipe-caret {
-    transform: rotate(90deg);
-}
-
-.krt-bp-recipe-cell {
-    padding: 0;
-    background: rgb(0 0 0 / 25%);
-    border-bottom: 1px solid var(--color-gray-3);
-}
-
-.krt-bp-recipe {
-    padding: 1rem 1.25rem;
-}
-
-.krt-bp-recipe-variants {
-    margin: 0 0 0.6rem;
-    color: var(--color-gray-2);
-    font-size: 0.8rem;
-    font-style: italic;
-}
-
-.krt-bp-recipe-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-.krt-bp-recipe-table th {
-    text-align: left;
-    padding: 0.25rem 0.6rem;
-    border-bottom: 1px solid var(--color-gray-3);
-    font-family: var(--font-headline);
-    font-weight: var(--fw-bold);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    font-size: var(--fs-xs);
-    /* Neutral column header; orange is reserved for action + identity (REQ-UI-002). */
-    color: var(--color-gray-1);
-}
-
-.krt-bp-recipe-table td {
-    vertical-align: top;
-    padding: 0.5rem 0.6rem;
-    border-bottom: 1px solid rgb(40 40 40 / 60%);
-}
-
-.krt-bp-recipe-table tr:last-child td {
-    border-bottom: none;
-}
-.krt-bp-recipe-ing-cell {
-    width: 38%;
-}
-
-.krt-bp-recipe-slot {
-    display: block;
-    margin-bottom: 0.25rem;
-    color: var(--color-gray-2);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    font-size: 0.72rem;
-}
-
-.krt-bp-recipe-ing {
-    display: block;
-    color: var(--color-gray-1);
-}
-.krt-bp-recipe-ing + .krt-bp-recipe-ing {
-    margin-top: 0.2rem;
-}
-.krt-bp-recipe-ing-meta {
-    color: var(--color-gray-2);
-    font-size: 0.8rem;
-}
-
-.krt-bp-recipe-stat {
-    display: block;
-}
-
-.krt-bp-recipe-stat + .krt-bp-recipe-stat {
-    margin-top: 0.5rem;
-    padding-top: 0.5rem;
-    border-top: 1px dashed var(--color-gray-3);
-}
-
-.krt-bp-recipe-stat-label {
-    color: var(--color-gray-1);
-    font-weight: 700;
-}
-
-.krt-bp-recipe-stat-bw {
-    margin-left: 0.4rem;
-    color: var(--color-gray-2);
-    font-size: 0.8rem;
-}
-
-.krt-bp-recipe-slider {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    margin-top: 0.3rem;
-}
-
-.krt-bp-recipe-slider-row {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.krt-bp-recipe-end {
-    min-width: 2.5rem;
-    color: var(--color-gray-2);
-    font-size: 0.75rem;
-    font-variant-numeric: tabular-nums;
-}
-
-.krt-bp-recipe-end-max {
-    text-align: right;
-}
-
-.krt-bp-recipe-range {
-    flex: 1 1 auto;
-    min-width: 120px;
-    max-width: 240px;
-    min-height: 44px;
-    accent-color: var(--color-primary);
-}
-
-.krt-bp-recipe-slider-out {
-    display: flex;
-    align-items: baseline;
-    gap: 0.35rem;
-    font-size: 0.85rem;
-}
-
-.krt-bp-recipe-q {
-    color: var(--color-gray-2);
-    font-variant-numeric: tabular-nums;
-}
-.krt-bp-recipe-arrow {
-    color: var(--color-gray-2);
-}
-
-.krt-bp-recipe-val,
-.krt-bp-recipe-depval {
-    color: var(--color-primary);
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-}
-
-.krt-bp-recipe-dash {
-    color: var(--color-gray-2);
-}
-
-.krt-bp-recipe-loading,
-.krt-bp-recipe-empty {
-    padding: 0.75rem 1.25rem;
-    color: var(--color-gray-2);
-    font-style: italic;
-}
-
-.krt-bp-recipe-error {
-    padding: 0.75rem 1.25rem;
-    color: var(--color-danger);
-    font-style: italic;
-}
-
-/* Smartphone: collapse the two-column recipe table to stacked, labelled blocks. */
-@media (width <= 768px) {
-    .krt-bp-recipe-table,
-    .krt-bp-recipe-table tbody,
-    .krt-bp-recipe-table tr,
-    .krt-bp-recipe-table td {
-        display: block;
-        width: 100%;
+    .krt-bp-recipe-toggle-col {
+        width: 3rem;
+    }
+    .krt-bp-recipe-toggle-cell {
+        width: 3rem;
+        text-align: center;
     }
 
-    .krt-bp-recipe-table thead {
-        display: none;
-    }
-    .krt-bp-recipe-table td {
-        border-bottom: none;
+    .krt-bp-recipe-toggle {
+        min-width: 44px;
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: 1px solid var(--color-gray-3);
+        /* Corners are sharp everywhere except pills + circular controls (REQ-UI-007). */
+        border-radius: var(--radius-none);
+        color: var(--color-primary);
+        cursor: pointer;
     }
 
-    .krt-bp-recipe-table tr {
-        padding: 0.5rem 0;
+    .krt-bp-recipe-toggle:hover,
+    .krt-bp-recipe-toggle:focus {
+        border-color: var(--color-primary);
+        background: rgb(231 126 35 / 12%);
+        outline: none;
+    }
+
+    .krt-bp-recipe-caret {
+        display: inline-block;
+        font-size: 0.85rem;
+        line-height: 1;
+        transition: transform 0.15s ease;
+    }
+
+    .krt-bp-recipe-toggle[aria-expanded='true'] .krt-bp-recipe-caret {
+        transform: rotate(90deg);
+    }
+
+    .krt-bp-recipe-cell {
+        padding: 0;
+        background: rgb(0 0 0 / 25%);
         border-bottom: 1px solid var(--color-gray-3);
     }
 
-    .krt-bp-recipe-ing-cell {
-        width: 100%;
+    .krt-bp-recipe {
+        padding: 1rem 1.25rem;
     }
 
-    .krt-bp-recipe-table td::before {
-        content: attr(data-label);
-        display: block;
-        margin-bottom: 0.3rem;
+    .krt-bp-recipe-variants {
+        margin: 0 0 0.6rem;
+        color: var(--color-gray-2);
+        font-size: 0.8rem;
+        font-style: italic;
+    }
+
+    .krt-bp-recipe-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .krt-bp-recipe-table th {
+        text-align: left;
+        padding: 0.25rem 0.6rem;
+        border-bottom: 1px solid var(--color-gray-3);
         font-family: var(--font-headline);
         font-weight: var(--fw-bold);
         text-transform: uppercase;
         letter-spacing: 0.04em;
         font-size: var(--fs-xs);
-        color: var(--color-primary);
+        /* Neutral column header; orange is reserved for action + identity (REQ-UI-002). */
+        color: var(--color-gray-1);
+    }
+
+    .krt-bp-recipe-table td {
+        vertical-align: top;
+        padding: 0.5rem 0.6rem;
+        border-bottom: 1px solid rgb(40 40 40 / 60%);
+    }
+
+    .krt-bp-recipe-table tr:last-child td {
+        border-bottom: none;
+    }
+    .krt-bp-recipe-ing-cell {
+        width: 38%;
+    }
+
+    .krt-bp-recipe-slot {
+        display: block;
+        margin-bottom: 0.25rem;
+        color: var(--color-gray-2);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        font-size: 0.72rem;
+    }
+
+    .krt-bp-recipe-ing {
+        display: block;
+        color: var(--color-gray-1);
+    }
+    .krt-bp-recipe-ing + .krt-bp-recipe-ing {
+        margin-top: 0.2rem;
+    }
+    .krt-bp-recipe-ing-meta {
+        color: var(--color-gray-2);
+        font-size: 0.8rem;
+    }
+
+    .krt-bp-recipe-stat {
+        display: block;
+    }
+
+    .krt-bp-recipe-stat + .krt-bp-recipe-stat {
+        margin-top: 0.5rem;
+        padding-top: 0.5rem;
+        border-top: 1px dashed var(--color-gray-3);
+    }
+
+    .krt-bp-recipe-stat-label {
+        color: var(--color-gray-1);
+        font-weight: 700;
+    }
+
+    .krt-bp-recipe-stat-bw {
+        margin-left: 0.4rem;
+        color: var(--color-gray-2);
+        font-size: 0.8rem;
+    }
+
+    .krt-bp-recipe-slider {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        margin-top: 0.3rem;
+    }
+
+    .krt-bp-recipe-slider-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .krt-bp-recipe-end {
+        min-width: 2.5rem;
+        color: var(--color-gray-2);
+        font-size: 0.75rem;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .krt-bp-recipe-end-max {
+        text-align: right;
     }
 
     .krt-bp-recipe-range {
-        max-width: none;
+        flex: 1 1 auto;
+        min-width: 120px;
+        max-width: 240px;
+        min-height: 44px;
+        accent-color: var(--color-primary);
     }
-}
 
-/* ==========================================================================
+    .krt-bp-recipe-slider-out {
+        display: flex;
+        align-items: baseline;
+        gap: 0.35rem;
+        font-size: 0.85rem;
+    }
+
+    .krt-bp-recipe-q {
+        color: var(--color-gray-2);
+        font-variant-numeric: tabular-nums;
+    }
+    .krt-bp-recipe-arrow {
+        color: var(--color-gray-2);
+    }
+
+    .krt-bp-recipe-val,
+    .krt-bp-recipe-depval {
+        color: var(--color-primary);
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .krt-bp-recipe-dash {
+        color: var(--color-gray-2);
+    }
+
+    .krt-bp-recipe-loading,
+    .krt-bp-recipe-empty {
+        padding: 0.75rem 1.25rem;
+        color: var(--color-gray-2);
+        font-style: italic;
+    }
+
+    .krt-bp-recipe-error {
+        padding: 0.75rem 1.25rem;
+        color: var(--color-danger);
+        font-style: italic;
+    }
+
+    /* Smartphone: collapse the two-column recipe table to stacked, labelled blocks. */
+    @media (width <= 768px) {
+        .krt-bp-recipe-table,
+        .krt-bp-recipe-table tbody,
+        .krt-bp-recipe-table tr,
+        .krt-bp-recipe-table td {
+            display: block;
+            width: 100%;
+        }
+
+        .krt-bp-recipe-table thead {
+            display: none;
+        }
+        .krt-bp-recipe-table td {
+            border-bottom: none;
+        }
+
+        .krt-bp-recipe-table tr {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--color-gray-3);
+        }
+
+        .krt-bp-recipe-ing-cell {
+            width: 100%;
+        }
+
+        .krt-bp-recipe-table td::before {
+            content: attr(data-label);
+            display: block;
+            margin-bottom: 0.3rem;
+            font-family: var(--font-headline);
+            font-weight: var(--fw-bold);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            font-size: var(--fs-xs);
+            color: var(--color-primary);
+        }
+
+        .krt-bp-recipe-range {
+            max-width: none;
+        }
+    }
+
+    /* ==========================================================================
    Blueprints master-detail (V3) — page-specific layout on top of the DS
    .master-detail / .quality-* / .empty-state patterns.
    ========================================================================== */
 
-/* Compact add bar in the greeting head (typeahead + CTA + JSON import). */
-.krt-bp-head {
-    display: flex;
-    /* Title left, add-bar (search + add + import) right. Without an explicit row direction the
+    /* Compact add bar in the greeting head (typeahead + CTA + JSON import). */
+    .krt-bp-head {
+        display: flex;
+        /* Title left, add-bar (search + add + import) right. Without an explicit row direction the
        shared .krt-personal-inventory-header (flex-direction: column) would stack the add-bar
        below the title; "wrap" keeps the stacked fallback on narrow screens. */
-    flex-flow: row wrap;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 1rem;
-}
+        flex-flow: row wrap;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+    }
 
-.krt-bp-addbar {
-    display: flex;
-    gap: 0.5rem;
-    align-items: flex-start;
-    flex-wrap: wrap;
-}
+    .krt-bp-addbar {
+        display: flex;
+        gap: 0.5rem;
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
 
-.krt-bp-addbar .krt-bp-search {
-    margin: 0;
-    min-width: 280px;
-    position: relative;
-}
+    .krt-bp-addbar .krt-bp-search {
+        margin: 0;
+        min-width: 280px;
+        position: relative;
+    }
 
-.krt-bp-addbar .krt-bp-search input {
-    min-height: 44px;
-    /* Leave room for the leading magnifier glyph (DS search-input affordance). */
-    padding-left: 38px;
-}
+    .krt-bp-addbar .krt-bp-search input {
+        min-height: 44px;
+        /* Leave room for the leading magnifier glyph (DS search-input affordance). */
+        padding-left: 38px;
+    }
 
-/* Leading magnifier inside the typeahead, matching the DS search-input specimen:
+    /* Leading magnifier inside the typeahead, matching the DS search-input specimen:
    absolutely positioned over the input's left inset, non-interactive, neutral grey. */
-.krt-bp-search-icon {
-    position: absolute;
-    left: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    display: inline-flex;
-    color: var(--color-gray-2);
-    pointer-events: none;
-}
+    .krt-bp-search-icon {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        display: inline-flex;
+        color: var(--color-gray-2);
+        pointer-events: none;
+    }
 
-.krt-bp-search-icon .krt-icon {
-    width: 16px;
-    height: 16px;
-}
+    .krt-bp-search-icon .krt-icon {
+        width: 16px;
+        height: 16px;
+    }
 
-/* Staging chips collapse to a compact strip under the bar; hidden when empty
+    /* Staging chips collapse to a compact strip under the bar; hidden when empty
    (the CTA stays disabled until something is staged). */
-.krt-bp-staging-bar {
-    margin-top: 0.5rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-}
+    .krt-bp-staging-bar {
+        margin-top: 0.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
 
-/* "Auswahl" heading sits inline before the staged chips (consistent with the admin
+    /* "Auswahl" heading sits inline before the staged chips (consistent with the admin
    blueprint twins). The compact bar omits the empty-text, so the heading stays hidden
    until at least one chip is staged to keep the empty bar quiet. */
-.krt-bp-staging-bar .krt-bp-staging-label {
-    margin-bottom: 0;
-}
+    .krt-bp-staging-bar .krt-bp-staging-label {
+        margin-bottom: 0;
+    }
 
-.krt-bp-staging-bar:not(:has(.chip)) .krt-bp-staging-label {
-    display: none;
-}
+    .krt-bp-staging-bar:not(:has(.chip)) .krt-bp-staging-label {
+        display: none;
+    }
 
-.krt-bp-staging-bar .krt-bp-chip-list {
-    min-height: 0;
-}
+    .krt-bp-staging-bar .krt-bp-chip-list {
+        min-height: 0;
+    }
 
-.krt-bp-staging-bar .krt-bp-staging-empty {
-    display: none;
-}
+    .krt-bp-staging-bar .krt-bp-staging-empty {
+        display: none;
+    }
 
-/* Master list: scrollable, filter box pinned on top. */
-.krt-bp-master-filter {
-    padding: 8px;
-    border-bottom: var(--border-hairline);
-}
+    /* Master list: scrollable, filter box pinned on top. */
+    .krt-bp-master-filter {
+        padding: 8px;
+        border-bottom: var(--border-hairline);
+    }
 
-.krt-bp-master-filter input {
-    width: 100%;
-    box-sizing: border-box;
-    background: var(--color-surface-input);
-    border: 1px solid var(--color-gray-3);
-    color: var(--color-gray-1);
-    padding: 6px 8px;
-    font-size: 0.8rem;
-    min-height: 44px;
-}
+    .krt-bp-master-filter input {
+        width: 100%;
+        box-sizing: border-box;
+        background: var(--color-surface-input);
+        border: 1px solid var(--color-gray-3);
+        color: var(--color-gray-1);
+        padding: 6px 8px;
+        font-size: 0.8rem;
+        min-height: 44px;
+    }
 
-.krt-bp-master-rows {
-    max-height: 65vh;
-    overflow-y: auto;
-}
+    .krt-bp-master-rows {
+        max-height: 65vh;
+        overflow-y: auto;
+    }
 
-.master-row {
-    width: 100%;
-    background: none;
-    border-top: none;
-    border-left: 3px solid transparent;
-    border-right: none;
-    text-align: left;
-    font-family: var(--font-body);
-}
+    .master-row {
+        width: 100%;
+        background: none;
+        border-top: none;
+        border-left: 3px solid transparent;
+        border-right: none;
+        text-align: left;
+        font-family: var(--font-body);
+    }
 
-/*
+    /*
  * REQ-UI-009's dense exemption for the blueprint list rows, written down in CSS for the first
  * time.
  *
@@ -1066,273 +1069,274 @@
  * cannot decline the offer. This rule is the decline — and, being a `--touch-target-dense`
  * consumer, it is simultaneously what finally puts the class in the guard's dense set.
  */
-@media (width <= 1024px) {
-    .master-row {
-        min-height: var(--touch-target-dense);
+    @media (width <= 1024px) {
+        .master-row {
+            min-height: var(--touch-target-dense);
+        }
     }
-}
 
-/* Right-aligned status cluster on a master row: the note pencil + the craft badge sit
+    /* Right-aligned status cluster on a master row: the note pencil + the craft badge sit
    together at the row's trailing edge so the "can I build this?" signal is scannable. */
-.krt-bp-row-aside {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    margin-left: auto;
-    flex: none;
-}
-
-.master-row .master-row-note {
-    color: var(--color-primary);
-    display: inline-flex;
-    flex: none;
-}
-
-.master-row .master-row-note .krt-icon {
-    width: 14px;
-    height: 14px;
-}
-
-/* Detail pane: head row, quality blocks, note box, mobile back button. */
-.krt-bp-detail-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-
-.krt-bp-detail-name {
-    font-weight: var(--fw-bold);
-    color: var(--color-white);
-    font-size: 0.95rem;
-}
-
-.krt-bp-detail-acquired {
-    font-size: 0.7rem;
-    color: var(--color-gray-2-text);
-    margin-top: 2px;
-}
-
-.krt-bp-detail-actions {
-    display: flex;
-    gap: 5px;
-}
-
-.krt-bp-detail-recipe .quality-block {
-    margin-bottom: 12px;
-}
-
-.krt-bp-detail-note {
-    margin: 0;
-    font-size: 0.8rem;
-    background: var(--color-surface-input);
-    border-left: 3px solid var(--color-primary);
-    padding: 6px 9px;
-    white-space: pre-line;
-}
-
-.krt-bp-detail-back {
-    display: none;
-    margin-bottom: 0.75rem;
-}
-
-/* Wide variant for the import preview inside the KRT modal frame. */
-.krt-modal.krt-bp-import-frame {
-    max-width: 1100px;
-    width: 95%;
-}
-
-/* Mobile (≤900px): list → detail navigation. */
-@media (width <= 900px) {
-    .krt-bp-md .detail-pane {
-        display: none;
-    }
-
-    .krt-bp-md.is-detail .master-list {
-        display: none;
-    }
-
-    .krt-bp-md.is-detail .detail-pane {
-        display: block;
-    }
-
-    .krt-bp-md.is-detail .krt-bp-detail-back {
+    .krt-bp-row-aside {
         display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-left: auto;
+        flex: none;
     }
 
-    .krt-bp-addbar .krt-bp-search {
-        min-width: 0;
-        flex: 1 1 100%;
+    .master-row .master-row-note {
+        color: var(--color-primary);
+        display: inline-flex;
+        flex: none;
     }
-}
 
-/* ==========================================================================
+    .master-row .master-row-note .krt-icon {
+        width: 14px;
+        height: 14px;
+    }
+
+    /* Detail pane: head row, quality blocks, note box, mobile back button. */
+    .krt-bp-detail-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .krt-bp-detail-name {
+        font-weight: var(--fw-bold);
+        color: var(--color-white);
+        font-size: 0.95rem;
+    }
+
+    .krt-bp-detail-acquired {
+        font-size: 0.7rem;
+        color: var(--color-gray-2-text);
+        margin-top: 2px;
+    }
+
+    .krt-bp-detail-actions {
+        display: flex;
+        gap: 5px;
+    }
+
+    .krt-bp-detail-recipe .quality-block {
+        margin-bottom: 12px;
+    }
+
+    .krt-bp-detail-note {
+        margin: 0;
+        font-size: 0.8rem;
+        background: var(--color-surface-input);
+        border-left: 3px solid var(--color-primary);
+        padding: 6px 9px;
+        white-space: pre-line;
+    }
+
+    .krt-bp-detail-back {
+        display: none;
+        margin-bottom: 0.75rem;
+    }
+
+    /* Wide variant for the import preview inside the KRT modal frame. */
+    .krt-modal.krt-bp-import-frame {
+        max-width: 1100px;
+        width: 95%;
+    }
+
+    /* Mobile (≤900px): list → detail navigation. */
+    @media (width <= 900px) {
+        .krt-bp-md .detail-pane {
+            display: none;
+        }
+
+        .krt-bp-md.is-detail .master-list {
+            display: none;
+        }
+
+        .krt-bp-md.is-detail .detail-pane {
+            display: block;
+        }
+
+        .krt-bp-md.is-detail .krt-bp-detail-back {
+            display: inline-flex;
+        }
+
+        .krt-bp-addbar .krt-bp-search {
+            min-width: 0;
+            flex: 1 1 100%;
+        }
+    }
+
+    /* ==========================================================================
    Craftability (#781): refinery toggle, master-row craft badge, and the
    detail-pane craftability section (counter + per-material breakdown).
    Status-green / warning-yellow / research-blue accents; orange stays the CTA.
    ========================================================================== */
 
-.krt-bp-craft-toolbar {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-    /* First row inside the collection box: a hairline separates it from the master-detail. */
-    margin: 0 0 0.75rem;
-    padding-bottom: 0.75rem;
-    border-bottom: var(--border-hairline);
-}
+    .krt-bp-craft-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        /* First row inside the collection box: a hairline separates it from the master-detail. */
+        margin: 0 0 0.75rem;
+        padding-bottom: 0.75rem;
+        border-bottom: var(--border-hairline);
+    }
 
-/* Hidden while the collection is empty (the empty-state shows instead). recipe.js mirrors this
+    /* Hidden while the collection is empty (the empty-state shows instead). recipe.js mirrors this
    from the rendered master rows after an in-place swap, since the toolbar lives outside the
    swapped #krt-bp-list fragment and is therefore not re-rendered by the swap itself. */
-.krt-bp-craft-toolbar.is-empty {
-    display: none;
-}
+    .krt-bp-craft-toolbar.is-empty {
+        display: none;
+    }
 
-.krt-bp-refinery-toggle,
-.krt-bp-craftable-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    min-height: 44px;
-    cursor: pointer;
-    color: var(--color-gray-1);
-    font-size: 0.8rem;
-}
+    .krt-bp-refinery-toggle,
+    .krt-bp-craftable-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-height: 44px;
+        cursor: pointer;
+        color: var(--color-gray-1);
+        font-size: 0.8rem;
+    }
 
-.krt-bp-refinery-toggle input,
-.krt-bp-craftable-toggle input {
-    flex: none;
-}
+    .krt-bp-refinery-toggle input,
+    .krt-bp-craftable-toggle input {
+        flex: none;
+    }
 
-.krt-bp-craft-toolbar-hint {
-    color: var(--color-gray-2-text);
-    font-size: 0.72rem;
-}
+    .krt-bp-craft-toolbar-hint {
+        color: var(--color-gray-2-text);
+        font-size: 0.72rem;
+    }
 
-/* Master-row badge: lives in the trailing .krt-bp-row-aside cluster (which owns the
+    /* Master-row badge: lives in the trailing .krt-bp-row-aside cluster (which owns the
    margin-left:auto), so the note pencil and the badge stay grouped at the row's edge. */
-.krt-bp-craft-badge {
-    flex: none;
-    font-size: 0.62rem;
-    font-weight: var(--fw-bold);
-    font-variant-numeric: tabular-nums;
-    letter-spacing: 0.03em;
-    padding: 1px 6px;
-    border: 1px solid transparent;
-    white-space: nowrap;
-}
+    .krt-bp-craft-badge {
+        flex: none;
+        font-size: 0.62rem;
+        font-weight: var(--fw-bold);
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0.03em;
+        padding: 1px 6px;
+        border: 1px solid transparent;
+        white-space: nowrap;
+    }
 
-.krt-bp-craft-badge.is-ok {
-    color: var(--color-success-text);
-    border-color: rgb(46 188 61 / 35%);
-    background: rgb(46 188 61 / 10%);
-}
+    .krt-bp-craft-badge.is-ok {
+        color: var(--color-success-text);
+        border-color: rgb(46 188 61 / 35%);
+        background: rgb(46 188 61 / 10%);
+    }
 
-.krt-bp-craft-badge.is-missing {
-    color: var(--color-warning);
-    border-color: rgb(255 210 63 / 35%);
-    background: rgb(255 210 63 / 10%);
-}
+    .krt-bp-craft-badge.is-missing {
+        color: var(--color-warning);
+        border-color: rgb(255 210 63 / 35%);
+        background: rgb(255 210 63 / 10%);
+    }
 
-.krt-bp-craft-badge.is-muted {
-    color: var(--color-gray-2-text);
-}
+    .krt-bp-craft-badge.is-muted {
+        color: var(--color-gray-2-text);
+    }
 
-.krt-bp-craft-badge.is-ref {
-    color: var(--color-info-text);
-    border-color: rgb(108 147 239 / 35%);
-    background: rgb(108 147 239 / 10%);
-}
+    .krt-bp-craft-badge.is-ref {
+        color: var(--color-info-text);
+        border-color: rgb(108 147 239 / 35%);
+        background: rgb(108 147 239 / 10%);
+    }
 
-/* Detail-pane craftability section. */
-.krt-bp-craft-summary {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    flex-wrap: wrap;
-    margin-bottom: 0.75rem;
-}
+    /* Detail-pane craftability section. */
+    .krt-bp-craft-summary {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        flex-wrap: wrap;
+        margin-bottom: 0.75rem;
+    }
 
-.krt-bp-craft-label {
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--color-gray-2-text);
-}
+    .krt-bp-craft-label {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--color-gray-2-text);
+    }
 
-.krt-bp-craft-count {
-    font-size: 0.85rem;
-    font-weight: var(--fw-bold);
-    font-variant-numeric: tabular-nums;
-}
+    .krt-bp-craft-count {
+        font-size: 0.85rem;
+        font-weight: var(--fw-bold);
+        font-variant-numeric: tabular-nums;
+    }
 
-.krt-bp-craft-refmark {
-    color: var(--color-info-text);
-}
+    .krt-bp-craft-refmark {
+        color: var(--color-info-text);
+    }
 
-.krt-bp-craft-limit {
-    font-size: 0.72rem;
-    color: var(--color-gray-2-text);
-}
+    .krt-bp-craft-limit {
+        font-size: 0.72rem;
+        color: var(--color-gray-2-text);
+    }
 
-.krt-bp-craft-note {
-    margin: 0;
-    font-size: 0.78rem;
-    font-style: italic;
-    color: var(--color-gray-2-text);
-}
+    .krt-bp-craft-note {
+        margin: 0;
+        font-size: 0.78rem;
+        font-style: italic;
+        color: var(--color-gray-2-text);
+    }
 
-.krt-bp-craft-mats {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
+    .krt-bp-craft-mats {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
 
-.krt-bp-craft-mat {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 10px;
-    flex-wrap: wrap;
-    font-size: 0.78rem;
-    padding: 4px 0;
-    border-bottom: 1px solid rgb(40 40 40 / 60%);
-}
+    .krt-bp-craft-mat {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 10px;
+        flex-wrap: wrap;
+        font-size: 0.78rem;
+        padding: 4px 0;
+        border-bottom: 1px solid rgb(40 40 40 / 60%);
+    }
 
-.krt-bp-craft-mat:last-child {
-    border-bottom: none;
-}
+    .krt-bp-craft-mat:last-child {
+        border-bottom: none;
+    }
 
-.krt-bp-craft-mat-name {
-    flex: 1 1 auto;
-    color: var(--color-gray-1);
-}
+    .krt-bp-craft-mat-name {
+        flex: 1 1 auto;
+        color: var(--color-gray-1);
+    }
 
-.krt-bp-craft-mat.is-short .krt-bp-craft-mat-name {
-    color: var(--color-warning);
-}
+    .krt-bp-craft-mat.is-short .krt-bp-craft-mat-name {
+        color: var(--color-warning);
+    }
 
-.krt-bp-craft-mat-figs {
-    display: flex;
-    gap: 12px;
-    align-items: baseline;
-    flex: none;
-}
+    .krt-bp-craft-mat-figs {
+        display: flex;
+        gap: 12px;
+        align-items: baseline;
+        flex: none;
+    }
 
-.krt-bp-craft-mat-fig {
-    color: var(--color-gray-1);
-    font-variant-numeric: tabular-nums;
-}
+    .krt-bp-craft-mat-fig {
+        color: var(--color-gray-1);
+        font-variant-numeric: tabular-nums;
+    }
 
-.krt-bp-craft-mat-q {
-    color: var(--color-info-text);
-    font-variant-numeric: tabular-nums;
-}
+    .krt-bp-craft-mat-q {
+        color: var(--color-info-text);
+        font-variant-numeric: tabular-nums;
+    }
 
-.krt-bp-craft-mat-missing {
-    color: var(--color-warning);
-    font-variant-numeric: tabular-nums;
+    .krt-bp-craft-mat-missing {
+        color: var(--color-warning);
+        font-variant-numeric: tabular-nums;
+    }
 }

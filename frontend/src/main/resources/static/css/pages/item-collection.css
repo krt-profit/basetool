@@ -2,13 +2,17 @@
  * (FE-PERF-02). Linked in the same place the block stood, so the cascade order is
  * unchanged. */
 
-.krt-select:focus {
-    outline: 2px solid var(--color-primary);
-    outline-offset: 1px;
-}
-@media (width <= 768px) {
-    .table-responsive {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
+@layer base, components, page, migration, utilities;
+
+@layer page {
+    .krt-select:focus {
+        outline: 2px solid var(--color-primary);
+        outline-offset: 1px;
+    }
+    @media (width <= 768px) {
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
     }
 }
