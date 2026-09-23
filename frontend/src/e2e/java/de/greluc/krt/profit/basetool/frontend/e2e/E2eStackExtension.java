@@ -74,7 +74,17 @@ public final class E2eStackExtension implements BeforeAllCallback {
    */
   static final String KEYSTORE_PW = "basetool-test";
 
-  /** Local image tag the compose build override tags the freshly built images with. */
+  /**
+   * The image tag of the PREBUILT path only: {@code .github/workflows/e2e.yml}'s {@code
+   * build-stack} job builds the images under it and every matrix cell boots them with {@code
+   * --no-build}. One runner, one checkout, so a fixed name is safe there and is what the three
+   * files agree on ({@code E2ePrebuiltImageParityTest}).
+   *
+   * <p>A stack built here uses {@link ServedBuildCheck#localImageTag} instead — a name unique to
+   * the checkout. This one name used to serve every checkout on a machine, and two checkouts
+   * running the suite at once raced for it: the first booted the second's image and went green
+   * against code it was never meant to test (2026-09-23). See {@link #imageTag}.
+   */
   private static final String IMAGE_TAG = "e2e-local";
 
   /**
@@ -184,7 +194,7 @@ public final class E2eStackExtension implements BeforeAllCallback {
    * The external services whose images are pulled from a registry ({@code db-backend-dev}, {@code
    * db-keycloak-dev}, {@code keycloak-dev}, {@code redis-dev}). {@code backend-dev} / {@code
    * frontend-dev} are deliberately excluded: they are built from local Dockerfiles and tagged with
-   * {@link #IMAGE_TAG}, so {@code docker compose pull} of them would fail against the registry.
+   * {@link #imageTag()}, so {@code docker compose pull} of them would fail against the registry.
    */
   private static final List<String> PULLED_SERVICES =
       List.of("db-backend-dev", "db-keycloak-dev", "keycloak-dev", "redis-dev");
@@ -282,8 +292,14 @@ public final class E2eStackExtension implements BeforeAllCallback {
     if (prebuilt()) {
       requirePrebuiltImages(root);
     }
+    requireFrontendPortFree(root);
     prePullImages(root);
     composeUp(root);
+    // The stack must be THIS checkout's: compare what it serves with the files here, before a
+    // single
+    // test runs against it (ServedBuildCheck).
+    ServedBuildCheck.assertServesThisCheckout(
+        EPHEMERAL_BASE_URL, root, BackendSeeder.trustingTestCa());
     // Seed UEX-owned catalog reference data (refinery-hosting location, ship type, refining
     // method) the admin REST API cannot create on a fresh DB — unblocks the Refinery/Hangar
     // flows.
@@ -358,6 +374,35 @@ public final class E2eStackExtension implements BeforeAllCallback {
             missing);
       }
     }
+  }
+
+  /**
+   * The tag this run's backend and frontend images carry: the fixed {@link #IMAGE_TAG} in prebuilt
+   * mode, otherwise one derived from the checkout's path, so parallel checkouts never share an
+   * image.
+   *
+   * @return the value handed to compose as {@code IRI_BASETOOL_VERSION}
+   */
+  static String imageTag() {
+    return prebuilt() ? IMAGE_TAG : ServedBuildCheck.localImageTag(repoRoot());
+  }
+
+  /**
+   * Fails fast, naming the other stack, when a container already publishes the frontend port — the
+   * ports and subnets are fixed, so only one ephemeral stack can run on a machine at a time.
+   *
+   * @param root the repository root, used as the working directory of the {@code docker} call
+   * @throws Exception if the check cannot be run or the port is taken
+   */
+  private void requireFrontendPortFree(Path root) throws Exception {
+    Path out = Paths.get("build", "e2e", "port-check.log").toAbsolutePath();
+    runProcess(
+        root,
+        "port-check",
+        List.of("docker", "ps", "--filter", "publish=18081", "--format", "{{.Names}}"),
+        Map.of(),
+        Duration.ofMinutes(1));
+    ServedBuildCheck.assertPortFree(Files.readString(out), 18081);
   }
 
   /**
@@ -622,7 +667,10 @@ public final class E2eStackExtension implements BeforeAllCallback {
     env.put("REDIS_INGEST_USERNAME", RedisAclTemplate.INGEST_USER);
     env.put("REDIS_INGEST_PASSWORD", RedisAclTemplate.E2E_PASSWORDS.get("REDIS_INGEST_PASSWORD"));
     env.put("SERVER_SSL_KEY_STORE_PASSWORD", KEYSTORE_PW);
-    env.put("IRI_BASETOOL_VERSION", IMAGE_TAG);
+    env.put("IRI_BASETOOL_VERSION", imageTag());
+    // Its own compose project too, for the same reason: two checkouts whose directories share a
+    // name would otherwise share containers, networks and volumes.
+    env.put("COMPOSE_PROJECT_NAME", ServedBuildCheck.composeProjectName(repoRoot()));
     // Audit L-1 / REQ-SEC-024: exercise the enforced `aud` path. See EXPECTED_AUDIENCE — the
     // e2e realm stamps this audience, so turning the knob on here rehearses the prod flip.
     env.put("IRI_BACKEND_EXPECTED_AUDIENCES", EXPECTED_AUDIENCE);

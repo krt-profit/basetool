@@ -380,6 +380,12 @@ of this repository's schedules is a clock time). Maintainers apply the label to 
 flows, auth / session, controllers or migrations; ask for it if your PR
 does.
 
+Locally, `./gradlew :frontend:e2eTest` builds and boots its own stack under an image tag and a
+compose project name derived from your checkout's path, so parallel checkouts never test each
+other's code, and it refuses to start if the page the stack serves is not your checkout's build
+(`ServedBuildCheck`). Ports are fixed, so only one E2E stack runs on a machine at a time; a second
+one fails at start-up and names the stack holding port 18081.
+
 The CycloneDX SBOMs are a release artefact, not a build output: they are
 regenerated and committed only by the
 [release-prepare workflow](.github/workflows/release-prepare.yml) (or on

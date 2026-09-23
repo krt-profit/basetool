@@ -2673,6 +2673,20 @@ public final class BackendSeeder {
    *
    * @return a TLS context trusting only the test CA
    */
+  /**
+   * An HTTP client trusting only the committed test CA, for callers outside the seeder that talk to
+   * the stack — {@code ServedBuildCheck} reads the frontend's landing page with it. The CA signed
+   * the frontend's leaf as well, and that leaf names {@code localhost} too.
+   *
+   * @return a client that verifies the stack's certificates against the test CA
+   */
+  static HttpClient trustingTestCa() {
+    return HttpClient.newBuilder()
+        .sslContext(backendCertContext())
+        .connectTimeout(java.time.Duration.ofSeconds(10))
+        .build();
+  }
+
   private static SSLContext backendCertContext() {
     try {
       KeyStore keyStore = KeyStore.getInstance("PKCS12");
