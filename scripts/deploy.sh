@@ -1000,7 +1000,7 @@ fi
 # provisioned host before its first bundle -- falls back to .env, and the generator's constant is
 # the last resort.
 #
-# EVERY PKCS#12 mounted under /run/secrets/, not the first one (REQ-SEC-TBD04T): since the
+# EVERY PKCS#12 mounted under /run/secrets/, not the first one (REQ-SEC-070): since the
 # per-service keystores each service mounts its own file plus the internal truststore, and one
 # missing file among several is exactly the case `head -n1` could not see.
 keystore_mount_sources() {

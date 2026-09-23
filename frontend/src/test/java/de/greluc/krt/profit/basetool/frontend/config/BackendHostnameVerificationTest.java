@@ -44,8 +44,8 @@ import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
- * Pins the frontend→backend TLS hop's hostname check on the pinned prod path (REQ-SEC-TBD04T,
- * ADR-TBD04T), against a real HTTPS server.
+ * Pins the frontend→backend TLS hop's hostname check on the pinned prod path (REQ-SEC-070,
+ * ADR-0211), against a real HTTPS server.
  *
  * <p>Two certificates, both pinned in turn: one naming {@code localhost} — the host the tests dial
  * — and one naming only {@code backend}. With {@code app.http.verify-backend-hostname} off (the

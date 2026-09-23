@@ -35,7 +35,7 @@ staging directory `…/staging/<UTC timestamp>/`:
 | Backend DB `krt_basetool`      | `krt_basetool.dump`                       | `pg_dump -Fc` inside the `db-backend` container                                                                            |
 | Keycloak DB `keycloak`         | `keycloak.dump`                           | `pg_dump -Fc` inside the `db-keycloak` container — **the live source of truth** for realm/users/clients, not `realm-export.json` |
 | Edge TLS material + ACME state | `edge-certs.tar.gz`, `edge-acme-state.tar.gz`, `edge-acme-webroot.tar.gz` | `tar` of the three named volumes through a helper container; a volume that does not exist is logged as skipped |
-| Host secrets/config            | `config/dotenv`, `config/keystore.p12`, `config/internal-tls.tar`, `config/realm-export.json`, `config/providers.tar.gz`, `config/users.acl` | `.env`, the keystore, the **per-service internal TLS material** (`/var/iri/secrets/tls`, only once rolled out — REQ-SEC-TBD04T), the realm export, `keycloak/providers`, and the **redis ACL** (access control, not session data — redis refuses to start without it) |
+| Host secrets/config            | `config/dotenv`, `config/keystore.p12`, `config/internal-tls.tar`, `config/realm-export.json`, `config/providers.tar.gz`, `config/users.acl` | `.env`, the keystore, the **per-service internal TLS material** (`/var/iri/secrets/tls`, only once rolled out — REQ-SEC-070), the realm export, `keycloak/providers`, and the **redis ACL** (access control, not session data — redis refuses to start without it) |
 | Monitoring plane (ADR-0072)    | `monitoring/grafana.db`, `monitoring/secrets.tar.gz`, `monitoring/alertmanager.tar.gz` | Grafana SQLite (brief `grafana` stop for a consistent copy), `/var/iri/monitoring/{secrets,certs}`, Alertmanager silences + notification log |
 | Prometheus TSDB (Sundays only) | `monitoring/prometheus-tsdb-snapshot.tar.gz` | admin-API snapshot via a throwaway curl container on `net-monitoring-core` |
 
@@ -257,7 +257,7 @@ flock /var/lock/iri-deploy.lock true      # returns once no deploy is running
    # keystore: gid 10001 (backend/frontend/ingest) -> 110000, Keycloak uid 1000 -> 100999
    install -o root -g 110000 -m 0640 "${R}/config/keystore.p12" /var/iri/secrets/keystore.p12
    setfacl -m u:100999:r /var/iri/secrets/keystore.p12
-   # per-service internal TLS (REQ-SEC-TBD04T) -- only when the snapshot carries it. Same
+   # per-service internal TLS (REQ-SEC-070) -- only when the snapshot carries it. Same
    # ownership as the keystore; keycloak.p12 gets Keycloak's ACL, the truststore and CA are public
    if [ -s "${R}/config/internal-tls.tar" ]; then
      install -d -o root -g root -m 0755 /var/iri/secrets/tls

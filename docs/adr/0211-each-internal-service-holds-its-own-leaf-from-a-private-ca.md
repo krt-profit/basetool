@@ -1,9 +1,9 @@
-# ADR-TBD04T — Each internal service holds its own leaf from a private CA
+# ADR-0211 — Each internal service holds its own leaf from a private CA
 
 - **Status:** Accepted — shipped inert; the production rollout awaits the owner
 - **Date:** 2026-09-23
 - **Deciders:** @greluc
-- **Requirement:** [REQ-SEC-TBD04T](../specs/security-and-access.md)
+- **Requirement:** [REQ-SEC-070](../specs/security-and-access.md)
 - **Related:** [ADR-0139](0139-shared-committed-tls-material-for-the-test-stack.md) (the test
   material, amended), [ADR-0204](0204-backend-and-ingest-call-http-through-restclient-without-webflux.md)
   §6 (the relay's hostname opt-out), [ADR-0162](0162-edge-is-native-nginx-with-a-separate-acme-client.md) (the edge

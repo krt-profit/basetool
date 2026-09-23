@@ -8,7 +8,7 @@
 # hand anywhere. Run it only when the material expires (see --days below) or when
 # a service needs a hostname that is not in its SAN list.
 #
-# It has the SHAPE production has (REQ-SEC-TBD04T, ADR-TBD04T): one private CA,
+# It has the SHAPE production has (REQ-SEC-070, ADR-0211): one private CA,
 # one leaf per service, a CA-only truststore -- minted by the same
 # scripts/mint-internal-tls.sh the production host runs, only with published
 # throwaway values:

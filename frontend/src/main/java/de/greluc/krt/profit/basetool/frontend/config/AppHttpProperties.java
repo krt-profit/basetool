@@ -54,10 +54,10 @@ import org.springframework.validation.annotation.Validated;
  *     Request bodies are unaffected and stay JSON either way.
  * @param verifyBackendHostname whether the frontend→backend TLS hop verifies that the backend's
  *     certificate names the host it dialled ({@code backend}), on top of the pinned chain
- *     (REQ-SEC-TBD04T, ADR-TBD04T). {@code false} — the default, and every deployment's behaviour
- *     before the per-service certificates — pins the chain only; {@code true} once each service
- *     serves its own leaf from the internal CA, which is the point: with one CA trusted, only the
- *     name tells the backend's certificate from any other service's. Bound from {@code
+ *     (REQ-SEC-070, ADR-0211). {@code false} — the default, and every deployment's behaviour before
+ *     the per-service certificates — pins the chain only; {@code true} once each service serves its
+ *     own leaf from the internal CA, which is the point: with one CA trusted, only the name tells
+ *     the backend's certificate from any other service's. Bound from {@code
  *     INTERNAL_TLS_VERIFY_HOSTNAME}. Ignored under {@code dev}/{@code test}, which trust the
  *     ephemeral certificate wholesale.
  */

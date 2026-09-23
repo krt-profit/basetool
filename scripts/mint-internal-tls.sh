@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Profit Basetool - mint the internal TLS material: one private CA, one leaf certificate per
-# service, and a CA-only truststore (REQ-SEC-TBD04T, ADR-TBD04T).
+# service, and a CA-only truststore (REQ-SEC-070, ADR-0211).
 #
 # WHY
 #   Until this existed every service served the SAME key: one self-signed keystore.p12 was the
@@ -37,6 +37,9 @@
 # Exit codes: 0 done, 1 refused or failed (nothing half-written is left behind), 2 bad invocation.
 
 set -eu
+# Everything this writes starts private; the operator opens up the truststore and the CA afterwards
+# (they hold no key). A default umask of 022 would leave every private key world-readable until then.
+umask 077
 
 usage() {
   sed -n '/^# USAGE/,/^# Exit codes/p' "$0" 2>/dev/null | sed 's/^# \{0,1\}//' >&2 || true
@@ -98,8 +101,9 @@ fi
 export MSYS_NO_PATHCONV=1
 
 WORK="$OUT/.mint-$$"
-# umask rather than `mkdir -m`: Git Bash on NTFS refuses the explicit chmod and aborts the run.
-(umask 077 && mkdir "$WORK")
+# 0700 through the umask above rather than `mkdir -m`: Git Bash on NTFS refuses the explicit chmod
+# and aborts the run.
+mkdir "$WORK"
 cleanup() { rm -rf "$WORK"; }
 trap cleanup EXIT INT TERM
 

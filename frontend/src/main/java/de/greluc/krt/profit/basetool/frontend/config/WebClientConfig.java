@@ -257,7 +257,7 @@ public class WebClientConfig {
    * thing tying the cert to the target host.
    *
    * <p>That reasoning holds for ONE self-signed certificate and stops holding for a CA. Once every
-   * service serves its own leaf signed by the internal CA (REQ-SEC-TBD04T, ADR-TBD04T), the pinned
+   * service serves its own leaf signed by the internal CA (REQ-SEC-070, ADR-0211), the pinned
    * anchor vouches for all of them, and the name is the only thing that tells the backend's
    * certificate from the ingest's. {@code app.http.verify-backend-hostname} ({@code
    * INTERNAL_TLS_VERIFY_HOSTNAME}) keeps the check ON on the pinned prod path; it defaults to
@@ -396,7 +396,7 @@ public class WebClientConfig {
       }
       SslContext sslContext = builder.build();
       // Pinned trust skips the name check -- unless the per-service certificates are in place
-      // (REQ-SEC-TBD04T): one internal CA then signs every service, so the chain alone no longer
+      // (REQ-SEC-070): one internal CA then signs every service, so the chain alone no longer
       // tells the backend from the ingest or Keycloak, and the name is what does. dev/test keep the
       // wholesale trust of the ephemeral certificate either way.
       boolean disableHostnameVerification =

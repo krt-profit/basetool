@@ -2320,7 +2320,7 @@ scenario_podman_missing_per_service_keystore_refuses() {
   setup_host "${tmp}"
   podman_units "${tmp}"
   write_marker "${PMARKER}"
-  # REQ-SEC-TBD04T: after the per-service rollout the backend's file exists and the ingest unit
+  # REQ-SEC-070: after the per-service rollout the backend's file exists and the ingest unit
   # names its OWN keystore -- plus an internal truststore -- which this host lacks.
   printf 'Volume=%s/tls/ingest.p12:/run/secrets/keystore.p12:ro\n' "${tmp}" >> "${T_UNIT_DIR}/ingest.container"
   printf 'Volume=%s/keystore.p12:/run/secrets/internal-truststore.p12:ro\n' "${tmp}" >> "${T_UNIT_DIR}/ingest.container"

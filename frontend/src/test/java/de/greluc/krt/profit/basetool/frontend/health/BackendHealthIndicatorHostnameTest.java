@@ -36,9 +36,9 @@ import org.springframework.boot.ssl.SslStoreBundle;
 import org.springframework.core.env.Environment;
 
 /**
- * Pins the backend health probe's hostname check on the pinned prod path (REQ-SEC-TBD04T): it
- * follows {@code app.http.verify-backend-hostname} exactly as the API client does, so a readiness
- * probe cannot keep the frontend "healthy" against a certificate the API client would refuse.
+ * Pins the backend health probe's hostname check on the pinned prod path (REQ-SEC-070): it follows
+ * {@code app.http.verify-backend-hostname} exactly as the API client does, so a readiness probe
+ * cannot keep the frontend "healthy" against a certificate the API client would refuse.
  */
 class BackendHealthIndicatorHostnameTest {
 

@@ -70,7 +70,7 @@ app:
     structured-enabled: false
   ingest:
     backend-base-url: ${BACKEND_URL:https://backend:11261}
-    # REQ-SEC-TBD04T / ADR-TBD04T: verify that the backend's certificate names `backend` on the
+    # REQ-SEC-070 / ADR-0211: verify that the backend's certificate names `backend` on the
     # pinned relay. Off by default (chain pinned, name ignored -- ADR-0204's opt-out); on once every
     # service has its own leaf from the internal CA.
     verify-backend-hostname: ${INTERNAL_TLS_VERIFY_HOSTNAME:false}

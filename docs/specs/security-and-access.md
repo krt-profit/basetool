@@ -704,7 +704,7 @@ re-login · **ADR:** ADR-0122
 ### REQ-SEC-014 — Encrypted transport to Keycloak (no cleartext edge)
 
 Production Keycloak MUST serve **HTTPS only** — `--http-enabled=false --https-port=18443`, with the
-shared bind-mounted `keystore.p12` (its own leaf from the internal CA once REQ-SEC-TBD04T is rolled
+shared bind-mounted `keystore.p12` (its own leaf from the internal CA once REQ-SEC-070 is rolled
 out) — so neither edge that reaches it is cleartext:
 
 - **edge &rarr; Keycloak:** the native nginx edge (ADR-0162) terminates the public Let's Encrypt
@@ -4733,7 +4733,7 @@ mismatch · **Runbook:** [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../OAUTH2_C
 [ADR-0202](../adr/0202-a-realm-is-brought-to-the-production-shape-by-a-provisioner-that-never-deletes.md)
 amendment 2 · **Related:** REQ-SEC-001, REQ-SEC-012
 
-### REQ-SEC-TBD04T — Each internal service holds its own certificate, and clients trust only the CA
+### REQ-SEC-070 — Each internal service holds its own certificate, and clients trust only the CA
 
 No internal service may hold another service's private key, and no internal client may trust a
 certificate merely for being pinned (audit finding ING-SEC-04). The target shape, which the
@@ -4782,7 +4782,7 @@ production rollout reaches step by step:
 `https_internal` probes and the three app scrapes already verify each service's name against
 `basetool-ca.crt`, and `iri-cert-expiry` reports the CA's expiry once that file is the CA ·
 **Runbook:** [`deployment.md` &rarr; Internal TLS](../deployment.md#internal-tls-per-service-certificates-from-a-private-ca)
-· **ADR:** ADR-TBD04T · **Related:** REQ-SEC-014, REQ-OPS-016, REQ-OBS-008, REQ-INGEST-001
+· **ADR:** [ADR-0211](../adr/0211-each-internal-service-holds-its-own-leaf-from-a-private-ca.md) · **Related:** REQ-SEC-014, REQ-OPS-016, REQ-OBS-008, REQ-INGEST-001
 
 ## Out of scope
 

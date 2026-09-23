@@ -47,7 +47,7 @@ spring:
       jks:
         backend-trust:
           truststore:
-            # REQ-SEC-TBD04T: the INTERNAL TRUSTSTORE -- the internal CA once the per-service
+            # REQ-SEC-070: the INTERNAL TRUSTSTORE -- the internal CA once the per-service
             # certificates are rolled out; until then compose points it at the shared keystore,
             # so nothing changes. Falls back to the own keystore when the variable is absent.
             location: ${INTERNAL_TLS_TRUSTSTORE:${SERVER_SSL_KEY_STORE:classpath:keystore.p12}}

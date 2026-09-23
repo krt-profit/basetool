@@ -67,9 +67,9 @@ import org.springframework.validation.annotation.Validated;
  *     APP_INGEST_MAX_HANDOFFS_PER_SUBJECT}
  * @param verifyBackendHostname whether the relay to the backend verifies that the backend's
  *     certificate names the host it dialled, on top of the pinned {@code backend-trust} chain
- *     (REQ-SEC-TBD04T, ADR-TBD04T). {@code false}, the default, keeps ADR-0204's opt-out: chain
- *     only. {@code true} once every service serves its own leaf from the internal CA — the anchor
- *     then vouches for all of them, and the name is what tells the backend's certificate from the
+ *     (REQ-SEC-070, ADR-0211). {@code false}, the default, keeps ADR-0204's opt-out: chain only.
+ *     {@code true} once every service serves its own leaf from the internal CA — the anchor then
+ *     vouches for all of them, and the name is what tells the backend's certificate from the
  *     gateway's own. Bound from {@code INTERNAL_TLS_VERIFY_HOSTNAME}; ignored under {@code
  *     dev}/{@code test}
  */

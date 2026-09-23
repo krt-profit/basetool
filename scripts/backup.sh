@@ -360,7 +360,7 @@ if [[ -f "${KEYSTORE_PATH}" ]]; then
 else
   log "WARN: keystore not found at ${KEYSTORE_PATH} — skipped"
 fi
-# The per-service internal TLS material (REQ-SEC-TBD04T): one keystore per service, the CA-only
+# The per-service internal TLS material (REQ-SEC-070): one keystore per service, the CA-only
 # truststore and the CA certificate, minted into one directory. Its CA key no longer exists, so a
 # lost file cannot be re-issued -- only the whole set re-minted, with every consumer restarted.
 # Captured as one tar through the helper, like the keystore above and for the same reason (the

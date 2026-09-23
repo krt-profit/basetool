@@ -2666,9 +2666,9 @@ public final class BackendSeeder {
 
   /**
    * Builds an {@link SSLContext} that trusts ONLY the committed test CA (ADR-0139), loaded from the
-   * CA-only test truststore -- the same shape production pins (REQ-SEC-TBD04T). The backend's leaf
-   * names {@code localhost}, so the JDK's default hostname verification still applies and does
-   * real work: the CA also signed the frontend's, ingest's and Keycloak's leaves, and none of those
+   * CA-only test truststore -- the same shape production pins (REQ-SEC-070). The backend's leaf
+   * names {@code localhost}, so the JDK's default hostname verification still applies and does real
+   * work: the CA also signed the frontend's, ingest's and Keycloak's leaves, and none of those
    * would be accepted here in the backend's place by name alone.
    *
    * @return a TLS context trusting only the test CA

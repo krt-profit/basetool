@@ -116,3 +116,15 @@ decision.
   hand is one line and is what the WebClient builders already did.
 - **Apache HttpClient 5 or Jetty as the request factory.** Either would add a dependency the JDK
   client makes unnecessary; neither is on the classpath today.
+
+## Amendment 1 (2026-09-23) — the relay's hostname opt-out becomes a switch
+
+Decision 6 kept the relay's `backend-trust` anchor without a hostname check, because the one shared
+certificate named every service and a name check could only pass. ADR-0211 (REQ-SEC-070,
+ING-SEC-04) gives every service its own leaf from one private CA, and then the pin alone no longer
+tells the backend from the frontend or Keycloak. So the opt-out is now `app.ingest.verify-backend-hostname`
+(`INTERNAL_TLS_VERIFY_HOSTNAME`): `false` — the default until the owner's rollout — installs the
+`X509ExtendedTrustManager` that ignores the engine, exactly as described above; `true` hands JSSE the
+pinned `X509TrustManager` unwrapped, so it verifies the name. The pinned truststore itself is now read
+from `INTERNAL_TLS_TRUSTSTORE` (falling back to the keystore, as before). `dev`/`test`, the no-bundle
+path and the token client are unchanged.

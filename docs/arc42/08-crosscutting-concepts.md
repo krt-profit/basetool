@@ -28,6 +28,11 @@ Beyond roles there are three mechanisms that are easy to miss:
   each confined to its own keys and channels, with `default` switched off at the end of the rollout
   (REQ-SEC-068, ADR-0207). The ACL is rendered from a committed template with hashes, never
   passwords, and the E2E stack runs against it.
+- **Internal TLS: one leaf per service, one CA, the name checked** — a private CA whose key is
+  destroyed at mint time signs a leaf for backend, frontend, ingest and Keycloak; clients pin the
+  CA and verify the hostname (REQ-SEC-070, ADR-0211). Shipped inert behind
+  `INTERNAL_TLS_VERIFY_HOSTNAME` and fallback mounts; the committed test material already has the
+  shape (ADR-0139 amendment 1).
 
 Authority: [`security-and-access.md`](../specs/security-and-access.md) (`REQ-SEC-*`),
 [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md), `ArchitectureTest`.

@@ -4,7 +4,7 @@ The certificates and keystores the local test stack serves HTTPS with. **Committ
 so every developer's stack, every CI run and the Android dev build speak TLS with the same
 material and nobody has to generate or install anything.
 
-Since REQ-SEC-TBD04T (ADR-TBD04T) it has **the shape production has**: one private CA, one leaf
+Since REQ-SEC-070 (ADR-0211) it has **the shape production has**: one private CA, one leaf
 per service, a CA-only truststore — minted by the same `scripts/mint-internal-tls.sh` the
 production host runs. Password of every `.p12`: `basetool-test`.
 

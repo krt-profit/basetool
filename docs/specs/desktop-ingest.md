@@ -160,7 +160,7 @@ network only.
   `dev`/`test` the `backend-trust` bundle (`INTERNAL_TLS_TRUSTSTORE`) is the relay's only anchor,
   **without** a hostname check by default and **with** one when
   `app.ingest.verify-backend-hostname` / `INTERNAL_TLS_VERIFY_HOSTNAME` is true — the state
-  REQ-SEC-TBD04T's rollout reaches, once one internal CA signs every service and the pin alone no
+  REQ-SEC-070's rollout reaches, once one internal CA signs every service and the pin alone no
   longer tells them apart. *(Corrected 2026-09-23: the parenthesis here said the service-alias
   certificate has no matching SAN. It has one — `dns:backend` — and the edge and Prometheus verify
   it; the check was off because a shared certificate made it meaningless, not impossible.)* No

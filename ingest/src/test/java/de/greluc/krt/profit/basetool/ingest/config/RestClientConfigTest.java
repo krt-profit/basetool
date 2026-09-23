@@ -134,7 +134,7 @@ class RestClientConfigTest {
 
   @Test
   void withHostnameVerificationTheRelayRefusesAPinnedButMisnamedCertificate() throws Exception {
-    // REQ-SEC-TBD04T / ING-SEC-04: once one internal CA signs every service the pinned anchor
+    // REQ-SEC-070 / ING-SEC-04: once one internal CA signs every service the pinned anchor
     // vouches for all of them, so the name has to be checked. Same pinned chain as the default
     // case above, verification on: refused.
     try (MockWebServer backend = httpsServer(BACKEND_CERT)) {

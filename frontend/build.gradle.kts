@@ -315,7 +315,7 @@ dependencies {
   // MockWebServer for HTTP simulations in WebClient tests
   testImplementation(libs.okhttp3.mockwebserver)
   // In-memory certificates for the hostname-verification tests of the backend TLS hop
-  // (REQ-SEC-TBD04T): one named for the host a test dials and one that is not, which the
+  // (REQ-SEC-070): one named for the host a test dials and one that is not, which the
   // committed test material cannot offer — every one of its leaves names localhost.
   testImplementation(libs.okhttp3.tls)
   // ArchUnit core (no archunit-junit5 — that pulls in a clashing JUnit Platform

@@ -717,7 +717,7 @@ The deploy path is hardened at the host layer, beyond running as an unprivileged
   **translated** host uids, `root:110000` plus `user:100999:r` (subuid base 100000), and an extra
   `user:iri:r` so the backup helper, which runs as the service user, can read it. The private-key
   material is never readable by `other`; the Docker host's `root:10001` + `u:1000` is the same rule
-  before translation. The per-service keystores under `/var/iri/secrets/tls/` (REQ-SEC-TBD04T)
+  before translation. The per-service keystores under `/var/iri/secrets/tls/` (REQ-SEC-070)
   follow the same rule, each readable only by the service it belongs to (and `iri` for the backup);
   the CA-only truststore and `ca.crt` hold no key and may be `0644`.
 - **The pre-flight checks the keystore the stack will actually mount** (since 2026-09-22). Under
@@ -726,7 +726,7 @@ The deploy path is hardened at the host layer, beyond running as an unprivileged
   `/var/iri/secrets/keystore.p12` and which never reads `.env` again. `deploy.sh` checked `.env` on
   both runtimes until then, so on the Podman host it could certify a file the units do not mount; it
   now reads the path out of the installed units and falls back to `.env` only while no unit names a
-  keystore mount (a host before its first bundle). Since REQ-SEC-TBD04T it checks **every**
+  keystore mount (a host before its first bundle). Since REQ-SEC-070 it checks **every**
   PKCS#12 the units mount under `/run/secrets/` — each service's own keystore and the internal
   truststore — not just the first match.
 - **The deployer runs from `/`.** `sudo -u <service user>` keeps the caller's working directory and

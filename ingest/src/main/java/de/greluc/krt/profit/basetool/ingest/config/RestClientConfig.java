@@ -62,13 +62,13 @@ import org.springframework.web.client.RestClient;
  * certificate is trusted without validation and without a hostname check. In every other profile a
  * configured {@code backend-trust} SSL bundle becomes the backend relay's <em>only</em> trust
  * anchor. Whether the relay then also verifies the hostname is {@code
- * app.ingest.verify-backend-hostname} (REQ-SEC-TBD04T, ADR-TBD04T): off by default — the chain is
- * pinned and the name ignored, as ADR-0204 kept it for the single shared self-signed certificate —
- * and on once every service serves its own leaf from the internal CA, where the pinned anchor
- * vouches for every service and only the name tells the backend's certificate from the gateway's
- * own. With no bundle the relay falls back to the JVM trust store with hostname verification ON.
- * The Keycloak client trusts the JVM anchors plus the pinned {@code keycloak-trust} bundle and
- * always verifies the hostname outside {@code dev}/{@code test}.
+ * app.ingest.verify-backend-hostname} (REQ-SEC-070, ADR-0211): off by default — the chain is pinned
+ * and the name ignored, as ADR-0204 kept it for the single shared self-signed certificate — and on
+ * once every service serves its own leaf from the internal CA, where the pinned anchor vouches for
+ * every service and only the name tells the backend's certificate from the gateway's own. With no
+ * bundle the relay falls back to the JVM trust store with hostname verification ON. The Keycloak
+ * client trusts the JVM anchors plus the pinned {@code keycloak-trust} bundle and always verifies
+ * the hostname outside {@code dev}/{@code test}.
  *
  * <p><b>How the hostname check is switched off per client.</b> The JDK client cannot do that
  * through its own API — it always asks the TLS engine for HTTPS endpoint identification, and the
@@ -189,7 +189,7 @@ public class RestClientConfig {
   /**
    * The backend relay's TLS context: trust-everything in {@code dev}/{@code test} (no hostname
    * check), the {@code backend-trust} bundle as the only anchor elsewhere (hostname checked when
-   * {@code app.ingest.verify-backend-hostname} is set, REQ-SEC-TBD04T), or the JVM default with
+   * {@code app.ingest.verify-backend-hostname} is set, REQ-SEC-070), or the JVM default with
    * hostname verification when no bundle is registered.
    *
    * @return the TLS context for the backend relay

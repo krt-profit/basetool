@@ -128,7 +128,7 @@ public class BackendHealthIndicator implements HealthIndicator {
    *     truststore used to pin the probe's TLS trust in prod
    * @param environment the active environment, used to pick the trust policy per profile
    * @param verifyHostname {@code app.http.verify-backend-hostname}: keep the certificate-to-host
-   *     check on the pinned prod path (REQ-SEC-TBD04T), exactly as the API client does
+   *     check on the pinned prod path (REQ-SEC-070), exactly as the API client does
    */
   @Autowired
   public BackendHealthIndicator(
@@ -270,7 +270,7 @@ public class BackendHealthIndicator implements HealthIndicator {
    *       forced the probe {@code DOWN} and flapped the deploy.
    * </ul>
    *
-   * <p>With {@code verifyHostname} (REQ-SEC-TBD04T) the pinned path keeps the certificate-to-host
+   * <p>With {@code verifyHostname} (REQ-SEC-070) the pinned path keeps the certificate-to-host
    * check: once every service carries its own leaf from the internal CA, the pinned anchor vouches
    * for all of them and only the name tells the backend's certificate apart.
    *

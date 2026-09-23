@@ -410,7 +410,7 @@ chmod 644 /var/iri/monitoring/certs/basetool-ca.crt && restorecon -F /var/iri/mo
 openssl x509 -in /var/iri/monitoring/certs/basetool-ca.crt -noout -subject -ext subjectAltName
 ```
 
-Once the per-service internal TLS is rolled out (REQ-SEC-TBD04T) the file is the **internal CA**
+Once the per-service internal TLS is rolled out (REQ-SEC-070) the file is the **internal CA**
 instead — `install -m 0644 /var/iri/secrets/tls/ca.crt /var/iri/monitoring/certs/basetool-ca.crt`
 — and the steps above no longer apply: the per-service keystores hold leaves, not the anchor. Every
 consumer (Prometheus `server_name`, the blackbox module, the edge's `proxy_ssl_name`) already checks

@@ -125,7 +125,7 @@ services:
         tmpfs:
           mode: 0o777
       # The committed test certificate (ADR-0139) -- this service's own leaf, signed by the test CA
-      # like production's per-service leaves (REQ-SEC-TBD04T) -- by a hardcoded path for the same reason
+      # like production's per-service leaves (REQ-SEC-070) -- by a hardcoded path for the same reason
       # docker-compose.test.yml uses one: IRI_KEYSTORE_HOST_PATH still selects the PRODUCTION
       # keystore. It must be this file and not a locally generated one, because test.yml pins
       # SERVER_SSL_KEY_STORE_PASSWORD to this keystore's password — mounting any other store makes
@@ -169,7 +169,7 @@ services:
         tmpfs:
           mode: 0o777
       # The committed test certificate (ADR-0139) -- this service's own leaf, signed by the test CA
-      # like production's per-service leaves (REQ-SEC-TBD04T) -- by a hardcoded path for the same reason
+      # like production's per-service leaves (REQ-SEC-070) -- by a hardcoded path for the same reason
       # docker-compose.test.yml uses one: IRI_KEYSTORE_HOST_PATH still selects the PRODUCTION
       # keystore. It must be this file and not a locally generated one, because test.yml pins
       # SERVER_SSL_KEY_STORE_PASSWORD to this keystore's password — mounting any other store makes

@@ -9,6 +9,11 @@
   Vollzugriff. Neue Variablen `REDIS_<DIENST>_USERNAME`/`_PASSWORD` und `REDIS_DEFAULT_USER`;
   ohne sie bleibt alles wie bisher. Die ACL-Datei enthält nur noch Hashwerte.
 
+- **Interne TLS-Verbindungen: jeder Dienst kann ein eigenes Zertifikat bekommen.** Backend, Webtool,
+  Ingest und Keycloak lassen sich auf eigene, von einer internen CA signierte Zertifikate umstellen,
+  und `INTERNAL_TLS_VERIFY_HOSTNAME` lässt Webtool und Ingest zusätzlich den Namen des Backends
+  prüfen. Ohne Umstellung bleibt alles wie bisher; für Mitglieder unsichtbar.
+
 ### Removed
 
 - **API: die 17 veralteten Einsatz-Schnittstellen sind vorzeitig entfernt.** Angekündigt war der

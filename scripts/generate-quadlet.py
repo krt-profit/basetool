@@ -241,7 +241,7 @@ READ_ONLY: dict[str, dict[str, Any]] = {
     "ingest": {},
 }
 
-#: The per-service keystores and the internal truststore (REQ-SEC-TBD04T, ADR-TBD04T) are baked
+#: The per-service keystores and the internal truststore (REQ-SEC-070, ADR-0211) are baked
 #: to the SHARED keystore on purpose: that is what production mounts until the owner has minted
 #: /var/iri/secrets/tls/ on the host. The rollout flips these five to the files in that directory
 #: (docs/deployment.md, "Internal TLS"); a unit naming a file the host lacks would not start.

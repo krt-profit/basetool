@@ -100,8 +100,8 @@ everyone's setup.
 
 ## Amendment 1 (2026-09-23) — the material takes production's per-service shape
 
-ADR-TBD04T gives every internal service its own leaf certificate from a private CA, with only
-the CA distributed as the trust anchor (REQ-SEC-TBD04T, ING-SEC-04). The test material follows,
+ADR-0211 gives every internal service its own leaf certificate from a private CA, with only
+the CA distributed as the trust anchor (REQ-SEC-070, ING-SEC-04). The test material follows,
 so the stacks CI and developers run exercise the same trust relationships production has:
 
 |              File              |                                     Contents                                      |
