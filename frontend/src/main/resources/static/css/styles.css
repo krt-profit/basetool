@@ -4939,23 +4939,7 @@
      */
         /* `.btn.btn-xs2` lives in the page layer (FE-MOD-02). */
 
-        /*
-     * The inventory row selector, at REQ-UI-009's dense floor.
-     *
-     * A repeated dense in-row control — one per inventory row — so 32px rather than 44px, on
-     * the same reading as `.btn-xs`, `.matrix-flag` and `.bank-row-toggle`. It measured 26px.
-     *
-     * The second rule the inverted default does not replace, and for the same reason as
-     * `.btn.btn-xs2`: the 20px square is declared in inventory-my.html's inline <style>, which
-     * is read after this file, so the element prefix in `input.item-checkbox` is what wins the
-     * tie. `#personalOnly` shares the class but is wrapped in a `<label>` that is already well
-     * over the floor — the label is the hit area, and raising the box does it no harm.
-     */
-        input.item-checkbox {
-            width: var(--touch-target-dense);
-            height: var(--touch-target-dense);
-            min-height: var(--touch-target-dense);
-        }
+        /* `input.item-checkbox` lives in the page layer (FE-MOD-02). */
 
         /*
      * On touch devices the generic rule sets padding: 0.75rem 1rem which,
@@ -7017,6 +7001,18 @@
         /* Touch classes: the page-local 32px `.btn-xs2` keeps the 44px floor (REQ-UI-009). */
         .btn.btn-xs2 {
             min-height: var(--touch-target);
+        }
+
+        /* Touch classes: the inventory row selector at the dense floor (REQ-UI-009). One per
+           inventory row, so 32px rather than 44px, like `.btn-xs`, `.matrix-flag` and
+           `.bank-row-toggle`. Here and not in `components`, because inventory-my.css declares the
+           20px square in the page layer, which beats every components rule whatever its
+           specificity; left in `components` it measured 26px (2026-09-23). `#personalOnly` shares
+           the class inside a `<label>` that is already over the floor, so raising it does no harm. */
+        input.item-checkbox {
+            width: var(--touch-target-dense);
+            height: var(--touch-target-dense);
+            min-height: var(--touch-target-dense);
         }
     }
 }

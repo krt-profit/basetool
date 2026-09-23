@@ -555,8 +555,11 @@ and no stylesheet had ever declared:
 
 Three rules remain written out per control in the touch block, and each states a decision rather than
 filling a gap: `.btn.btn-xs2` and `input.item-checkbox` must out-specify a page-local rule (a page
-stylesheet under `css/pages/`, formerly an inline `<style>`) that the browser reads after
-`styles.css`, and the dismiss-button group (`.close-sidebar-btn`,
+stylesheet under `css/pages/`, formerly an inline `<style>`), so since REQ-UI-024 both sit in the
+page-layer block at the end of `styles.css`, where specificity against the page stylesheets decides
+*(2026-09-23: `input.item-checkbox` was first left in `components`, where the page layer's 20px
+square beat it at every width; the group checkbox on `/inventory/my` measured 26px on touch classes
+until it moved)*, and the dismiss-button group (`.close-sidebar-btn`,
 `.krt-modal-close`) declares its square and its centring. *(2026-09-22: that group used to exist
 because `.close-modal` was a `<span>` no element selector reaches; the span went with the legacy
 dialog shapes in #1891, and the explicit `min-height` is kept only because it is harmless.)*
