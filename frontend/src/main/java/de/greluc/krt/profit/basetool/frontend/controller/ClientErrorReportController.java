@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import de.greluc.krt.profit.basetool.frontend.logging.LogSafe;
 import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.logging.LogSafe;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.net.URI;
 import java.net.URISyntaxException;

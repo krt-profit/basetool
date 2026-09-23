@@ -20,10 +20,10 @@
 package de.greluc.krt.profit.basetool.ingest.service;
 
 import de.greluc.krt.profit.basetool.ingest.config.ClientIdentityProperties;
-import de.greluc.krt.profit.basetool.ingest.logging.LogSafe;
 import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.ingest.model.dto.Provenance;
 import de.greluc.krt.profit.basetool.ingest.web.ClientNotAllowedException;
+import de.greluc.krt.profit.basetool.logging.LogSafe;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;

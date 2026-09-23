@@ -43,7 +43,7 @@ import de.greluc.krt.profit.basetool.backend.dto.uex.UexStarSystemDto;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexTerminalDto;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexVehicleDto;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
-import de.greluc.krt.profit.basetool.backend.support.LogSafe;
+import de.greluc.krt.profit.basetool.logging.LogSafe;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import java.util.Collections;

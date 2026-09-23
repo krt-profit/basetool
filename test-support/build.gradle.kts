@@ -44,6 +44,11 @@ dependencies {
   // consumers already carry Spring, but saying so here keeps the module honest on its own.
   api("org.springframework:spring-web")
   api("org.springframework:spring-webmvc")
+  // `ProfiledLogbackConfig` loads an application's real logback configuration into a private
+  // context, so the three apps can pin that their prod JSON sink masks what reaches it
+  // (ADR-0205). `api`: the consumer's test holds the returned `LoggerContext`. Every consumer
+  // already has logback through Boot's logging starter, at this same BOM-managed version.
+  api("ch.qos.logback:logback-classic")
 
   // Lombok + the JetBrains annotations, on both source sets and compile-only on each: this module
   // is `testImplementation` for its two consumers, so anything that leaked onto its runtime

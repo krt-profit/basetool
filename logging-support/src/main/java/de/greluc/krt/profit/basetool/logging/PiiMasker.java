@@ -17,18 +17,18 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.ingest.logging;
+package de.greluc.krt.profit.basetool.logging;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * Regex-based PII / secret masking for the ingest gateway's prod JSON log sink (used by {@link
- * PiiMaskingLogstashEncoder}). Mirrors the backend/frontend {@code PiiMasker} classes so all three
- * modules scrub the same patterns (REQ-OBS-004; each module keeps its own copy per the established
- * no-shared-module convention). Introduced by epic #936 Phase 1: the ingest prod appender
- * previously used the stock, unmasked {@code LogstashEncoder} — the last unmasked log stream in the
- * system, and a prerequisite for shipping ingest logs to Loki in Phase 2.
+ * Regex-based PII / secret masking behind every appender of all three applications: {@link
+ * PiiMaskingPatternLayout} for the console and plain-text file sinks and {@link
+ * PiiMaskingLogstashEncoder} for the prod JSON sink (REQ-OBS-004). One implementation, so the
+ * backend, the frontend and the ingest gateway cannot scrub different patterns (ADR-0205).
  *
  * <p>Patterns:
  *
@@ -39,7 +39,7 @@ import java.util.regex.Pattern;
  *   <li>Values introduced by the keywords {@code bearer}, {@code token}, {@code session-id} or
  *       {@code authorization} keep the keyword and replace the trailing value with {@code ***}. The
  *       keyword only counts when a separator follows it ({@code :}, {@code =} or whitespace), so an
- *       identifier that merely contains one of them -&gt; a {@code GuestEditTokenContextFilter}
+ *       identifier that merely contains one of them -&gt; a {@code BearerTokenAuthenticationFilter}
  *       stack frame, an {@code AuthorizationFilter} class name -&gt; survives intact instead of
  *       being truncated at the keyword.
  * </ul>
@@ -65,7 +65,7 @@ public final class PiiMasker {
   // The keyword must be followed by a real separator - ":", "=" or whitespace. With the
   // separator optional, every identifier that merely CONTAINS one of the keywords was eaten
   // together with everything after it: a stack frame
-  // "GuestEditTokenContextFilter.doFilterInternal" reached the log as "GuestEditToken***" and
+  // "BearerTokenAuthenticationFilter.doFilter" reached the log as "BearerToken***" and
   // "...intercept.AuthorizationFilter.doFilter" as "Authorization***", which is exactly the
   // information an incident needs. Requiring the separator loses no secret: a token is logged as
   // "token=x", "token: x" or "Bearer x", never as "tokenx".
@@ -80,12 +80,15 @@ public final class PiiMasker {
 
   /**
    * Returns {@code input} with all detected PII / secret occurrences replaced by fixed
-   * placeholders. {@code null}, empty and PII-free inputs are returned as-is.
+   * placeholders. {@code null}, empty and PII-free inputs are returned as the very same instance,
+   * which is what lets {@link PiiMaskingLogstashEncoder} hand the original bytes back for the
+   * common, PII-free event without a re-encode.
    *
    * @param input the raw log line or serialized JSON document to scrub; may be {@code null}.
    * @return the masked text, or {@code input} unchanged when it is {@code null} / empty / PII-free.
    */
-  public static String mask(String input) {
+  @Contract(value = "null -> null; !null -> !null", pure = true)
+  public static @Nullable String mask(@Nullable String input) {
     if (input == null || input.isEmpty()) {
       return input;
     }

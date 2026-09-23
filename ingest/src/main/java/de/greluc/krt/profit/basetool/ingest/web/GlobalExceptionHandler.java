@@ -20,10 +20,10 @@
 package de.greluc.krt.profit.basetool.ingest.web;
 
 import de.greluc.krt.profit.basetool.ingest.config.LoggingProperties;
-import de.greluc.krt.profit.basetool.ingest.logging.LogSafe;
 import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.ingest.ratelimit.RateLimitedException;
 import de.greluc.krt.profit.basetool.ingest.service.ServiceAccountTokenProvider;
+import de.greluc.krt.profit.basetool.logging.LogSafe;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.List;

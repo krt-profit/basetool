@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.ingest.service;
 
 import de.greluc.krt.profit.basetool.ingest.config.IngestProperties;
-import de.greluc.krt.profit.basetool.ingest.logging.LogSafe;
 import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.ingest.model.dto.HandoffKind;
 import de.greluc.krt.profit.basetool.ingest.model.dto.IngestResponseDto;
@@ -28,6 +27,7 @@ import de.greluc.krt.profit.basetool.ingest.model.dto.Provenance;
 import de.greluc.krt.profit.basetool.ingest.model.dto.RefineryExtractDto;
 import de.greluc.krt.profit.basetool.ingest.model.dto.RefineryExtractOrderDto;
 import de.greluc.krt.profit.basetool.ingest.ratelimit.SubjectRateLimiter;
+import de.greluc.krt.profit.basetool.logging.LogSafe;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
