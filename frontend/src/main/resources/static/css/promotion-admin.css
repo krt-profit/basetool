@@ -12,137 +12,148 @@
  * a pure delete-from-inline + link-this-file change.
  */
 
-/* ============================================================
+@layer base, components, page, migration, utilities;
+
+@layer page {
+    /* ============================================================
    FORM CONTROLS (used inside the modals above)
    ============================================================ */
-/* .form-group spacing comes from the central definition in styles.css */
-.form-input {
-    width: 100%;
-    background: var(--color-gray-4);
-    border: 1px solid var(--color-gray-3);
-    color: var(--color-gray-1);
-    padding: 0.5rem 0.75rem;
-    font-size: var(--fs-sm);
-    box-sizing: border-box;
-}
-
-.form-input:focus {
-    border-color: var(--color-primary);
-    outline: none;
-}
-
-.form-input[readonly] {
-    background: var(--color-surface-input);
-    color: var(--color-gray-2-text);
-    cursor: not-allowed;
-}
-
-.form-hint {
-    display: block;
-    font-size: 0.75rem;
-    color: var(--color-gray-2-text);
-    margin-top: 0.3rem;
-}
-
-.form-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.75rem;
-}
-
-@media (width <= 768px) {
-    .form-row {
-        grid-template-columns: 1fr;
+    /* .form-group spacing comes from the central definition in styles.css */
+    .form-input {
+        width: 100%;
+        background: var(--color-gray-4);
+        border: 1px solid var(--color-gray-3);
+        color: var(--color-gray-1);
+        padding: 0.5rem 0.75rem;
+        font-size: var(--fs-sm);
+        box-sizing: border-box;
     }
-}
 
-/* ============================================================
+    /* On a text or number input the base text-input rule in styles.css has always set the background
+   and the font size: its (0,1,1) beat `.form-input` (0,1,0). The page layer now outranks it, so
+   the outcome is restated here (FE-MOD-02). Selects and textareas keep `.form-input`'s values. */
+    input.form-input:is([type='text'], [type='number']) {
+        background-color: var(--color-surface-input);
+        font-size: var(--fs-body);
+    }
+
+    .form-input:focus {
+        border-color: var(--color-primary);
+        outline: none;
+    }
+
+    .form-input[readonly] {
+        background: var(--color-surface-input);
+        color: var(--color-gray-2-text);
+        cursor: not-allowed;
+    }
+
+    .form-hint {
+        display: block;
+        font-size: 0.75rem;
+        color: var(--color-gray-2-text);
+        margin-top: 0.3rem;
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+    }
+
+    @media (width <= 768px) {
+        .form-row {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* ============================================================
    SHARED ADMIN PATTERNS
    ============================================================ */
-/*
+    /*
  * Compact button used inside per-row action stacks and the rank-group
  * action bar. Visually denser than a default .btn (smaller padding +
  * font size) but still honours the Styleguide 44px touch-target rule.
  */
-.pa-btn-tiny {
-    padding: 0.35rem 0.7rem;
-    font-size: 0.75rem;
-    min-height: 44px;
-}
+    .pa-btn-tiny {
+        padding: 0.35rem 0.7rem;
+        font-size: 0.75rem;
+        min-height: 44px;
+    }
 
-/*
+    /*
  * "Dirty" state highlight on inputs/textareas that the admin has edited
  * but not yet persisted. Implemented on the topics page where every
  * level-content textarea is editable in place. Border colour matches the
  * brand orange so the visual "you have unsaved work here" cue is loud
  * without being alarming.
  */
-.pa-dirty {
-    border-color: var(--color-primary) !important;
-    background: rgb(231 126 35 / 5%);
-}
+    .pa-dirty {
+        border-color: var(--color-primary);
+        background: rgb(231 126 35 / 5%);
+    }
 
-/*
+    /*
  * Filter input pattern in the rank-requirements toolbar. Same visual
  * language as the search field on /promotion/manage.
  */
-.pa-toolbar {
-    display: flex;
-    gap: 0.75rem;
-    align-items: center;
-    flex-wrap: wrap;
-    margin-bottom: 1rem;
-}
+    .pa-toolbar {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
+    }
 
-.pa-toolbar .pa-search {
-    flex: 1 1 240px;
-    min-width: 180px;
-    max-width: 320px;
-}
+    .pa-toolbar .pa-search {
+        flex: 1 1 240px;
+        min-width: 180px;
+        max-width: 320px;
+    }
 
-.pa-toolbar .pa-spacer {
-    flex: 1;
-}
+    .pa-toolbar .pa-spacer {
+        flex: 1;
+    }
 
-/*
+    /*
  * Sticky action column on the rank-requirements sub-table. The
  * Bearbeiten/Löschen pair must stay accessible even when the
  * description column pushes the table wider than the viewport.
  */
-.pa-rank-subtable {
-    position: relative;
-}
+    .pa-rank-subtable {
+        position: relative;
+    }
 
-.pa-rank-subtable td.pa-actions-cell {
-    position: sticky;
-    right: 0;
-    background-color: var(--color-bg-dark-gray);
-    box-shadow: -2px 0 4px rgb(0 0 0 / 40%);
-}
+    .pa-rank-subtable td.pa-actions-cell {
+        position: sticky;
+        right: 0;
+        background-color: var(--color-bg-dark-gray);
+        box-shadow: -2px 0 4px rgb(0 0 0 / 40%);
+    }
 
-/*
+    /*
  * Up/down sort buttons used on the topics admin page in place of the
  * raw "sortOrder" number input.
  */
-.pa-sort-controls {
-    display: inline-flex;
-    flex-direction: column;
-    gap: 0.1rem;
-}
+    .pa-sort-controls {
+        display: inline-flex;
+        flex-direction: column;
+        gap: 0.1rem;
+    }
 
-.pa-sort-controls .pa-sort-btn {
-    background: transparent;
-    border: 1px solid var(--color-gray-3);
-    color: var(--color-gray-2-text);
-    width: 1.8rem;
-    height: 1.1rem;
-    padding: 0;
-    font-size: var(--fs-2xs);
-    cursor: pointer;
-    line-height: 1;
-}
+    .pa-sort-controls .pa-sort-btn {
+        background: transparent;
+        border: 1px solid var(--color-gray-3);
+        color: var(--color-gray-2-text);
+        width: 1.8rem;
+        height: 1.1rem;
+        padding: 0;
+        font-size: var(--fs-2xs);
+        cursor: pointer;
+        line-height: 1;
+    }
 
-/*
+    /*
  * Touch classes: the dense floor, not the full 44px.
  *
  * 1.8rem x 1.1rem is 28.8 x 17.6px, which is under WCAG 2.5.8 AA's 24px minimum and not merely
@@ -159,131 +170,132 @@
  * No list to keep in step: TouchClassLayoutE2eTest's `floorFor()` reads the dense set out of
  * the CSSOM, so declaring the token here is what grants the exemption.
  */
-@media (width <= 1024px) {
-    .pa-sort-controls .pa-sort-btn {
-        min-height: var(--touch-target-dense);
-        height: var(--touch-target-dense);
+    @media (width <= 1024px) {
+        .pa-sort-controls .pa-sort-btn {
+            min-height: var(--touch-target-dense);
+            height: var(--touch-target-dense);
+        }
     }
-}
 
-.pa-sort-controls .pa-sort-btn:hover:not(:disabled) {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-}
+    .pa-sort-controls .pa-sort-btn:hover:not(:disabled) {
+        border-color: var(--color-primary);
+        color: var(--color-primary);
+    }
 
-.pa-sort-controls .pa-sort-btn:disabled {
-    opacity: 0.35;
-    cursor: not-allowed;
-}
+    .pa-sort-controls .pa-sort-btn:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+    }
 
-/*
+    /*
  * Topics page: collapsible category card. The <details>/<summary> pair
  * gives us a native, accessible toggle; we only restyle the markers.
  */
-.pa-category-card {
-    margin-top: 0.75rem;
-}
+    .pa-category-card {
+        margin-top: 0.75rem;
+    }
 
-.pa-category-card > summary {
-    list-style: none;
-    cursor: pointer;
-    padding: 0.5rem 0.75rem;
-    background-color: var(--color-surface-input);
-    border: 1px solid var(--color-gray-3);
-    color: var(--color-gray-1);
-    font-weight: 600;
-    font-size: var(--fs-sm);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-}
-.pa-category-card > summary::-webkit-details-marker {
-    display: none;
-}
+    .pa-category-card > summary {
+        list-style: none;
+        cursor: pointer;
+        padding: 0.5rem 0.75rem;
+        background-color: var(--color-surface-input);
+        border: 1px solid var(--color-gray-3);
+        color: var(--color-gray-1);
+        font-weight: 600;
+        font-size: var(--fs-sm);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+    .pa-category-card > summary::-webkit-details-marker {
+        display: none;
+    }
 
-.pa-category-card > summary::before {
-    content: '+';
-    color: var(--color-primary);
-    font-weight: var(--fw-bold);
-    font-size: var(--fs-body);
-    margin-right: 0.5rem;
-}
-.pa-category-card[open] > summary::before {
-    content: '\2212';
-}
+    .pa-category-card > summary::before {
+        content: '+';
+        color: var(--color-primary);
+        font-weight: var(--fw-bold);
+        font-size: var(--fs-body);
+        margin-right: 0.5rem;
+    }
+    .pa-category-card[open] > summary::before {
+        content: '\2212';
+    }
 
-.pa-category-card > .pa-category-body {
-    border: 1px solid var(--color-gray-3);
-    border-top: none;
-    padding: 0.75rem;
-    background: var(--color-bg-dark-gray);
-}
+    .pa-category-card > .pa-category-body {
+        border: 1px solid var(--color-gray-3);
+        border-top: none;
+        padding: 0.75rem;
+        background: var(--color-bg-dark-gray);
+    }
 
-/*
+    /*
  * Level-content row inside a category card. Three rows per category
  * (Stufe A/B/C). Compact, so admins can keep all three on screen at
  * once when the category is expanded.
  */
-.pa-level-row {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.5rem;
-    background: var(--color-surface-input);
-    border: 1px solid var(--color-gray-3);
-    padding: 0.4rem 0.6rem;
-    margin-bottom: 0.5rem;
-}
-.pa-level-row:last-child {
-    margin-bottom: 0;
-}
+    .pa-level-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5rem;
+        background: var(--color-surface-input);
+        border: 1px solid var(--color-gray-3);
+        padding: 0.4rem 0.6rem;
+        margin-bottom: 0.5rem;
+    }
+    .pa-level-row:last-child {
+        margin-bottom: 0;
+    }
 
-.pa-level-row .pa-level-label {
-    color: var(--color-primary);
-    font-weight: var(--fw-bold);
-    font-size: var(--fs-xs);
-    min-width: 52px;
-    padding-top: 0.35rem;
-}
+    .pa-level-row .pa-level-label {
+        color: var(--color-primary);
+        font-weight: var(--fw-bold);
+        font-size: var(--fs-xs);
+        min-width: 52px;
+        padding-top: 0.35rem;
+    }
 
-.pa-level-row .pa-level-textarea {
-    flex: 1;
-    font-size: 0.85rem;
-    resize: vertical;
-    min-height: 44px;
-}
+    .pa-level-row .pa-level-textarea {
+        flex: 1;
+        font-size: 0.85rem;
+        resize: vertical;
+        min-height: 44px;
+    }
 
-.pa-level-row .pa-level-save {
-    font-size: 0.75rem;
-    padding: 0.3rem 0.7rem;
-    align-self: flex-start;
-}
+    .pa-level-row .pa-level-save {
+        font-size: 0.75rem;
+        padding: 0.3rem 0.7rem;
+        align-self: flex-start;
+    }
 
-/*
+    /*
  * Save-all banner shown at the top of the topics page while at least one
  * textarea is dirty. Mirrors the manage page's queue-indicator visual.
  */
-.pa-save-all-banner {
-    display: none;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.5rem 0.75rem;
-    margin-bottom: 0.75rem;
-    border: 1px solid var(--color-primary);
-    background: rgb(231 126 35 / 6%);
-    color: var(--color-primary);
-    font-family: var(--font-headline);
-    font-weight: var(--fw-bold);
-    text-transform: uppercase;
-    font-size: 0.75rem;
-    letter-spacing: 0.05em;
-}
-.pa-save-all-banner.visible {
-    display: flex;
-}
+    .pa-save-all-banner {
+        display: none;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.5rem 0.75rem;
+        margin-bottom: 0.75rem;
+        border: 1px solid var(--color-primary);
+        background: rgb(231 126 35 / 6%);
+        color: var(--color-primary);
+        font-family: var(--font-headline);
+        font-weight: var(--fw-bold);
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.05em;
+    }
+    .pa-save-all-banner.visible {
+        display: flex;
+    }
 
-.pa-save-all-banner .pa-save-all-count {
-    color: var(--color-primary);
-    font-weight: var(--fw-bold);
+    .pa-save-all-banner .pa-save-all-count {
+        color: var(--color-primary);
+        font-weight: var(--fw-bold);
+    }
 }

@@ -60,9 +60,26 @@ A rendered page carries no developer text and no inline page CSS (`REQ-UI-023`,
   sent with every response. Never put the star-slash pair inside one: it closes the block early and
   renders the rest of the text into the page. Write `* /`.
 - **Page CSS goes into `static/css/pages/<page>.css`**, linked with `<link rel="stylesheet">` where
-  a `<style>` block would stand (in the `extraLinks` fragment for the head, so it still loads after
-  `styles.css` and before `inline-migration.css`). No `<style>` element in a template. It is linted
-  by `:frontend:lintCssInline` with the tiny template rule set, and formatted by Prettier.
+  a `<style>` block would stand (in the `extraLinks` fragment for the head). No `<style>` element in
+  a template. It is linted by `:frontend:lintCssInline` with the tiny template rule set, and
+  formatted by Prettier.
+
+### CSS: the layer decides, not the load order (binding)
+
+Every stylesheet starts with `@layer base, components, page, migration, utilities;` and puts every
+rule inside one of those layers (`REQ-UI-024`, ADR-0212, `CascadeLayerOrderTest`). Between layers the
+order decides, before specificity:
+
+- `styles.css` owns `base` (fonts, tokens) and `components`; every page or area stylesheet is
+  `page`; `inline-migration.css` is `migration`; `krtm-hidden` / `krtm-modal-open` are `utilities`.
+- A page rule beats a design-system rule as an ordinary rule. Do not bump specificity
+  (`main .x`, `div.x`, `.x.x`) and do not add `!important` for it.
+- A design-system declaration that has to beat page CSS goes into the `@layer page` block at the end
+  of `styles.css`, with a comment naming what it beats. Never into `utilities`, which would also beat
+  the page rules that out-specify it and every migrated inline class.
+- A migrated `krtm-*` class beats page and component rules, like the inline style it replaced. To
+  restyle such an element, remove the migrated class from the markup; do not fight it.
+- A rule outside any layer beats every layer. That is why the test fails on one.
 
 ### Script load order (binding — it has regressed three times)
 

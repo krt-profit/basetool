@@ -2,236 +2,240 @@
  * (FE-PERF-02). Linked in the same place the block stood, so the cascade order is
  * unchanged. */
 
-.eval-topic {
-    margin-bottom: 2rem;
-}
-.eval-topic-header {
-    font-family: var(--font-headline);
-    text-transform: uppercase;
-    color: var(--color-primary);
-    font-size: 1.1rem;
-    letter-spacing: 0.08em;
-    border-bottom: 1px solid var(--color-primary);
-    padding-bottom: 0.4rem;
-    margin-bottom: 1rem;
-}
-.badge-level {
-    display: inline-block;
-    padding: 0.15rem 0.6rem;
-    font-size: 0.75rem;
-    font-family: var(--font-headline);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    border: 1px solid var(--color-primary);
-    color: var(--color-primary);
-}
-.badge-none {
-    display: inline-block;
-    padding: 0.15rem 0.6rem;
-    font-size: 0.75rem;
-    font-family: var(--font-headline);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    border: 1px solid #444;
-    color: #666;
-}
-/*
+@layer base, components, page, migration, utilities;
+
+@layer page {
+    .eval-topic {
+        margin-bottom: 2rem;
+    }
+    .eval-topic-header {
+        font-family: var(--font-headline);
+        text-transform: uppercase;
+        color: var(--color-primary);
+        font-size: 1.1rem;
+        letter-spacing: 0.08em;
+        border-bottom: 1px solid var(--color-primary);
+        padding-bottom: 0.4rem;
+        margin-bottom: 1rem;
+    }
+    .badge-level {
+        display: inline-block;
+        padding: 0.15rem 0.6rem;
+        font-size: 0.75rem;
+        font-family: var(--font-headline);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border: 1px solid var(--color-primary);
+        color: var(--color-primary);
+    }
+    .badge-none {
+        display: inline-block;
+        padding: 0.15rem 0.6rem;
+        font-size: 0.75rem;
+        font-family: var(--font-headline);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border: 1px solid #444;
+        color: #666;
+    }
+    /*
  * "Weak"-Highlight: applied to a category badge when the user's assigned
  * level is strictly below the highest minimum demanded by any rank
  * requirement for that category. Same colour palette as the "missing"
  * state on the eligibility chips so the visual language is consistent
  * across both halves of the page.
  */
-.badge-weak {
-    color: #d35400;
-    border-color: #d35400;
-}
-.eval-row.is-weak td:first-child {
-    border-left: 3px solid #d35400;
-}
-.eval-required {
-    display: block;
-    font-size: 0.7rem;
-    color: var(--color-gray-2-text);
-    margin-top: 0.15rem;
-}
+    .badge-weak {
+        color: #d35400;
+        border-color: #d35400;
+    }
+    .eval-row.is-weak td:first-child {
+        border-left: 3px solid #d35400;
+    }
+    .eval-required {
+        display: block;
+        font-size: 0.7rem;
+        color: var(--color-gray-2-text);
+        margin-top: 0.15rem;
+    }
 
-.eligibility-card {
-    background: #141414;
-    border: 1px solid #333;
-    padding: 1rem 1.25rem;
-    margin-bottom: 1rem;
-}
-.eligibility-card.is-eligible {
-    border-color: var(--color-primary);
-    box-shadow: 0 0 8px rgba(231, 126, 35, 0.25);
-}
-.eligibility-card-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    margin-bottom: 0.75rem;
-}
-.eligibility-title {
-    font-family: var(--font-headline);
-    text-transform: uppercase;
-    color: var(--color-primary);
-    font-size: 0.95rem;
-    letter-spacing: 0.08em;
-}
-.eligibility-status {
-    font-family: var(--font-headline);
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    padding: 0.2rem 0.6rem;
-    border: 1px solid;
-    letter-spacing: 0.06em;
-}
-.eligibility-status.is-eligible {
-    color: #4caf50;
-    border-color: #4caf50;
-}
-.eligibility-status.not-eligible {
-    color: #d35400;
-    border-color: #d35400;
-}
-.eligibility-status.no-rules {
-    color: #888;
-    border-color: #555;
-}
+    .eligibility-card {
+        background: #141414;
+        border: 1px solid #333;
+        padding: 1rem 1.25rem;
+        margin-bottom: 1rem;
+    }
+    .eligibility-card.is-eligible {
+        border-color: var(--color-primary);
+        box-shadow: 0 0 8px rgba(231, 126, 35, 0.25);
+    }
+    .eligibility-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+    }
+    .eligibility-title {
+        font-family: var(--font-headline);
+        text-transform: uppercase;
+        color: var(--color-primary);
+        font-size: 0.95rem;
+        letter-spacing: 0.08em;
+    }
+    .eligibility-status {
+        font-family: var(--font-headline);
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        padding: 0.2rem 0.6rem;
+        border: 1px solid;
+        letter-spacing: 0.06em;
+    }
+    .eligibility-status.is-eligible {
+        color: #4caf50;
+        border-color: #4caf50;
+    }
+    .eligibility-status.not-eligible {
+        color: #d35400;
+        border-color: #d35400;
+    }
+    .eligibility-status.no-rules {
+        color: #888;
+        border-color: #555;
+    }
 
-/*
+    /*
  * "You-are-here"-Marker: highlights the eligibility card whose fromRank
  * matches the current user's rank (= next promotion step). Auto-opened
  * via the order in the DOM stays as-is, but the visual emphasis tells
  * the user "this is the one to focus on".
  */
-.eligibility-card.is-next-step {
-    border-color: var(--color-primary);
-    box-shadow: 0 0 8px rgba(231, 126, 35, 0.4);
-}
-.next-step-badge {
-    display: inline-block;
-    font-family: var(--font-headline);
-    font-size: 0.65rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    padding: 0.15rem 0.5rem;
-    border: 1px solid var(--color-primary);
-    color: var(--color-primary);
-    background: rgba(231, 126, 35, 0.08);
-    white-space: nowrap;
-}
+    .eligibility-card.is-next-step {
+        border-color: var(--color-primary);
+        box-shadow: 0 0 8px rgba(231, 126, 35, 0.4);
+    }
+    .next-step-badge {
+        display: inline-block;
+        font-family: var(--font-headline);
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        padding: 0.15rem 0.5rem;
+        border: 1px solid var(--color-primary);
+        color: var(--color-primary);
+        background: rgba(231, 126, 35, 0.08);
+        white-space: nowrap;
+    }
 
-/*
+    /*
  * Progress bar per eligibility card. achievedTotal/requiredTotal is
  * computed client-side (sum across all checks in the card) so the bar
  * keeps working even if a future server change adds more checks per
  * rule. Width is set inline by the script after DOMContentLoaded.
  */
-.eligibility-progress {
-    margin: 0.5rem 0 0.75rem 0;
-    background: var(--color-surface-input);
-    border: 1px solid var(--color-gray-3);
-    height: 0.5rem;
-    position: relative;
-    overflow: hidden;
-}
-.eligibility-progress-fill {
-    height: 100%;
-    background: var(--color-success);
-    transition: width 0.3s ease-out;
-}
-.eligibility-card:not(.is-eligible) .eligibility-progress-fill {
-    background: linear-gradient(90deg, var(--color-warning), var(--color-danger));
-}
-.eligibility-progress-label {
-    font-size: 0.75rem;
-    color: var(--color-gray-2-text);
-    margin-bottom: 0.2rem;
-}
-
-.checks-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.85rem;
-}
-.checks-table th {
-    color: var(--color-gray-2-text);
-    font-weight: 400;
-    text-align: left;
-    padding: 0.3rem 0.6rem;
-    border-bottom: 1px solid #2a2a2a;
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-.checks-table td {
-    padding: 0.35rem 0.6rem;
-    border-bottom: 1px solid #1e1e1e;
-    color: var(--color-gray-1);
-    vertical-align: top;
-}
-.checks-table tr:last-child td {
-    border-bottom: none;
-}
-.check-status-ok {
-    color: #4caf50;
-    font-weight: 700;
-}
-.check-status-missing {
-    color: #d35400;
-    font-weight: 700;
-}
-.checks-table tr.is-row-satisfied {
-    background: rgba(76, 175, 80, 0.04);
-}
-.checks-table tr.is-row-missing {
-    background: rgba(211, 84, 0, 0.04);
-}
-.checks-row-hidden {
-    display: none;
-}
-
-.me-toolbar {
-    display: flex;
-    gap: 0.75rem;
-    align-items: center;
-    margin-bottom: 0.75rem;
-    flex-wrap: wrap;
-}
-.me-filter-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.35rem 0.6rem;
-    border: 1px solid var(--color-gray-3);
-    background-color: var(--color-bg-dark-gray);
-    color: var(--color-gray-1);
-    font-size: 0.8rem;
-    cursor: pointer;
-    user-select: none;
-    min-height: 38px;
-    box-sizing: border-box;
-}
-.me-filter-chip:has(input:checked) {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-}
-.me-filter-chip input[type='checkbox'] {
-    width: 1rem;
-    height: 1rem;
-}
-
-@media (width <= 768px) {
-    .eval-table-wrapper,
-    .checks-wrapper {
-        overflow-x: auto;
+    .eligibility-progress {
+        margin: 0.5rem 0 0.75rem 0;
+        background: var(--color-surface-input);
+        border: 1px solid var(--color-gray-3);
+        height: 0.5rem;
+        position: relative;
+        overflow: hidden;
     }
-    .eligibility-card-header {
-        flex-direction: column;
-        align-items: flex-start;
+    .eligibility-progress-fill {
+        height: 100%;
+        background: var(--color-success);
+        transition: width 0.3s ease-out;
+    }
+    .eligibility-card:not(.is-eligible) .eligibility-progress-fill {
+        background: linear-gradient(90deg, var(--color-warning), var(--color-danger));
+    }
+    .eligibility-progress-label {
+        font-size: 0.75rem;
+        color: var(--color-gray-2-text);
+        margin-bottom: 0.2rem;
+    }
+
+    .checks-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+    }
+    .checks-table th {
+        color: var(--color-gray-2-text);
+        font-weight: 400;
+        text-align: left;
+        padding: 0.3rem 0.6rem;
+        border-bottom: 1px solid #2a2a2a;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+    .checks-table td {
+        padding: 0.35rem 0.6rem;
+        border-bottom: 1px solid #1e1e1e;
+        color: var(--color-gray-1);
+        vertical-align: top;
+    }
+    .checks-table tr:last-child td {
+        border-bottom: none;
+    }
+    .check-status-ok {
+        color: #4caf50;
+        font-weight: 700;
+    }
+    .check-status-missing {
+        color: #d35400;
+        font-weight: 700;
+    }
+    .checks-table tr.is-row-satisfied {
+        background: rgba(76, 175, 80, 0.04);
+    }
+    .checks-table tr.is-row-missing {
+        background: rgba(211, 84, 0, 0.04);
+    }
+    .checks-row-hidden {
+        display: none;
+    }
+
+    .me-toolbar {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+        margin-bottom: 0.75rem;
+        flex-wrap: wrap;
+    }
+    .me-filter-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.35rem 0.6rem;
+        border: 1px solid var(--color-gray-3);
+        background-color: var(--color-bg-dark-gray);
+        color: var(--color-gray-1);
+        font-size: 0.8rem;
+        cursor: pointer;
+        user-select: none;
+        min-height: 38px;
+        box-sizing: border-box;
+    }
+    .me-filter-chip:has(input:checked) {
+        border-color: var(--color-primary);
+        color: var(--color-primary);
+    }
+    .me-filter-chip input[type='checkbox'] {
+        width: 1rem;
+        height: 1rem;
+    }
+
+    @media (width <= 768px) {
+        .eval-table-wrapper,
+        .checks-wrapper {
+            overflow-x: auto;
+        }
+        .eligibility-card-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
     }
 }

@@ -2,37 +2,41 @@
  * (FE-PERF-02). Linked in the same place the block stood, so the cascade order is
  * unchanged. */
 
-.form-group label {
-    display: block;
-    margin-bottom: 0.4rem;
-    font-family: var(--font-body);
-    font-size: 0.8rem;
-}
-.form-group input[type='text'],
-.form-group select,
-.form-group textarea {
-    width: 100%;
-    padding: 0.5rem;
-    background-color: var(--color-gray-4);
-    border: 1px solid var(--color-gray-3);
-    color: var(--color-gray-1);
-    box-sizing: border-box;
-}
-.form-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 1rem;
-}
-.selector-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: end;
-    gap: 0.75rem;
-    padding: 0.75rem;
-    margin-bottom: 0.75rem;
-    border: 1px solid var(--color-gray-3);
-}
-.selector-row .form-group {
-    flex: 1 1 160px;
-    margin: 0;
+@layer base, components, page, migration, utilities;
+
+@layer page {
+    .form-group label {
+        display: block;
+        margin-bottom: 0.4rem;
+        font-family: var(--font-body);
+        font-size: 0.8rem;
+    }
+    .form-group input[type='text'],
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 0.5rem;
+        background-color: var(--color-gray-4);
+        border: 1px solid var(--color-gray-3);
+        color: var(--color-gray-1);
+        box-sizing: border-box;
+    }
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1rem;
+    }
+    .selector-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: end;
+        gap: 0.75rem;
+        padding: 0.75rem;
+        margin-bottom: 0.75rem;
+        border: 1px solid var(--color-gray-3);
+    }
+    .selector-row .form-group {
+        flex: 1 1 160px;
+        margin: 0;
+    }
 }

@@ -595,9 +595,11 @@ class InventoryPageControllerMvcTest {
   // Two page-CSS guards for the Einbuchen form: (1) the blanket `.form-group input` rule excludes
   // radio/checkbox inputs via a zero-specificity :where(), so the Material <-> Item radios keep
   // the global 1.2rem KRT circle styling and the rule cannot outrank the combobox chevron
-  // padding; (2) the (0,3,0) `.form-group.check-row.krtm-hidden` override must exist — the
-  // (0,2,0) check-row flex rule would otherwise beat the (0,1,0) `.krtm-hidden` utility and the
-  // REQ-INV-026 merge opt-in row could never be hidden for PIECE materials.
+  // padding; (2) the REQ-INV-026 merge opt-in row stays hideable for PIECE materials. That used to
+  // need a (0,3,0) `.form-group.check-row.krtm-hidden` override, because the (0,2,0) check-row flex
+  // rule beat the (0,1,0) `.krtm-hidden` utility. Since REQ-UI-024 `.krtm-hidden` sits in the
+  // `utilities` cascade layer and beats every page rule (CascadeLayerOrderTest asserts it), so the
+  // override is gone and must not come back as a second, now misleading, source of the rule.
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void viewInputPage_pageCssExcludesTogglesAndKeepsMergeRowHideable() throws Exception {
@@ -612,7 +614,8 @@ class InventoryPageControllerMvcTest {
             PageStylesheets.content(
                 containsString(
                     ".form-group input:where(:not([type='checkbox']):not([type='radio']))")))
-        .andExpect(PageStylesheets.content(containsString(".form-group.check-row.krtm-hidden")));
+        .andExpect(
+            PageStylesheets.content(not(containsString(".form-group.check-row.krtm-hidden"))));
   }
 
   // REQ-FE-011/REQ-FE-016: the shared combobox i18n bootstrap (fragments/head.html) must carry a
