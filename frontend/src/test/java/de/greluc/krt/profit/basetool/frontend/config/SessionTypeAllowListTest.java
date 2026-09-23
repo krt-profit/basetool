@@ -75,6 +75,7 @@ import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2RefreshToken;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.oauth2.core.oidc.OidcIdToken;
@@ -411,6 +412,11 @@ class SessionTypeAllowListTest {
           new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("test").build(), claims);
       jwt.sign(new RSASSASigner(key));
       NimbusJwtDecoder decoder = NimbusJwtDecoder.withPublicKey(key.toRSAPublicKey()).build();
+      // The issue time is fixed so the sample is reproducible, which makes the token expired on
+      // any clock past it: the decoder's default timestamp validator turned this test red from
+      // five minutes after the fixed instant on. The test is about the claims' runtime types,
+      // not about token validity, so the decode validates nothing.
+      decoder.setJwtValidator(token -> OAuth2TokenValidatorResult.success());
       decoder.setClaimSetConverter(
           new MappedJwtClaimSetConverter(
               OidcIdTokenDecoderFactory.createDefaultClaimTypeConverters()));
