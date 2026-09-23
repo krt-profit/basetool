@@ -31,9 +31,13 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
@@ -181,5 +185,63 @@ class AdminPersonalInventoryPageControllerMvcTest {
     verify(backendApiClient).get(uriCaptor.capture(), anyTypeRef(), qCaptor.capture());
     assertTrue(uriCaptor.getValue().contains("q={q}"), uriCaptor.getValue());
     assertEquals(term, qCaptor.getValue());
+  }
+
+  // Regression (2026-09-23): an invalid create used to flash its BindingResult through the
+  // redirect.
+  // The session serializer writes a BindingResult but cannot read one back, so the redirect's GET
+  // dropped the whole flash map and the admin saw a closed modal with no errors. It now re-renders
+  // inline, with nothing flashed and nothing sent to the backend.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void add_withValidationErrors_reRendersInlineWithTheModalOpen_andFlashesNothing()
+      throws Exception {
+    UUID userSub = UUID.randomUUID();
+    when(backendApiClient.get(contains("/api/v1/admin/personal-inventory/"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+
+    mockMvc
+        .perform(post("/admin/personal-inventory/" + userSub + "/add").with(csrf()))
+        .andExpect(status().isOk())
+        .andExpect(view().name("admin/personal-inventory"))
+        .andExpect(model().attribute("showItemModal", true))
+        .andExpect(
+            model().attribute("modalAction", "/admin/personal-inventory/" + userSub + "/add"))
+        .andExpect(model().attribute("selectedUserSub", userSub))
+        .andExpect(model().attributeHasFieldErrors("personalInventoryForm", "name", "quantity"))
+        .andExpect(flash().attributeCount(0))
+        .andExpect(content().string(containsString("krt-pi-error-box")));
+
+    verify(backendApiClient, never()).post(anyString(), any(), any());
+  }
+
+  // Same for an invalid update: inline, modal re-opened on the update action, nothing flashed.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void update_withValidationErrors_reRendersInlineWithTheModalOpen_andFlashesNothing()
+      throws Exception {
+    UUID userSub = UUID.randomUUID();
+    UUID itemId = UUID.randomUUID();
+    when(backendApiClient.get(contains("/api/v1/admin/personal-inventory/"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+
+    mockMvc
+        .perform(
+            post("/admin/personal-inventory/" + userSub + "/" + itemId + "/update")
+                .with(csrf())
+                .param("name", "Kiste")
+                .param("quantity", "0"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("admin/personal-inventory"))
+        .andExpect(model().attribute("showItemModal", true))
+        .andExpect(
+            model()
+                .attribute(
+                    "modalAction",
+                    "/admin/personal-inventory/" + userSub + "/" + itemId + "/update"))
+        .andExpect(model().attributeHasFieldErrors("personalInventoryForm", "quantity"))
+        .andExpect(flash().attributeCount(0));
+
+    verify(backendApiClient, never()).put(anyString(), any(), any());
   }
 }

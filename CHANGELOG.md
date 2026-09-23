@@ -27,6 +27,9 @@
   
 ### Added
 
+- **Backend: der interne Schlüsselabruf bei Keycloak lässt sich jetzt einschalten.** Neue
+  optionale Variable `IRI_BACKEND_KEYCLOAK_JWK_SET_URI`; ohne sie bleibt alles wie bisher.
+
 - **Anmeldung: das Webtool kann sich als vertraulicher Client bei Keycloak ausweisen.** Mit
   `KEYCLOAK_FRONTEND_CLIENT_SECRET` sendet es beim Einlösen des Anmelde-Codes zusätzlich zu PKCE
   ein Geheimnis; ohne die Variable bleibt alles wie bisher. Die Umstellung meldet niemanden ab.
@@ -155,6 +158,10 @@
   `IngestAudienceGateOff`, solange die Audience-Prüfung aus ist.
 
 ### Fixed
+
+- **Admin: Eingabefehler im Formular „Persönliches Inventar“ gehen nicht mehr verloren.** Beim
+  Anlegen oder Bearbeiten für ein Mitglied blieb das Fenster nach einem Fehler geschlossen und
+  leer; jetzt öffnet es sich wieder mit den Eingaben und den Fehlermeldungen.
 
 - **Sicherheit: die Sitzungs-Typliste kennt jetzt alle Werte einer echten Anmeldung.** Im Modus
   `enforce` hätte sie das ID-Token jedes Mitglieds abgelehnt (eine Adresse und Zahlen in den
