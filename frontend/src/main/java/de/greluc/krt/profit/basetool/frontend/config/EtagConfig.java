@@ -40,40 +40,32 @@ import org.springframework.web.filter.ShallowEtagHeaderFilter;
  * buffering and never produced an ETag — pure cost, paid on each render, and a streaming response
  * only escaped it because Spring MVC's emitter handler opts out of the buffer per request.
  *
- * <p>The routes that set their own cacheable {@code Cache-Control}, and therefore keep the ETag and
- * the {@code If-None-Match} → {@code 304} it enables, are exactly {@link #ETAG_URL_PATTERNS}:
+ * <p>The filter covers exactly {@link #ETAG_URL_PATTERNS}, the two routes where an ETag is what
+ * makes revalidation cheap:
  *
  * <ul>
- *   <li>the asset trees {@link WebMvcConfig} serves ({@code public, max-age=31536000, immutable}).
- *       Content-hashed and {@code Last-Modified}-capable, so the ETag is a second revalidation path
- *       rather than the only one; kept because {@code StaticResourcesCachingTest} pins it and
- *       dropping it is a separate decision;
  *   <li>{@code /manifest.webmanifest} ({@code public, max-age=3600}), re-read by browsers hourly;
  *   <li>{@code /.well-known/assetlinks.json} ({@code public, max-age=86400}).
  * </ul>
  *
- * <p>The asset-tree prefixes mirror {@link WebMvcConfig#addResourceHandlers}; {@code
- * StaticResourceHandlerMappingTest} fails when a tree is added there without its prefix here.
+ * <p><b>The static asset trees are deliberately outside it</b> (owner decision 2026-09-23). Every
+ * asset URL {@link WebMvcConfig} serves is content-hashed and sent {@code public, max-age=31536000,
+ * immutable}, so a browser never revalidates it, and the resource handler answers an {@code
+ * If-Modified-Since} from {@code Last-Modified} on its own. An ETag there bought nothing and cost a
+ * full in-memory copy of every font, image and script on the way out. {@code
+ * StaticResourcesCachingTest} pins both halves: assets keep their cache headers and carry no ETag,
+ * the manifest keeps its ETag and {@code 304}.
  */
 @Configuration
 public class EtagConfig {
 
   /**
-   * The servlet URL patterns the ETag filter is registered on. Servlet path-prefix patterns ({@code
-   * /css/*}) cover a whole tree, so each {@code /tree/**} handler of {@link WebMvcConfig} appears
-   * as {@code /tree/*}.
+   * The servlet URL patterns the ETag filter is registered on: the two publicly cacheable,
+   * non-hashed responses whose revalidation an ETag turns into a body-less {@code 304}.
    */
   @Unmodifiable
   public static final List<String> ETAG_URL_PATTERNS =
-      List.of(
-          "/css/*",
-          "/fonts/*",
-          "/images/*",
-          "/js/*",
-          "/logos/*",
-          "/robots.txt",
-          "/manifest.webmanifest",
-          "/.well-known/assetlinks.json");
+      List.of("/manifest.webmanifest", "/.well-known/assetlinks.json");
 
   /**
    * Registers the {@link ShallowEtagHeaderFilter} on {@link #ETAG_URL_PATTERNS} at near-highest

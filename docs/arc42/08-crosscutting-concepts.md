@@ -85,11 +85,12 @@ Two binding rules shape every UI change:
   write outside `krtFetch` fails `:frontend:lintJs` (REQ-FE-002), and so does an HTML sink that is
   neither escaped through `escapeHtml` / `escapeAttr` nor a server fragment inserted through
   `krtFetch.setTrustedHtml` (REQ-FE-022, `eslint-plugin-no-unsanitized`).
-- **Only cacheable routes are buffered for an ETag** (2026-09-22, FE-PERF-03). The frontend's
-  `ShallowEtagHeaderFilter` covers the static asset trees, the web app manifest and
-  `assetlinks.json` — the responses with a cacheable `Cache-Control` of their own. Everything else
-  is `no-store`, where no ETag can be issued, so pages, fragments and the SSE relay stream
-  unbuffered. A new publicly cacheable route joins `EtagConfig.ETAG_URL_PATTERNS` (ADR-0161).
+- **An ETag only where it pays** (FE-PERF-03, 2026-09-22; assets out 2026-09-23). The frontend's
+  `ShallowEtagHeaderFilter` covers the web app manifest and `assetlinks.json` — publicly
+  cacheable and not content-hashed. The static assets are hashed, `immutable` and revalidate by
+  `Last-Modified`; everything else is `no-store`, where no ETag can be issued. So assets, pages,
+  fragments and the SSE relay all leave unbuffered. A new publicly cacheable, non-hashed route
+  joins `EtagConfig.ETAG_URL_PATTERNS` (ADR-0161).
 
 Authority: [`ui-design-system.md`](../specs/ui-design-system.md),
 [`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md) (`REQ-FE-*`),

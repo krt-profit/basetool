@@ -117,6 +117,16 @@ preserve every contract above. In priority order, each as its own change with it
    > `StaticResourceHandlerMappingTest` fails when an asset tree lacks its prefix, and the frontend's
    > `SseDeliveryThroughFilterChainTest` reads a stream's first frame off a real socket.
 
+   > [!note] Amended 2026-09-23 (owner decision): the asset trees are out of the filter too
+   > Every asset URL is content-hashed and sent `immutable` for a year, so a browser never
+   > revalidates it, and the resource handler answers `If-Modified-Since` from `Last-Modified` on
+   > its own. The ETag there was a second revalidation path nobody used, paid for with an
+   > in-memory copy of every font, image and script. `EtagConfig.ETAG_URL_PATTERNS` is now
+   > `/manifest.webmanifest` and `/.well-known/assetlinks.json` only. `StaticResourcesCachingTest`
+   > asserts an asset keeps `max-age=31536000, immutable` and `Last-Modified`, answers
+   > `If-Modified-Since` with `304` and carries no ETag; `StaticResourceHandlerMappingTest` fails
+   > when an asset tree is put back into the list.
+
 4. **Add an `openapi.json` schema diff against the previous release tag in CI**, closing the gap
    ADR-0136 documents about itself (`ExternalContractTest` *"does not compare types, nullability or enum
    values"*). This is the evolution discipline protobuf field numbers would have provided, as a test

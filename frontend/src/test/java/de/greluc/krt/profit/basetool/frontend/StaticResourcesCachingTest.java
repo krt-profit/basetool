@@ -70,22 +70,32 @@ class StaticResourcesCachingTest {
             .build();
   }
 
+  /**
+   * A static asset stays outside the ETag filter (owner decision 2026-09-23): it keeps its year-long
+   * {@code immutable} cache header and its {@code Last-Modified}, answers an {@code
+   * If-Modified-Since} with a {@code 304} from the resource handler itself, and carries no ETag —
+   * the header only the filter adds, so its absence is the proof the body was not buffered for one.
+   *
+   * @throws Exception if the MockMvc request fails
+   */
   @Test
-  void staticResource_ShouldSendEtag_AndReturn304OnMatch() throws Exception {
+  void staticResource_ShouldBeImmutableWithLastModified_AndCarryNoEtag() throws Exception {
     String resource = "/images/drake_interplanetary_black.svg";
 
-    String etag =
+    String lastModified =
         mockMvc
             .perform(get(resource))
             .andExpect(status().isOk())
-            .andExpect(header().string("ETag", notNullValue()))
-            .andExpect(header().string("Cache-Control", containsString("max-age")))
+            .andExpect(header().string("Cache-Control", containsString("max-age=31536000")))
+            .andExpect(header().string("Cache-Control", containsString("immutable")))
+            .andExpect(header().string("Last-Modified", notNullValue()))
+            .andExpect(header().doesNotExist("ETag"))
             .andReturn()
             .getResponse()
-            .getHeader("ETag");
+            .getHeader("Last-Modified");
 
     mockMvc
-        .perform(get(resource).header("If-None-Match", etag))
+        .perform(get(resource).header("If-Modified-Since", lastModified))
         .andExpect(status().isNotModified());
   }
 
