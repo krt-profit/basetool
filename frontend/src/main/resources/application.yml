@@ -250,6 +250,11 @@ app:
     # class is refused and that one attribute dropped. Lenient: any case, and an unknown value falls
     # back to report with a WARN.
     type-allow-list: ${APP_SESSION_TYPE_ALLOW_LIST:report}
+    # Spring Session's startup CONFIG call for keyspace notifications (RedisSessionConfig). Only the
+    # image build's AOT training run switches it off (docker/app/Dockerfile, IMG-PERF-12), because
+    # it is the one step of the context refresh that opens a Redis connection. Every deployment
+    # keeps true: a frontend that cannot reach its session store must fail its startup (ADR-0084).
+    configure-keyspace-notifications: true
   ui:
     notification-duration: 5000
   logging:
@@ -303,7 +308,7 @@ app:
 # backend outage genuinely means this frontend cannot serve, and the deploy loop
 # no longer restart-storms on a merely-unhealthy container (ADR-0083).
 # `livenessState` is likewise not in this group.
-# The Docker HEALTHCHECK in frontend/Dockerfile points at /actuator/health/readiness
+# The Docker HEALTHCHECK in docker/app/Dockerfile (stage runtime-frontend) points at /actuator/health/readiness
 # so this group is what gates docker-compose `service_healthy`.
 management:
   endpoints:

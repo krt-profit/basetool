@@ -625,9 +625,15 @@ rule — no blanket "everything is masked" claim:
   the single `older_than = "167h"` drop stage nor any of the three masking replaces can touch a fresh
   line or either phrase. The observed line is recorded verbatim beside the rule, because its wording
   is JVM-version-dependent and a Temurin bump is the thing that would silently invalidate it. **The
-  runtime digest has moved since** (the three Dockerfiles pin `…@sha256:3137541d…` as of 2026-09-22),
+  runtime digest has moved since** (the app Dockerfile pins `…@sha256:3137541d…` as of 2026-09-22),
   so the re-check in [`monitoring/README.md`](../../monitoring/README.md) → *After a Temurin bump* is
-  owed.
+  owed. A second rule consumes the same stream since 2026-09-23: **`JvmStartupCacheRejected`**
+  (warning) fires on the JVM's own `Unable to use AOT cache` / `Loading static archive failed` (and
+  the AppCDS equivalents), which a JVM prints when its `JAVA_TOOL_OPTIONS` layout differs from the
+  one the image's startup cache was trained with — the service starts, without the cache
+  (REQ-OPS-030, ADR-0209). Its lines were reproduced on the pinned digest and are asserted by
+  `scripts/check-loki-rule-signatures.py`, which holds `JvmNativeThreadExhaustion` to its recorded
+  lines too.
 - **Keycloak file log** (`app="keycloak"`) — masked **in the shipper** (Alloy stages scrub
   `username=` / `ipAddress=` before ingestion).
 

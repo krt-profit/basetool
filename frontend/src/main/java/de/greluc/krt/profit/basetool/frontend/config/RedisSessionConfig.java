@@ -125,6 +125,21 @@ public class RedisSessionConfig {
   private String typeAllowListValue;
 
   /**
+   * Whether startup runs Spring Session's keyspace-notification configuration against Redis at all
+   * ({@code app.session.configure-keyspace-notifications}, default {@code true}), read by {@link
+   * #configureRedisAction()}.
+   *
+   * <p>Only the image build switches it off: its ahead-of-time training run starts the whole
+   * application context without lazy initialisation and without a Redis server, and this startup
+   * {@code CONFIG GET} is the one step of the refresh that opens a Redis connection (IMG-PERF-12,
+   * ADR-0209). Every real deployment keeps the default -- the server's own {@code
+   * --notify-keyspace-events Egx} makes the call a no-op under the per-service ACL users anyway,
+   * but a frontend that cannot reach its session store must still fail its startup (ADR-0084).
+   */
+  @Value("${app.session.configure-keyspace-notifications:true}")
+  private boolean configureKeyspaceNotifications;
+
+  /**
    * <em>Anonymous</em> session idle timeout read from {@code app.session.anonymous-timeout}
    * (default 30m), applied as the repository's default {@code maxInactiveInterval} (REQ-SEC-025,
    * ADR-0088).
@@ -520,11 +535,18 @@ public class RedisSessionConfig {
    * always did. Under the frontend's own ACL user the refusal is logged and the server's {@code
    * --notify-keyspace-events Egx} is relied on instead.
    *
-   * @return the tolerant action.
+   * <p>With {@link #configureKeyspaceNotifications} off the action is Spring Session's {@link
+   * ConfigureRedisAction#NO_OP}, so the startup opens no Redis connection at all -- which is what
+   * the image build's AOT training run needs (IMG-PERF-12).
+   *
+   * @return the tolerant action, or {@link ConfigureRedisAction#NO_OP} when the property is off.
    */
   @NotNull
   @Bean
   public ConfigureRedisAction configureRedisAction() {
+    if (!configureKeyspaceNotifications) {
+      return ConfigureRedisAction.NO_OP;
+    }
     return new TolerantKeyspaceNotificationsAction();
   }
 

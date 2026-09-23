@@ -39,6 +39,7 @@ import org.springframework.session.FlushMode;
 import org.springframework.session.Session;
 import org.springframework.session.config.SessionRepositoryCustomizer;
 import org.springframework.session.data.redis.RedisIndexedSessionRepository;
+import org.springframework.session.data.redis.config.ConfigureRedisAction;
 import org.springframework.session.security.SpringSessionBackedSessionRegistry;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.validation.BeanPropertyBindingResult;
@@ -151,6 +152,32 @@ class RedisSessionConfigTest {
     SpringSessionBackedSessionRegistry<Session> registry = config.sessionRegistry(repository);
 
     assertThat(registry).isNotNull();
+  }
+
+  /**
+   * With {@code app.session.configure-keyspace-notifications} at its default the startup action is
+   * the ACL-tolerant one (REQ-SEC-068), which still runs Spring Session's {@code CONFIG} call and
+   * still fails the startup on an unreachable Redis (ADR-0084).
+   */
+  @Test
+  void keyspaceActionIsTheTolerantOneByDefault() {
+    RedisSessionConfig config = new RedisSessionConfig();
+    ReflectionTestUtils.setField(config, "configureKeyspaceNotifications", true);
+
+    assertThat(config.configureRedisAction())
+        .isInstanceOf(TolerantKeyspaceNotificationsAction.class);
+  }
+
+  /**
+   * Switched off -- only the image build's AOT training run does that (IMG-PERF-12) -- the action
+   * is Spring Session's {@code NO_OP}, so the context refresh opens no Redis connection at all.
+   */
+  @Test
+  void keyspaceActionIsNoOpWhenSwitchedOff() {
+    RedisSessionConfig config = new RedisSessionConfig();
+    ReflectionTestUtils.setField(config, "configureKeyspaceNotifications", false);
+
+    assertThat(config.configureRedisAction()).isSameAs(ConfigureRedisAction.NO_OP);
   }
 
   /**

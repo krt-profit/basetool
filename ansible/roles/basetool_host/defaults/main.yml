@@ -102,7 +102,7 @@ basetool_host_manage_selinux: true
 # The reasons are in docs/archive/PODMAN_HOST_BOOTSTRAP.md section 3 and they have not changed with the
 # runtime -- only the arithmetic has.
 basetool_host_container_owners:
-  - container_uid: 10001          # backend / frontend / ingest, set in their Dockerfiles
+  - container_uid: 10001          # backend / frontend / ingest, set in docker/app/Dockerfile
     reason: "the app modules write their logs here"
     paths:
       - backend/log

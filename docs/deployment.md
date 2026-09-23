@@ -72,6 +72,11 @@ disaster recovery: [`backup.md`](backup.md). The monitoring plane:
   `keycloak-theme`, `monitoring` and **`quadlet/`** — the unit files and their `env.d` templates.
   It is promoted in lock-step with the app images and the `basetool-keycloak-spi` JAR bundle
   (ADR-0055), so a promoted unit change reaches the host by the next tick.
+- **The three app images are one Dockerfile (ADR-0209).** `docker/app/Dockerfile`, built with
+  `--build-arg MODULE=backend|frontend|ingest` from the repository root. Each image carries a Java
+  AOT cache its build verified; a host that starts one with a different
+  `-XX:UseCompactObjectHeaders` (for instance the ADR-0180 rollback through `IRI_EXTRA_JAVA_OPTS`)
+  starts without the cache — slower, not broken — and `JvmStartupCacheRejected` says so.
 - **Provisioning is separate from delivery (ADR-0188).** Packages, users, directories, SELinux,
   firewall, haproxy, the host monitoring services and the operational scripts and timers come from
   the Ansible role in [`ansible/`](../ansible/README.md), run by an operator. It never deploys a

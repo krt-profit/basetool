@@ -1,6 +1,6 @@
 # ADR-0180 — Compact object headers are enabled on Java 25, ahead of JDK 27's default
 
-- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-09-16 (`2937c2f99`, #1921: `-XX:+UseCompactObjectHeaders` in the three Dockerfiles and `docker-compose.yml`).
+- **Status:** Accepted — implemented; amended by [ADR-0209](0209-the-images-ship-a-java-aot-cache-trained-eagerly-and-verified-at-build.md) (2026-09-23: the archive this invariant binds is now a Java AOT cache, and a mismatch is detected at build and at run time instead of being silent). *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-09-16 (`2937c2f99`, #1921: `-XX:+UseCompactObjectHeaders` in the three Dockerfiles and `docker-compose.yml`).
 - **Date:** 2026-09-15
 - **Deciders:** @greluc (pending)
 - **Related:** specs `REQ-OPS-030` (new) ·
