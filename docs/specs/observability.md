@@ -1960,6 +1960,21 @@ session read can fail:
   warning), which sums **across** `missing_key` precisely so a format break that loses all three
   fields at once cannot hide below a per-series threshold.
 
+A fifth frontend session meter came with the session type allow-list (REQ-SEC-067, ADR-0206):
+
+- `basetool_session_type_refused_total{mode}` — counter bumped by `SessionTypeAllowList` when a
+  session value names a class outside the allow-list. `mode` is `report` or `enforce`, a closed set
+  (`off` never counts); the class name goes into a once-per-class `WARN`, never into a tag, because a
+  type id comes out of a stored payload and is unbounded. Under `report` — what a deploy ships — the
+  value is read anyway and Jackson caches the deserializer it resolved, so the counter rises **once
+  per class and slot per frontend lifetime**: it answers "does such a class occur", which is exactly
+  the gate for switching to `enforce`. Under `enforce` every refused read counts, and the dropped
+  attribute is also counted on `basetool_session_value_dropped_total{cause="InvalidTypeIdException"}`,
+  so a sustained stream trips `SessionValueDropsSustained` as well. Backs
+  `SessionTypeOutsideAllowList` (`sum by (mode) (increase(…[1h])) > 0`, no `for`, warning) — a rate
+  threshold would never see the single report-mode step. Pinned by
+  `monitoring/prometheus/tests/session_type_allow_list_alert_test.yml`.
+
 Two frontend meters were added by the 2026-08 logging audit:
 
 - `basetool_session_evicted_total` — unlabelled counter, bumped by `SessionEvictionLoggingStrategy`

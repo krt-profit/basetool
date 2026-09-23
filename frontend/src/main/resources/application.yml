@@ -238,6 +238,13 @@ app:
     # handler (authenticated = post-login bump).
     anonymous-timeout: ${APP_SESSION_ANONYMOUS_TIMEOUT:30m}
     authenticated-timeout: ${APP_SESSION_AUTHENTICATED_TIMEOUT:720h}
+    # Which classes a session value may name as its @class type id (REQ-SEC-067, ADR-0206,
+    # SessionTypeAllowList). off = every class, the validator of before; report (default) = every
+    # class is still read, a class outside the list is counted in
+    # basetool_session_type_refused_total{mode="report"} and named once in a WARN; enforce = such a
+    # class is refused and that one attribute dropped. Lenient: any case, and an unknown value falls
+    # back to report with a WARN.
+    type-allow-list: ${APP_SESSION_TYPE_ALLOW_LIST:report}
   ui:
     notification-duration: 5000
   logging:

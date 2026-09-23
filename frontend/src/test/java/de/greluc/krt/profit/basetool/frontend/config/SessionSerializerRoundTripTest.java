@@ -24,11 +24,13 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.greluc.krt.profit.basetool.frontend.model.dto.ImportSuggestionDto;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.apache.tomcat.websocket.server.WsHttpSessionBindingListener;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.serializer.GenericJacksonJsonRedisSerializer;
@@ -104,8 +106,18 @@ class SessionSerializerRoundTripTest {
     assertEquals(Boolean.TRUE, roundTrip(Boolean.TRUE));
   }
 
-  /** A record, i.e. an implicitly final type whose JSON form is an object. */
-  private record ProbeRecord(String name, int amount) {}
+  /**
+   * A record, i.e. an implicitly final type whose JSON form is an object — one of the application's
+   * own, because since REQ-SEC-067 a record declared in this test package would be refused by the
+   * session type allow-list for its package rather than for being final, and the cases below would
+   * then pass for the wrong reason.
+   *
+   * @return a refinery-import suggestion, a record the import flash really carries.
+   */
+  private static ImportSuggestionDto probeRecord() {
+    return new ImportSuggestionDto(
+        UUID.fromString("00000000-0000-0000-0000-000000000001"), "probe", 0.5);
+  }
 
   @Test
   void aRecordAsAnAttributeValue_cannotBeReadBack() {
@@ -123,7 +135,7 @@ class SessionSerializerRoundTripTest {
     // is an allow-list of individually named container classes, not a change of policy for final
     // types. If this ever starts passing, the allow-list has grown into a blanket rule and the
     // required Long/Integer session keys are the next thing to check.
-    assertThrows(Exception.class, () -> roundTrip(new ProbeRecord("probe", 3)));
+    assertThrows(Exception.class, () -> roundTrip(probeRecord()));
   }
 
   @Test
@@ -142,7 +154,7 @@ class SessionSerializerRoundTripTest {
     // session". A non-final container gets its `@class`, and its contents are then written through
     // Object-typed slots, which type-id everything inside — including a record. This is why flash
     // attributes (a java.util.ArrayList of FlashMap) survive while a bare record does not.
-    List<Object> wrapped = new ArrayList<>(List.of(new ProbeRecord("probe", 3)));
+    List<Object> wrapped = new ArrayList<>(List.of(probeRecord()));
 
     assertEquals(wrapped, roundTrip(wrapped));
     assertEquals(
