@@ -265,6 +265,25 @@ check_mode() {
       && { echo "FAIL: ${mode}: a header is trusted with nothing in front of the edge"; exit 1; }
   fi
 
+  # Compression beyond text/html. `gzip on` without gzip_types compresses HTML only,
+  # which is how CSS, JS and JSON left the edge uncompressed until 2026-09-23 while
+  # the upstreams were told not to compress. The event stream must stay OUT: gzip
+  # buffers it, and live sync would arrive in bursts or not at all.
+  local gz
+  gz="$(grep -E '^[[:space:]]*gzip_types ' "${dump}" || true)"
+  [[ -n "${gz}" ]] || { echo "FAIL: ${mode}: no gzip_types - the edge compresses text/html only"; exit 1; }
+  # One type per line, compared as fixed strings: `image/svg+xml` is not a regex.
+  local gz_list t
+  gz_list="$(tr -s ' ;\t' '\n' <<<"${gz}")"
+  for t in text/css text/javascript application/javascript application/json image/svg+xml; do
+    grep -qxF "${t}" <<<"${gz_list}" \
+      || { echo "FAIL: ${mode}: gzip_types does not list ${t}"; exit 1; }
+  done
+  grep -qxF 'text/event-stream' <<<"${gz_list}" \
+    && { echo "FAIL: ${mode}: gzip_types lists text/event-stream - gzip would buffer the SSE streams"; exit 1; }
+  grep -qE '^[[:space:]]*gzip_vary on;' "${dump}" \
+    || { echo "FAIL: ${mode}: gzip_vary is not on"; exit 1; }
+
   # The health listener must NEVER speak proxy_protocol, in either shape: the
   # container's own HEALTHCHECK is a plain wget, and a rejected check would hold
   # the whole stack down behind an edge that is working.
