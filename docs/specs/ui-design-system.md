@@ -231,21 +231,36 @@ enabled in `frontend/eslint.config.mjs` (checked 2026-09-22) — see Open questi
 > The paragraph below about inline `display` versus classes describes the defect the contract ended;
 > the contract clears any inline `display` on both open and close.
 >
-> **Not done:** moving the ninety hand-written dialog shells onto `fragments/modal-wrapper.html`.
-> Their behaviour is now shared; what remains duplicated is the head markup, and each move changes a
-> dialog's rendered head (`h2` → `h3`, an icon close → ✕) and ids that scripts and tests address. An
-> owner decision.
+> **Every dialog is rendered by `fragments/modal-wrapper.html` (2026-09-23, owner decision).** The
+> 94 hand-written shells (and the bank movement fragment) now call `modal-wrapper :: modal`, so the
+> overlay, the frame and the head exist once. The head is the design system's: an `<h2>` title and
+> the ✕ `.krt-modal-close` labelled `general.a11y.closeModal`. Until then the shells had drifted
+> (`<h2>` in 76, `<h3>` in 20; an ✕ in 74, an icon button in 22). The accessible name moved onto
+> the `<dialog>` itself (`aria-labelledby` the heading when a script retitles it, else
+> `aria-label`), instead of a `role="dialog"` frame inside a native dialog. Dialog ids stayed as
+> they were. Five hooks moved: hangar's add/edit titles and the mission unit dialogs' initial ship
+> now sit on their forms, and the Materialbörse, Materialgesuch and Leitung ✕ are bound by the
+> page-scoped classes `mb-modal-close` / `mg-modal-close` / `leitung-modal-close`. The move also
+> fixed five order-detail dialogs (Eintragung, Notiz, Übergabe, Item-Übergabe, Produktion): their ✕
+> carried `close-modal-display` without a `data-modal-id`, so it closed nothing, and Escape, which
+> clicks the ✕, closed nothing either.
 
 The KRT HUD modal — `.krt-modal-overlay` scrim > `.krt-modal` frame (orange top edge + corner
-brackets) > `.krt-modal-head` (title + close-X) — is extracted as the reusable Thymeleaf fragment
-`fragments/modal-wrapper.html :: modal(modalId, titleKey, variant, body)`. New `.krt-modal-overlay`
-modals and migrations use it rather than hand-copying the shell; the bespoke body/footer is passed
-through the `body` fragment expression (`~{::selector}`) so rendering stays identical, and
-`variant` appends a `.krt-modal--*` class (e.g. `krt-modal--wide`, `krt-modal--danger`). Modals open
-with `data-trigger="open-modal-display"` and **close with the single standardized trigger
-`data-trigger="close-modal-display"` + `data-modal-id`** (common-handlers.js). The older
-`data-modal-dismiss` convention is being migrated onto it and survives only on the
-`mission-detail.html` dialogs (handled in `mission-detail.js`); new dialogs never use it. The overlay's hidden default comes from
+brackets) > `.krt-modal-head` (title + close-X) — is the Thymeleaf fragment
+`fragments/modal-wrapper.html :: modal`, and **every** dialog is rendered by it. The fragment
+declares no signature; a call names what it needs: `modalId` and `titleKey` (required), `body`
+(required: by convention a `<th:block th:ref="<modalId>-body">` inside the call, holding the
+`.krt-modal-body` and `.krt-modal-foot`; in a fragment file it names its template,
+`~{fragments/x :: <ref>}`), and optionally `variant` (a `.krt-modal--*` or page frame class),
+`titleId` (heading id for a script that retitles; the dialog is then `aria-labelledby` it), `open`
+(server-rendered open state), `closeTrigger` (the ✕'s `data-trigger`, default
+`close-modal-display`; `''` when a page script binds the ✕ by `closeClass`), `closeClass` and
+`closeId`. A condition or iteration goes on a `<th:block>` around the call. Modals open with
+`data-trigger="open-modal-display"` and **close with the single standardized trigger
+`data-trigger="close-modal-display"` + `data-modal-id`** (common-handlers.js), which the wrapper puts
+on every ✕ that has no page handler. The older `data-modal-dismiss` convention survives only on
+footer buttons of the `mission-detail.html` dialogs (handled by `krt-modal.js`); new dialogs never
+use it. The overlay's hidden default comes from
 the **global** `.krt-modal-overlay { display:none }` in `styles.css` (loaded on every page;
 `bank.css` duplicates it as defense-in-depth), so the fragment injects no inline style. A modal is
 made visible by adding the `krtm-modal-open` class (`display:flex`, in the `utilities` cascade layer,
@@ -273,9 +288,21 @@ hiding it — so the class always wins regardless of how the other side toggled 
   through `window.krtModal`.
 - [x] An opened dialog is modal (`:modal`), takes focus, makes the page behind it unfocusable, keeps
   Tab inside it, closes on Escape, returns focus to its opener and opens again.
+- [x] Every dialog is rendered by `modal-wrapper :: modal`; no other template carries
+  `.krt-modal-overlay`, `.krt-modal`, `.krt-modal-head` or `.krt-modal-close`, and the head is an
+  `<h2>` and an ✕ (2026-09-23).
+- [x] A dialog renders only where its openers and the script that drives it do. The promotion
+  admin pages in the admin's all-squadrons view, and the admin blueprint page before a member is
+  picked, render none of their dialogs (2026-09-23; until then they rendered dead markup).
+- [x] Every dialog on every page route and on a seeded mission, operation, order, refinery order and
+  bank account opens modally with a title, an accessible name and a visible ✕, takes focus, and
+  closes on Escape and on its ✕. A declared dialog the walk does not reach is listed with its reason.
 
-**Enforced by:** `SingleModalShapeTest` (`everyOverlayIsANativeDialog`), `DialogA11yE2eTest`,
-`OrgChartKeyboardA11yE2eTest`, `TouchClassLayoutE2eTest`
+**Enforced by:** `SingleModalShapeTest` (`everyOverlayIsANativeDialog`,
+`everyDialogIsRenderedByTheWrapper`), `ModalWrapperRenderTest`, `DialogA11yE2eTest`
+(`everyDialogFollowsTheContract`), `PromotionAdminDialogsRenderWithTheirScriptMvcTest`,
+`AdminPersonalBlueprintsPageControllerMvcTest`, `OrgChartKeyboardA11yE2eTest`,
+`TouchClassLayoutE2eTest`
 
 **Three sanctioned widths, and no fourth.** `.krt-modal` is 440 px (confirms and single-field
 prompts), `.krt-modal--wide` is 600 px (form-heavy: 3+ stacked fields) and `.krt-modal--xwide` is
@@ -283,16 +310,17 @@ prompts), `.krt-modal--wide` is 600 px (form-heavy: 3+ stacked fields) and `.krt
 material/item pickers and the refinery store sheet. A dialog that needs a width none of these gives
 is a signal to revisit its content, not to add a per-page `max-width`.
 
-**The head's parts are styled, and both heading levels count.** `.krt-modal-close` carries the
+**The head's parts are styled.** `.krt-modal-close` carries the
 `.close-sidebar-btn` treatment (its already-approved sibling — same job, an ✕ that dismisses a
 surface), squared and floored to 44 px in the touch block, with `flex-shrink: 0` so a long German
 title cannot squeeze it narrower than its glyph and a `:focus-visible` ring because it is the first
 Tab stop inside a dialog. It had **no rule at all** until #1884 found it by measurement, and the
 port would have moved the legacy dialogs onto something worse than the styled `.close-modal` they
-came from. The head's title rule covers **`h2` and `h3`**: hand-written shells use `h2` and
-the `modal-wrapper` fragment emits `h3`, and while only `h2` was styled a fragment-rendered title
-fell through to the global heading rule and rendered orange at the browser's default `h3` size
-instead of white at `0.85rem`. The close button's accessible name is **`general.a11y.closeModal`**
+came from. The head's title rule styles the wrapper's **`h2`**. It covered `h3` as well while the
+hand-written shells used `h2` and the fragment emitted `h3` (an unstyled `h3` title fell through to
+the global heading rule and rendered orange at the browser's `h3` size); since 2026-09-23 every
+dialog's title is the wrapper's `h2` and the `h3` selector is gone. The close button's accessible
+name is **`general.a11y.closeModal`**
 (it was `bank.a11y.closeModal`, on fifteen pages that have nothing to do with the Bank).
 
 **A wrapper between the frame and its form needs `.krt-modal-flow`.** The frame caps itself at
@@ -366,7 +394,7 @@ out-specify the page-level `.form-row > .form-group` floor, which is declared la
 - [ ] The frame's width is one of the three sanctioned variants (default / `--wide` / `--xwide`),
   not a per-page `max-width`.
 - [ ] The head carries a `.krt-modal-close` labelled `general.a11y.closeModal`, and its title is an
-  `h2` or `h3` (both are styled).
+  `h2`.
 - [ ] A swap container between `.krt-modal` and its `<form>` carries `.krt-modal-flow`, so the body
   still scrolls under the `90vh` cap.
 - [ ] `.krt-modal-overlay` is `display:none` by default in the global `styles.css` (not only in a

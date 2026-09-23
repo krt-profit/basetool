@@ -30,14 +30,9 @@
                              Ignored when accountSelectable (bank.js derives it per chosen account).
     - canDeposit / canWithdraw / canTransfer: which movement types the type selector offers.
 */-->
-<dialog th:fragment="movementModal(modalId, refreshTarget, accountId, accountSelectable, justificationRequired, canDeposit, canWithdraw, canTransfer)"
-     class="krt-modal-overlay" th:id="${modalId}">
-    <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.movement.title}">
-        <div class="krt-modal-head">
-            <h3 th:text="#{bank.modal.movement.title}">Kontobewegung</h3>
-            <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                    th:attr="data-modal-id=${modalId}" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-        </div>
+<th:block th:fragment="movementModal(modalId, refreshTarget, accountId, accountSelectable, justificationRequired, canDeposit, canWithdraw, canTransfer)">
+<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId=${modalId}, titleKey='bank.modal.movement.title', body=~{fragments/bank-movement-modal :: bank-movement-modal-body})}">
+    <th:block th:ref="bank-movement-modal-body">
         <!--/* The endpoint + account-id-field default to the first available type; bank.js resets both
              on open (primeModal -> syncMovementRows) and on every type change. data-account-id pins
              the fixed source account (detail); the selectable variant syncs it from the source
@@ -286,7 +281,8 @@
                         th:text="#{bank.action.deposit}">Einzahlen</button>
             </div>
         </form>
-    </div>
-</dialog>
+    </th:block>
+</th:block>
+</th:block>
 </body>
 </html>

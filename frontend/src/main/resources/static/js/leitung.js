@@ -169,7 +169,7 @@
                 openModal(opener);
                 return;
             }
-            if (e.target.closest('[data-leitung-cancel]')) {
+            if (e.target.closest('[data-leitung-cancel], .leitung-modal-close')) {
                 closeModal();
                 return;
             }

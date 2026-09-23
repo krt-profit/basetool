@@ -120,14 +120,8 @@
 </main>
 
 <!--/* Create / Edit modal (KRT modal frame, no native dialogs) */-->
-<dialog id="krt-pi-modal" class="krt-modal-overlay" role="dialog" aria-modal="true"
-     aria-labelledby="krt-pi-modal-title"
-     th:classappend="${showItemModal != null} ? 'krtm-modal-open' : 'krtm-hidden'">
-    <div class="krt-modal krt-modal--wide">
-        <div class="krt-modal-head">
-            <h2 id="krt-pi-modal-title" th:text="#{personalInventory.modal.create.title}">Eintrag anlegen</h2>
-            <button type="button" class="btn btn-ghost btn-icon close" data-trigger="pi-close-modal" th:title="#{personalInventory.action.cancel}" th:aria-label="#{personalInventory.action.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
-        </div>
+<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='krt-pi-modal', titleKey='personalInventory.modal.create.title', variant='krt-modal--wide', titleId='krt-pi-modal-title', open=${showItemModal != null}, closeTrigger='pi-close-modal', body=~{::krt-pi-modal-body})}">
+    <th:block th:ref="krt-pi-modal-body">
 
         <form id="krt-pi-form"
               th:action="${modalAction != null ? modalAction : '/personal-inventory/add'}"
@@ -175,16 +169,12 @@
                 <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{personalInventory.action.save}">Speichern</span></button>
             </div>
         </form>
-    </div>
-</dialog>
+    </th:block>
+</th:block>
 
 <!--/* Delete confirmation modal (KRT danger frame; the body names what is deleted) */-->
-<dialog id="krt-pi-delete-modal" class="krt-modal-overlay krtm-display-none-5790" role="dialog" aria-modal="true" th:aria-label="#{personalInventory.action.delete.confirm.title}">
-    <div class="krt-modal krt-modal--danger">
-        <div class="krt-modal-head">
-            <h2 th:text="#{personalInventory.action.delete.confirm.title}">Eintrag loeschen</h2>
-            <button type="button" class="btn btn-ghost btn-icon close" data-trigger="pi-close-delete" th:title="#{personalInventory.action.cancel}" th:aria-label="#{personalInventory.action.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
-        </div>
+<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='krt-pi-delete-modal', titleKey='personalInventory.action.delete.confirm.title', variant='krt-modal--danger', closeTrigger='pi-close-delete', body=~{::krt-pi-delete-modal-body})}">
+    <th:block th:ref="krt-pi-delete-modal-body">
         <div class="krt-modal-body">
             <p id="krt-pi-delete-message" class="krtm-margin-0-2a0c" th:text="#{personalInventory.action.delete.confirm.body}">Wirklich loeschen?</p>
         </div>
@@ -195,8 +185,8 @@
                 <button type="submit" class="btn btn-danger"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{personalInventory.action.delete.confirm.ok}">L&ouml;schen</span></button>
             </div>
         </form>
-    </div>
-</dialog>
+    </th:block>
+</th:block>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">

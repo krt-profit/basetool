@@ -252,13 +252,8 @@
         </div>
     </div>
 
-    <dialog id="storeModal" class="krt-modal-overlay" th:classappend="${showStoreModal} ? 'krtm-modal-open' : 'krtm-hidden'">
-        <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{refineryorder.action.store}">
-            <div class="krt-modal-head">
-                <h2 th:text="#{refineryorder.action.store}">Einlagern</h2>
-                <button type="button" class="krt-modal-close" data-trigger="rod-close-store"
-                        th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='storeModal', titleKey='refineryorder.action.store', variant='krt-modal--wide', open=${showStoreModal}, closeTrigger='rod-close-store', body=~{::storeModal-body})}">
+        <th:block th:ref="storeModal-body">
             
             <!--/* Live-sync seam for the `store` section (REQ-FE-015): the dialog's rows are derived
                  from the order's output goods, so a peer's save re-renders them here via
@@ -375,8 +370,8 @@
             </form>
             </th:block>
             </div>
-        </div>
-    </dialog>
+        </th:block>
+    </th:block>
 
     <!--/* Section-sized inline error for an unknown / failed ?fragment= render (REQ-FE-015): a
          peer-driven refresh that names a section the controller does not know degrades to this

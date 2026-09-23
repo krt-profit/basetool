@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyClass;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -89,6 +90,49 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
         .andExpect(content().string(containsString("data-krt-combobox=\"remote-users\"")))
         .andExpect(model().attributeExists("blueprints"))
         .andExpect(model().attribute("adminMode", Boolean.TRUE));
+  }
+
+  // REQ-UI-013: a dialog renders only together with its openers and its script. Without a member
+  // selected the page shows the picker and the global purge danger zone; the member's edit, remove
+  // and import dialogs, their openers and the import script appear only once a member is chosen.
+  // Until 2026-09-23 the three dialogs rendered on the bare page as dead markup.
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void view_withoutMember_rendersOnlyThePurgeDialog() throws Exception {
+    String html =
+        mockMvc
+            .perform(get("/admin/personal-blueprints"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(html)
+        .contains("id=\"bp-purge-modal\"")
+        .doesNotContain("id=\"krt-bp-edit-modal\"")
+        .doesNotContain("id=\"krt-bp-delete-modal\"")
+        .doesNotContain("id=\"krt-bp-import-modal\"")
+        .doesNotContain("personal-inventory-blueprints-import.js");
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void view_withMember_rendersTheMembersDialogsTogetherWithTheImportScript() throws Exception {
+    PageResponse<UserDto> empty = new PageResponse<>(List.of(), 0, 1000, 0, 0, List.of());
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(empty);
+    String html =
+        mockMvc
+            .perform(
+                get("/admin/personal-blueprints")
+                    .param("userSub", "00000000-0000-0000-0000-000000000009"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(html)
+        .contains("id=\"krt-bp-edit-modal\"")
+        .contains("id=\"krt-bp-delete-modal\"")
+        .contains("id=\"krt-bp-import-modal\"")
+        .contains("personal-inventory-blueprints-import.js");
   }
 
   @Test

@@ -2933,7 +2933,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         typeSelect.addEventListener('change', () => filterShips(true));
 
-        const modal = typeSelect.closest('.krt-modal');
+        const modal = typeSelect.closest('[data-init-shiptype]');
         if (modal) {
             const initialType = modal.dataset.initShiptype;
             const initialShip = modal.dataset.initShip;

@@ -216,14 +216,9 @@
 </main>
 
 <!--/* Assign / reassign / add-staff modal (admins only) */-->
-<dialog id="oc-modal" class="krt-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="oc-modal-title"
-     sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
-    <div class="krt-modal krt-modal--wide">
-        <div class="krt-modal-head">
-            <h2 id="oc-modal-title" th:text="#{orgChart.modal.title}">Position besetzen</h2>
-            <button type="button" class="krt-modal-close" data-trigger="oc-modal-cancel"
-                    th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-        </div>
+<th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='oc-modal', titleKey='orgChart.modal.title', variant='krt-modal--wide', titleId='oc-modal-title', closeTrigger='oc-modal-cancel', body=~{::oc-modal-body})}">
+    <th:block th:ref="oc-modal-body">
         <div class="krt-modal-body">
         <input type="hidden" id="oc-mode">
         <input type="hidden" id="oc-position-type">
@@ -261,8 +256,9 @@
             <button type="button" class="btn btn--cta" data-trigger="oc-modal-submit"
                     th:text="#{orgChart.modal.submit}">Zuweisen</button>
         </div>
-    </div>
-</dialog>
+    </th:block>
+</th:block>
+</th:block>
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     // Thymeleaf-interpolated i18n strings only; the imperative logic lives in the org-chart.js

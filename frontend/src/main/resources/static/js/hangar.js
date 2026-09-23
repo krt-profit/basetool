@@ -89,7 +89,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const modalDeleteBtn = document.getElementById('modal-delete-btn');
 
     function openAddModal(btn) {
-        modalTitle.textContent = modal.getAttribute('data-title-add');
+        modalTitle.textContent = form.getAttribute('data-title-add');
         form.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
         document.getElementById('ship-name').value = '';
         document.getElementById('ship-type').value = '';
@@ -102,7 +102,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function openEditModal(btn) {
-        modalTitle.textContent = modal.getAttribute('data-title-edit');
+        modalTitle.textContent = form.getAttribute('data-title-edit');
         form.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
         document.getElementById('ship-name').value = btn.getAttribute('data-name');
         document.getElementById('ship-type').value = btn.getAttribute('data-type');

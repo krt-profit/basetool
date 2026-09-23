@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/*
+  Test-only harness for fragments/modal-wrapper :: modal, rendered by ModalWrapperRenderTest
+  through the Spring Thymeleaf engine: one call per parameter shape the templates use.
+*/-->
+<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='h-plain', titleKey='info.delete', body=~{::h-plain-body})}">
+    <th:block th:ref="h-plain-body">
+        <div class="krt-modal-body"><p>PLAIN-BODY</p></div>
+        <div class="krt-modal-foot"><button type="button" class="btn btn-ghost">FOOT</button></div>
+    </th:block>
+</th:block>
+
+<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='h-full', titleKey='info.delete', variant='krt-modal--wide krt-modal--danger', titleId='h-full-title', open=${true}, closeTrigger='page-close-handler', closeClass='close-h-full', closeId='h-full-x', body=~{::h-full-body})}">
+    <th:block th:ref="h-full-body">
+        <form class="h-full-form"><div class="krt-modal-body">FULL-BODY</div></form>
+    </th:block>
+</th:block>
+
+<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='h-class-bound', titleKey='info.delete', open=${false}, closeTrigger='', closeClass='close-h-class', body=~{::h-class-bound-body})}">
+    <th:block th:ref="h-class-bound-body"><div class="krt-modal-body">CLASS-BOUND-BODY</div></th:block>
+</th:block>
+
+<th:block th:each="r : ${rows}">
+<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='h-row-' + ${r}, titleKey='info.delete', body=~{::h-row-body})}">
+    <th:block th:ref="h-row-body"><div class="krt-modal-body" th:text="'ROW-BODY-' + ${r}">row</div></th:block>
+</th:block>
+</th:block>
+
+<th:block th:if="${false}">
+<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='h-hidden', titleKey='info.delete', body=~{::h-hidden-body})}">
+    <th:block th:ref="h-hidden-body"><div class="krt-modal-body">HIDDEN-BODY</div></th:block>
+</th:block>
+</th:block>
+</body>
+</html>

@@ -168,13 +168,8 @@
 </main>
 
 <!--/* Create Material Modal */-->
-<dialog id="modal-create-material" class="krt-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-create-material-title">
-    <div class="krt-modal krt-modal--wide krt-modal-create-material">
-        <div class="krt-modal-head">
-            <h2 id="modal-create-material-title" th:text="#{admin.materials.create.modal.title}">Neues Material anlegen</h2>
-            <button type="button" class="krt-modal-close" data-trigger="materials-close-create-modal"
-                    th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-        </div>
+<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='modal-create-material', titleKey='admin.materials.create.modal.title', variant='krt-modal--wide krt-modal-create-material', titleId='modal-create-material-title', closeTrigger='materials-close-create-modal', body=~{::modal-create-material-body})}">
+    <th:block th:ref="modal-create-material-body">
         <div class="krt-modal-body">
         <p class="form-hint krtm-margin-bottom-1rem-c2c0" th:text="#{admin.materials.create.modal.intro}">Für Materialien, die noch nicht in UEX vorhanden sind.</p>
 
@@ -241,8 +236,8 @@
             <button type="button" class="btn btn-ghost" data-trigger="materials-close-create-modal" th:text="#{general.cancel}">Abbrechen</button>
             <button type="button" class="btn btn--cta" data-trigger="materials-submit-create" th:text="#{admin.materials.create.submit}">Anlegen</button>
         </div>
-    </div>
-</dialog>
+    </th:block>
+</th:block>
 
 <script th:src="@{/js/autocomplete.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">

@@ -113,12 +113,8 @@
 </main>
 
 <!--/* SpecialCommand Modal (create + edit, action URL toggled by JS) */-->
-<dialog id="specialcommand-modal" class="krt-modal-overlay" th:classappend="${openModal == 'specialcommand-modal'} ? 'krtm-modal-open' : 'krtm-hidden'">
-    <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{admin.specialcommands.create}">
-        <div class="krt-modal-head">
-            <h2 id="sc-modal-title" th:text="#{admin.specialcommands.create}">Spezialkommando</h2>
-            <button type="button" class="krt-modal-close close-sc-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-        </div>
+<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='specialcommand-modal', titleKey='admin.specialcommands.create', variant='krt-modal--wide', titleId='sc-modal-title', open=${openModal == 'specialcommand-modal'}, closeTrigger='', closeClass='close-sc-modal', body=~{::specialcommand-modal-body})}">
+    <th:block th:ref="specialcommand-modal-body">
         <form id="sc-form" method="post" th:action="${modalAction != null and openModal == 'specialcommand-modal'} ? ${modalAction} : @{/admin/special-commands}" th:object="${specialCommandForm}">
             <input type="hidden" name="version" id="edit-sc-version" th:value="*{version}">
             <div class="krt-modal-body">
@@ -143,18 +139,14 @@
                 <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{members.save}">Speichern</span></button>
             </div>
         </form>
-    </div>
-</dialog>
+    </th:block>
+</th:block>
 
 <!--/* Delete confirmation modal — the per-row trash button is a soft-delete (deactivate, reversible
      via "Aktivieren"); the form action is set to the clicked SK's delete URL by the script below.
      No native confirm() per the design system's "no native browser dialogs" rule. */-->
-<dialog id="sc-delete-modal" class="krt-modal-overlay">
-    <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{info.delete.confirm.title}">
-        <div class="krt-modal-head">
-            <h2 th:text="#{info.delete.confirm.title}">Löschen bestätigen</h2>
-            <button type="button" class="krt-modal-close close-sc-delete-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-        </div>
+<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='sc-delete-modal', titleKey='info.delete.confirm.title', variant='krt-modal--danger', closeTrigger='', closeClass='close-sc-delete-modal', body=~{::sc-delete-modal-body})}">
+    <th:block th:ref="sc-delete-modal-body">
         <div class="krt-modal-body">
             <p th:text="#{admin.specialcommands.delete.confirm}" class="mb-2">Möchten Sie dieses Spezialkommando wirklich löschen?</p>
             <p class="m-0"><strong id="sc-delete-name" class="krtm-color-var-color-primary-473b"></strong></p>
@@ -165,8 +157,8 @@
                 <button type="submit" class="btn btn-danger" th:text="#{info.delete}">Löschen</button>
             </form>
         </div>
-    </div>
-</dialog>
+    </th:block>
+</th:block>
 
 <!--/* Modal wiring: open create on +button, open edit prefilled from data-* on Edit button, close on x */-->
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
