@@ -109,6 +109,13 @@ done
 # proves the directive parses and the file is readable.
 cp "${CERT_DIR}/${HOSTS[0]}/fullchain.pem" "${CERT_DIR}/upstream-ca.crt"
 
+# Grafana's own self-signed certificate, the anchor of the Grafana upstream when
+# EDGE_GRAFANA_UPSTREAM_VERIFY=on (REQ-OBS-008). Shaped like the one monitoring/README.md mints.
+openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj "/CN=grafana" \
+  -addext "subjectAltName=DNS:grafana" \
+  -keyout "${CERT_DIR}/grafana-upstream.key" -out "${CERT_DIR}/grafana-upstream.crt" >/dev/null 2>&1
+rm -f "${CERT_DIR}/grafana-upstream.key"
+
 echo "==> validating ${EDGE_DIR} with ${IMAGE}"
 
 # --user 0:0 applies to THIS VALIDATION CONTAINER ONLY. The image runs as uid 101
@@ -149,12 +156,13 @@ for v in "${EDGE_VARS[@]}"; do ENV_ARGS+=(-e "${v}=${RENDER[${v}]}"); done
 # They are not variations of one configuration: a proxy_protocol listener REJECTS a
 # header-less connection, so a mistake in either direction takes the site down.
 check_mode() {
-  local mode="$1" trusted="$2"
+  local mode="$1" trusted="$2" grafana_verify="${3:-off}"
   local out="${CERT_DIR}/${mode}-nginx-t.out"
   echo "==> validating the '${mode}' shape"
 
   docker run --rm --user 0:0 --network none \
   "${ENV_ARGS[@]}" -e EDGE_RENDER_ONLY=1 -e EDGE_TRUSTED_PROXY="${trusted}" --ulimit "nofile=${NOFILE}:${NOFILE}" \
+  -e EDGE_GRAFANA_UPSTREAM_VERIFY="${grafana_verify}" \
   -v "$(to_native "${EDGE_DIR}"):/edge:ro" \
   -v "$(to_native "${CERT_DIR}"):/certs:ro" \
   --entrypoint sh \
@@ -166,6 +174,7 @@ check_mode() {
   cp -r /edge /etc/nginx/edge
   cp -r /certs /etc/nginx/certs
   mv /etc/nginx/certs/upstream-ca.crt /etc/nginx/upstream-ca.crt
+  mv /etc/nginx/certs/grafana-upstream.crt /etc/nginx/grafana-upstream.crt
   mkdir -p /var/www/acme /usr/share/nginx/html/maintenance /tmp/nginx
   # nginx does not open these at parse time, but the roots must exist.
   : > /usr/share/nginx/html/maintenance/maintenance.html
@@ -318,6 +327,26 @@ check_mode() {
   grep -q 'deny all;' <<<"${admin}" \
     || { echo "FAIL: ${mode}: /auth/admin lost its load-bearing 'deny all'"; exit 1; }
 
+  # Grafana's upstream (REQ-OBS-008). Verified exactly when the switch says so, against Grafana's
+  # OWN certificate and never against upstream-ca.crt: `openssl req -x509` marks it CA:TRUE, so
+  # mixing the two anchors would let Grafana's key vouch for a backend certificate.
+  local gtls='include /etc/nginx/edge/include/upstream-grafana-tls.conf;'
+  if [[ "${grafana_verify}" == "on" ]]; then
+    grep -qF "${gtls}" "${dump}" \
+      || { echo "FAIL: ${mode}: EDGE_GRAFANA_UPSTREAM_VERIFY=on but the Grafana location does not include its TLS block"; exit 1; }
+    grep -qE '^[[:space:]]*proxy_ssl_trusted_certificate /etc/nginx/grafana-upstream.crt;' "${dump}" \
+      || { echo "FAIL: ${mode}: the Grafana upstream is not anchored on Grafana's own certificate"; exit 1; }
+    grep -qE '^[[:space:]]*proxy_ssl_name[[:space:]]+grafana;' "${dump}" \
+      || { echo "FAIL: ${mode}: the Grafana upstream does not check the name grafana"; exit 1; }
+  else
+    grep -qF "${gtls}" "${dump}" \
+      && { echo "FAIL: ${mode}: the Grafana upstream is verified although EDGE_GRAFANA_UPSTREAM_VERIFY is off"; exit 1; }
+  fi
+  # In neither mode does the Grafana anchor show up anywhere but its own block, and upstream-ca.crt
+  # never becomes Grafana's anchor.
+  [[ "$(grep -cE '^[[:space:]]*proxy_ssl_trusted_certificate /etc/nginx/grafana-upstream.crt;' "${dump}")" -le 1 ]] \
+    || { echo "FAIL: ${mode}: Grafana's certificate is an anchor in more than one place"; exit 1; }
+
   echo "==> '${mode}' is valid, ${#HOSTS[@]} vhosts rendered and present, and starts clean"
 }
 
@@ -344,6 +373,8 @@ check_mode frontend '172.28.15.10'
 # those addresses is named; this list is exactly what generate-quadlet.py emits. Six literals are no
 # more a range than one is, and a prefix is still refused below.
 check_mode frontend-rootless '172.28.15.10 172.28.3.250 172.28.4.250 172.28.7.250 172.28.11.250 172.28.13.250'
+# The Grafana upstream verified (REQ-OBS-008): the switch the owner turns on, rendered and started.
+check_mode grafana-verified '' on
 
 refuses 'an IPv4 wildcard'         '0.0.0.0/0'
 refuses 'an IPv6 wildcard'         '::/0'
@@ -374,4 +405,26 @@ refuses_admin 'a prefix'        '10.0.0.0/8'
 refuses_admin 'an IPv4 wildcard' '0.0.0.0'
 refuses_admin 'one good and one bad address' '10.9.0.7 192.168.0.0/16'
 
-echo "==> edge configuration is valid in ALL THREE shapes"
+# EDGE_GRAFANA_UPSTREAM_VERIFY: `on` without the certificate, or a value that is neither on nor
+# off, is refused at start-up rather than rendered into a configuration that fails later or
+# silently does the opposite of what was meant.
+refuses_grafana() {
+  local label="$1" value="$2" with_cert="$3"
+  if docker run --rm --user 0:0 --network none "${ENV_ARGS[@]}" \
+       -e EDGE_RENDER_ONLY=1 -e EDGE_GRAFANA_UPSTREAM_VERIFY="${value}" -e WITH_CERT="${with_cert}" \
+       -v "$(to_native "${EDGE_DIR}"):/edge:ro" -v "$(to_native "${CERT_DIR}"):/certs:ro" \
+       --entrypoint sh "${IMAGE}" -c '
+         set -eu; cp -r /edge /etc/nginx/edge
+         [ "${WITH_CERT}" = yes ] && cp /certs/grafana-upstream.crt /etc/nginx/grafana-upstream.crt
+         sh /etc/nginx/edge/render-and-run.sh
+       ' >/dev/null 2>&1; then
+    echo "FAIL: EDGE_GRAFANA_UPSTREAM_VERIFY='${value}' (${label}) was ACCEPTED - it must be refused"
+    exit 1
+  fi
+  echo "==> refused grafana ${label}: ${value}"
+}
+
+refuses_grafana 'on without the certificate' 'on' no
+refuses_grafana 'an unknown value' 'yes' yes
+
+echo "==> edge configuration is valid in ALL FOUR shapes"

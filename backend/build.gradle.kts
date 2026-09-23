@@ -249,4 +249,12 @@ tasks.named<Test>("test") {
     )
     .withPropertyName("liveSyncTopicRegistrySource")
     .withPathSensitivity(PathSensitivity.RELATIVE)
+
+  // `JwkSetUriNamespaceTest` asserts that the backend's generated Quadlet environment passes
+  // KEYCLOAK_JWK_SET_URI (REQ-SEC-024). Off the classpath like the files above, so a compose edit
+  // that dropped the line would otherwise leave this task UP-TO-DATE and the check unrun.
+  inputs
+    .file(rootProject.file("quadlet/env.d/backend.env.tmpl"))
+    .withPropertyName("backendQuadletEnvTemplate")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
 }

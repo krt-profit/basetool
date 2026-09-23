@@ -316,6 +316,18 @@ entry does no harm).
   `./gradlew --write-verification-metadata sha256 <the failing task>` on the
   machine that fails, compare each added SHA against the file on Maven Central
   (its published `.sha1` must match too), and commit the additions.
+- **`dependencyCheckAggregate` resolves more than `help build` does.** The OWASP
+  plugin fetches the POM of every dependency it scans through a detached
+  configuration, so a PR that touches any `build.gradle.kts` (which runs
+  `dependency-check.yml`) failed on 23 POMs nothing else ever resolved — Keycloak's
+  OpenTelemetry, Jackson 2 and webauthn4j among them — from 2026-09-23 (#2034).
+  Regenerate them without downloading the NVD feed: a one-line init script
+  `allprojects { plugins.withId('org.owasp.dependencycheck') { dependencyCheck { autoUpdate = false } } }`
+  saved as `no-nvd-update.gradle`, then
+  `./gradlew --no-parallel --write-verification-metadata sha256 -I no-nvd-update.gradle dependencyCheckAggregate`.
+  The task then fails with *Analysis failed* for want of a database; the
+  resolution before it, which is what the writer needs, has already run. Check
+  the additions against Maven Central as above.
 - **Dependabot** only manages GitHub Actions, Docker images and the frontend's
   npm packages here, none of which Gradle resolves. A Dependabot *security
   update* for a Gradle dependency, should one ever be opened, fails verification
