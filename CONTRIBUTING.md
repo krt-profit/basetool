@@ -309,6 +309,13 @@ entry does no harm).
 - **If CI still fails verification on a coordinate your machine never
   complained about**, the command ran on a warm cache somewhere; run it again as
   written, or in a Linux container, and commit what it adds.
+- **The reverse happens too: a warm local cache can need entries a cold one
+  never fetches.** On 2026-09-23 a local `:frontend:test` failed on the POMs of
+  okhttp 5.5.0 and okio 3.18.1, which the file lacked because the cold-cache run
+  had resolved those modules from their Gradle module files alone. Run
+  `./gradlew --write-verification-metadata sha256 <the failing task>` on the
+  machine that fails, compare each added SHA against the file on Maven Central
+  (its published `.sha1` must match too), and commit the additions.
 - **Dependabot** only manages GitHub Actions, Docker images and the frontend's
   npm packages here, none of which Gradle resolves. A Dependabot *security
   update* for a Gradle dependency, should one ever be opened, fails verification
