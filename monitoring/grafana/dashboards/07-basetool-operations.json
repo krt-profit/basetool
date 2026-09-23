@@ -2829,7 +2829,7 @@
       },
       "type": "timeseries",
       "title": "App live-sync streams (open)",
-      "description": "Open app live-sync SSE streams (ADR-0143). The app holds one per screen, so this tracks how many members are on a live surface. Evictions should sit at zero: a non-zero rate means a client is leaking streams on navigation rather than a member using four devices.",
+      "description": "Open app live-sync SSE streams (ADR-0143). The app holds one per screen, so this tracks how many members are on a live surface. Evictions should sit at zero: a non-zero rate means a client is leaking streams on navigation rather than a member using four devices. Frames are written off the publishing thread through a bounded per-stream queue (BE-PERF-13): `queued` hovers near zero, and `dropped` counts frames refused by a full queue (AppLiveSyncFramesDropped).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -2870,6 +2870,24 @@
           "refId": "B",
           "expr": "sum(rate(basetool_livesync_streams_evicted_total[1h])) * 3600",
           "legendFormat": "evicted at the per-member cap/h",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "refId": "C",
+          "expr": "sum(basetool_livesync_frames_queued)",
+          "legendFormat": "frames queued for delivery",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "refId": "D",
+          "expr": "sum(rate(basetool_livesync_frames_dropped_total[1h])) * 3600",
+          "legendFormat": "frames dropped at a full queue/h",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"

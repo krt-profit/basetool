@@ -958,6 +958,21 @@ public final class MetricNames {
   public static final String LIVESYNC_SEND_FAILURES = "basetool.livesync.send.failures";
 
   /**
+   * Counter {@code basetool_livesync_frames_dropped_total} — tag {@code event} ({@link
+   * #TAG_EVENT}); a frame offered to an app live-sync stream whose bounded delivery queue was full,
+   * and therefore dropped instead of buffered (BE-PERF-13). Zero while every subscriber reads; a
+   * rising rate means streams stopped draining.
+   */
+  public static final String LIVESYNC_FRAMES_DROPPED = "basetool.livesync.frames.dropped";
+
+  /**
+   * Gauge {@code basetool_livesync_frames_queued} — frames waiting in the app live-sync streams'
+   * delivery queues, summed across all streams (BE-PERF-13). Hovers near zero; a standing value is
+   * a subscriber that stopped reading.
+   */
+  public static final String LIVESYNC_FRAMES_QUEUED = "basetool.livesync.frames.queued";
+
+  /**
    * Counter {@code basetool_livesync_delivered_total} — tag {@code topic_class}; {@code changed}
    * frames written into a room, counted once per frame rather than once per receiver.
    */

@@ -782,7 +782,9 @@ throwaway cache (Redis is session-store only, ADR-0074):
   defect here.
 
 Both command lines — the `redis-dev` template and the `redis` prod override (which additionally
-carries `--aclfile`) — stay in lockstep on these persistence/memory flags. The posture is
+carries `--aclfile`) — stay in lockstep on these persistence/memory flags, and both carry
+`--notify-keyspace-events Egx`, which Spring Session needs and the frontend's own ACL user may not
+set itself (REQ-SEC-068). The posture is
 **observable**: because `--maxmemory` is set (`redis_memory_max_bytes > 0`), the `RedisMemoryHigh`
 leading-indicator alert is functional (it self-guards on that being non-zero and was inert while
 maxmemory was unset), and `RedisEvictions` is a misconfiguration tripwire (any eviction under
@@ -800,7 +802,8 @@ posture has ever had on the **primary** durability layer.
 
 - [ ] Both redis command lines in `docker-compose.yml` set `--appendonly yes --appendfsync everysec`,
   `--save "60 1"`, `--maxmemory 384mb`, and `--maxmemory-policy noeviction`; the prod override keeps
-  `--aclfile` and the two lines carry identical persistence/memory flags.
+  `--aclfile` and the two lines carry identical persistence/memory flags and
+  `--notify-keyspace-events Egx`.
 - [ ] `--maxmemory` (384mb) is strictly below the container memory limit (512M) so a snapshot /
   AOF-rewrite fork has copy-on-write headroom.
 - [ ] The eviction policy is `noeviction`; no `allkeys-*` / `volatile-*` policy is configured.
@@ -1809,6 +1812,46 @@ there.
 **Decision:**
 [ADR-0202](../adr/0202-a-realm-is-brought-to-the-production-shape-by-a-provisioner-that-never-deletes.md) ·
 **Runbook:** [`INGEST_KEYCLOAK_SETUP.md` → *New or out-of-date realm*](../INGEST_KEYCLOAK_SETUP.md#new-or-out-of-date-realm-run-the-provisioner)
+
+### REQ-OPS-034 — Every artifact the build resolves matches a committed checksum
+
+The build verifies what it downloads, not only which version it asks for (SEC-15, 2026-09-23).
+`gradle/verification-metadata.xml` lists a **SHA-256 for every jar, POM and Gradle module file**
+the build resolves — the applications' runtime and test classpaths, the Gradle plugins, the tool
+configurations (Checkstyle, SpotBugs, PIT, JaCoCo, Spotless, the OWASP scan) and the Node.js
+archive the frontend's linters run on — and Gradle refuses an artifact whose bytes do not match, or
+that has no entry at all, before it is used.
+
+- **Strict everywhere a product is built**: CI, the E2E and PIT workflows, the three image builds
+  (they copy `gradle/` already) and the release workflows run in the default strict mode.
+  `dependency-submission.yml` alone runs lenient — it ships nothing, and its action injects an
+  init-script plugin the file does not describe.
+- **Checksums only.** PGP signatures are not verified (ADR-0208 says why and when to revisit).
+- **`-sources.jar` and `-javadoc.jar` are trusted** by pattern: IDE downloads, never on a build
+  classpath.
+- **The change that alters the graph carries the regenerated file**, produced by
+  `GRADLE_USER_HOME="$(mktemp -d)" ./gradlew --write-verification-metadata sha256 help build :frontend:compileE2eJava`
+  ([`CONTRIBUTING.md`](../../CONTRIBUTING.md) → *Dependency verification*). A catalog bump without it
+  fails CI with the offending coordinates.
+- **The Node.js archive differs per operating system**, so its component carries one artifact per
+  platform the build runs on (`win-x64`, `linux-x64` at introduction).
+
+**Acceptance**
+
+- [x] On an empty Gradle user home, in Linux, `--dependency-verification strict` resolves and runs
+  `help`, `assemble`, `compileTestJava`, `:frontend:compileE2eJava`, `:frontend:nodeSetup`,
+  `spotlessCheck`, `checkstyleMain`, `spotbugsMain`, every `licensee` and every `cyclonedxBom` without
+  a verification failure (2026-09-23).
+- [x] The full CI build (`build :frontend:compileE2eJava`) on the maintainer's Windows
+  workstation with the warm cache.
+- [x] An artifact whose checksum is edited in the file fails the build with
+  "Dependency verification failed" (the negative case, run once at introduction).
+
+**Enforced by:** `gradle/verification-metadata.xml` (every Gradle invocation) · `ci.yml`,
+`e2e.yml`, `pitest.yml`, `release-images.yml`, the three `Dockerfile`s (strict by default) ·
+**Decision:** [ADR-0208](../adr/0208-gradle-verifies-every-dependency-against-a-committed-sha-256.md)
+· **Related:** REQ-OPS-025 (the SBOMs describing what these artifacts become), REQ-OPS-021 (one
+image build per commit)
 
 ## Open questions
 

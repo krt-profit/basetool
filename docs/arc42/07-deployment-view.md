@@ -69,6 +69,11 @@ Consequences worth stating:
   units, so the two databases and Redis, which sit on nothing else, cannot reach the internet
   (ADR-0162, extended 2026-09-22). Compose keeps them non-internal for the local `-dev` twins, which
   publish their ports there.
+- **Redis's ACL is rendered, not written.** `/var/iri/redis/users.acl` comes from
+  `scripts/redis-users.acl.tmpl` through `render-redis-acl.py` (installed by the role), one user per
+  service and SHA-256 hashes only, and is applied live with `ACL LOAD` (REQ-SEC-068, ADR-0207).
+  The unit carries `--notify-keyspace-events Egx` and an unauthenticated `PING` health probe, so
+  neither depends on which ACL users exist.
 - **Podman features go through Quadlet keys, not raw arguments** — `RunInit=`, `Ulimit=` and the
   network's `Options=` since 2026-09-22. Only `--cpus` and `--oom-score-adj`, which have no key in
   podman 5.8, remain `PodmanArgs=`.

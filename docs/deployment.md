@@ -206,7 +206,7 @@ Shapes and locations only. Values live on the host and in the off-site backup, n
 | `/var/iri/code/env.d/<svc>.env` | `deploy:iri 0640`, dir `2750` | per-service environment, one closed allow-list each | **generated** on every config change; never edit — edit `.env` |
 | `/var/iri/secrets/keystore.p12` | `root:110000 0640` + ACL `u:100999:r`, `u:iri:r` | the shared internal TLS keystore (backend, frontend, ingest, keycloak) | ACL for keycloak and for the backup helper; see [rotation](#internal-keystore-and-certificate-rotation) |
 | `/var/iri/code/realm-export.json` | `root:100999` + ACL `u:iri:r` | Keycloak realm seed, bind-mounted into keycloak | only seeds an empty realm; the live realm is in `db-keycloak` |
-| `/var/iri/redis/users.acl` | `root:root 0644` | Redis ACL, **with** a `user default …` line | without that line redis resets `default` to `nopass`; check `grep -c '^user default ' …` = 1 |
+| `/var/iri/redis/users.acl` | `root:root 0644` | Redis ACL, one user per service, **rendered** by `render-redis-acl.py` (SHA-256 hashes, no password) and **with** a `user default …` line | without that line redis resets `default` to `nopass`; check `grep -c '^user default ' …` = 1 — see [The Redis ACL](#the-redis-acl) |
 | `/etc/iri/ghcr-pull-token` | `deploy:deploy 0600`, dir `0700` | classic PAT, `read:packages` only | optional sidecar `ghcr-pull-token.expiry` (ISO date) |
 | `/etc/iri/backup.env`, `/etc/iri/rclone.conf` | `deploy`-readable | restic repository, password, rclone remote | [`backup.md`](backup.md) |
 | `/var/iri/monitoring/secrets/*`, `/var/iri/monitoring/certs/*` | translated uids | Prometheus web auth, scrape password, Alertmanager routes, `basetool-ca.crt`, Grafana's own cert | [`monitoring/README.md`](../monitoring/README.md) |
@@ -219,27 +219,115 @@ Shapes and locations only. Values live on the host and in the off-site backup, n
 `/var/iri/redis/users.acl` is the **only** authentication Redis has: `--requirepass` was removed on
 2026-09-16, and once `--aclfile` is in play a file without a `default` entry makes Redis reset
 `default` to `nopass ~* &* +@all` — the whole session store, OAuth2 refresh tokens included, open on
-the internal network (the 2026-07-10 defect). Two entries: `default`, carrying exactly
-`REDIS_PASSWORD` from `.env`, and a read-only `monitoring` user for `redis-exporter` that can run
-introspection commands but cannot list or read keys.
+the internal network (the 2026-07-10 defect).
+
+Since REQ-SEC-068 / ADR-0207 the file is **rendered, never written by hand**:
+[`scripts/render-redis-acl.py`](../scripts/render-redis-acl.py) fills
+[`scripts/redis-users.acl.tmpl`](../scripts/redis-users.acl.tmpl) — the rules, committed and
+reviewed — from `.env`, with every password replaced by its SHA-256 (`#<hex>`), so the file on disk
+and in every backup holds no credential. The role installs both next to `render-env-d.py`. It
+refuses, writing nothing, when a variable is missing or the result lacks exactly one `default` line.
+
+| User | Password in `.env` | May do |
+|---|---|---|
+| `default` | `REDIS_PASSWORD` | everything while `REDIS_DEFAULT_USER` is `on` (the default); **nothing** once it is `off` |
+| `admin` | `REDIS_PASSWORD` | everything — the operator's user for `ACL LOAD` and inspection; only the redis container's own environment carries it |
+| `monitoring` | `REDIS_EXPORTER_PASSWORD` | introspection for `redis-exporter`; no key, no `SCAN` (a key's name is a session id) |
+| `basetool-frontend` | `REDIS_FRONTEND_PASSWORD` | `basetool:session:*`, `GETDEL` of `ingest:handoff:*`, the session-event, keyspace-event and live-sync channels, `SCAN`, `INFO` |
+| `basetool-backend` | `REDIS_BACKEND_PASSWORD` | publish/subscribe on `basetool:livesync:changed` and `basetool:notify:published`, `INFO`; no key |
+| `basetool-ingest` | `REDIS_INGEST_PASSWORD` | `SET`/`RPUSH`/`LPOP`/`EXPIRE`/`DEL` on `ingest:*`, `INFO`; no channel, no `SCAN` |
+
+An application reaches Redis as its own user only when its `REDIS_<SVC>_USERNAME` is set; with it
+empty it sends a password-only `AUTH` with the shared `REDIS_PASSWORD`, which is the `default` user —
+exactly the pre-rollout behaviour. The server carries `--notify-keyspace-events Egx` itself, so the
+frontend no longer needs `CONFIG`, and the unit's health probe is an unauthenticated `PING` that
+accepts `NOAUTH`, so it does not care which users exist.
+
+**Render and apply** (as root, from `/`; `${UCTL}` / `${UPOD}` from
+[Shell conventions](#shell-conventions-used-below)):
 
 ```bash
-# default first, its password read straight out of .env (not typed, not in history)
-printf 'user default on >%s ~* &* +@all\n' \
-  "$(sed -n 's/^REDIS_PASSWORD=//p' /var/iri/code/.env | tail -1)" > /var/iri/redis/users.acl
-printf 'user monitoring on >%s -@all +@connection +@read +client +config|get +info +latency +slowlog +memory +cluster|info +cluster|slots +cluster|nodes +xinfo +pfcount -keys sanitize-payload\n' \
-  "$(openssl rand -base64 30 | tr -d '/+=\n')" >> /var/iri/redis/users.acl
+cd /
+cp -p /var/iri/redis/users.acl /var/iri/redis/users.acl.backup-$(date +%Y%m%d-%H%M%S)
+/var/iri/code/scripts/render-redis-acl.py --env /var/iri/code/.env \
+  --template /var/iri/code/scripts/redis-users.acl.tmpl --out /var/iri/redis/users.acl
 chown root:root /var/iri/redis/users.acl && chmod 0644 /var/iri/redis/users.acl
 restorecon -F /var/iri/redis/users.acl
-grep -c '^user default ' /var/iri/redis/users.acl        # must be 1
+grep -c '^user default ' /var/iri/redis/users.acl                 # must be 1
+grep -c '>' /var/iri/redis/users.acl                               # must be 0: hashes only
+# live and atomic -- a malformed file is rejected and the running ACL stays. As `admin` once the
+# rendered file has been loaded at least once; the very first load authenticates as `default`
+# (drop `--user admin`), because the hand-written file before it has no admin user.
+${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin ACL LOAD'   # OK
 ```
 
-Put the monitoring user's password into `.env` as `REDIS_EXPORTER_PASSWORD` (read it back with
-`grep -oP '(?<=^user monitoring on >)[^ ]+' /var/iri/redis/users.acl`). **Rotating `REDIS_PASSWORD`
-means changing both places** — the `default` line and `.env` — then restarting redis and every
-client (`${UCTL} restart redis.service backend.service frontend.service ingest.service
-redis-exporter.service`); one without the other locks the apps out of their sessions.
-`check-conformance.py --only redis-requires-auth` proves an unauthenticated `PING` is refused.
+`ACL LOAD` needs no restart and signs nobody out. `check-conformance.py --only redis-requires-auth`
+still proves an unauthenticated `PING` is refused.
+
+> [!warning] Read the ACL log by field, never whole
+> `redis-cli ACL LOG` answers what was refused and by whom — and its `object` field is the key or
+> channel, which for a session key **is a session id**. Print the usernames and reasons only:
+> `${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin ACL LOG 20' | awk 'p{print; p=0} /^(username|reason|context)$/{printf "%s: ", $0; p=1}'`.
+
+**Rotating a password** is `.env` + render + `ACL LOAD` + restarting the one service that uses it
+(`render-env-d.py` first, so its `env.d` file carries the new value). Rotating `REDIS_PASSWORD`
+touches `default`/`admin` and the redis unit's own environment: render both, `ACL LOAD`, then
+`${UCTL} restart redis.service` so the container sees the new `REDIS_PASSWORD` for the next `ACL
+LOAD`.
+
+##### Rollout: one ACL user per service (needs the owner's yes)
+
+Merging and deploying REQ-SEC-068 changes no credential. The deploy restarts `redis` once — its
+unit gained `--notify-keyspace-events Egx` and the credential-free health probe — and every
+application still authenticates as `default`. The rollout is the owner's, in this order; each step
+can be stopped and rolled back on its own.
+
+1. **Install the renderer** (from WSL): `ansible-playbook site.yml --limit production --tags scripts
+   --check --diff`, then without `--check --diff`. Verify
+   `ls -l /var/iri/code/scripts/render-redis-acl.py /var/iri/code/scripts/redis-users.acl.tmpl`.
+2. **Three new passwords into `.env`**, generated on the host so they never cross a terminal:
+
+   ```bash
+   cd /
+   cp -p /var/iri/code/.env /var/iri/code/.env.backup-$(date +%Y%m%d-%H%M%S)
+   for v in REDIS_FRONTEND_PASSWORD REDIS_BACKEND_PASSWORD REDIS_INGEST_PASSWORD; do
+     grep -q "^${v}=" /var/iri/code/.env || \
+       printf '%s=%s\n' "$v" "$(openssl rand -base64 36 | tr -d '/+=\n')" >> /var/iri/code/.env
+   done
+   grep -c -E '^REDIS_(FRONTEND|BACKEND|INGEST)_PASSWORD=' /var/iri/code/.env   # 3
+   ```
+
+3. **Render with `default` still on, and load it** — the block above, first load without `--user
+   admin`. Nothing changes for the applications yet; `admin` and the three service users now exist.
+   Check: `${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin ACL
+   USERS'` lists all six.
+4. **Move the applications**, one at a time, watching each come back healthy:
+
+   ```bash
+   printf '%s\n' REDIS_BACKEND_USERNAME=basetool-backend REDIS_INGEST_USERNAME=basetool-ingest \
+     REDIS_FRONTEND_USERNAME=basetool-frontend >> /var/iri/code/.env
+   sudo -u deploy /var/iri/code/scripts/render-env-d.py \
+     --env /var/iri/code/.env --templates /var/iri/code/quadlet/env.d --out /var/iri/code/env.d
+   ${UCTL} restart backend.service     # live sync + notifications: basetool_redis_fanout_subscribed == 1
+   ${UCTL} restart ingest.service      # a desktop import reaches "Import-Link" and opens
+   ${UCTL} restart frontend.service    # nobody is signed out: the sessions are in Redis
+   ```
+
+   Verify: `${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin CLIENT
+   LIST' | grep -o 'user=[^ ]*' | sort | uniq -c` shows the three service users and no application
+   on `default`; `RedisAclDenials` stays silent; log in, open a mission (live sync), run one
+   refinery import.
+5. **Switch `default` off**: append `REDIS_DEFAULT_USER=off` to `.env`, render, `ACL LOAD` as
+   `admin`. Verify `${UPOD} exec redis sh -c 'redis-cli ping'` answers `NOAUTH`,
+   `${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli ping'` (password-only, i.e.
+   `default`) answers `WRONGPASS … or user is disabled`, `${UPOD} healthcheck run redis` is healthy,
+   and `redis-exporter` still scrapes (`redis_up == 1`).
+
+**Rollback**, from any step: step 5 — set `REDIS_DEFAULT_USER=on` (or delete the line), render,
+`ACL LOAD`. Step 4 — delete the three `REDIS_*_USERNAME` lines, render `env.d/`, restart the three
+services: they are back on `default`. Step 3 — `cp -p` the `users.acl.backup-*` back and `ACL LOAD`
+(authenticating as `default`). The passwords may stay in `.env`; nothing reads them without the
+usernames.
 
 ---
 
