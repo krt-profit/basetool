@@ -51,8 +51,9 @@ public class Ship extends AbstractEntity<UUID> {
 
   private String name;
 
-  @ManyToOne
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "ship_type_id", nullable = false)
+  @ToString.Exclude
   private ShipType shipType;
 
   @NotBlank(message = "{validation.insurance.required}")
@@ -61,14 +62,16 @@ public class Ship extends AbstractEntity<UUID> {
       message = "{validation.insurance.pattern}")
   private String insurance;
 
-  @ManyToOne
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "location_id")
+  @ToString.Exclude
   private Location location;
 
   private boolean fitted;
 
-  @ManyToOne
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "owner_id", nullable = false)
+  @ToString.Exclude
   private User owner;
 
   /**

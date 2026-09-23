@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -53,12 +54,14 @@ public class Location extends AbstractEntity<UUID> {
   @Column(columnDefinition = "TEXT")
   private String description;
 
-  @ManyToOne
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "city_id")
+  @ToString.Exclude
   private City city;
 
-  @ManyToOne
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "space_station_id")
+  @ToString.Exclude
   private SpaceStation spaceStation;
 
   @Column(nullable = false)

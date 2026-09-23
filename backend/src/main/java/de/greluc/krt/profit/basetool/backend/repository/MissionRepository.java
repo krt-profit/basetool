@@ -111,12 +111,46 @@ public interface MissionRepository
    * class-{@code @Transactional} controller, so the lazy fetch is always inside an open persistence
    * context.
    *
+   * <p>The participants' three to-one associations ride along in the same join since they became
+   * lazy (BE-PERF-11): each is one row per participant, so joining them adds no row product, and
+   * the roster mapping reads all three for every participant.
+   *
    * @param id the mission id
    * @return the mission with its participants pre-loaded, or empty when none exists
    */
   @Override
-  @EntityGraph(attributePaths = {"participants"})
+  @EntityGraph(
+      attributePaths = {
+        "participants",
+        "participants.user",
+        "participants.desiredMissionJobType",
+        "participants.plannedMissionJobType"
+      })
   Optional<Mission> findById(UUID id);
+
+  /**
+   * Initialises a mission's {@code assignedUnits} together with every to-one the unit mapping reads
+   * — the unit's ship type and its manufacturer, the assigned ship with its type, manufacturer,
+   * location and owner, and the responsible user — in one statement, into the <em>current</em>
+   * persistence context.
+   *
+   * <p>The detail read calls it right after {@link #findById(UUID)}; the result is the same managed
+   * {@link Mission}, so the collection the mapper then walks is already initialised. Kept out of
+   * {@code findById}'s graph on purpose: two sibling collections there would fetch-join into a
+   * {@code participants x assignedUnits} product (#1138). Until BE-PERF-11 these to-ones were EAGER
+   * and came with the unit rows; lazy, they would cost five batch loads per detail read.
+   *
+   * @param id the mission id
+   * @return the mission (at most one element), with its unit graph initialised
+   */
+  @Query(
+      "SELECT m FROM Mission m LEFT JOIN FETCH m.assignedUnits u"
+          + " LEFT JOIN FETCH u.shipType ust LEFT JOIN FETCH ust.manufacturer"
+          + " LEFT JOIN FETCH u.ship s LEFT JOIN FETCH s.shipType sst"
+          + " LEFT JOIN FETCH sst.manufacturer LEFT JOIN FETCH s.location"
+          + " LEFT JOIN FETCH s.owner LEFT JOIN FETCH u.responsibleUser"
+          + " WHERE m.id = :id")
+  List<Mission> fetchAssignedUnitGraph(@Param("id") UUID id);
 
   /**
    * Returns the next upcoming mission (limit 1) whose {@code plannedStartTime} is after {@code

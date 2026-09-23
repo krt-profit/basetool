@@ -62,13 +62,15 @@ public class MissionParticipant extends AbstractEntity<UUID> {
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
-  @ManyToOne
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "mission_id", nullable = false)
   @JsonIgnore
+  @ToString.Exclude
   private Mission mission;
 
-  @ManyToOne
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "user_id")
+  @ToString.Exclude
   private User user;
 
   private String guestName;
@@ -89,6 +91,12 @@ public class MissionParticipant extends AbstractEntity<UUID> {
    * LazyInitializationException} at mapping time. {@code @BatchSize} keeps the eager load from
    * degenerating into one SELECT per participant when a roster is rendered.
    *
+   * <p><i>Corrected 2026-09-23:</i> the premise above no longer holds — {@code MissionController}
+   * is class-level {@code @Transactional}, so the slim endpoints map inside the transaction, and
+   * this participant's own to-one associations ({@code mission}, {@code user} and both job types)
+   * became LAZY with BE-PERF-11 on exactly that basis. This collection kept EAGER only because
+   * BE-PERF-11 was scoped to to-one associations; making it lazy is a separate, measured change.
+   *
    * <p>{@code @OptimisticLock(excluded = true)} would be inappropriate here: unlike the parent
    * mission's participant collection, mutating a participant's own affiliations is a genuine edit
    * of that participant row and is covered by the participant's own {@code @Version}.
@@ -103,12 +111,14 @@ public class MissionParticipant extends AbstractEntity<UUID> {
   @Setter(AccessLevel.NONE)
   private Set<OrgUnit> orgUnits = new LinkedHashSet<>();
 
-  @ManyToOne
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "desired_mission_job_type_id")
+  @ToString.Exclude
   private JobType desiredMissionJobType;
 
-  @ManyToOne
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "planned_task_job_type_id")
+  @ToString.Exclude
   private JobType plannedMissionJobType;
 
   /**

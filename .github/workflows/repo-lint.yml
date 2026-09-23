@@ -730,6 +730,15 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/render-redis-acl.py --selftest
 
+      # The main-push reuse decision of release-images.yml (REQ-OPS-021, ADR-0210). The script decides
+      # whether a pushed range changed anything that goes into an image; a wrong "no" would ship a
+      # stale image under a new commit's tag, so the self-test pins every branch of the decision and
+      # fails when the COPY parser stops seeing the real Dockerfile's inputs (an empty input set would
+      # make every push look input-free).
+      - name: image-reuse-plan / Self-test the release reuse decision
+        if: ${{ !cancelled() }}
+        run: python3 .github/scripts/image_reuse_plan.py --selftest
+
   container-checks:
     name: Container checks
     runs-on: ubuntu-latest

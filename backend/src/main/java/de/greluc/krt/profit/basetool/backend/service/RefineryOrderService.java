@@ -996,10 +996,14 @@ public class RefineryOrderService {
    * {@code type = 'refinery'} terminals by {@code
    * UexUniverseSyncService.reconcileRefineryTerminalFlags()}.
    *
-   * <p>Reads the already-loaded parent in memory rather than issuing a query, and that is load
-   * bearing: a query here would auto-flush a transaction that is midway through rewriting the order
-   * and its goods, so the goods {@code clear()} + re-add would race its own freshly written rows
-   * and fail with {@code ObjectOptimisticLockingFailureException}.
+   * <p>Reads the parent through the location's association rather than issuing a query, and that is
+   * load bearing: a query here would auto-flush a transaction that is midway through rewriting the
+   * order and its goods, so the goods {@code clear()} + re-add would race its own freshly written
+   * rows and fail with {@code ObjectOptimisticLockingFailureException}. Since BE-PERF-11
+   * (2026-09-23) {@code city} / {@code spaceStation} are lazy, so the first read may initialise a
+   * proxy; that is an entity load by id, for which Hibernate never auto-flushes (only JPQL /
+   * criteria / native queries do), and both callers run it straight after loading the location,
+   * before the goods are touched.
    *
    * @param location the order's chosen location
    * @throws IllegalArgumentException when the location hosts no live refinery terminal

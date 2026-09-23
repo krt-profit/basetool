@@ -23,6 +23,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -209,12 +210,14 @@ public class Material extends AbstractEntity<UUID> {
   @Column(name = "source_systems", nullable = false, length = 16)
   private MaterialSourceSystem sourceSystems = MaterialSourceSystem.UEX_ONLY;
 
-  @ManyToOne
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "refined_material_id")
+  @ToString.Exclude
   private Material refinedMaterial;
 
-  @ManyToOne
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "category_id")
+  @ToString.Exclude
   private MaterialCategory category;
 
   // ───── KRT P4K Reader source lane (catalog import) ─────

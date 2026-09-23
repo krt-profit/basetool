@@ -1,6 +1,6 @@
 # ADR-0137 — One image build per commit, and no BuildKit layer cache
 
-- **Status:** Accepted
+- **Status:** Accepted — amended by [ADR-0210](0210-a-main-push-that-changes-no-image-input-re-tags-the-previous-build.md) (2026-09-23: a `main` push that changes no image input re-tags the previous `main` build instead of building)
 - **Date:** 2026-08-19
 - **Deciders:** Repository owner (@greluc)
 - **Related:** spec REQ-OPS-021 ([`deployment-delivery.md`](../specs/deployment-delivery.md)) · REQ-OPS-002 (promotion gates) · REQ-OPS-015 (host-side signature verification) · ADR-0049 (config as a promotable OCI artifact) · ADR-0055 (keycloak-spi bundle)
