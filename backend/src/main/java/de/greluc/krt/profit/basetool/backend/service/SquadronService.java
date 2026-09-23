@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronDto;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
@@ -86,12 +88,7 @@ public class SquadronService {
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no match
    */
   public Squadron getSquadronById(@NotNull UUID id) {
-    return squadronRepository
-        .findById(id)
-        .orElseThrow(
-            () ->
-                new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                    "Squadron not found"));
+    return Entities.require(squadronRepository.findById(id), "Squadron not found");
   }
 
   /**
@@ -146,8 +143,7 @@ public class SquadronService {
   @CacheEvict(cacheNames = CacheConfig.SQUADRONS_CACHE, allEntries = true)
   public void deleteSquadron(@NotNull UUID id) {
     if (!squadronRepository.existsById(id)) {
-      throw new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-          "Squadron not found");
+      throw new NotFoundException("Squadron not found");
     }
     Squadron squadron = getSquadronById(id);
     squadron.setActive(false);

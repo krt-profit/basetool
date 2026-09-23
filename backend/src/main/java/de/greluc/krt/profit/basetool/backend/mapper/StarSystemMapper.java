@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.mapper;
 import de.greluc.krt.profit.basetool.backend.model.StarSystem;
 import de.greluc.krt.profit.basetool.backend.model.dto.StarSystemDto;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 
 /** MapStruct mapper between Star System entities and DTOs. */
 @Mapper(config = CentralMapperConfig.class)
@@ -30,5 +31,7 @@ public interface StarSystemMapper {
   StarSystemDto toDto(StarSystem starSystem);
 
   /** Builds a new {@link StarSystem} entity from the inbound DTO. */
+  @Mapping(target = "createdAt", ignore = true)
+  @Mapping(target = "updatedAt", ignore = true)
   StarSystem toEntity(StarSystemDto dto);
 }

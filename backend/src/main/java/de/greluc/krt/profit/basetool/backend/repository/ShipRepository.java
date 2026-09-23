@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.backend.repository;
 
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
+import de.greluc.krt.profit.basetool.backend.model.ShipType;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -29,6 +31,7 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /** Spring Data repository for Ship. */
@@ -59,10 +62,9 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
   @Modifying(clearAutomatically = true)
   @Query("UPDATE Ship s SET s.fitted = false WHERE " + ScopeSpecifications.SHIP_SCOPE_TRIPLE)
   void resetAllFittedScoped(
-      @org.springframework.data.repository.query.Param("isAdminAllScope") boolean isAdminAllScope,
-      @org.springframework.data.repository.query.Param("activeOrgUnitId") UUID activeOrgUnitId,
-      @org.springframework.data.repository.query.Param("memberOrgUnitIds")
-          java.util.Collection<UUID> memberOrgUnitIds);
+      @Param("isAdminAllScope") boolean isAdminAllScope,
+      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
 
   /**
    * Bulk-sets the location of every ship owned by {@code ownerId} to {@code location}; backs the
@@ -78,9 +80,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    */
   @Modifying(clearAutomatically = true)
   @Query("UPDATE Ship s SET s.location = :location WHERE s.owner.id = :ownerId")
-  int setLocationForOwner(
-      @org.springframework.data.repository.query.Param("ownerId") UUID ownerId,
-      @org.springframework.data.repository.query.Param("location") Location location);
+  int setLocationForOwner(@Param("ownerId") UUID ownerId, @Param("location") Location location);
 
   /**
    * Deletes the whole hangar of the given owner as part of the hard account deletion
@@ -97,7 +97,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    */
   @Modifying
   @Query("DELETE FROM Ship s WHERE s.owner.id = :ownerId")
-  int deleteByOwnerId(@org.springframework.data.repository.query.Param("ownerId") UUID ownerId);
+  int deleteByOwnerId(@Param("ownerId") UUID ownerId);
 
   /**
    * Derived Spring-Data check - returns {@code true} iff at least one row matches {@code
@@ -129,8 +129,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
   @Query(
       "SELECT s.shipType.id AS shipTypeId, COUNT(s) AS shipCount FROM Ship s"
           + " WHERE s.owner.id = :ownerId GROUP BY s.shipType.id")
-  List<ShipTypeCount> countShipsPerTypeByOwnerId(
-      @org.springframework.data.repository.query.Param("ownerId") UUID ownerId);
+  List<ShipTypeCount> countShipsPerTypeByOwnerId(@Param("ownerId") UUID ownerId);
 
   /**
    * Row of {@link #countShipsPerTypeByOwnerId(UUID)}: a ship type and how many ships of it one
@@ -239,9 +238,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
           )
           """)
   Page<Ship> findByOwnerIdFiltered(
-      @org.springframework.data.repository.query.Param("ownerId") UUID ownerId,
-      @org.springframework.data.repository.query.Param("search") String search,
-      Pageable pageable);
+      @Param("ownerId") UUID ownerId, @Param("search") String search, Pageable pageable);
 
   /**
    * Returns every ship owned by any of the given users, eagerly fetching the relations needed for
@@ -253,7 +250,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * @return ships owned by those users
    */
   @EntityGraph(attributePaths = {"shipType", "location", "owner", "owningOrgUnit"})
-  List<Ship> findByOwnerIdIn(java.util.Collection<UUID> ownerIds);
+  List<Ship> findByOwnerIdIn(Collection<UUID> ownerIds);
 
   /**
    * Lists every entity. Overridden here to attach an {@code @EntityGraph}. Eagerly fetches the
@@ -272,10 +269,9 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
   @EntityGraph(attributePaths = {"shipType", "location", "owner", "owningOrgUnit"})
   @Query("SELECT s FROM Ship s WHERE " + ScopeSpecifications.SHIP_SCOPE_TRIPLE)
   Page<Ship> findAllScoped(
-      @org.springframework.data.repository.query.Param("isAdminAllScope") boolean isAdminAllScope,
-      @org.springframework.data.repository.query.Param("activeOrgUnitId") UUID activeOrgUnitId,
-      @org.springframework.data.repository.query.Param("memberOrgUnitIds")
-          java.util.Collection<UUID> memberOrgUnitIds,
+      @Param("isAdminAllScope") boolean isAdminAllScope,
+      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
       Pageable pageable);
 
   /**
@@ -322,11 +318,10 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
               + "  OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:query as string), '%'))"
               + " )")
   Page<Object[]> countShipsByType(
-      @org.springframework.data.repository.query.Param("isAdminAllScope") boolean isAdminAllScope,
-      @org.springframework.data.repository.query.Param("activeOrgUnitId") UUID activeOrgUnitId,
-      @org.springframework.data.repository.query.Param("memberOrgUnitIds")
-          java.util.Collection<UUID> memberOrgUnitIds,
-      @org.springframework.data.repository.query.Param("query") String query,
+      @Param("isAdminAllScope") boolean isAdminAllScope,
+      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
+      @Param("query") String query,
       Pageable pageable);
 
   /**
@@ -355,10 +350,8 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
       "SELECT s FROM Ship s WHERE s.shipType IN :shipTypes AND "
           + ScopeSpecifications.SHIP_SCOPE_TRIPLE)
   List<Ship> findByShipTypeInScoped(
-      @org.springframework.data.repository.query.Param("shipTypes")
-          List<de.greluc.krt.profit.basetool.backend.model.ShipType> shipTypes,
-      @org.springframework.data.repository.query.Param("isAdminAllScope") boolean isAdminAllScope,
-      @org.springframework.data.repository.query.Param("activeOrgUnitId") UUID activeOrgUnitId,
-      @org.springframework.data.repository.query.Param("memberOrgUnitIds")
-          java.util.Collection<UUID> memberOrgUnitIds);
+      @Param("shipTypes") List<ShipType> shipTypes,
+      @Param("isAdminAllScope") boolean isAdminAllScope,
+      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
 }

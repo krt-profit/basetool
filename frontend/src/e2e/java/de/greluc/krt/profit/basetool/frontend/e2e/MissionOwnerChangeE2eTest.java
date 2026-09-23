@@ -67,7 +67,16 @@ class MissionOwnerChangeE2eTest {
   private static String memberId;
   private static String officerId;
 
-  /** Launches the browser and, for the ephemeral stack, seeds a mission and two candidates. */
+  /**
+   * Launches the browser and, for the ephemeral stack, seeds a mission and two candidates.
+   *
+   * <p>Only the admin actor is homed in IRIDIUM (the mission create is staffel-scoped). The two
+   * candidates are merely materialised as {@code app_user} rows by logging them in once: an owner
+   * change accepts any existing user, and the admin's unpinned picker searches every user. They are
+   * deliberately <em>not</em> passed to {@link BackendSeeder#ensureIridiumMembership}, which
+   * self-assigns through the ADMIN-only membership endpoint and 403s for a non-admin that has no
+   * Staffel yet — the {@code initializationError} this class shipped with on 2026-09-22.
+   */
   @BeforeAll
   static void setUp() {
     playwright = Playwright.create();
@@ -75,8 +84,6 @@ class MissionOwnerChangeE2eTest {
     if (STACK.managesStack()) {
       BackendSeeder seeder = new BackendSeeder();
       seeder.ensureIridiumMembership(USERNAME, PASSWORD);
-      seeder.ensureIridiumMembership(MEMBER, MEMBER_PASSWORD);
-      seeder.ensureIridiumMembership(OFFICER, OFFICER_PASSWORD);
       memberId = seeder.getUserId(MEMBER, MEMBER_PASSWORD);
       officerId = seeder.getUserId(OFFICER, OFFICER_PASSWORD);
       missionId = seeder.createMission(USERNAME, PASSWORD, "E2E Owner Change Mission", false);

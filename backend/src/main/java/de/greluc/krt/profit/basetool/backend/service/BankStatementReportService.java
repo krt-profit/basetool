@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.exception.ReportGenerationException;
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;
@@ -136,9 +137,7 @@ public class BankStatementReportService {
       @Nullable ZoneId userZone,
       boolean redactHolders) {
     BankAccount account =
-        bankAccountRepository
-            .findById(accountId)
-            .orElseThrow(() -> new NotFoundException("Bank account not found"));
+        Entities.require(bankAccountRepository.findById(accountId), "Bank account not found");
     if (from.isAfter(to)) {
       throw new BadRequestException("Statement period start must not be after its end");
     }

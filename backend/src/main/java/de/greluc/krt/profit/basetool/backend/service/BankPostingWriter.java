@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;
 import de.greluc.krt.profit.basetool.backend.model.BankHolder;
@@ -82,9 +83,8 @@ public class BankPostingWriter {
    * @throws NotFoundException when the account does not exist
    */
   public BankAccount lockAccount(@NotNull UUID accountId) {
-    return accountRepository
-        .findByIdForUpdate(accountId)
-        .orElseThrow(() -> new NotFoundException("Bank account not found"));
+    return Entities.require(
+        accountRepository.findByIdForUpdate(accountId), "Bank account not found");
   }
 
   /**
@@ -95,9 +95,7 @@ public class BankPostingWriter {
    * @throws NotFoundException when the holder does not exist
    */
   public BankHolder requireHolder(@NotNull UUID holderId) {
-    return holderRepository
-        .findById(holderId)
-        .orElseThrow(() -> new NotFoundException("Bank holder not found"));
+    return Entities.require(holderRepository.findById(holderId), "Bank holder not found");
   }
 
   /**

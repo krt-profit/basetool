@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.MissionMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.ShipMapper;
@@ -748,10 +749,9 @@ public class MissionController {
    * @return the matching unit
    */
   private MissionUnit findUnit(@NotNull Mission mission, UUID unitId) {
-    return mission.getAssignedUnits().stream()
-        .filter(u -> unitId.equals(u.getId()))
-        .findFirst()
-        .orElseThrow(() -> new NotFoundException("Mission unit not found"));
+    return Entities.require(
+        mission.getAssignedUnits().stream().filter(u -> unitId.equals(u.getId())).findFirst(),
+        "Mission unit not found");
   }
 
   /**
@@ -762,10 +762,9 @@ public class MissionController {
    * @return the matching participant
    */
   private MissionParticipant findParticipant(@NotNull Mission mission, UUID participantId) {
-    return mission.getParticipants().stream()
-        .filter(p -> participantId.equals(p.getId()))
-        .findFirst()
-        .orElseThrow(() -> new NotFoundException("Participant not found"));
+    return Entities.require(
+        mission.getParticipants().stream().filter(p -> participantId.equals(p.getId())).findFirst(),
+        "Participant not found");
   }
 
   /**
@@ -776,10 +775,9 @@ public class MissionController {
    * @return the matching crew entry
    */
   private MissionCrew findCrew(@NotNull MissionUnit unit, UUID crewId) {
-    return unit.getCrew().stream()
-        .filter(c -> crewId.equals(c.getId()))
-        .findFirst()
-        .orElseThrow(() -> new NotFoundException("Crew member not found"));
+    return Entities.require(
+        unit.getCrew().stream().filter(c -> crewId.equals(c.getId())).findFirst(),
+        "Crew member not found");
   }
 
   // --- Units ---

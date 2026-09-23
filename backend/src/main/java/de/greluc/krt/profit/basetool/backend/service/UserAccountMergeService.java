@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.User;
@@ -252,13 +253,9 @@ public class UserAccountMergeService {
     if (sourceUserId.equals(targetUserId)) {
       throw new BusinessConflictException("An account cannot be merged into itself");
     }
-    userRepository
-        .findById(sourceUserId)
-        .orElseThrow(() -> new NotFoundException("Source account not found"));
+    Entities.require(userRepository.findById(sourceUserId), "Source account not found");
     final User target =
-        userRepository
-            .findById(targetUserId)
-            .orElseThrow(() -> new NotFoundException("Target account not found"));
+        Entities.require(userRepository.findById(targetUserId), "Target account not found");
 
     assertLedgersDoNotCollide(sourceUserId, targetUserId);
 

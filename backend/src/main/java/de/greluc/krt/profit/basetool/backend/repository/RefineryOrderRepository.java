@@ -21,9 +21,12 @@ package de.greluc.krt.profit.basetool.backend.repository;
 
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus;
+import de.greluc.krt.profit.basetool.backend.model.User;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -97,7 +100,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
       @Param("missionId") UUID missionId,
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds);
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
 
   /**
    * Derived Spring-Data query - returns entities matching {@code MissionIdIn}. Eagerly fetches the
@@ -148,9 +151,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    */
   @EntityGraph(attributePaths = {"owner", "location", "mission", "refiningMethod", "owningOrgUnit"})
   Page<RefineryOrder> findByOwnerIdAndStatusIn(
-      UUID ownerId,
-      List<de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus> statuses,
-      Pageable pageable);
+      UUID ownerId, List<RefineryOrderStatus> statuses, Pageable pageable);
 
   /**
    * Org-unit-scoped variant of {@link #findByOwnerId(UUID, Pageable)} for the cross-user oversight
@@ -186,7 +187,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
       @Param("ownerId") UUID ownerId,
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
       Pageable pageable);
 
   /**
@@ -208,19 +209,14 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
       :statuses
       """)
   List<RefineryOrder> findOwnedWithGoodsByStatusIn(
-      @Param("ownerId") UUID ownerId,
-      @Param("statuses")
-          java.util.Collection<de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus>
-              statuses);
+      @Param("ownerId") UUID ownerId, @Param("statuses") Collection<RefineryOrderStatus> statuses);
 
   /**
    * Derived Spring-Data query - returns entities matching {@code StatusIn}. Eagerly fetches the
    * configured relations via {@code @EntityGraph}.
    */
   @EntityGraph(attributePaths = {"owner", "location", "mission", "refiningMethod", "owningOrgUnit"})
-  Page<RefineryOrder> findByStatusIn(
-      List<de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus> statuses,
-      Pageable pageable);
+  Page<RefineryOrder> findByStatusIn(List<RefineryOrderStatus> statuses, Pageable pageable);
 
   /**
    * Lists every entity. Overridden here to attach an {@code @EntityGraph}. Eagerly fetches the
@@ -241,7 +237,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
   Page<RefineryOrder> findAllScoped(
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
       Pageable pageable);
 
   /**
@@ -255,11 +251,10 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
       "SELECT r FROM RefineryOrder r WHERE r.status IN :statuses AND "
           + ScopeSpecifications.REFINERY_ORDER_SCOPE_TRIPLE)
   Page<RefineryOrder> findByStatusInScoped(
-      @Param("statuses")
-          List<de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus> statuses,
+      @Param("statuses") List<RefineryOrderStatus> statuses,
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
       Pageable pageable);
 
   /**
@@ -279,10 +274,7 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    * @param newUser the new owner (the fallback admin)
    * @return the number of refinery orders reassigned
    */
-  @org.springframework.data.jpa.repository.Modifying
-  @org.springframework.data.jpa.repository.Query(
-      "UPDATE RefineryOrder r SET r.owner = :newUser WHERE r.owner = :oldUser")
-  int updateOwner(
-      @org.jetbrains.annotations.NotNull de.greluc.krt.profit.basetool.backend.model.User oldUser,
-      @org.jetbrains.annotations.NotNull de.greluc.krt.profit.basetool.backend.model.User newUser);
+  @Modifying
+  @Query("UPDATE RefineryOrder r SET r.owner = :newUser WHERE r.owner = :oldUser")
+  int updateOwner(@NotNull User oldUser, @NotNull User newUser);
 }

@@ -66,7 +66,7 @@ public interface ShipTypeRepository extends LookupTableRepository<ShipType, UUID
    * @return every ship whose {@code class_name} equals {@code className} ignoring case (possibly
    *     empty)
    */
-  java.util.List<ShipType> findByClassNameIgnoreCase(String className);
+  List<ShipType> findByClassNameIgnoreCase(String className);
 
   /**
    * Soft-deletes UEX-side ownership of every row whose {@code uex_vehicle_id} is set, NOT included

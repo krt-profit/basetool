@@ -391,6 +391,45 @@ class AuthHelperServiceTest {
   }
 
   // ---------------------------------------------------------------------
+  // isAdminOrOfficer() — the programmatic twin of Roles.ADMIN_OR_OFFICER (BE-SIMP-07)
+  // ---------------------------------------------------------------------
+
+  @Nested
+  class IsAdminOrOfficerTests {
+
+    @Test
+    void trueForAnAdmin() {
+      authContextWith("ROLE_ADMIN");
+      stubHierarchyReaches(List.of("ROLE_ADMIN", "ROLE_LOGISTICIAN", "ROLE_MISSION_MANAGER"));
+
+      assertTrue(helper.isAdminOrOfficer());
+    }
+
+    @Test
+    void trueForAnOfficer() {
+      authContextWith("ROLE_OFFICER");
+      stubHierarchyReaches(List.of("ROLE_OFFICER", "ROLE_LOGISTICIAN", "ROLE_MISSION_MANAGER"));
+
+      assertTrue(helper.isAdminOrOfficer());
+    }
+
+    @Test
+    void falseForARoleTheTwoImplyButThatImpliesNeither() {
+      // MISSION_MANAGER sits below both in the hierarchy; reaching it must not count.
+      authContextWith("ROLE_MISSION_MANAGER");
+      stubHierarchyReaches(List.of("ROLE_MISSION_MANAGER"));
+
+      assertFalse(helper.isAdminOrOfficer());
+    }
+
+    @Test
+    void falseWhenNobodyIsLoggedIn() {
+      assertFalse(helper.isAdminOrOfficer());
+      verify(roleHierarchy, never()).getReachableGrantedAuthorities(any());
+    }
+  }
+
+  // ---------------------------------------------------------------------
   // isMemberOrAbove() — the "mission outsider" predicate (its negation): false for anonymous and
   // for an authenticated role-less GUEST; true for every registered-member / elevated role.
   // ---------------------------------------------------------------------

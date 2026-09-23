@@ -24,12 +24,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
 import de.greluc.krt.profit.basetool.backend.support.RateLimitProperties;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,16 +51,20 @@ import tools.jackson.databind.ObjectMapper;
  */
 class SubjectRateLimitingFilterTest {
 
-  private RateLimitProperties properties;
+  /**
+   * The {@code app.rate-limit.*} keys the test configures, relative to that prefix; {@link
+   * #newFilter()} binds them, so every other key keeps its production default.
+   */
+  private final Map<String, Object> config = new HashMap<>();
+
   private MeterRegistry meterRegistry;
   private SubjectRateLimitingFilter filter;
 
   @BeforeEach
   void setUp() {
-    properties = new RateLimitProperties();
-    properties.getSubject().setCapacity(1);
-    properties.getSubject().setRefillTokens(1);
-    properties.getSubject().setRefillPeriod(Duration.ofMinutes(10));
+    config.put("subject.capacity", 1);
+    config.put("subject.refill-tokens", 1);
+    config.put("subject.refill-period", "10m");
     meterRegistry = new SimpleMeterRegistry();
     filter = newFilter();
   }
@@ -70,15 +75,15 @@ class SubjectRateLimitingFilterTest {
   }
 
   /**
-   * Builds a filter over the current properties.
+   * Builds a filter over the currently configured keys.
    *
    * @return a filter with an empty bucket cache.
    */
   private SubjectRateLimitingFilter newFilter() {
-    AppProblemProperties problemProperties = new AppProblemProperties();
-    problemProperties.setBaseUri("https://profit-base.online/problems/");
+    AppProblemProperties problemProperties =
+        new AppProblemProperties("https://profit-base.online/problems/");
     return new SubjectRateLimitingFilter(
-        properties,
+        BoundProperties.bind(RateLimitProperties.class, config),
         new StaticMessageSource(),
         new ProblemResponseFactory(problemProperties),
         new ObjectMapper(),
@@ -186,7 +191,7 @@ class SubjectRateLimitingFilterTest {
 
   @Test
   void disablingTheSubjectBudgetLeavesTheRequestUntouched() throws Exception {
-    properties.getSubject().setEnabled(false);
+    config.put("subject.enabled", false);
     filter = newFilter();
     authenticateAs("member-a");
 
@@ -223,9 +228,9 @@ class SubjectRateLimitingFilterTest {
    * one-token write bucket of {@link #setUp()}.
    */
   private void withExportBudgetOfTwo() {
-    properties.getSubject().getExport().setCapacity(2);
-    properties.getSubject().getExport().setRefillTokens(2);
-    properties.getSubject().getExport().setRefillPeriod(Duration.ofMinutes(10));
+    config.put("subject.export.capacity", 2);
+    config.put("subject.export.refill-tokens", 2);
+    config.put("subject.export.refill-period", "10m");
     filter = newFilter();
   }
 
@@ -252,9 +257,9 @@ class SubjectRateLimitingFilterTest {
   @Test
   void everyExportFamilyIsCovered() throws Exception {
     // One token each: every family must spend from the budget, so the second call of each refuses.
-    properties.getSubject().getExport().setCapacity(1);
-    properties.getSubject().getExport().setRefillTokens(1);
-    properties.getSubject().getExport().setRefillPeriod(Duration.ofMinutes(10));
+    config.put("subject.export.capacity", 1);
+    config.put("subject.export.refill-tokens", 1);
+    config.put("subject.export.refill-period", "10m");
     String[] exports = {
       "/api/v1/users/me/export",
       "/api/v1/admin/users/u/export/pdf",
@@ -325,7 +330,7 @@ class SubjectRateLimitingFilterTest {
   @Test
   void disablingTheExportBudgetLeavesExportsToThePerIpBudget() throws Exception {
     withExportBudgetOfTwo();
-    properties.getSubject().getExport().setEnabled(false);
+    config.put("subject.export.enabled", false);
     filter = newFilter();
     authenticateAs("member-a");
 

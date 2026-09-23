@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.model.ShipType;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import java.util.UUID;
@@ -69,12 +70,7 @@ public class ShipTypeService {
    */
   @Cacheable(cacheNames = CacheConfig.SHIP_TYPES_CACHE)
   public ShipType getShipType(@NotNull UUID id) {
-    return shipTypeRepository
-        .findById(id)
-        .orElseThrow(
-            () ->
-                new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                    "ShipType not found"));
+    return Entities.require(shipTypeRepository.findById(id), "ShipType not found");
   }
 
   /**

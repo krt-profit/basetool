@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.SpaceStation;
 import de.greluc.krt.profit.basetool.backend.repository.SpaceStationRepository;
@@ -59,9 +60,7 @@ public class SpaceStationService {
    * @throws NotFoundException when no space station matches the id
    */
   public SpaceStation getSpaceStation(UUID id) {
-    return spaceStationRepository
-        .findById(id)
-        .orElseThrow(() -> new NotFoundException("Space station not found"));
+    return Entities.require(spaceStationRepository.findById(id), "Space station not found");
   }
 
   /**

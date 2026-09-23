@@ -80,7 +80,7 @@ public class ProblemResponseFactory {
       String correlationId) {
     ProblemDetail pd = ProblemDetail.forStatusAndDetail(status, detail);
     pd.setTitle(title);
-    pd.setType(URI.create(problemProperties.getBaseUri() + typeSuffix));
+    pd.setType(URI.create(problemProperties.baseUri() + typeSuffix));
     if (instanceUri != null && !instanceUri.isBlank()) {
       pd.setInstance(URI.create(instanceUri));
     }

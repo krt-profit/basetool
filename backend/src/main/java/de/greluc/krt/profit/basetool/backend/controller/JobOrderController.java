@@ -19,12 +19,14 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.model.JobOrderAssignee;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.CreateJobOrderItemRequestDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.HandoverReportPreviewRequestDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ItemDerivationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderHandoverCreateDto;
@@ -35,6 +37,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemHandoverCreat
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemHandoverDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemProductionCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDemandOverviewDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateJobOrderBlueprintCountingDto;
@@ -54,6 +57,7 @@ import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.support.JobOrderInventoryOwnerRedactor;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
+import de.greluc.krt.profit.basetool.backend.support.UserDtoRedaction;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import de.greluc.krt.profit.basetool.backend.web.PdfResponses;
 import de.greluc.krt.profit.basetool.backend.web.UserZone;
@@ -65,7 +69,9 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
 import java.time.ZoneId;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -260,16 +266,10 @@ public class JobOrderController {
   @Operation(
       summary = "Download item-handover report PDF",
       description = "Generates and downloads a PDF delivery note for a persisted item handover.")
-  @io.swagger.v3.oas.annotations.responses.ApiResponses({
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "200",
-        description = "PDF generated successfully"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "403",
-        description = "Forbidden"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "404",
-        description = "Job order or item handover not found")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "PDF generated successfully"),
+    @ApiResponse(responseCode = "403", description = "Forbidden"),
+    @ApiResponse(responseCode = "404", description = "Job order or item handover not found")
   })
   @PreAuthorize(
       "hasAnyRole('"
@@ -307,16 +307,10 @@ public class JobOrderController {
   @Operation(
       summary = "Download handover report PDF",
       description = "Generates and downloads a PDF handover report for a persisted handover.")
-  @io.swagger.v3.oas.annotations.responses.ApiResponses({
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "200",
-        description = "PDF generated successfully"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "403",
-        description = "Forbidden"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "404",
-        description = "Job order or handover not found")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "PDF generated successfully"),
+    @ApiResponse(responseCode = "403", description = "Forbidden"),
+    @ApiResponse(responseCode = "404", description = "Job order or handover not found")
   })
   @PreAuthorize(
       "hasAnyRole('"
@@ -351,16 +345,10 @@ public class JobOrderController {
   @Operation(
       summary = "Preview handover report PDF",
       description = "Generates a PDF handover report preview from unsaved handover data.")
-  @io.swagger.v3.oas.annotations.responses.ApiResponses({
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "200",
-        description = "PDF generated successfully"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "400",
-        description = "Invalid request data"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "403",
-        description = "Forbidden")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "PDF generated successfully"),
+    @ApiResponse(responseCode = "400", description = "Invalid request data"),
+    @ApiResponse(responseCode = "403", description = "Forbidden")
   })
   @PreAuthorize(
       "hasAnyRole('"
@@ -530,10 +518,10 @@ public class JobOrderController {
         // the requester's OWN order fulfilment (no processing-side stock/claims, no member PII), so
         // the Auftraggeber may see them (REQ-ORDERS-023; confirmed in the #1186 security review).
         dto.items(),
-        java.util.Collections.emptyList(),
-        java.util.Collections.emptyList(),
-        java.util.Collections.emptyList(),
-        java.util.Collections.emptyList(),
+        Collections.emptyList(),
+        Collections.emptyList(),
+        Collections.emptyList(),
+        Collections.emptyList(),
         dto.createdAt(),
         dto.version(),
         // Redaction hides the order's contents from a requester-only viewer; it says nothing about
@@ -557,7 +545,7 @@ public class JobOrderController {
   private static List<JobOrderMaterialDto> redactMaterialProgress(
       List<JobOrderMaterialDto> materials) {
     if (materials == null) {
-      return java.util.Collections.emptyList();
+      return Collections.emptyList();
     }
     return materials.stream()
         .map(
@@ -568,7 +556,7 @@ public class JobOrderController {
                     m.minQuality(),
                     m.amount(),
                     null,
-                    java.util.Collections.emptyList(),
+                    Collections.emptyList(),
                     null,
                     m.version()))
         .toList();
@@ -692,7 +680,7 @@ public class JobOrderController {
               + " pickers.")
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.JobOrderReferenceDto> lookupJobOrders(
+  public List<JobOrderReferenceDto> lookupJobOrders(
       @RequestParam(required = false, defaultValue = "false") boolean withNeeds) {
     return jobOrderQueryService.findAllActiveReference(withNeeds);
   }
@@ -725,9 +713,7 @@ public class JobOrderController {
     // viewer, including a member of another Staffel reading through the SK public escape. The same
     // caller asking GET /api/v1/users/{id} for the same person gets the peer shape unconditionally
     // (audit finding H-3), so this door was the wider one.
-    return tiered.withAssignees(
-        de.greluc.krt.profit.basetool.backend.support.UserDtoRedaction.toPeerShapedAssignees(
-            tiered.assignees()));
+    return tiered.withAssignees(UserDtoRedaction.toPeerShapedAssignees(tiered.assignees()));
   }
 
   /**
@@ -777,9 +763,9 @@ public class JobOrderController {
       description = "Returns all inventory items linked to a specific material in a job order.")
   @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeJobOrder(#id)")
   @Transactional(readOnly = true)
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto>
-      getInventoryItemsForJobOrderMaterial(@PathVariable UUID id, @PathVariable UUID matId) {
-    List<de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto> items =
+  public List<InventoryItemDto> getInventoryItemsForJobOrderMaterial(
+      @PathVariable UUID id, @PathVariable UUID matId) {
+    List<InventoryItemDto> items =
         jobOrderQueryService.getInventoryItemsForJobOrderMaterial(id, matId);
     return ownerScopeService.canSeeJobOrderInventoryOwners(id)
         ? items
@@ -805,10 +791,8 @@ public class JobOrderController {
               + " requirements (invisible orphaned links).")
   @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeJobOrder(#id)")
   @Transactional(readOnly = true)
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto>
-      getOrphanedLinkedInventory(@PathVariable UUID id) {
-    List<de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto> items =
-        jobOrderQueryService.getOrphanedLinkedInventory(id);
+  public List<InventoryItemDto> getOrphanedLinkedInventory(@PathVariable UUID id) {
+    List<InventoryItemDto> items = jobOrderQueryService.getOrphanedLinkedInventory(id);
     return ownerScopeService.canSeeJobOrderInventoryOwners(id)
         ? items
         : inventoryOwnerRedactor.redactInventoryItems(items);
@@ -832,17 +816,11 @@ public class JobOrderController {
           "Updates the status of a job order. For terminal statuses (COMPLETED, REJECTED), all"
               + " linked inventory items are unlinked atomically. Requires the current version for"
               + " optimistic locking.")
-  @io.swagger.v3.oas.annotations.responses.ApiResponses({
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "200",
-        description = "Status updated successfully"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "403",
-        description = "Forbidden – insufficient role"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "404",
-        description = "Job order not found"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Status updated successfully"),
+    @ApiResponse(responseCode = "403", description = "Forbidden – insufficient role"),
+    @ApiResponse(responseCode = "404", description = "Job order not found"),
+    @ApiResponse(
         responseCode = "409",
         description = "Conflict – optimistic locking failure (version mismatch)")
   })
@@ -900,20 +878,14 @@ public class JobOrderController {
       description =
           "Replaces the ordered-item lines and metadata of an item order; required materials are"
               + " re-derived from each line's blueprint. Rejected once the order has any handover.")
-  @io.swagger.v3.oas.annotations.responses.ApiResponses({
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "200",
-        description = "Item order updated"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Item order updated"),
+    @ApiResponse(
         responseCode = "400",
         description = "Not an item order, already has handovers, or an invalid blueprint choice"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "403",
-        description = "Forbidden"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "404",
-        description = "Order, item or blueprint not found"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+    @ApiResponse(responseCode = "403", description = "Forbidden"),
+    @ApiResponse(responseCode = "404", description = "Order, item or blueprint not found"),
+    @ApiResponse(
         responseCode = "409",
         description = "Conflict – optimistic locking failure (version mismatch)")
   })
@@ -945,20 +917,16 @@ public class JobOrderController {
           "Lets a member of the order's requesting org unit change quantities, add/remove"
               + " not-yet-delivered materials and edit the comment. Only while the order has no"
               + " delivery yet.")
-  @io.swagger.v3.oas.annotations.responses.ApiResponses({
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "200",
-        description = "Order updated"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Order updated"),
+    @ApiResponse(
         responseCode = "400",
         description = "Not a material order, or already has a delivery"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+    @ApiResponse(
         responseCode = "403",
         description = "Caller is not a member of the order's requesting org unit"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "404",
-        description = "Order or material not found"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+    @ApiResponse(responseCode = "404", description = "Order or material not found"),
+    @ApiResponse(
         responseCode = "409",
         description = "Conflict - optimistic locking failure (version mismatch)")
   })
@@ -986,20 +954,16 @@ public class JobOrderController {
       description =
           "Lets a member of the order's requesting org unit replace the ordered items and edit the"
               + " comment. Only while the order has no delivery yet.")
-  @io.swagger.v3.oas.annotations.responses.ApiResponses({
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "200",
-        description = "Order updated"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Order updated"),
+    @ApiResponse(
         responseCode = "400",
         description = "Not an item order, already has a delivery, or an invalid blueprint choice"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+    @ApiResponse(
         responseCode = "403",
         description = "Caller is not a member of the order's requesting org unit"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "404",
-        description = "Order, item or blueprint not found"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+    @ApiResponse(responseCode = "404", description = "Order, item or blueprint not found"),
+    @ApiResponse(
         responseCode = "409",
         description = "Conflict - optimistic locking failure (version mismatch)")
   })
@@ -1027,20 +991,12 @@ public class JobOrderController {
           "Sets whether the item order's blueprint-coverage view counts cosmetic variants of the"
               + " ordered items (family matching) or matches blueprints exactly. Item orders only."
               + " Requires the current version for optimistic locking.")
-  @io.swagger.v3.oas.annotations.responses.ApiResponses({
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "200",
-        description = "Counting mode updated"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "400",
-        description = "Not an item order"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "403",
-        description = "Forbidden – insufficient role"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "404",
-        description = "Job order not found"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Counting mode updated"),
+    @ApiResponse(responseCode = "400", description = "Not an item order"),
+    @ApiResponse(responseCode = "403", description = "Forbidden – insufficient role"),
+    @ApiResponse(responseCode = "404", description = "Job order not found"),
+    @ApiResponse(
         responseCode = "409",
         description = "Conflict – optimistic locking failure (version mismatch)")
   })
@@ -1109,16 +1065,10 @@ public class JobOrderController {
       description =
           "Removes the link between a material and a job order, and unlinks all associated"
               + " inventory items.")
-  @io.swagger.v3.oas.annotations.responses.ApiResponses({
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "204",
-        description = "Material successfully unlinked"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "403",
-        description = "Forbidden – insufficient role"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "404",
-        description = "Job order or material not found")
+  @ApiResponses({
+    @ApiResponse(responseCode = "204", description = "Material successfully unlinked"),
+    @ApiResponse(responseCode = "403", description = "Forbidden – insufficient role"),
+    @ApiResponse(responseCode = "404", description = "Job order or material not found")
   })
   @PreAuthorize(
       "hasAnyRole('"
@@ -1146,16 +1096,10 @@ public class JobOrderController {
       description =
           "Removes the link between a single inventory item and a job order by setting jobOrderId"
               + " to null. Uses Hibernate dirty-checking (no bulk update).")
-  @io.swagger.v3.oas.annotations.responses.ApiResponses({
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "204",
-        description = "Inventory item successfully unlinked"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "403",
-        description = "Forbidden – insufficient role"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "404",
-        description = "Job order or inventory item not found")
+  @ApiResponses({
+    @ApiResponse(responseCode = "204", description = "Inventory item successfully unlinked"),
+    @ApiResponse(responseCode = "403", description = "Forbidden – insufficient role"),
+    @ApiResponse(responseCode = "404", description = "Job order or inventory item not found")
   })
   @PreAuthorize(
       "hasAnyRole('"
@@ -1282,8 +1226,5 @@ public class JobOrderController {
    *     optimistic-lock check
    */
   public record AssigneeNoteRequest(
-      @jakarta.validation.constraints.Size(
-              max = de.greluc.krt.profit.basetool.backend.model.JobOrderAssignee.NOTE_MAX_LENGTH)
-          String note,
-      Long version) {}
+      @Size(max = JobOrderAssignee.NOTE_MAX_LENGTH) String note, Long version) {}
 }

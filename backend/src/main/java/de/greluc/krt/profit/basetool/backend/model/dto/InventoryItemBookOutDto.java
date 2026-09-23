@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.model.CheckoutType;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
@@ -82,7 +83,7 @@ public record InventoryItemBookOutDto(
     UUID targetUserId,
     UUID targetLocationId,
     CheckoutType type,
-    @jakarta.validation.constraints.Size(max = 120) String terminal,
+    @Size(max = 120) String terminal,
     @Min(0) BigDecimal sellAmount,
     @NotNull Long version,
     @Nullable UUID targetOwningOrgUnitId,

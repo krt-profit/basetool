@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.profit.basetool.backend.model.Material;
@@ -401,9 +402,8 @@ public class MaterialRequestBoardService {
    * @throws NotFoundException if no such request exists.
    */
   private MaterialExchangeRequest loadWithDetail(UUID requestId) {
-    return requestRepository
-        .findWithDetailById(requestId)
-        .orElseThrow(() -> new NotFoundException("Request not found: " + requestId));
+    return Entities.require(
+        requestRepository.findWithDetailById(requestId), () -> "Request not found: " + requestId);
   }
 
   /**

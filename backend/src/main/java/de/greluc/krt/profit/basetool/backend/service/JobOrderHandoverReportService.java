@@ -19,7 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.exception.ReportGenerationException;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderHandover;
 import de.greluc.krt.profit.basetool.backend.model.dto.HandoverReportPreviewRequestDto;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
@@ -85,9 +87,7 @@ public class JobOrderHandoverReportService {
         userZone);
 
     JobOrderHandover handover =
-        jobOrderHandoverRepository
-            .findById(handoverId)
-            .orElseThrow(() -> new NotFoundException("Handover not found"));
+        Entities.require(jobOrderHandoverRepository.findById(handoverId), "Handover not found");
 
     if (!handover.getJobOrder().getId().equals(jobOrderId)) {
       throw new NotFoundException("Handover does not belong to this job order");
@@ -218,8 +218,7 @@ public class JobOrderHandoverReportService {
       // generic detail. The cause is preserved on the exception so the ERROR log line
       // emitted by the handler carries the full PDF-library stacktrace; the exception
       // message itself is server-internal and never leaks to the API client.
-      throw new de.greluc.krt.profit.basetool.backend.exception.ReportGenerationException(
-          "PDF generation failed", e);
+      throw new ReportGenerationException("PDF generation failed", e);
     }
   }
 

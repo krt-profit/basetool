@@ -23,6 +23,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.config.AndroidClientProperties;
 import de.greluc.krt.profit.basetool.backend.model.dto.AppVersionPolicyDto;
+import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -39,7 +41,7 @@ class AppVersionPolicyControllerTest {
   @Test
   @DisplayName("an unconfigured server states no floor, rather than locking everyone out")
   void unconfiguredServerStatesNoFloor() {
-    AppVersionPolicyDto policy = policyOf(new AndroidClientProperties());
+    AppVersionPolicyDto policy = policyOf(BoundProperties.defaults(AndroidClientProperties.class));
 
     // The whole point of the default. A non-zero floor here would mean that the first deployment
     // carrying this code refuses every installed build, and the members it refuses are exactly the
@@ -52,9 +54,10 @@ class AppVersionPolicyControllerTest {
   @Test
   @DisplayName("the two version numbers stay apart, so a release is not a wall")
   void configuredPolicyKeepsFloorAndLatestApart() {
-    AndroidClientProperties properties = new AndroidClientProperties();
-    properties.setMinimumVersionCode(7);
-    properties.setLatestVersionCode(11);
+    AndroidClientProperties properties =
+        BoundProperties.bind(
+            AndroidClientProperties.class,
+            Map.of("minimum-version-code", 7, "latest-version-code", 11));
 
     AppVersionPolicyDto policy = policyOf(properties);
 

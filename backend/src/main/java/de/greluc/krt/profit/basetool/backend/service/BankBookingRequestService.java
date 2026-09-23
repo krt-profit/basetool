@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestCreatedEven
 import de.greluc.krt.profit.basetool.backend.event.BankBookingRequestRejectedEvent;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.BankConflictException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountStatus;
@@ -167,9 +168,7 @@ public class BankBookingRequestService {
       @Nullable UUID counterpartyUserId,
       @Nullable UUID counterpartyOrgUnitId) {
     BankAccount account =
-        accountRepository
-            .findById(accountId)
-            .orElseThrow(() -> new NotFoundException("Bank account not found"));
+        Entities.require(accountRepository.findById(accountId), "Bank account not found");
     requireActiveForRequest(account);
     // REQ-BANK-045: a withdrawal/transfer request leaving a justification-mandating account
     // (CARTEL, CARTEL_BANK, SPECIAL) must carry a non-blank Begründung; a deposit never does.
@@ -188,9 +187,8 @@ public class BankBookingRequestService {
             "Source and destination account of a transfer must differ");
       }
       targetAccount =
-          accountRepository
-              .findById(targetAccountId)
-              .orElseThrow(() -> new NotFoundException("Destination account not found"));
+          Entities.require(
+              accountRepository.findById(targetAccountId), "Destination account not found");
       requireActiveForRequest(targetAccount);
     }
 
@@ -276,10 +274,7 @@ public class BankBookingRequestService {
       throw new BadRequestException(
           "Only a withdrawal request records a counterparty (Empfaenger)");
     }
-    User user =
-        userRepository
-            .findById(userId)
-            .orElseThrow(() -> new NotFoundException("Counterparty user not found"));
+    User user = Entities.require(userRepository.findById(userId), "Counterparty user not found");
     if (orgUnitId == null) {
       return new CounterpartySnapshot(user.getId(), user.getEffectiveName(), null, null);
     }
@@ -492,9 +487,8 @@ public class BankBookingRequestService {
           "Source and destination account of a transfer must differ");
     }
     BankAccount target =
-        accountRepository
-            .findById(targetAccountId)
-            .orElseThrow(() -> new NotFoundException("Destination account not found"));
+        Entities.require(
+            accountRepository.findById(targetAccountId), "Destination account not found");
     requireActiveForRequest(target);
     request.setTargetAccount(target);
   }
@@ -720,13 +714,9 @@ public class BankBookingRequestService {
         };
 
     BankHolder holder =
-        holderRepository
-            .findById(holderId)
-            .orElseThrow(() -> new NotFoundException("Bank holder not found"));
+        Entities.require(holderRepository.findById(holderId), "Bank holder not found");
     BankTransaction transaction =
-        transactionRepository
-            .findById(booked.id())
-            .orElseThrow(() -> new NotFoundException("Bank transaction not found"));
+        Entities.require(transactionRepository.findById(booked.id()), "Bank transaction not found");
     UUID decider = authHelperService.currentUserId().orElse(null);
     request.setHolder(holder);
     request.setResultingTransaction(transaction);
@@ -914,9 +904,8 @@ public class BankBookingRequestService {
    * @throws NotFoundException when the request does not exist
    */
   private BankBookingRequest lockRequest(@NotNull UUID requestId) {
-    return requestRepository
-        .findByIdForUpdate(requestId)
-        .orElseThrow(() -> new NotFoundException("Booking request not found"));
+    return Entities.require(
+        requestRepository.findByIdForUpdate(requestId), "Booking request not found");
   }
 
   /**

@@ -154,7 +154,9 @@ chip — moved into the bundles on 2026-09-23 (FE-SIMP-03).
 ## 8.11 Configuration
 
 Type-safe `@ConfigurationProperties` with `@Validated` for anything that matters, so a
-misconfiguration fails at start-up rather than at first use. On the host, `env.d` files are
+misconfiguration fails at start-up rather than at first use. In the backend they are immutable
+records with `@DefaultValue` (BE-MOD-04), registered by `@ConfigurationPropertiesScan`; a unit test
+binds one through `BoundProperties`, so an unset key keeps its production default. On the host, `env.d` files are
 *rendered* from `.env` by `render-env-d.py`; the compose environment blocks are closed allow-lists,
 so a variable not named there cannot be pulled in from `.env` by accident.
 

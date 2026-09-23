@@ -91,7 +91,7 @@ class ScWikiSchedulerTest {
 
   @Test
   void schedule_isNoOp_whenMasterSwitchOff() {
-    when(properties.getSchedulerEnabled()).thenReturn(false);
+    when(properties.schedulerEnabled()).thenReturn(false);
 
     scheduler.scheduleScWikiSync();
 
@@ -105,7 +105,7 @@ class ScWikiSchedulerTest {
 
   @Test
   void schedule_runsEverySyncInDependencyOrder_whenEnabledAndGateFree() {
-    when(properties.getSchedulerEnabled()).thenReturn(true);
+    when(properties.schedulerEnabled()).thenReturn(true);
 
     scheduler.scheduleScWikiSync();
 
@@ -119,7 +119,7 @@ class ScWikiSchedulerTest {
   @Test
   void schedule_recordsSummedItemCount_acrossAllSteps() {
     // Given — each step reports how many catalogue rows it wrote this run.
-    when(properties.getSchedulerEnabled()).thenReturn(true);
+    when(properties.schedulerEnabled()).thenReturn(true);
     when(commoditySyncService.syncCommodities()).thenReturn(3);
     when(vehicleSyncService.syncVehicles()).thenReturn(5);
     when(itemSyncService.syncItems()).thenReturn(11);
@@ -145,7 +145,7 @@ class ScWikiSchedulerTest {
   @Test
   void schedule_recordsZeroItems_whenAStepFailsAndTheRestWriteNothing() {
     // Given — the item step throws (empty-200 outage or a transient error) and no step writes rows.
-    when(properties.getSchedulerEnabled()).thenReturn(true);
+    when(properties.schedulerEnabled()).thenReturn(true);
     when(itemSyncService.syncItems()).thenThrow(new RuntimeException("Wiki 500"));
 
     // When — the sweep must not propagate; the failing step contributes 0 to the tally.
@@ -165,7 +165,7 @@ class ScWikiSchedulerTest {
 
   @Test
   void schedule_evictsScWikiSyncedMasterDataAfterSweep() {
-    when(properties.getSchedulerEnabled()).thenReturn(true);
+    when(properties.schedulerEnabled()).thenReturn(true);
 
     scheduler.scheduleScWikiSync();
 
@@ -178,7 +178,7 @@ class ScWikiSchedulerTest {
   @Test
   void schedule_continuesRemainingSteps_afterOneStepThrows() {
     // Given — the master switch is on and the vehicle step (2nd in dependency order) throws.
-    when(properties.getSchedulerEnabled()).thenReturn(true);
+    when(properties.schedulerEnabled()).thenReturn(true);
     when(vehicleSyncService.syncVehicles()).thenThrow(new RuntimeException("Wiki vehicle 500"));
 
     // When — the sweep must not propagate the failure.
@@ -197,7 +197,7 @@ class ScWikiSchedulerTest {
 
   @Test
   void schedule_skipsEntireSweep_whenAnotherSyncIsAlreadyRunning() {
-    when(properties.getSchedulerEnabled()).thenReturn(true);
+    when(properties.schedulerEnabled()).thenReturn(true);
     // The shared gate denies entry (a UEX or SC Wiki sync is already in flight) → no step runs.
     doReturn(false).when(syncCoordinator).runExclusively(eq("SC Wiki"), any());
 
@@ -218,7 +218,7 @@ class ScWikiSchedulerTest {
     // umbrella
     // scwiki_sync records outcome=success — basetool_scheduled_job_step_failures_total{step} is the
     // only signal a persistently-failing step leaves, feeding ScWikiStepFailing.
-    when(properties.getSchedulerEnabled()).thenReturn(true);
+    when(properties.schedulerEnabled()).thenReturn(true);
     when(itemSyncService.syncItems()).thenThrow(new RuntimeException("Wiki 500"));
 
     scheduler.scheduleScWikiSync();

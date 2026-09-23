@@ -58,13 +58,11 @@ class InventoryItemMapperTest {
 
   @BeforeEach
   void setUp() {
-    // The MapStruct-generated InventoryItemMapperImpl is annotated @Component
-    // and pulls UserMapper via @Autowired. Outside of a Spring context we
-    // build it via the Mappers.getMapper(...) factory and wire the
-    // dependency manually so the nested toReferenceDto(...) call succeeds.
-    mapper = Mappers.getMapper(InventoryItemMapper.class);
-    ReflectionTestUtils.setField(mapper, "userMapper", Mappers.getMapper(UserMapper.class));
-    ReflectionTestUtils.setField(mapper, "squadronMapper", Mappers.getMapper(SquadronMapper.class));
+    // The generated InventoryItemMapperImpl receives the mappers it uses through its constructor
+    // (CentralMapperConfig: injectionStrategy = CONSTRUCTOR), so the test builds it the same way.
+    mapper =
+        new InventoryItemMapperImpl(
+            Mappers.getMapper(UserMapper.class), Mappers.getMapper(SquadronMapper.class));
     // The caller-aware seam behind canEdit (REQ-SEC-047). Answering true here keeps these tests
     // about the field mapping; the authorisation rule itself is covered where it lives.
     ReflectionTestUtils.setField(mapper, "stockAccess", ALWAYS_ALLOWED);

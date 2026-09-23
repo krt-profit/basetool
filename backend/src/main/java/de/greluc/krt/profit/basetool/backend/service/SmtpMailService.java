@@ -82,7 +82,7 @@ public class SmtpMailService implements MailService {
 
   @Override
   public void send(@NotNull MailMessage message) {
-    if (!mailProperties.isEnabled()) {
+    if (!mailProperties.enabled()) {
       log.debug(
           "Mail disabled (app.mail.enabled=false); dropping '{}' message.", message.subject());
       recordOutcome(MetricNames.MAIL_DROPPED_DISABLED);
@@ -135,8 +135,8 @@ public class SmtpMailService implements MailService {
    * @return the envelope-sender value for {@link SimpleMailMessage#setFrom}
    */
   private String formatFrom() {
-    String name = mailProperties.getFromName();
-    String address = mailProperties.getFrom();
+    String name = mailProperties.fromName();
+    String address = mailProperties.from();
     return (name != null && !name.isBlank()) ? name + " <" + address + ">" : address;
   }
 }

@@ -28,7 +28,4 @@ import org.mapstruct.Mapper;
 public interface RoleMapper {
   /** Maps a {@link Role} entity to its outbound DTO. */
   RoleDto toDto(Role role);
-
-  /** Builds a new {@link Role} entity from the inbound DTO. */
-  Role toEntity(RoleDto dto);
 }

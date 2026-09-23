@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.OrgUnitMembershipMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
@@ -59,6 +60,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
@@ -134,10 +136,7 @@ public class OrgUnitMembershipService {
   @Transactional
   public OrgUnitMembership addMember(@NotNull UUID specialCommandId, @NotNull UUID userId) {
     SpecialCommand sc = specialCommandService.getSpecialCommandById(specialCommandId);
-    User user =
-        userRepository
-            .findPlainById(userId)
-            .orElseThrow(() -> new NotFoundException("User not found"));
+    User user = Entities.require(userRepository.findPlainById(userId), "User not found");
     if (membershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, sc.getId())) {
       throw new DuplicateEntityException("User is already a member of this Spezialkommando");
     }
@@ -233,17 +232,11 @@ public class OrgUnitMembershipService {
   @Transactional
   public OrgUnitMembership addBereichLeader(
       @NotNull UUID bereichId, @NotNull UUID userId, @NotNull BereichLeadershipRole role) {
-    OrgUnit bereich =
-        orgUnitRepository
-            .findById(bereichId)
-            .orElseThrow(() -> new NotFoundException("Bereich not found"));
+    OrgUnit bereich = Entities.require(orgUnitRepository.findById(bereichId), "Bereich not found");
     if (bereich.getKind() != OrgUnitKind.BEREICH) {
       throw new BadRequestException("Org unit " + bereichId + " is not a Bereich");
     }
-    final User user =
-        userRepository
-            .findPlainById(userId)
-            .orElseThrow(() -> new NotFoundException("User not found"));
+    final User user = Entities.require(userRepository.findPlainById(userId), "User not found");
     if (userHoldsStaffelMembership(userId)) {
       throw new BadRequestException(
           "User belongs to a Staffel and cannot be a Bereichsleitung member — remove the Staffel"
@@ -306,9 +299,7 @@ public class OrgUnitMembershipService {
   public void removeBereichLeader(@NotNull UUID bereichId, @NotNull UUID userId) {
     OrgUnitMembershipId id = new OrgUnitMembershipId(userId, bereichId);
     OrgUnitMembership m =
-        membershipRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("Bereichsleitung membership not found"));
+        Entities.require(membershipRepository.findById(id), "Bereichsleitung membership not found");
     final MembershipRole previousRole = m.getRole();
     final Map<UUID, Set<UUID>> responsibleBefore =
         orgUnitBankResponsibilityServiceProvider.getObject().snapshotResponsibleHolders(bereichId);
@@ -341,17 +332,13 @@ public class OrgUnitMembershipService {
   @Transactional
   public OrgUnitMembership addOlMember(@NotNull UUID organisationsleitungId, @NotNull UUID userId) {
     OrgUnit ol =
-        orgUnitRepository
-            .findById(organisationsleitungId)
-            .orElseThrow(() -> new NotFoundException("Organisationsleitung not found"));
+        Entities.require(
+            orgUnitRepository.findById(organisationsleitungId), "Organisationsleitung not found");
     if (ol.getKind() != OrgUnitKind.ORGANISATIONSLEITUNG) {
       throw new BadRequestException(
           "Org unit " + organisationsleitungId + " is not the Organisationsleitung");
     }
-    final User user =
-        userRepository
-            .findPlainById(userId)
-            .orElseThrow(() -> new NotFoundException("User not found"));
+    final User user = Entities.require(userRepository.findPlainById(userId), "User not found");
     if (userHoldsStaffelMembership(userId)) {
       throw new BadRequestException(
           "User belongs to a Staffel and cannot be an Organisationsleitung member — remove the"
@@ -403,9 +390,8 @@ public class OrgUnitMembershipService {
   public void removeOlMember(@NotNull UUID organisationsleitungId, @NotNull UUID userId) {
     OrgUnitMembershipId id = new OrgUnitMembershipId(userId, organisationsleitungId);
     OrgUnitMembership m =
-        membershipRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("Organisationsleitung membership not found"));
+        Entities.require(
+            membershipRepository.findById(id), "Organisationsleitung membership not found");
     final MembershipRole previousRole = m.getRole();
     final Map<UUID, Set<UUID>> responsibleBefore =
         orgUnitBankResponsibilityServiceProvider
@@ -455,7 +441,7 @@ public class OrgUnitMembershipService {
   @Transactional
   public void setGrandAdmiral(@NotNull UUID organisationsleitungId, @NotNull UUID userId) {
     Organisationsleitung ol = requireOrganisationsleitung(organisationsleitungId);
-    userRepository.findPlainById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+    Entities.require(userRepository.findPlainById(userId), "User not found");
     // Auto-promote to OL member first when needed; an existing OL member is left untouched.
     if (!membershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, organisationsleitungId)) {
       addOlMember(organisationsleitungId, userId);
@@ -552,9 +538,8 @@ public class OrgUnitMembershipService {
    */
   private Organisationsleitung requireOrganisationsleitung(@NotNull UUID organisationsleitungId) {
     OrgUnit ol =
-        orgUnitRepository
-            .findById(organisationsleitungId)
-            .orElseThrow(() -> new NotFoundException("Organisationsleitung not found"));
+        Entities.require(
+            orgUnitRepository.findById(organisationsleitungId), "Organisationsleitung not found");
     if (!(ol instanceof Organisationsleitung organisationsleitung)) {
       throw new BadRequestException(
           "Org unit " + organisationsleitungId + " is not the Organisationsleitung");
@@ -620,13 +605,11 @@ public class OrgUnitMembershipService {
       @NotNull UUID userId,
       @NotNull MembershipFlagsPatchRequest request) {
     Squadron squadron =
-        squadronRepository
-            .findById(squadronId)
-            .orElseThrow(() -> new NotFoundException("Squadron not found"));
+        Entities.require(squadronRepository.findById(squadronId), "Squadron not found");
     OrgUnitMembership m =
-        membershipRepository
-            .findById(new OrgUnitMembershipId(userId, squadron.getId()))
-            .orElseThrow(() -> new NotFoundException("Membership not found"));
+        Entities.require(
+            membershipRepository.findById(new OrgUnitMembershipId(userId, squadron.getId())),
+            "Membership not found");
     assertVersionMatches(m, request.version());
     if (request.isLogistician() != null) {
       m.setLogistician(request.isLogistician());
@@ -707,9 +690,8 @@ public class OrgUnitMembershipService {
     Map<UUID, Squadron> targetSquadrons = new LinkedHashMap<>();
     for (UUID id : distinctIds) {
       Squadron sq =
-          squadronRepository
-              .findById(id)
-              .orElseThrow(() -> new NotFoundException("Squadron not found with id: " + id));
+          Entities.require(
+              squadronRepository.findById(id), () -> "Squadron not found with id: " + id);
       targetSquadrons.put(id, sq);
     }
 
@@ -886,15 +868,15 @@ public class OrgUnitMembershipService {
       @NotNull UUID squadronId,
       @NotNull UUID userId,
       @NotNull MembershipRole rank,
-      @org.jetbrains.annotations.Nullable UUID kommandoGroupId,
-      @org.jetbrains.annotations.Nullable Long version) {
+      @Nullable UUID kommandoGroupId,
+      @Nullable Long version) {
     if (!rank.isSquadronRank()) {
       throw new BadRequestException("Rank " + rank + " is not a squadron rank");
     }
     OrgUnitMembership m =
-        membershipRepository
-            .findById(new OrgUnitMembershipId(userId, squadronId))
-            .orElseThrow(() -> new NotFoundException("User is not a member of this Staffel"));
+        Entities.require(
+            membershipRepository.findById(new OrgUnitMembershipId(userId, squadronId)),
+            "User is not a member of this Staffel");
     if (m.getKind() != OrgUnitKind.SQUADRON) {
       throw new BadRequestException("Org unit " + squadronId + " is not a Staffel");
     }
@@ -944,13 +926,11 @@ public class OrgUnitMembershipService {
    */
   @Transactional
   public OrgUnitMembership removeSquadronRank(
-      @NotNull UUID squadronId,
-      @NotNull UUID userId,
-      @org.jetbrains.annotations.Nullable Long version) {
+      @NotNull UUID squadronId, @NotNull UUID userId, @Nullable Long version) {
     OrgUnitMembership m =
-        membershipRepository
-            .findById(new OrgUnitMembershipId(userId, squadronId))
-            .orElseThrow(() -> new NotFoundException("User is not a member of this Staffel"));
+        Entities.require(
+            membershipRepository.findById(new OrgUnitMembershipId(userId, squadronId)),
+            "User is not a member of this Staffel");
     assertVersionMatches(m, version);
     final MembershipRole previousRole = m.getRole();
     if (!previousRole.isSquadronRank()) {
@@ -1094,8 +1074,8 @@ public class OrgUnitMembershipService {
       @NotNull UUID squadronId,
       @NotNull UUID userId,
       @NotNull MembershipRole rank,
-      @org.jetbrains.annotations.Nullable UUID kommandoGroupId,
-      @org.jetbrains.annotations.Nullable Long version) {
+      @Nullable UUID kommandoGroupId,
+      @Nullable Long version) {
     return orgUnitMembershipMapper.toDto(
         assignSquadronRank(squadronId, userId, rank, kommandoGroupId, version));
   }
@@ -1115,9 +1095,7 @@ public class OrgUnitMembershipService {
    */
   @Transactional
   public OrgUnitMembershipDto removeSquadronRankDto(
-      @NotNull UUID squadronId,
-      @NotNull UUID userId,
-      @org.jetbrains.annotations.Nullable Long version) {
+      @NotNull UUID squadronId, @NotNull UUID userId, @Nullable Long version) {
     return orgUnitMembershipMapper.toDto(removeSquadronRank(squadronId, userId, version));
   }
 
@@ -1133,11 +1111,9 @@ public class OrgUnitMembershipService {
    * @throws NotFoundException if a referenced group does not exist.
    * @throws BadRequestException on a group pairing that violates the rank's contract.
    */
-  @org.jetbrains.annotations.Nullable
+  @Nullable
   private KommandoGroup resolveKommandoGroupForRank(
-      @NotNull UUID squadronId,
-      @NotNull MembershipRole rank,
-      @org.jetbrains.annotations.Nullable UUID kommandoGroupId) {
+      @NotNull UUID squadronId, @NotNull MembershipRole rank, @Nullable UUID kommandoGroupId) {
     boolean groupRequired =
         rank == MembershipRole.KOMMANDOLEITER || rank == MembershipRole.STELLV_KOMMANDOLEITER;
     boolean groupAllowed = groupRequired || rank == MembershipRole.ENSIGN;
@@ -1151,9 +1127,8 @@ public class OrgUnitMembershipService {
       throw new BadRequestException(rank + " must not be assigned to a Kommandogruppe");
     }
     KommandoGroup group =
-        kommandoGroupRepository
-            .findById(kommandoGroupId)
-            .orElseThrow(() -> new NotFoundException("Kommandogruppe not found"));
+        Entities.require(
+            kommandoGroupRepository.findById(kommandoGroupId), "Kommandogruppe not found");
     if (!group.getSquadron().getId().equals(squadronId)) {
       throw new BadRequestException("Kommandogruppe does not belong to this Staffel");
     }
@@ -1183,7 +1158,7 @@ public class OrgUnitMembershipService {
       @NotNull UUID squadronId,
       @NotNull UUID userId,
       @NotNull MembershipRole rank,
-      @org.jetbrains.annotations.Nullable KommandoGroup group) {
+      @Nullable KommandoGroup group) {
     List<OrgUnitMembership> roster =
         membershipRepository.findAllByIdOrgUnitId(squadronId).stream()
             .filter(m -> !m.getId().getUserId().equals(userId))
@@ -1228,9 +1203,9 @@ public class OrgUnitMembershipService {
    */
   private OrgUnitMembership loadMembership(UUID specialCommandId, UUID userId) {
     SpecialCommand sc = specialCommandService.getSpecialCommandById(specialCommandId);
-    return membershipRepository
-        .findById(new OrgUnitMembershipId(userId, sc.getId()))
-        .orElseThrow(() -> new NotFoundException("Membership not found"));
+    return Entities.require(
+        membershipRepository.findById(new OrgUnitMembershipId(userId, sc.getId())),
+        "Membership not found");
   }
 
   /**
@@ -1315,7 +1290,7 @@ public class OrgUnitMembershipService {
    * @param orgUnitId the org unit id; never {@code null}.
    * @return the org unit's shorthand/name label, or {@code null}.
    */
-  private @org.jetbrains.annotations.Nullable String orgUnitLabelById(@NotNull UUID orgUnitId) {
+  private @Nullable String orgUnitLabelById(@NotNull UUID orgUnitId) {
     return orgUnitRepository.findById(orgUnitId).map(OrgUnitLabels::shorthandOrName).orElse(null);
   }
 }

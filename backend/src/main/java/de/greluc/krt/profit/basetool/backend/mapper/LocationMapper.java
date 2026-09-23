@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.mapper;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 
 /** MapStruct mapper between Location entities and DTOs. */
 @Mapper(config = CentralMapperConfig.class)
@@ -30,6 +31,11 @@ public interface LocationMapper {
   LocationDto toDto(Location entity);
 
   /** Builds a new {@link Location} entity from the inbound DTO. */
+  // city / spaceStation are UEX-synced placement, never accepted from the admin form.
+  @Mapping(target = "createdAt", ignore = true)
+  @Mapping(target = "updatedAt", ignore = true)
+  @Mapping(target = "city", ignore = true)
+  @Mapping(target = "spaceStation", ignore = true)
   Location toEntity(LocationDto dto);
 
   /**

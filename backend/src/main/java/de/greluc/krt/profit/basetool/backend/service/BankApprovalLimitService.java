@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.BankApprovalLimitsDto;
 import de.greluc.krt.profit.basetool.backend.repository.BankAccountApprovalLimitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -183,7 +184,7 @@ public class BankApprovalLimitService {
             : userRepository.findAllById(userIds).stream()
                 .collect(Collectors.toMap(User::getId, User::getEffectiveName));
     BigDecimal areaMembersLimit = null;
-    List<BankApprovalLimitUserDto> userLimits = new java.util.ArrayList<>();
+    List<BankApprovalLimitUserDto> userLimits = new ArrayList<>();
     for (BankAccountApprovalLimit limit : limits) {
       switch (limit.getGranteeKind()) {
         case MEMBERSHIP_ROLE, GLOBAL_ROLE ->

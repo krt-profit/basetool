@@ -36,12 +36,16 @@ import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
+import de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -175,20 +179,15 @@ public class AccessGateService {
     if (authHelper.isAdmin()) {
       return true;
     }
-    Optional<org.springframework.security.core.Authentication> authentication =
-        authHelper.currentAuthentication();
+    Optional<Authentication> authentication = authHelper.currentAuthentication();
     if (authentication.isEmpty()
         || !authentication.get().isAuthenticated()
         || authentication.get().getAuthorities() == null) {
       return false;
     }
-    de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority target =
-        new de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority(
-            roleName, orgUnitId);
-    for (org.springframework.security.core.GrantedAuthority a :
-        authentication.get().getAuthorities()) {
-      if (a instanceof de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority ctx
-          && ctx.equals(target)) {
+    OrgUnitContextualAuthority target = new OrgUnitContextualAuthority(roleName, orgUnitId);
+    for (GrantedAuthority a : authentication.get().getAuthorities()) {
+      if (a instanceof OrgUnitContextualAuthority ctx && ctx.equals(target)) {
         return true;
       }
     }
@@ -852,7 +851,7 @@ public class AccessGateService {
    * @return {@code true} iff the caller shares at least one in-scope org unit with the target user.
    */
   private boolean canActOnTargetUserScoped(
-      @NotNull UUID targetUserId, @NotNull java.util.function.Predicate<UUID> unitScope) {
+      @NotNull UUID targetUserId, @NotNull Predicate<UUID> unitScope) {
     if (authHelper.isAdmin()) {
       return true;
     }

@@ -46,6 +46,11 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MissionStepDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionUnitDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitReferenceDto;
 import de.greluc.krt.profit.basetool.backend.support.MissionViewerAccess;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import org.jetbrains.annotations.Nullable;
 import org.mapstruct.BeforeMapping;
 import org.mapstruct.Mapper;
@@ -95,7 +100,7 @@ public abstract class MissionMapper {
     if (mission == null || targetType != MissionDto.class) {
       return;
     }
-    java.util.List<User> users = new java.util.ArrayList<>();
+    List<User> users = new ArrayList<>();
     for (MissionParticipant participant : mission.getParticipants()) {
       users.add(participant.getUser());
     }
@@ -176,6 +181,7 @@ public abstract class MissionMapper {
   /** Maps a {@link JobType} entity nested inside a mission to its outbound DTO. */
   @Mapping(target = "parentId", source = "parent.id")
   @Mapping(target = "isLeadershipRole", source = "leadershipRole")
+  @Mapping(target = "isMissionLead", source = "missionLead")
   public abstract JobTypeDto toDto(JobType jobType);
 
   /** Narrow reference DTO (id + name) used wherever the full mission payload is overkill. */
@@ -219,14 +225,13 @@ public abstract class MissionMapper {
    * @param orgUnits the participant's affiliations; {@code null} or empty yields an empty list.
    * @return the sorted reference DTOs; never {@code null}.
    */
-  public java.util.List<OrgUnitReferenceDto> orgUnitsToReferenceDtos(
-      java.util.Set<OrgUnit> orgUnits) {
+  public List<OrgUnitReferenceDto> orgUnitsToReferenceDtos(Set<OrgUnit> orgUnits) {
     if (orgUnits == null || orgUnits.isEmpty()) {
-      return java.util.List.of();
+      return List.of();
     }
     return orgUnits.stream()
         .sorted(
-            java.util.Comparator.<OrgUnit, Integer>comparing(
+            Comparator.<OrgUnit, Integer>comparing(
                     ou -> ou.getKind() == OrgUnitKind.SQUADRON ? 0 : 1)
                 .thenComparing(
                     ou -> ou.getName() == null ? "" : ou.getName(), String.CASE_INSENSITIVE_ORDER))
@@ -311,16 +316,16 @@ public abstract class MissionMapper {
    * semantics remain unchanged). Secondary sort is stable by participant display name to keep the
    * previous alphabetical ordering for non-leaders.
    */
-  public java.util.List<MissionCrewDto> resolveCrew(MissionUnit unit) {
+  public List<MissionCrewDto> resolveCrew(MissionUnit unit) {
     if (unit == null || unit.getCrew() == null) {
-      return java.util.List.of();
+      return List.of();
     }
-    java.util.Comparator<MissionCrew> leaderFirst =
-        java.util.Comparator.comparing((MissionCrew c) -> isLeaderCrew(c) ? 0 : 1)
+    Comparator<MissionCrew> leaderFirst =
+        Comparator.comparing((MissionCrew c) -> isLeaderCrew(c) ? 0 : 1)
             .thenComparing(
                 c -> {
                   String n = resolveParticipantName(c);
-                  return n == null ? "" : n.toLowerCase(java.util.Locale.ROOT);
+                  return n == null ? "" : n.toLowerCase(Locale.ROOT);
                 });
     return unit.getCrew().stream().sorted(leaderFirst).map(this::toDto).toList();
   }

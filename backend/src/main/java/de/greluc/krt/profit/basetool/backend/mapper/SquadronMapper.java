@@ -97,5 +97,6 @@ public interface SquadronMapper {
   @Mapping(target = "promotionEnabled", ignore = true)
   @Mapping(target = "profitEligible", ignore = true)
   @Mapping(target = "parent", ignore = true)
+  @Mapping(target = "department", ignore = true)
   Squadron toEntity(SquadronDto dto);
 }

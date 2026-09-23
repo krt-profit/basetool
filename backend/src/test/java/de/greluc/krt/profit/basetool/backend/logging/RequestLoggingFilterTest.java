@@ -26,6 +26,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.backend.config.LoggingProperties;
+import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import jakarta.servlet.ServletException;
 import java.io.IOException;
 import org.junit.jupiter.api.AfterEach;
@@ -47,8 +48,8 @@ import org.springframework.mock.web.MockHttpServletResponse;
  */
 class RequestLoggingFilterTest {
 
-  private final LoggingProperties props = new LoggingProperties();
-  private final RequestLoggingFilter filter = new RequestLoggingFilter(props);
+  private RequestLoggingFilter filter =
+      new RequestLoggingFilter(BoundProperties.defaults(LoggingProperties.class));
   private ListAppender<ILoggingEvent> appender;
 
   @BeforeEach
@@ -69,7 +70,7 @@ class RequestLoggingFilterTest {
   @Test
   void fastRequest_ShouldBeLoggedAtInfo() throws ServletException, IOException {
     // Given
-    props.setSlowRequestThresholdMs(10_000L);
+    filter = filterWithThreshold(10_000L);
     MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/missions");
     MockHttpServletResponse response = new MockHttpServletResponse();
     response.setStatus(200);
@@ -87,7 +88,7 @@ class RequestLoggingFilterTest {
   @Test
   void slowRequest_ShouldBeLoggedAtWarn() throws ServletException, IOException {
     // Given: threshold 0 ms makes every request "slow"
-    props.setSlowRequestThresholdMs(0L);
+    filter = filterWithThreshold(0L);
     MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/missions");
     MockHttpServletResponse response = new MockHttpServletResponse();
     response.setStatus(201);
@@ -106,7 +107,7 @@ class RequestLoggingFilterTest {
   @Test
   void slowNotificationStreamRelay_ShouldStayAtInfo() throws ServletException, IOException {
     // Given: threshold 0 ms makes every request "slow", but the SSE relay is exempt
-    props.setSlowRequestThresholdMs(0L);
+    filter = filterWithThreshold(0L);
     MockHttpServletRequest request =
         new MockHttpServletRequest("GET", "/api/v1/notifications/stream");
     MockHttpServletResponse response = new MockHttpServletResponse();
@@ -145,5 +146,17 @@ class RequestLoggingFilterTest {
     filter.doFilter(request, response, (req, res) -> {});
 
     assertThat(appender.list).isEmpty();
+  }
+
+  /**
+   * Builds the filter under test with the given slow-request threshold; the logging properties are
+   * an immutable record (BE-MOD-04), so a different threshold means a different filter.
+   *
+   * @param thresholdMs the slow-request threshold in milliseconds
+   * @return a filter reading that threshold
+   */
+  private static RequestLoggingFilter filterWithThreshold(long thresholdMs) {
+    return new RequestLoggingFilter(
+        BoundProperties.bind(LoggingProperties.class, "slow-request-threshold-ms", thresholdMs));
   }
 }

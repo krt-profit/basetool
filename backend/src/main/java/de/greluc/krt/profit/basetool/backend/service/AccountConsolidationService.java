@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalDecision;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
@@ -131,9 +132,7 @@ public class AccountConsolidationService {
       throw new BusinessConflictException("An account cannot be consolidated into itself");
     }
     User duplicate =
-        userRepository
-            .findById(duplicateId)
-            .orElseThrow(() -> new NotFoundException("Duplicate account not found"));
+        Entities.require(userRepository.findById(duplicateId), "Duplicate account not found");
     OptimisticLock.checkOptionalClient(duplicate.getVersion(), version, User.class, duplicateId);
     if (duplicateId.equals(adminId)) {
       // Not paternalism: the purge reassigns shared aggregates to "some other admin", and the
@@ -143,9 +142,7 @@ public class AccountConsolidationService {
     }
 
     User target =
-        userRepository
-            .findById(targetUserId)
-            .orElseThrow(() -> new NotFoundException("Target account not found"));
+        Entities.require(userRepository.findById(targetUserId), "Target account not found");
     if (target.getApprovalStatus() != ApprovalStatus.ACTIVE) {
       throw new BusinessConflictException("The target account must be an active account");
     }
@@ -273,9 +270,7 @@ public class AccountConsolidationService {
     }
 
     User target =
-        userRepository
-            .findById(targetUserId)
-            .orElseThrow(() -> new NotFoundException("Target account not found"));
+        Entities.require(userRepository.findById(targetUserId), "Target account not found");
     if (snowflake != null && !snowflake.isBlank()) {
       target.setDiscordUserId(snowflake);
     }

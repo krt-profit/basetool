@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
@@ -107,10 +108,7 @@ public class DiscordAccountExistenceService {
   @Contract("null -> null")
   @Nullable
   private static String normalize(@Nullable String value) {
-    if (value == null) {
-      return null;
-    }
-    String trimmed = value.trim().toLowerCase(Locale.ROOT);
-    return trimmed.isEmpty() ? null : trimmed;
+    String trimmed = StringNormalization.trimToNull(value);
+    return trimmed == null ? null : trimmed.toLowerCase(Locale.ROOT);
   }
 }

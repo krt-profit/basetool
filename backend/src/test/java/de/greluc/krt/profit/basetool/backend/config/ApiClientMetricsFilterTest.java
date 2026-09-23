@@ -30,6 +30,7 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
@@ -52,14 +53,18 @@ class ApiClientMetricsFilterTest {
 
   private ApiClientMetricsProperties properties;
   private IngestGatewayProperties gatewayProperties;
+
+  /** The gateway allowlist a test may extend; the properties record reads it by reference. */
+  private List<String> gatewayClientIds;
+
   private MeterRegistry meterRegistry;
   private ApiClientMetricsFilter filter;
 
   @BeforeEach
   void setUp() {
-    properties = new ApiClientMetricsProperties();
-    properties.setKnownClientIds(List.of("basetool-frontend", "basetool-android"));
-    gatewayProperties = new IngestGatewayProperties();
+    properties = new ApiClientMetricsProperties(List.of("basetool-frontend", "basetool-android"));
+    gatewayClientIds = new ArrayList<>();
+    gatewayProperties = new IngestGatewayProperties(gatewayClientIds);
     meterRegistry = new SimpleMeterRegistry();
     filter =
         new ApiClientMetricsFilter(
@@ -154,7 +159,7 @@ class ApiClientMetricsFilterTest {
   void aConfiguredIngestGatewayCountsAsKnownWithoutBeingListedTwice() throws Exception {
     // Otherwise the two lists drift and the gateway silently starts reading as 'other', which is
     // exactly the series the unknown-client alert watches.
-    gatewayProperties.setClientIds(List.of("basetool-ingest"));
+    gatewayClientIds.add("basetool-ingest");
     authenticateWithAzp("basetool-ingest");
 
     send("/api/v1/refinery/imports");

@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.support.RequestMemo;
 import de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver;
 import java.util.Collection;
 import java.util.Collections;
@@ -44,8 +45,6 @@ import org.jetbrains.annotations.Nullable;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.context.request.RequestAttributes;
-import org.springframework.web.context.request.RequestContextHolder;
 
 /**
  * MapStruct mapper between {@link User} entities and DTOs.
@@ -89,8 +88,8 @@ public abstract class UserMapper {
    * whole page on the member-facing user list / search endpoints. The memo collapses that to one
    * lookup per distinct user per request and is keyed by user id.
    */
-  private static final String MEMBERSHIP_CACHE_ATTR =
-      UserMapper.class.getName() + ".staffelMembershipByUserId";
+  private static final RequestMemo.Key<Map<UUID, List<OrgUnitMembership>>> MEMBERSHIP_CACHE_ATTR =
+      RequestMemo.Key.of(UserMapper.class, "staffelMembershipByUserId");
 
   /**
    * Request-attribute key under which {@link #resolveSquadrons(User)} memoises the resolved,
@@ -100,8 +99,8 @@ public abstract class UserMapper {
    * reference records, so they are safe to reuse across transactions within the request. Seeded for
    * a whole page at once by {@link #primeStaffelMemberships(Collection)}.
    */
-  private static final String SQUADRONS_CACHE_ATTR =
-      UserMapper.class.getName() + ".squadronReferencesByUserId";
+  private static final RequestMemo.Key<Map<UUID, List<SquadronReferenceDto>>> SQUADRONS_CACHE_ATTR =
+      RequestMemo.Key.of(UserMapper.class, "squadronReferencesByUserId");
 
   /**
    * Projects a {@link User} entity to its outbound DTO. The {@code squadron}, {@code squadrons},
@@ -254,27 +253,16 @@ public abstract class UserMapper {
   }
 
   /**
-   * Returns the request-scoped memo map stored under {@code attribute}, creating it on first use.
+   * Returns the request-scoped memo map stored under {@code key}, creating it on first use.
    *
-   * @param attribute the request-attribute key of the memo.
+   * @param key the memo's key.
    * @param <V> the memoised value type.
    * @return the memo keyed by user id, or {@code null} outside an HTTP request (no request scope,
    *     so no memo — callers fall back to a direct query).
    */
   @Nullable
-  private static <V> Map<UUID, V> requestMemo(@NotNull String attribute) {
-    RequestAttributes attrs = RequestContextHolder.getRequestAttributes();
-    if (attrs == null) {
-      return null;
-    }
-    @SuppressWarnings("unchecked") // only this class writes the attribute, always with this shape
-    Map<UUID, V> cache =
-        (Map<UUID, V>) attrs.getAttribute(attribute, RequestAttributes.SCOPE_REQUEST);
-    if (cache == null) {
-      cache = new HashMap<>();
-      attrs.setAttribute(attribute, cache, RequestAttributes.SCOPE_REQUEST);
-    }
-    return cache;
+  private static <V> Map<UUID, V> requestMemo(@NotNull RequestMemo.Key<Map<UUID, V>> key) {
+    return RequestMemo.getIfBound(key, HashMap::new);
   }
 
   /**
@@ -346,12 +334,11 @@ public abstract class UserMapper {
    *
    * <p>Memoised per request: the four derived-field resolvers each call this for the same user, so
    * without caching the underlying derived query runs once per resolver per {@code toDto}. The
-   * result is cached on the {@link RequestAttributes} keyed by user id ({@link
-   * #MEMBERSHIP_CACHE_ATTR}), so it runs at most once per distinct user per request. Outside an
-   * HTTP request (e.g. a scheduled task that maps a user) there is no request scope, so it falls
-   * back to the direct query with no memo. Only eagerly-loaded scalar fields of the returned
-   * memberships are read by the callers, so a value surviving into a later transaction within the
-   * same request is still safe to read.
+   * result is cached in a {@link RequestMemo} keyed by user id ({@link #MEMBERSHIP_CACHE_ATTR}), so
+   * it runs at most once per distinct user per request. Outside an HTTP request (e.g. a scheduled
+   * task that maps a user) there is no request scope, so it falls back to the direct query with no
+   * memo. Only eagerly-loaded scalar fields of the returned memberships are read by the callers, so
+   * a value surviving into a later transaction within the same request is still safe to read.
    *
    * <p>The memo assumes a user's Staffel membership set is <em>immutable for the duration of the
    * request</em>: it is populated lazily on first read, so a write endpoint that mutates the

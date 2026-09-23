@@ -284,8 +284,8 @@ public class NotificationStreamService {
    * Bumps {@code basetool_sse_send_failures_total} for a push that failed on the named SSE event
    * and leaves the throwable in a DEBUG line, just before the dead emitter is dropped. The {@code
    * event} tag is a fixed literal ({@code connected} / {@code notification} / {@code heartbeat})
-   * and the {@code cause} tag is the bounded three-value shape from {@link #causeTag}; neither ever
-   * carries recipient data.
+   * and the {@code cause} tag is the bounded three-value shape from {@link
+   * SseSendFailureCause#tagOf}; neither ever carries recipient data.
    *
    * <p>DEBUG and not higher on purpose: a broken pipe here is the normal outcome of closing a
    * browser tab, so every level above DEBUG is a client-triggerable log flood (REQ-OBS-001). The
@@ -304,35 +304,13 @@ public class NotificationStreamService {
             MetricNames.TAG_EVENT,
             event,
             MetricNames.TAG_CAUSE,
-            causeTag(cause))
+            SseSendFailureCause.tagOf(cause))
         .increment();
     log.debug(
         "Dropping SSE emitter of recipient {} after a failed '{}' push",
         recipientUserId,
         event,
         cause);
-  }
-
-  /**
-   * Maps a failed emitter write onto the bounded {@code cause} tag vocabulary: an {@link
-   * IOException} is the benign client hang-up, an {@link IllegalStateException} means the emitter
-   * had already completed (a registry lifecycle race, not a dead client), anything else is {@code
-   * other}. Derived from the exception TYPE only — a message or class name would be an unbounded
-   * label (REQ-OBS-006).
-   *
-   * @param cause the exception the emitter write threw
-   * @return {@link MetricNames#CAUSE_IO}, {@link MetricNames#CAUSE_ILLEGAL_STATE} or {@link
-   *     MetricNames#CAUSE_OTHER}
-   */
-  @NotNull
-  private static String causeTag(@NotNull Throwable cause) {
-    if (cause instanceof IOException) {
-      return MetricNames.CAUSE_IO;
-    }
-    if (cause instanceof IllegalStateException) {
-      return MetricNames.CAUSE_ILLEGAL_STATE;
-    }
-    return MetricNames.CAUSE_OTHER;
   }
 
   /**

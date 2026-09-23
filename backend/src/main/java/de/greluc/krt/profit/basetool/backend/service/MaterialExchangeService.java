@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.event.MaterialExchangeInterestRegisteredEvent;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -145,12 +146,9 @@ public class MaterialExchangeService {
   public MaterialExchangeOfferDto release(MaterialExchangeReleaseRequest request) {
     UUID viewerId = requireViewerId();
     InventoryItem item =
-        inventoryItemRepository
-            .findById(request.inventoryItemId())
-            .orElseThrow(
-                () ->
-                    new NotFoundException(
-                        "Inventory item not found: " + request.inventoryItemId()));
+        Entities.require(
+            inventoryItemRepository.findById(request.inventoryItemId()),
+            () -> "Inventory item not found: " + request.inventoryItemId());
     if (item.getUser() == null || !viewerId.equals(item.getUser().getId())) {
       throw new AccessDeniedException("Only the item's owner may release it to the Materialbörse.");
     }
@@ -278,16 +276,11 @@ public class MaterialExchangeService {
   public MaterialExchangeOfferDto releaseItem(MaterialExchangeItemReleaseRequest request) {
     UUID viewerId = requireViewerId();
     User owner =
-        userRepository
-            .findById(viewerId)
-            .orElseThrow(() -> new NotFoundException("User not found: " + viewerId));
+        Entities.require(userRepository.findById(viewerId), () -> "User not found: " + viewerId);
     ResolvedProduct product =
-        blueprintProductService
-            .resolveByProductKey(request.productKey())
-            .orElseThrow(
-                () ->
-                    new NotFoundException(
-                        "No craftable item (blueprint product) for key: " + request.productKey()));
+        Entities.require(
+            blueprintProductService.resolveByProductKey(request.productKey()),
+            () -> "No craftable item (blueprint product) for key: " + request.productKey());
 
     MaterialExchangeOffer offer = new MaterialExchangeOffer();
     offer.setKind(MaterialExchangeOfferKind.ITEM);
@@ -348,9 +341,7 @@ public class MaterialExchangeService {
       UUID offerId, MaterialExchangeOfferUpdateRequest request) {
     UUID viewerId = requireViewerId();
     MaterialExchangeOffer offer =
-        offerRepository
-            .findById(offerId)
-            .orElseThrow(() -> new NotFoundException("Offer not found: " + offerId));
+        Entities.require(offerRepository.findById(offerId), () -> "Offer not found: " + offerId);
     requireOwner(offer, viewerId);
     OptimisticLock.check(
         offer.getVersion(), request.version(), MaterialExchangeOffer.class, offerId);
@@ -393,9 +384,7 @@ public class MaterialExchangeService {
   public MaterialExchangeOfferDto deactivate(UUID offerId) {
     UUID viewerId = requireViewerId();
     MaterialExchangeOffer offer =
-        offerRepository
-            .findById(offerId)
-            .orElseThrow(() -> new NotFoundException("Offer not found: " + offerId));
+        Entities.require(offerRepository.findById(offerId), () -> "Offer not found: " + offerId);
     requireOwner(offer, viewerId);
     return deactivateOffer(offer, viewerId);
   }
@@ -414,10 +403,10 @@ public class MaterialExchangeService {
   public MaterialExchangeOfferDto deactivateForItem(UUID inventoryItemId) {
     UUID viewerId = requireViewerId();
     MaterialExchangeOffer offer =
-        offerRepository
-            .findByInventoryItemIdAndStatus(inventoryItemId, MaterialExchangeOfferStatus.ACTIVE)
-            .orElseThrow(
-                () -> new NotFoundException("No active offer for item: " + inventoryItemId));
+        Entities.require(
+            offerRepository.findByInventoryItemIdAndStatus(
+                inventoryItemId, MaterialExchangeOfferStatus.ACTIVE),
+            () -> "No active offer for item: " + inventoryItemId);
     requireOwner(offer, viewerId);
     return deactivateOffer(offer, viewerId);
   }
@@ -460,9 +449,7 @@ public class MaterialExchangeService {
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void registerInterestInNewTransaction(UUID offerId, UUID viewerId) {
     MaterialExchangeOffer offer =
-        offerRepository
-            .findById(offerId)
-            .orElseThrow(() -> new NotFoundException("Offer not found: " + offerId));
+        Entities.require(offerRepository.findById(offerId), () -> "Offer not found: " + offerId);
     if (offer.getStatus() != MaterialExchangeOfferStatus.ACTIVE) {
       throw new NotFoundException("Offer is not active: " + offerId);
     }
@@ -473,9 +460,7 @@ public class MaterialExchangeService {
       return;
     }
     User viewer =
-        userRepository
-            .findById(viewerId)
-            .orElseThrow(() -> new NotFoundException("User not found: " + viewerId));
+        Entities.require(userRepository.findById(viewerId), () -> "User not found: " + viewerId);
     MaterialExchangeInterest interest = new MaterialExchangeInterest();
     interest.setOffer(offer);
     interest.setInterestedUser(viewer);
@@ -512,9 +497,7 @@ public class MaterialExchangeService {
   public MaterialExchangeOfferDto withdrawInterest(UUID offerId) {
     UUID viewerId = requireViewerId();
     MaterialExchangeOffer offer =
-        offerRepository
-            .findById(offerId)
-            .orElseThrow(() -> new NotFoundException("Offer not found: " + offerId));
+        Entities.require(offerRepository.findById(offerId), () -> "Offer not found: " + offerId);
     long removed = interestRepository.deleteByOfferIdAndInterestedUserId(offerId, viewerId);
     if (removed > 0) {
       auditService.record(
