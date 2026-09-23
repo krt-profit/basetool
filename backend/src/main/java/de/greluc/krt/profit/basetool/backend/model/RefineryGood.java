@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.model;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -50,16 +51,18 @@ public class RefineryGood extends AbstractEntity<UUID> {
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
-  @ManyToOne
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "input_material_id", nullable = false)
+  @ToString.Exclude
   private Material inputMaterial;
 
   @Column(nullable = false)
   @Min(1)
   private Integer inputQuantity;
 
-  @ManyToOne
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "output_material_id", nullable = false)
+  @ToString.Exclude
   private Material outputMaterial;
 
   @Column(nullable = false)
@@ -71,8 +74,9 @@ public class RefineryGood extends AbstractEntity<UUID> {
   @Max(1000)
   private Integer quality;
 
-  @ManyToOne
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "refinery_order_id", nullable = false)
   @JsonIgnore
+  @ToString.Exclude
   private RefineryOrder refineryOrder;
 }

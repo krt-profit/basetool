@@ -93,6 +93,26 @@ primes first: the full mission DTO (a `@BeforeMapping` in `MissionMapper` over p
 ship owners), the job-order Bearbeiter lists (per page in `JobOrderStockProjectionService`, per order
 in `JobOrderMapper`), the user lists and searches, the member-evaluation list and the all-ships list.
 
+**Every to-one association is `LAZY`** (BE-PERF-11, 2026-09-23). A `@ManyToOne` / `@OneToOne`
+without an explicit `fetch` is EAGER by the JPA default, and 38 of them were: every load of the owner
+dragged its whole reachable graph along whether the caller read it or not — a price-sync chunk
+pulled each material's refined material and category, a ship list every owner with its roles. All
+are declared `fetch = FetchType.LAZY` now, and `ArchitectureTest.toOneAssociationsAreDeclaredLazy`
+fails the build on a new one that is not. A read that needs an association fetches it on purpose:
+an `@EntityGraph` on the finder (`MissionRepository.findById` graphs `participants` with their user
+and both job types; `RefineryOrderRepository.findById` the four to-ones and the goods with their
+materials), a `JOIN FETCH` into the current persistence context
+(`MissionRepository.fetchAssignedUnitGraph` for the mission detail's units), or the batch loader
+inside the caller's transaction. With `open-in-view` off, no mapping may happen after the
+transaction that loaded the entity — every controller that maps these aggregates runs in its own
+`@Transactional`. **An entity that enters a Caffeine cache is completed first**:
+`support.CachedEntityGraphs` initialises the lazy to-ones of `Material` (the whole
+`refinedMaterial` chain with categories), `Location`, `ShipType` and `JobType` inside the cached
+method's own read-only transaction, because a cached entity outlives its session and is handed to
+every later reader on any thread. `LazyToOneReadPathsTest` drives the hot reads through the real
+HTTP stack without a test transaction, twice (cold and from the caches), and asserts that none
+costs more statements for twelve rows than for three.
+
 **A foreign-key target is resolved without its graph.** `UserRepository.findById` graphs `roles` and
 `roles.permissions` for the authentication path and `/users/me`; a service that needs the user only
 as a foreign-key target or for a scalar uses `findPlainById` (an `EntityManager.find` fragment, the

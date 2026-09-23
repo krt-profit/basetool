@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MaterialSellingTerminalDt
 import de.greluc.krt.profit.basetool.backend.repository.MaterialCategoryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialPriceRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.support.CachedEntityGraphs;
 import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.Collection;
@@ -81,7 +82,7 @@ public class MaterialService {
    */
   @Cacheable(cacheNames = CacheConfig.MATERIALS_CACHE, key = "'all-' + #pageable")
   public Page<Material> getAllMaterials(@NotNull Pageable pageable) {
-    return materialRepository.findAll(pageable);
+    return CachedEntityGraphs.materials(materialRepository.findAll(pageable));
   }
 
   /**
@@ -97,7 +98,7 @@ public class MaterialService {
    */
   @Cacheable(cacheNames = CacheConfig.MATERIALS_CACHE, key = "'visible-' + #pageable")
   public Page<Material> getVisibleMaterials(@NotNull Pageable pageable) {
-    return materialRepository.findByIsVisibleTrue(pageable);
+    return CachedEntityGraphs.materials(materialRepository.findByIsVisibleTrue(pageable));
   }
 
   /**
@@ -169,7 +170,8 @@ public class MaterialService {
    */
   @Cacheable(cacheNames = CacheConfig.MATERIAL_BY_ID_CACHE)
   public Material getMaterial(@NotNull UUID id) {
-    return Entities.require(materialRepository.findById(id), "Material not found");
+    return CachedEntityGraphs.material(
+        Entities.require(materialRepository.findById(id), "Material not found"));
   }
 
   /**
