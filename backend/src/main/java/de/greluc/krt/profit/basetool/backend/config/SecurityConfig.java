@@ -55,7 +55,6 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.GrantedAuthority;
@@ -448,7 +447,9 @@ public class SecurityConfig {
       // and have no session cookie to attack. The test profile is gated by
       // Spring profile activation and is never enabled in deployed environments.
       // lgtm[java/spring-disabled-csrf-protection]
-      http.csrf(AbstractHttpConfigurer::disable);
+      http.csrf(
+          org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer
+              ::disable);
     } else {
       // L-2: pin the CSRF cookie's Secure + SameSite attributes explicitly. Spring's default
       // CookieCsrfTokenRepository does not set SameSite, leaving the browser to fall back to
