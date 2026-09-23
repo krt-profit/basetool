@@ -152,6 +152,10 @@
 
 ### Fixed
 
+- **Admin: Eingabefehler im Formular „Persönliches Inventar“ gehen nicht mehr verloren.** Beim
+  Anlegen oder Bearbeiten für ein Mitglied blieb das Fenster nach einem Fehler geschlossen und
+  leer; jetzt öffnet es sich wieder mit den Eingaben und den Fehlermeldungen.
+
 - **Sicherheit: die Sitzungs-Typliste kennt jetzt alle Werte einer echten Anmeldung.** Im Modus
   `enforce` hätte sie das ID-Token jedes Mitglieds abgelehnt (eine Adresse und Zahlen in den
   Token-Angaben) und damit alle abgemeldet. Produktion läuft mit `report` und war nicht betroffen.
