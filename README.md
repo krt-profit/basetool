@@ -189,6 +189,7 @@ POSTGRES_USER / POSTGRES_PASSWORD            # backend DB
 KC_POSTGRES_USER / KC_POSTGRES_PASSWORD      # Keycloak DB
 KC_BOOTSTRAP_ADMIN_USERNAME / _PASSWORD      # Keycloak realm-master admin
 KEYCLOAK_ADMIN_CLIENT_SECRET                 # backend → Keycloak admin API
+KEYCLOAK_FRONTEND_CLIENT_SECRET              # optional: set = the frontend logs in as a confidential client (ADR-0001)
 SERVER_SSL_KEY_STORE_PASSWORD                # PKCS12 keystore password
 IRI_KEYSTORE_HOST_PATH                       # host path of keystore.p12 (bind-mounted read-only)
 REDIS_PASSWORD                               # Redis session store

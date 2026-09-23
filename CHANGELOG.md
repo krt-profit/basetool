@@ -18,6 +18,10 @@
   
 ### Added
 
+- **Anmeldung: das Webtool kann sich als vertraulicher Client bei Keycloak ausweisen.** Mit
+  `KEYCLOAK_FRONTEND_CLIENT_SECRET` sendet es beim Einlösen des Anmelde-Codes zusätzlich zu PKCE
+  ein Geheimnis; ohne die Variable bleibt alles wie bisher. Die Umstellung meldet niemanden ab.
+
 - **Sicherheit: Sitzungsdaten dürfen nur noch bekannte Klassen enthalten.** Das Webtool liest einen
   in Redis gespeicherten Sitzungswert nur, wenn dessen Typ auf einer festen Liste steht. Neue
   Variable `APP_SESSION_TYPE_ALLOW_LIST` (`report` als Vorgabe: nichts ändert sich, Abweichungen

@@ -159,6 +159,11 @@ spring:
         registration:
           keycloak:
             client-id: basetool-frontend
+            # ADR-0001 / REQ-SEC-069: the client TYPE follows the secret. With
+            # KEYCLOAK_FRONTEND_CLIENT_SECRET set, FrontendClientAuthenticationConfig makes this a
+            # confidential client (client_secret_basic + PKCE); empty, it stays the public client
+            # below (none + PKCE). One variable, so the method and the secret cannot disagree.
+            client-secret: ${KEYCLOAK_FRONTEND_CLIENT_SECRET:}
             client-authentication-method: none
             # Audit finding L-4 (2026-05-20): `offline_access` produces a long-lived refresh
             # token. Refresh tokens are persisted in the Redis-backed Spring Session anyway, so

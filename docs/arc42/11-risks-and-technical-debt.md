@@ -151,11 +151,13 @@ Neither item is required for the members-only posture to be correct — that is 
 application and asserted by the probes — but each is a decided reduction of blast radius that has
 not happened.
 
-- **The frontend is still a public OAuth2 client.** ADR-0001 (*Accepted — implementation pending*,
-  2026-05-20) decided to make it confidential (PKCE **and** a client secret), closing security-audit
-  finding M-6. The code still says `client-authentication-method: none`; the frontend client carries
-  PKCE `S256` as the interim state. Procedure:
-  [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md).
+- **The frontend is still a public OAuth2 client in production.** ADR-0001 decided to make it
+  confidential (PKCE **and** a client secret), closing security-audit finding M-6. The code shipped
+  on 2026-09-23 (REQ-SEC-069) and is inert until `KEYCLOAK_FRONTEND_CLIENT_SECRET` is set; the
+  production switch is two owner steps with no login window —
+  [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md). Until
+  then the frontend client carries PKCE `S256` as the interim state. Closed when the provisioner
+  reports `basetool-frontend` confidential in production.
 - **Three of the twelve Keycloak hardening steps are open** —
   [`KEYCLOAK_HARDENING_RUNBOOK.md`](../KEYCLOAK_HARDENING_RUNBOOK.md): step 2 (decide *Forgot
   password* on Keycloak's own SMTP; `resetPasswordAllowed` was still on at the last recorded

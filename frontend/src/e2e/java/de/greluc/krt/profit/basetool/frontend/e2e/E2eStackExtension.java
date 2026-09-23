@@ -189,6 +189,13 @@ public final class E2eStackExtension implements BeforeAllCallback {
   private static final List<String> PULLED_SERVICES =
       List.of("db-backend-dev", "db-keycloak-dev", "keycloak-dev", "redis-dev");
 
+  /**
+   * The throwaway client secret of {@code basetool-frontend} in {@code realm-export.e2e.json},
+   * handed to the frontend as {@code KEYCLOAK_FRONTEND_CLIENT_SECRET} and presented by {@code
+   * BackendSeeder}. Obviously synthetic and published on purpose; never a production value.
+   */
+  static final String FRONTEND_CLIENT_SECRET = "e2e-frontend-client-secret-do-not-use-in-prod";
+
   /** Guards one-time start across multiple test classes sharing this extension. */
   private static volatile boolean started = false;
 
@@ -598,6 +605,10 @@ public final class E2eStackExtension implements BeforeAllCallback {
     env.put("KC_BOOTSTRAP_ADMIN_USERNAME", "admin");
     env.put("KC_BOOTSTRAP_ADMIN_PASSWORD", "admin-e2e-pw-do-not-use-in-prod");
     env.put("KEYCLOAK_ADMIN_CLIENT_SECRET", "e2e-client-secret-do-not-use-in-prod");
+    // ADR-0001 / REQ-SEC-069: the E2E frontend logs in as the CONFIDENTIAL client (secret + PKCE),
+    // the shape production reaches at the end of its rollout. Must match `basetool-frontend` in
+    // realm-export.e2e.json; BackendSeeder presents the same secret on its password grant.
+    env.put("KEYCLOAK_FRONTEND_CLIENT_SECRET", FRONTEND_CLIENT_SECRET);
     // The per-service Redis ACL users (REQ-SEC-068): docker-compose.e2e.yml loads the committed
     // docker/test-redis/users.acl with `default` OFF, so each app must reach Redis as its own user
     // through the same REDIS_<SVC>_USERNAME / _PASSWORD mapping production uses. REDIS_PASSWORD is

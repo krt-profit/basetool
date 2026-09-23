@@ -1053,6 +1053,12 @@ x-frontend: &frontend-template
     APP_LOGGING_SLOW_REQUEST_THRESHOLD_MS: ${APP_LOGGING_SLOW_REQUEST_THRESHOLD_MS:-2000}
     # Derived from KC_HOSTNAME — see the rationale on the backend template's KEYCLOAK_ISSUER_URI.
     KEYCLOAK_ISSUER_URI: ${IRI_KEYCLOAK_ISSUER_URI:-${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/iri}
+    # ADR-0001 / REQ-SEC-069: set, the frontend logs in as a CONFIDENTIAL client (client secret +
+    # PKCE); empty, as the public client it has always been. Deliberately optional (`:-`, not `:?`):
+    # merging and deploying this changes nothing until the owner puts the secret into the host .env,
+    # and the order of that and the Keycloak switch does not matter (Keycloak ignores a secret sent
+    # by a client it still considers public) -- docs/OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md.
+    KEYCLOAK_FRONTEND_CLIENT_SECRET: ${KEYCLOAK_FRONTEND_CLIENT_SECRET:-}
     BACKEND_URL: https://backend:11261
     # The frontend->backend transport levers (ADR-0161 8.1 / 8.5, REQ-API-011). Listed here because
     # this block is a CLOSED ALLOW-LIST and there is no `env_file:` anywhere: a variable that is not
