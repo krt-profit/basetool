@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.model;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -57,7 +58,7 @@ public class MissionStep extends AbstractEntity<UUID> {
   private UUID id;
 
   /** Owning mission. Never serialised to avoid a back-reference cycle in the JSON payload. */
-  @ManyToOne(optional = false)
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "mission_id", nullable = false)
   @JsonIgnore
   private Mission mission;

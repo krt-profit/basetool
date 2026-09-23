@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.model;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -51,12 +52,14 @@ public class MaterialPrice extends AbstractEntity<UUID> {
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
-  @ManyToOne(optional = false)
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "material_id", nullable = false)
+  @ToString.Exclude
   private Material material;
 
-  @ManyToOne(optional = false)
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "terminal_id", nullable = false)
+  @ToString.Exclude
   private Terminal terminal;
 
   private BigDecimal priceBuy;

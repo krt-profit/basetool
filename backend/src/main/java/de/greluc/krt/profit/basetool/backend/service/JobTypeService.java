@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.model.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobTypeDto;
 import de.greluc.krt.profit.basetool.backend.repository.JobTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
+import de.greluc.krt.profit.basetool.backend.support.CachedEntityGraphs;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.List;
 import java.util.UUID;
@@ -71,10 +72,10 @@ public class JobTypeService {
    */
   @Cacheable(cacheNames = CacheConfig.JOB_TYPES_CACHE)
   public List<JobType> getJobTypes(@Nullable JobTypeArchetype archetype) {
-    if (archetype == null) {
-      return jobTypeRepository.findByActiveTrue();
-    }
-    return jobTypeRepository.findByArchetypeAndActiveTrue(archetype);
+    return CachedEntityGraphs.jobTypes(
+        archetype == null
+            ? jobTypeRepository.findByActiveTrue()
+            : jobTypeRepository.findByArchetypeAndActiveTrue(archetype));
   }
 
   /**
@@ -88,14 +89,19 @@ public class JobTypeService {
   @Cacheable(cacheNames = CacheConfig.JOB_TYPES_CACHE)
   public Page<JobType> getJobTypes(
       @Nullable JobTypeArchetype archetype, @NotNull Pageable pageable, boolean includeInactive) {
+    Page<JobType> page;
     if (archetype == null) {
-      return includeInactive
-          ? jobTypeRepository.findAll(pageable)
-          : jobTypeRepository.findByActiveTrue(pageable);
+      page =
+          includeInactive
+              ? jobTypeRepository.findAll(pageable)
+              : jobTypeRepository.findByActiveTrue(pageable);
+    } else {
+      page =
+          includeInactive
+              ? jobTypeRepository.findByArchetype(archetype, pageable)
+              : jobTypeRepository.findByArchetypeAndActiveTrue(archetype, pageable);
     }
-    return includeInactive
-        ? jobTypeRepository.findByArchetype(archetype, pageable)
-        : jobTypeRepository.findByArchetypeAndActiveTrue(archetype, pageable);
+    return CachedEntityGraphs.jobTypes(page);
   }
 
   /**

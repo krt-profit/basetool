@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.fields;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
@@ -30,6 +31,7 @@ import com.tngtech.archunit.core.domain.JavaAnnotation;
 import com.tngtech.archunit.core.domain.JavaCall;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.core.domain.JavaField;
 import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.domain.JavaParameterizedType;
 import com.tngtech.archunit.core.domain.JavaType;
@@ -40,6 +42,9 @@ import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.BankAuditService;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -373,6 +378,30 @@ class ArchitectureTest {
         .because(
             "Controllers must return DTOs (or Page<Dto>/ResponseEntity<Dto>), never raw JPA"
                 + " entities.")
+        .check(CLASSES);
+  }
+
+  @Test
+  void toOneAssociationsAreDeclaredLazy() {
+    // Reasoning (BE-PERF-11, 2026-09-23): a @ManyToOne / @OneToOne without an explicit fetch is
+    // EAGER by the JPA default, and 38 of them were. Every load of the owner then dragged the whole
+    // reachable graph along — a price-sync chunk pulled Material -> refined Material -> category
+    // for
+    // every row, a hangar list every ship's owner with its roles — whether the caller read it or
+    // not. All of them are LAZY now; a read that needs an association fetches it deliberately (an
+    // @EntityGraph, a JOIN FETCH, or the batch loader inside the caller's transaction), and a
+    // cached
+    // entity is completed by support.CachedEntityGraphs before the cache stores it. This rule keeps
+    // a new association from silently reintroducing the default.
+    fields()
+        .that()
+        .areAnnotatedWith(ManyToOne.class)
+        .or()
+        .areAnnotatedWith(OneToOne.class)
+        .should(declareFetchTypeLazy())
+        .because(
+            "to-one associations are LAZY by project rule (BE-PERF-11); fetch what a read needs"
+                + " with an @EntityGraph or JOIN FETCH instead of making every load eager")
         .check(CLASSES);
   }
 
@@ -906,6 +935,29 @@ class ArchitectureTest {
         .map(java.util.regex.Pattern::quote)
         .reduce((a, b) -> a + "|" + b)
         .orElseThrow();
+  }
+
+  /**
+   * The condition behind {@link #toOneAssociationsAreDeclaredLazy()}: the field's {@code ManyToOne}
+   * or {@code OneToOne} annotation states {@code fetch = FetchType.LAZY}.
+   *
+   * @return the condition
+   */
+  private static ArchCondition<JavaField> declareFetchTypeLazy() {
+    return new ArchCondition<>("declare fetch = FetchType.LAZY") {
+      @Override
+      public void check(JavaField field, ConditionEvents events) {
+        FetchType fetch =
+            field.isAnnotatedWith(ManyToOne.class)
+                ? field.getAnnotationOfType(ManyToOne.class).fetch()
+                : field.getAnnotationOfType(OneToOne.class).fetch();
+        if (fetch != FetchType.LAZY) {
+          events.add(
+              SimpleConditionEvent.violated(
+                  field, field.getFullName() + " is fetched " + fetch + ", not LAZY"));
+        }
+      }
+    };
   }
 
   private static ArchCondition<JavaClass> haveAtLeastOnePreAuthorizeAnnotation() {

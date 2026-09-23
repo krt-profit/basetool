@@ -65,6 +65,11 @@
   erneuerten Tokens sie nicht mehr jedes Mal neu laden. Eine in Keycloak entzogene Rolle wirkt
   weiterhin beim nächsten Token (ADR-0174).
   
+
+- **Backend: Datenbankzugriffe laden nur noch, was sie brauchen.** Verknüpfte Datensätze (z. B.
+  Schiffstyp, Besitzer, Material-Kategorie) werden nicht mehr bei jedem Laden automatisch
+  mitgeholt, sondern gezielt dort, wo eine Ansicht sie anzeigt. Das entlastet vor allem die
+  UEX-Abgleiche und Listen; sichtbar ändert sich nichts.
 - **Intern: eine gemeinsame Log-Bereinigung für Backend, Webtool und Ingest.** Maskierung von
   Tokens und E-Mail-Adressen sowie der Schutz gegen gefälschte Logzeilen liegen jetzt einmal im
   neuen Modul `logging-support` statt dreifach kopiert (ADR-0205). Keine Funktionsänderung.
