@@ -170,6 +170,12 @@ not happened.
   now converge away (the extractor's unused code flow, the ingest scopes on the app, the
   compose-internal frontend origin — ADR-0202 amendment 1), but **production keeps them until the
   provisioner is applied there**, which is an owner-gated write.
+- **Redis still has one all-powerful user in production until the per-service rollout.** Backend,
+  frontend and ingest share `default` (`~* &* +@all`) and one password, so any one of them could
+  read every session's OAuth2 tokens. REQ-SEC-068 / ADR-0207 shipped the per-service users, the
+  renderer and the E2E proof; the switch is the owner's five-step rollout in
+  [`deployment.md` → *The Redis ACL*](../deployment.md#the-redis-acl). Closed when `REDIS_DEFAULT_USER`
+  is `off` in production.
 
 ## 11.8 Smaller, known, and deliberately left
 

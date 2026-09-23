@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Security
+
+- **Redis: jeder Dienst bekommt einen eigenen ACL-Benutzer.** Backend, Webtool und Ingest können
+  Redis künftig mit eigenen, eng begrenzten Zugängen nutzen statt mit einem gemeinsamen
+  Vollzugriff. Neue Variablen `REDIS_<DIENST>_USERNAME`/`_PASSWORD` und `REDIS_DEFAULT_USER`;
+  ohne sie bleibt alles wie bisher. Die ACL-Datei enthält nur noch Hashwerte.
+
 ### Removed
 
 - **API: die 17 veralteten Einsatz-Schnittstellen sind vorzeitig entfernt.** Angekündigt war der

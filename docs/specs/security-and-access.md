@@ -19,7 +19,7 @@ read/write is isolated to the calling user unless the caller is privileged.
 > linking of a registration). The mission finance-entry scope below shared `REQ-SEC-019` with the
 > Discord-link indicator until 2026-09-22, when it was renumbered to **REQ-SEC-065** on the owner's
 > decision (see the renumbering table in [`INDEX.md`](INDEX.md)). **REQ-SEC-054** was never
-> allocated. The next free id is **REQ-SEC-068** — re-check `origin/main` and open PRs before
+> allocated. The next free id is **REQ-SEC-069** — re-check `origin/main` and open PRs before
 > claiming it. Requirements are grouped by subject, not strictly by number.
 
 ### REQ-SEC-001 — OIDC topology
@@ -4616,6 +4616,63 @@ keep the contract of the Keycloak base template it overrides:
 template is the reference) · **Code:** `keycloak-theme/krt-theme/login/login.ftl`,
 `login-otp.ftl`, `login-update-password.ftl` · **Related:** THEME-SEC-01 / THEME-SIMP-01 of the
 2026-09 improvement audit
+
+### REQ-SEC-068 — Each service reaches Redis as its own least-privilege ACL user
+
+Redis holds the frontend's sessions — OAuth2 access **and refresh** tokens included — the live-sync
+and notification fan-out, and the ingest handoff. Backend, frontend and ingest used to reach it as
+one user, `default` (`~* &* +@all`), with one shared password, so a compromise of any one of them —
+the internet-facing ingest gateway above all — was a compromise of every member's session. The
+2026-07-10 incident (a `default` user left `nopass`) showed how quietly that user can go wrong
+(APPSEC-04, improvement audit 2026-09-22).
+
+**The rule:** every service authenticates as its own ACL user, and each user can reach exactly what
+its service does:
+
+| User | Keys | Channels | Commands beyond `@connection` |
+| --- | --- | --- | --- |
+| `basetool-frontend` | `basetool:session:*`, `ingest:handoff:*` | `basetool:session:*`, the created-event pattern, `__keyevent@0__:del` / `:expired`, `basetool:livesync:changed` / `:presence` | read, write, keyspace, hash, set, sorted set, string, pub/sub, transaction, `INFO`; no dangerous command, no `CONFIG` |
+| `basetool-backend` | none | `basetool:livesync:changed`, `basetool:notify:published` | `PUBLISH`, `SUBSCRIBE`, `UNSUBSCRIBE`, `INFO` |
+| `basetool-ingest` | `ingest:*` | none | `SET`/`SETEX`/`PSETEX`, `RPUSH`, `LPOP`, `EXPIRE`/`PEXPIRE`, `DEL`/`UNLINK`, `INFO` |
+| `monitoring` | none | none | introspection; **not** `SCAN` or `RANDOMKEY`, which are not key-checked and would list every session id |
+| `admin` | all | all | all — the operator's, never in an application's environment |
+| `default` | — | — | switched **off** at the end of the rollout |
+
+- **The rules are code.** `scripts/redis-users.acl.tmpl` is the single source; `render-redis-acl.py`
+  renders it on the host with SHA-256 hashes (never a clear-text password) and refuses a partial
+  render or a file without exactly one `default` line. The Testcontainers suites and the E2E stack
+  load the same template.
+- **Merging changes nothing for the applications.** A service uses its own user only when its
+  `REDIS_<SVC>_USERNAME` is set; empty, it sends a password-only `AUTH` with the shared
+  `REDIS_PASSWORD`, which is `default`, exactly as before.
+- **Nothing depends on the ACL state that must not.** The server carries `--notify-keyspace-events
+  Egx` (the frontend's `TolerantKeyspaceNotificationsAction` logs a `CONFIG` refusal instead of
+  failing), and the health probe is an unauthenticated `PING` accepting `NOAUTH`.
+- A new key prefix or channel is a template change, re-rendered and `ACL LOAD`ed on the host.
+
+**Acceptance**
+
+- [ ] Under the template with `default` off, the frontend's real Spring Session repository stores,
+  indexes, renames and deletes a session and receives its created and deleted events; live sync
+  publishes and receives on both channels; a handoff is consumed; `SCAN` and `INFO` answer.
+- [ ] The backend's notification fan-out and live-sync channel work under its user; the gateway's
+  real staging, cap eviction included, works under its user.
+- [ ] `ACL DRYRUN` refuses, per user, every foreign key, foreign channel, `CONFIG`, `KEYS`,
+  `FLUSHALL`/`FLUSHDB`, `SCAN` for backend, ingest and monitoring, and `ACL` for every non-admin user.
+- [ ] A password-only `AUTH` works while `default` is on and fails once it is off.
+- [ ] The committed E2E ACL equals the template rendered with the E2E passwords, and the E2E stack
+  runs every application on its own user with `default` off.
+- [ ] Refusals are alerted on (`RedisAclDenials`).
+
+**Enforced by:** `RedisAclFrontendIntegrationTest` (real Spring Session, live sync, handoff, the
+`ACL DRYRUN` matrix for all users, the committed E2E ACL), `RedisAclBackendIntegrationTest`,
+`RedisAclIngestIntegrationTest`, `render-redis-acl.py --selftest` (`repo-lint.yml`), the E2E suite
+(`docker-compose.e2e.yml`, `E2eStackExtension`, `IngestHandoffE2eTest`) ·
+`monitoring/prometheus/tests/redis_acl_denials_test.yml` · **Code:** `scripts/redis-users.acl.tmpl`,
+`scripts/render-redis-acl.py`, `TolerantKeyspaceNotificationsAction`, the three apps'
+`spring.data.redis.username` · **Monitoring:** `RedisAclDenials` · **Runbook:**
+[`deployment.md` → *The Redis ACL*](../deployment.md#the-redis-acl) · **ADR:** [ADR-0207](../adr/0207-each-service-reaches-redis-as-its-own-acl-user.md) ·
+**Related:** REQ-SEC-025, REQ-OPS-018
 
 ## Out of scope
 
