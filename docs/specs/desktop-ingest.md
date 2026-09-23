@@ -181,6 +181,14 @@ never acts for a user other than the one it authenticated.
 > `basetool-backend`. `isAuthenticated()` for the *user* is unchanged; what was added is a gate on
 > the *client software*.
 
+> **Amended 2026-09-22 (owner decision, ADR-0202 amendment).** The Keycloak client offers the
+> device grant **and nothing else**: `standardFlowEnabled: false` and no redirect URI. Production
+> carried an unused authorization-code flow with two loopback wildcard redirect URIs and no PKCE
+> (the hardening runbook's thirteenth finding); the extractor has no authorization-code client
+> (`DeviceGrantClient` sends only `device_code` and `refresh_token` grants). The target shape is
+> `scripts/provision-keycloak-realm.py`, which removes both from every realm it provisions;
+> production follows on the owner's apply.
+
 **Acceptance**
 
 - [x] A request without a valid signed realm token is rejected 401/403; no forward happens. With
@@ -553,7 +561,18 @@ Four checks, each **inert until configured** and each **fail-closed** once it is
 | Token binding | **not a gate** — both schemes are accepted on purpose (`REQ-INGEST-012`: `.jwt()` alongside `.dPoP()`, so a client rollout needs no flag day). An access token arriving *unbound* is logged as a lapsed-protection canary, never refused                  | — (no property)                                 |
 
 A missing claim is refused exactly like an unknown one: treating "no `azp`" as "nothing to check"
-would silently disable the gate the moment a realm change stopped stamping it. The reject reasons
+would silently disable the gate the moment a realm change stopped stamping it.
+
+**Who carries the exclusive scope (2026-09-22).** `extractor-ingest-only` — the `aud=basetool-ingest`
+and the `scope`-claim value the capability check reads — is assigned to `basetool-sc-extractor` and,
+inherited from its creation, to `basetool-ingest-gateway`; to no browser client and, by owner
+decision of 2026-09-22, **not** to `basetool-android`. The app had inherited both ingest scopes from
+the realm defaults, so an app token passed the audience and capability checks and only the `azp`
+allowlist kept it out. The app requests neither scope and never calls ingest; its own
+`aud=basetool-backend` comes from its `backend-audience` mapper. `provision-keycloak-realm.py`
+removes both scopes from the app in every realm it provisions (production on the owner's apply).
+
+The reject reasons
 stay distinct (`unknown_client`, `missing_azp`, `missing_scope`, `bad_provenance`) because they split
 into two operationally opposite causes — a foreign tool calling, versus a Keycloak mapper regression
 locking the legitimate extractor out. Token binding is deliberately absent from that list: it is not

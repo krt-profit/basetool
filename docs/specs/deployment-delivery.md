@@ -1765,8 +1765,14 @@ there.
 - **Dry run by default.** `--apply` writes, then re-plans; the apply fails unless the second plan is
   empty. A realm in shape produces no write at all.
 - **Additive.** An object only the target realm has is reported and left alone. The exceptions are
-  existing decisions — the Android client's realm-role scope (`REQ-SEC-035`), its withheld
-  `offline_access` (ADR-0131) — and the scope lists of a client the same run created.
+  owner decisions, each named in the script — the Android client's realm-role scope
+  (`REQ-SEC-035`), its withheld `offline_access` (ADR-0131), and the three retirements of
+  2026-09-22 (below) — and the scope lists of a client the same run created.
+- **Three production entries are retired and converge away wherever they are found** (owner
+  decision 2026-09-22, ADR-0202 amendment): `basetool-sc-extractor`'s authorization-code flow and
+  its two loopback wildcard redirect URIs (`REQ-INGEST-002`); both ingest scopes on
+  `basetool-android` (`REQ-INGEST-011`); `basetool-frontend`'s `http://frontend:18081` redirect URI
+  and web origin. Production keeps them until the owner applies the provisioner there.
 - **The DPoP write order holds** (`REQ-SEC-030`): when the Android client or the DPoP profile has to
   change, the policy is detached first and re-attached last, and both client-policy lists are merged
   by name so no other policy or profile is lost.
@@ -1783,6 +1789,9 @@ there.
   reported and still present; no secret appears in the output or in any payload.
 - [ ] After provisioning, `keycloak-config-snapshot.sql` run on the environment and on production
   diffs only in the lines its header lists as environment-specific.
+- [ ] `provision-keycloak-realm.test.sh` section 8: against a realm still carrying the three retired
+  entries, the plan removes exactly those (plus the DPoP detach/re-attach the app's scope removal
+  needs) and a second apply is empty.
 
 **Enforced by:** `scripts/provision-keycloak-realm.py` · `scripts/provision-keycloak-realm.test.sh`
 (`.github/workflows/keycloak-provisioner.yml`) · `scripts/keycloak-config-snapshot.sql` ·
