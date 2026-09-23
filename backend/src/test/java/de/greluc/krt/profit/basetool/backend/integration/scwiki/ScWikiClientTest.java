@@ -25,12 +25,14 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import de.greluc.krt.profit.basetool.backend.config.RestClientConfig;
 import de.greluc.krt.profit.basetool.backend.config.ScWikiProperties;
 import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiBlueprintDto;
 import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiCommodityDto;
 import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiResponseDto;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.micrometer.observation.ObservationRegistry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -43,7 +45,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.web.reactive.function.client.WebClient;
 
 /**
  * Unit tests for {@link ScWikiClient} using {@link MockWebServer} to stand in for {@code
@@ -85,7 +86,11 @@ class ScWikiClientTest {
     properties.setPageSize(200);
     properties.setRequestsPerSecond(1000);
     meterRegistry = new SimpleMeterRegistry();
-    client = new ScWikiClient(WebClient.builder(), properties, meterRegistry);
+    client =
+        new ScWikiClient(
+            new RestClientConfig().restClientBuilder(ObservationRegistry.NOOP),
+            properties,
+            meterRegistry);
     client.initClient();
   }
 
@@ -153,7 +158,7 @@ class ScWikiClientTest {
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertNotNull(req);
     // Comma is in RFC 3986's sub-delims set and stays unencoded in query values when sent by
-    // Spring's WebClient. Accept both forms — what matters is the wire-level include is present.
+    // Spring's RestClient. Accept both forms — what matters is the wire-level include is present.
     String path = req.getPath();
     assertTrue(
         path.contains("include=blueprints,items") || path.contains("include=blueprints%2Citems"),
@@ -304,7 +309,10 @@ class ScWikiClientTest {
 
     AtomicInteger paceCalls = new AtomicInteger(0);
     ScWikiClient counter =
-        new ScWikiClient(WebClient.builder(), properties, meterRegistry) {
+        new ScWikiClient(
+            new RestClientConfig().restClientBuilder(ObservationRegistry.NOOP),
+            properties,
+            meterRegistry) {
           @Override
           public void paceForRateLimit() {
             paceCalls.incrementAndGet();

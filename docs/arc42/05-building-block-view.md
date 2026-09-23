@@ -68,7 +68,7 @@ Layered, with the direction enforced by ArchUnit rather than by convention:
 | `dto` / `mapper` | Records on the boundary, MapStruct between them and entities |
 | `support` | Cross-cutting helpers, including the `OptimisticLock` family |
 | `task` | Scheduled jobs |
-| `integration` | Outbound third parties — `UexClient`, `scwiki` |
+| `integration` | Outbound third parties — `UexClient`, `scwiki` — on the blocking `RestClient` from `config.RestClientConfig` (JDK HTTP client, no WebFlux; ADR-0204), which `KeycloakService` shares |
 | `event` | Domain events, including what drives notifications and live sync |
 | `metrics` / `health` / `logging` | `basetool_*` business metrics, health indicators, MDC enrichment |
 | `filter` / `interceptor` / `annotation` / `validation` / `util` / `web` / `exception` / `config` | The usual Spring surface |
@@ -94,8 +94,11 @@ that has to cross that boundary — the active-OrgUnit pin, the correlation id �
 
 - **`ingest`** — a gateway: authentication (DPoP accepted, `REQ-INGEST-012`), the approved-client
   check, rate limiting, payload size limits, a relay to the backend under the gateway's own service
-  identity, and the single-use Redis handoff. Ships its own committed `openapi.json`.
-  Specification: [`desktop-ingest.md`](../specs/desktop-ingest.md).
+  identity, and the single-use Redis handoff. Ships its own committed `openapi.json`. Its two
+  outbound calls — the relay and its own token grant — are blocking `RestClient`s on the JDK HTTP
+  client (`config.RestClientConfig`, ADR-0204); the module has no WebFlux and no Reactor Netty, so
+  the worker-thread trap of §5.3 does not exist there. Specification:
+  [`desktop-ingest.md`](../specs/desktop-ingest.md).
 - **`keycloak-spi`** — a provider JAR, deliberately free of the application stack: no Spring Boot,
   Java-21 bytecode for the Keycloak JVM, its own Lombok pin, `@JBossLog` rather than `@Slf4j`. It
   holds the Discord identity provider and its mappers, the guild/role gate authenticator, the

@@ -42,9 +42,9 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.context.request.WebRequest;
-import org.springframework.web.reactive.function.client.WebClientRequestException;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -223,11 +223,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
    * the backend cannot have logged on the gateway's behalf), and the cached token is invalidated so
    * the next upload mints a fresh one.
    *
-   * @param ex the WebClient response exception
+   * @param ex the relay's response exception ({@code HttpClientErrorException}, {@code
+   *     HttpServerErrorException} or {@code UnknownHttpStatusCodeException}, all of which extend
+   *     {@link RestClientResponseException})
    * @return a relayed 4xx problem, or a 502 for a backend auth refusal or a backend 5xx
    */
-  @ExceptionHandler(WebClientResponseException.class)
-  public @NotNull ProblemDetail handleBackendResponse(@NotNull WebClientResponseException ex) {
+  @ExceptionHandler(RestClientResponseException.class)
+  public @NotNull ProblemDetail handleBackendResponse(@NotNull RestClientResponseException ex) {
     HttpStatusCode status = ex.getStatusCode();
     if (status.value() == HttpStatus.UNAUTHORIZED.value()
         || status.value() == HttpStatus.FORBIDDEN.value()) {
@@ -289,12 +291,19 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
    * A genuine transport failure reaching the backend (connection refused, timeout) → 502. This is
    * the signal the backend is down and is what opens the circuit breaker, so it is logged at WARN.
    *
+   * <p>Mapped on {@link RestClientException}, the parent of {@code RestClient}'s {@code
+   * ResourceAccessException} (connect or read failure) and of the plain exception it raises when a
+   * response body cannot be read — a connection torn down mid-body, a body past the payload cap.
+   * Both are a relay that did not complete, not a defect in the gateway. A backend answer with an
+   * error status is the more specific {@link RestClientResponseException} and goes to {@link
+   * #handleBackendResponse} instead; the token grant's own failures never reach here, because the
+   * provider turns them into a {@code ServiceAccountTokenException}.
+   *
    * @param ex the request exception
    * @return a 502 problem
    */
-  @ExceptionHandler(WebClientRequestException.class)
-  public @NotNull ProblemDetail handleBackendTransportFailure(
-      @NotNull WebClientRequestException ex) {
+  @ExceptionHandler(RestClientException.class)
+  public @NotNull ProblemDetail handleBackendTransportFailure(@NotNull RestClientException ex) {
     log.warn("Backend relay failed: {}", ex.getClass().getSimpleName());
     return backendUnavailable();
   }
@@ -457,8 +466,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
    * @param ex the backend response exception
    * @return the backend problem's detail/title (capped), or a generic fallback
    */
-  private @NotNull String backendDetail(@NotNull WebClientResponseException ex) {
-    MediaType contentType = ex.getHeaders().getContentType();
+  private @NotNull String backendDetail(@NotNull RestClientResponseException ex) {
+    HttpHeaders headers = ex.getResponseHeaders();
+    MediaType contentType = headers == null ? null : headers.getContentType();
     if (contentType == null || !contentType.isCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)) {
       return GENERIC_BACKEND_REJECT;
     }

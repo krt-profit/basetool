@@ -1105,7 +1105,8 @@ points the name at the host's own reverse proxy; its default, `localhost:127.0.0
 
 Resolving the name is not the same as trusting what answers on it. That metadata fetch runs on a
 plain `RestTemplate` and therefore validates against the **JVM default trust store** — the
-`backend-trust` / `keycloak-trust` SSL bundles cover the inter-service WebClients only. An
+`backend-trust` / `keycloak-trust` SSL bundles cover the inter-service clients only (the frontend's
+WebClients, the backend's Keycloak admin client, the ingest's `RestClient`s — ADR-0204). An
 environment whose proxy presents a self-signed certificate fails with `PKIX path building failed`
 at exactly the same point. `IRI_TRUSTSTORE_HOST_PATH` mounts a trust store at
 `/run/secrets/truststore.p12` and `IRI_EXTRA_JAVA_OPTS` appends the `javax.net.ssl.trustStore*`

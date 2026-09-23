@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.integration.scwiki;
 
+import de.greluc.krt.profit.basetool.backend.config.ResponseSizeLimitInterceptor;
 import de.greluc.krt.profit.basetool.backend.config.ScWikiProperties;
 import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiMetaDto;
 import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiResponseDto;
@@ -26,7 +27,6 @@ import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiRow;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -42,8 +42,7 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
+import org.springframework.web.client.RestClient;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
@@ -52,8 +51,9 @@ import tools.jackson.databind.json.JsonMapper;
  * Read-only HTTP client for the SC Wiki catalogue API ({@code https://api.star-citizen.wiki}).
  *
  * <p>Mirrors {@link de.greluc.krt.profit.basetool.backend.integration.UexClient} for shared bits
- * (per-call timeout, fail-soft empty-list returns, ETag conditional GET, 16 MB in-memory buffer)
- * and adds three behaviours specific to the Wiki API (per SC_WIKI_SYNC_PLAN.md §5.3):
+ * (blocking {@code RestClient} with a 30 s read timeout, fail-soft empty-list returns, ETag
+ * conditional GET, 16 MB response-body cap) and adds three behaviours specific to the Wiki API (per
+ * SC_WIKI_SYNC_PLAN.md §5.3):
  *
  * <ol>
  *   <li><b>Pagination</b> — Wiki endpoints return a {@code {data, meta, links}} envelope where
@@ -86,13 +86,20 @@ import tools.jackson.databind.json.JsonMapper;
 public class ScWikiClient {
 
   /**
-   * Per-call timeout for the underlying reactive request. Matches the UEX client (30 s) so a single
-   * hung Wiki page does not delay the whole {@code ScWikiScheduler} tick beyond the scheduler's own
-   * grace window.
+   * Largest response body one Wiki call may deliver (16 MiB), the ceiling the reactive codec used
+   * to enforce. See {@link #initClient()} for why it is a backstop and not a comfortable margin.
    */
-  private static final Duration CALL_TIMEOUT = Duration.ofSeconds(30);
+  static final long MAX_RESPONSE_BYTES = 16L * 1024 * 1024;
 
-  private final WebClient.Builder webClientBuilder;
+  /**
+   * A fresh, observed builder from {@code RestClientConfig} (prototype-scoped), so the base URL set
+   * here does not leak into any other client. Its request factory bounds each call by the same 30 s
+   * read timeout as the UEX client, so a single hung Wiki page cannot delay the whole {@code
+   * ScWikiScheduler} tick beyond the scheduler's own grace window.
+   */
+  private final RestClient.Builder restClientBuilder;
+
+  /** The {@code app.scwiki.*} configuration: base URL, page sizes, pacing and game version. */
   private final ScWikiProperties properties;
 
   /**
@@ -102,8 +109,8 @@ public class ScWikiClient {
    */
   private final MeterRegistry meterRegistry;
 
-  /** Reusable WebClient bound to the Wiki base URL. Built once after dependency injection. */
-  private WebClient client;
+  /** Reusable client bound to the Wiki base URL. Built once after dependency injection. */
+  private RestClient client;
 
   /**
    * Last-seen {@code ETag} response header value, keyed by the canonical page-1 request URI
@@ -125,26 +132,27 @@ public class ScWikiClient {
   private final ObjectMapper objectMapper = JsonMapper.builder().build();
 
   /**
-   * Builds the {@link WebClient} after dependency injection. Done once in {@code @PostConstruct}
-   * instead of lazily per call so the Reactor-Netty connection pool from {@link
-   * de.greluc.krt.profit.basetool.backend.config.WebClientConfig} is reused for every Wiki request
+   * Builds the {@link RestClient} after dependency injection. Done once in {@code @PostConstruct}
+   * instead of lazily per call so the JDK connection pool behind {@link
+   * de.greluc.krt.profit.basetool.backend.config.RestClientConfig} is reused for every Wiki request
    * over the application's lifetime.
    *
-   * <p>The 16 MB in-memory codec ceiling matches {@code UexClient}. It is <b>not</b> the
-   * comfortable margin an earlier version of this comment claimed ("the largest probed Wiki list
-   * page sits around 1.3 MB"): measured against the live API on 2026-08-28, {@code /api/vehicles}
-   * at the default page size of 200 answers with <b>10.4 MB</b> on page 1, because a vehicle row
-   * carries its entire port / shield / power tree. Exceeding the ceiling throws inside the decode,
-   * which this client swallows into an empty list — so the sync would stop silently rather than
-   * fail loudly. The vehicle walk therefore requests a smaller page (see {@code
+   * <p>The 16 MB response-body cap ({@link #MAX_RESPONSE_BYTES}, enforced by a {@link
+   * ResponseSizeLimitInterceptor}) matches {@code UexClient}. It is <b>not</b> the comfortable
+   * margin an earlier version of this comment claimed ("the largest probed Wiki list page sits
+   * around 1.3 MB"): measured against the live API on 2026-08-28, {@code /api/vehicles} at the
+   * default page size of 200 answers with <b>10.4 MB</b> on page 1, because a vehicle row carries
+   * its entire port / shield / power tree. Exceeding the ceiling throws inside the decode, which
+   * this client swallows into an empty list — so the sync would stop silently rather than fail
+   * loudly. The vehicle walk therefore requests a smaller page (see {@code
    * ScWikiProperties.vehiclesPageSize}), which is the real fix; the ceiling is the backstop.
    */
   @PostConstruct
   void initClient() {
     this.client =
-        webClientBuilder
+        restClientBuilder
             .baseUrl(properties.getApiUrl())
-            .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024))
+            .requestInterceptor(new ResponseSizeLimitInterceptor(MAX_RESPONSE_BYTES))
             .build();
   }
 
@@ -645,30 +653,28 @@ public class ScWikiClient {
     // single-resource responses in {"data": {…}} and returns others flat, so reading the body as a
     // tree and unwrapping a top-level "data" node before binding is simpler and more robust than a
     // codec-level bind that would have to know about the envelope.
-    String rawBody =
-        client
-            .get()
-            .uri(uri)
-            .exchangeToMono(
-                response -> {
-                  int status = response.statusCode().value();
-                  if (status == 404 || status == 304) {
-                    return Mono.<String>empty();
-                  }
-                  if (!response.statusCode().is2xxSuccessful()) {
-                    return response.createError();
-                  }
-                  return response.bodyToMono(String.class);
-                })
-            .timeout(CALL_TIMEOUT)
-            .onErrorResume(
-                e -> {
-                  log.warn("Failed to fetch {} from SC Wiki API ({})", resourceLabel, uri, e);
-                  recordFetchErrorOnce(errorLatch);
-                  return Mono.empty();
-                })
-            .blockOptional()
-            .orElse(null);
+    String rawBody;
+    try {
+      rawBody =
+          client
+              .get()
+              .uri(uri)
+              .exchange(
+                  (clientRequest, response) -> {
+                    int status = response.getStatusCode().value();
+                    if (status == 404 || status == 304) {
+                      return null;
+                    }
+                    if (!response.getStatusCode().is2xxSuccessful()) {
+                      throw response.createException();
+                    }
+                    return response.bodyTo(String.class);
+                  });
+    } catch (RuntimeException e) {
+      log.warn("Failed to fetch {} from SC Wiki API ({})", resourceLabel, uri, e);
+      recordFetchErrorOnce(errorLatch);
+      return null;
+    }
     if (rawBody == null || rawBody.isBlank()) {
       return null;
     }
@@ -712,53 +718,52 @@ public class ScWikiClient {
     // relative, and treats already-encoded sequences (%5B / %5D) as literal — exactly what
     // buildPagedUri produces. Passing a URI directly would BYPASS the baseUrl (Spring treats a
     // URI argument as fully resolved), which caused MockWebServer tests to hit localhost:80.
-    WebClient.RequestHeadersSpec<?> request = client.get().uri(requestUri);
+    RestClient.RequestHeadersSpec<?> request = client.get().uri(requestUri);
     if (previousEtag != null && !previousEtag.isBlank()) {
       request = request.header(HttpHeaders.IF_NONE_MATCH, previousEtag);
     }
-    return request
-        .exchangeToMono(
-            response -> {
-              int status = response.statusCode().value();
-              if (status == 304) {
-                log.debug(
-                    "SC Wiki {} page unchanged since last sync (304 Not Modified) — skipping.",
-                    resourceLabel);
-                return Mono.just(PageOutcome.<T>unchanged());
-              }
-              if (!response.statusCode().is2xxSuccessful()) {
-                return response.createError();
-              }
-              String etag = response.headers().asHttpHeaders().getETag();
-              if (etag != null && !etag.isBlank()) {
-                etagByFirstPageUri.put(requestUri, etag);
-              }
-              return response.bodyToMono(typeRef).map(PageOutcome::ok);
-            })
-        .timeout(CALL_TIMEOUT)
-        .onErrorResume(
-            e -> {
-              log.warn("Failed to fetch {} from SC Wiki API ({})", resourceLabel, requestUri, e);
-              recordFetchErrorOnce(errorLatch);
-              return Mono.just(PageOutcome.<T>error());
-            })
-        .blockOptional()
-        .orElse(PageOutcome.error());
+    try {
+      return request.exchangeForRequiredValue(
+          (clientRequest, response) -> {
+            int status = response.getStatusCode().value();
+            if (status == 304) {
+              log.debug(
+                  "SC Wiki {} page unchanged since last sync (304 Not Modified) — skipping.",
+                  resourceLabel);
+              return PageOutcome.<T>unchanged();
+            }
+            if (!response.getStatusCode().is2xxSuccessful()) {
+              throw response.createException();
+            }
+            String etag = response.getHeaders().getETag();
+            if (etag != null && !etag.isBlank()) {
+              etagByFirstPageUri.put(requestUri, etag);
+            }
+            ScWikiResponseDto<T> body = response.bodyTo(typeRef);
+            // An empty 2xx body decodes to null; the reactive pipeline completed empty there and
+            // fell through to the same uncounted error outcome.
+            return body == null ? PageOutcome.<T>error() : PageOutcome.ok(body);
+          });
+    } catch (RuntimeException e) {
+      log.warn("Failed to fetch {} from SC Wiki API ({})", resourceLabel, requestUri, e);
+      recordFetchErrorOnce(errorLatch);
+      return PageOutcome.error();
+    }
   }
 
   /**
-   * Builds the page URI as a relative path with unencoded brackets. WebClient's default URI builder
-   * encodes {@code [} / {@code ]} to {@code %5B} / {@code %5D} on the wire — a previous attempt
-   * that pre-encoded the brackets caused double-encoding ({@code %255B}) because Spring's default
-   * mode treats already-encoded sequences in a non-template URI literal as content to be encoded
-   * again. The wiki accepts both encoded and unencoded brackets in keys; producing the unencoded
-   * form keeps the WebClient happy and the test assertions on the recorded request path see the
-   * canonical encoded form.
+   * Builds the page URI as a relative path with unencoded brackets. RestClient's default URI
+   * builder encodes {@code [} / {@code ]} to {@code %5B} / {@code %5D} on the wire — a previous
+   * attempt that pre-encoded the brackets caused double-encoding ({@code %255B}) because Spring's
+   * default mode treats already-encoded sequences in a non-template URI literal as content to be
+   * encoded again. The wiki accepts both encoded and unencoded brackets in keys; producing the
+   * unencoded form keeps the RestClient happy and the test assertions on the recorded request path
+   * see the canonical encoded form.
    *
    * <p>Appended params (in order): {@code page[number]}, {@code page[size]}, {@code include} (if
    * non-blank), each {@code filter[<key>]} (for every non-blank entry, in the map's iteration
    * order), {@code version} (if non-blank). Commas inside {@code include} stay literal and are
-   * encoded by the WebClient to {@code %2C}.
+   * encoded by the RestClient to {@code %2C}.
    *
    * @param endpoint Wiki endpoint path
    * @param pageNumber 1-based page index
@@ -768,7 +773,7 @@ public class ScWikiClient {
    * @param pageSize the {@code page[size]} to request — already resolved by {@link
    *     #effectivePageSize}, so every page of one walk asks for the same size and the ETag cache
    *     key stays stable
-   * @return relative URI string passed to the WebClient via {@code .uri(String)}
+   * @return relative URI string passed to the RestClient via {@code .uri(String)}
    */
   private String buildPagedUri(
       String endpoint, int pageNumber, String include, Map<String, String> filters, int pageSize) {

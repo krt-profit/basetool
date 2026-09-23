@@ -564,7 +564,7 @@ public class SecurityConfig {
                     // dev/test/e2e there is no management port and Actuator rides the application
                     // connector. Either way, without this rule the write would reach
                     // `anyRequest().authenticated()` below and ANY valid realm JWT could set the
-                    // ROOT logger to TRACE, which makes Spring Security / WebClient / Netty write
+                    // ROOT logger to TRACE, which makes Spring Security / the HTTP clients write
                     // bearer tokens and request bodies into a log stream retained for 744 h. Only
                     // the mutator is gated; the read (GET /actuator/loggers) stays on the
                     // authenticated catch-all. Frontend and ingest permit all of /actuator/** on
