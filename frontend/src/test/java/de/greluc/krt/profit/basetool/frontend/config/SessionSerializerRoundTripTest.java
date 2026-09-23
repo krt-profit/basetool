@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.ImportSuggestionDto;
+import de.greluc.krt.profit.basetool.frontend.model.form.PersonalInventoryForm;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -35,6 +36,7 @@ import org.apache.tomcat.websocket.server.WsHttpSessionBindingListener;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.serializer.GenericJacksonJsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializer;
+import org.springframework.validation.BeanPropertyBindingResult;
 
 /**
  * The session serializer must be able to read back what it just wrote.
@@ -136,6 +138,25 @@ class SessionSerializerRoundTripTest {
     // types. If this ever starts passing, the allow-list has grown into a blanket rule and the
     // required Long/Integer session keys are the next thing to check.
     assertThrows(Exception.class, () -> roundTrip(probeRecord()));
+  }
+
+  @Test
+  void aBindingResultIsWrittenButCannotBeReadBack() {
+    // The root cause of the admin personal-inventory form losing its errors (fixed 2026-09-23):
+    // RedisSessionConfig's BindingResultMixin makes a BeanPropertyBindingResult WRITABLE (it hides
+    // the self-referencing model), but nothing makes it READABLE — it has no constructor Jackson
+    // can use, and neither has FieldError. A flash map carrying one was therefore written without
+    // complaint and dropped whole on the redirect's GET (REQ-SEC-063). The fix is that a
+    // BindingResult never enters the session at all (FlashAttributeTypesTest); this case pins why,
+    // so nobody "fixes" the rule away by trusting the mix-in.
+    PersonalInventoryForm form = new PersonalInventoryForm();
+    BeanPropertyBindingResult errors = new BeanPropertyBindingResult(form, "personalInventoryForm");
+    errors.rejectValue("name", "NotBlank", "must not be blank");
+
+    byte[] written = serializer.serialize(errors);
+
+    assertTrue(written.length > 0, "the mix-in makes the value writable");
+    assertThrows(Exception.class, () -> serializer.deserialize(written));
   }
 
   @Test

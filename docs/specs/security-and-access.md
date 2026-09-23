@@ -3076,6 +3076,13 @@ Two rules, and which applies depends on who writes the value:
   list is resolved by name and skipped when absent, so it cannot break the build on a container that
   does not carry the class. It must stay short, and it must never carry one of our own classes —
   putting one there converts a two-character fix into a permanent exception.
+- **A `BindingResult` never enters a flash attribute** (added 2026-09-23). The session can *write*
+  one — `BindingResultMixin` hides its self-referencing model — but cannot *read* it back:
+  `BeanPropertyBindingResult` and `FieldError` have no constructor Jackson can use, so the
+  redirect's GET dropped the **whole flash map** — form input, field errors and every toast flashed
+  beside them. The admin personal-inventory form did that from the day it was written: an invalid
+  submission came back as a closed modal with no errors. A form that fails validation re-renders its
+  view inline, which every other form in the frontend already did.
 
 Tomcat 11.0.25 added `org.apache.tomcat.websocket.server.WsHttpSessionBindingListener`, a `record`
 that `WsServerContainer#registerAuthenticatedSession` writes whenever an authenticated WebSocket
@@ -3110,10 +3117,14 @@ read as bare scalars, and changing their wire format breaks every live session a
   is an exception per named class, never a policy change.
 - [ ] `basetool_session_value_dropped_total` is zero in steady state, so a non-zero rate is a real
   poisoning.
+- [x] No controller flashes a `BindingResult`; an invalid admin personal-inventory create or update
+  re-renders inline with the modal open and its field errors, and flashes nothing.
 
 **Enforced by:** `SessionSerializerRoundTripTest` (the required keys and scalars still read back;
 the Tomcat listener round-trips and carries `@class`; a plain record and `List.of`/`Map.of` still do
-not) · `FaultTolerantSessionSerializerTest`, `SessionAttributeDiagnosticMapperTest` (the survivable
+not; a `BindingResult` writes but does not read) · `FlashAttributeTypesTest` (no
+`addFlashAttribute` in the main sources names a binding result) ·
+`AdminPersonalInventoryPageControllerMvcTest` (the inline re-render) · `FaultTolerantSessionSerializerTest`, `SessionAttributeDiagnosticMapperTest` (the survivable
 path and the attribute-naming WARN) · **Code:** `RedisSessionConfig#buildSessionJsonMapper`,
 `CONTAINER_WRITTEN_FINAL_SESSION_TYPES`, `ForcedTypeIdMixin`, `FaultTolerantSessionSerializer`,
 `SessionAttributeDiagnosticMapper` · **Monitoring:** `SessionValueDropsSustained`,
