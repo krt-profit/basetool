@@ -45,7 +45,7 @@ import org.springframework.validation.annotation.Validated;
  * @param slowRequestThresholdMs inbound requests slower than this are logged at WARN by {@code
  *     RequestLoggingFilter}
  * @param slowBackendCallThresholdMs outbound backend relays slower than this get the {@code Slow
- *     backend call} marker from {@code WebClientLoggingFilter}
+ *     backend call} marker from {@code BackendCallLoggingInterceptor}
  * @param structuredEnabled feature flag mirroring the backend/frontend key so the three modules
  *     share one configuration surface; the JSON appender itself is profile-gated in {@code
  *     logback-spring.xml}

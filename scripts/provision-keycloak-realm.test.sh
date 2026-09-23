@@ -479,7 +479,7 @@ assert_eq "$(query "$state" "'extractor-ingest-only' in scope_names('default', '
 assert_eq "$(query "$state" "scope_names('optional', 'basetool-android')")" \
   "['address', 'microprofile-jwt', 'organization', 'phone']" "offline_access is withheld from the app"
 assert_eq "$(query "$state" "sorted(client('basetool-frontend')['redirectUris'])")" \
-  "['http://frontend:18081/*', 'https://testing.example/*', 'https://testing.example/login/oauth2/code/keycloak']" \
+  "['https://testing.example/*', 'https://testing.example/login/oauth2/code/keycloak']" \
   "the frontend's redirect URIs come from --public-origin"
 assert_eq "$(query "$state" "client('basetool-android')['redirectUris']")" \
   "['https://testing.example/app/callback']" "the app's callback comes from --public-origin"
@@ -637,6 +637,64 @@ assert_eq "$(query "$state" "client('grafana')['redirectUris']")" \
 output="$(KCADM_STUB_STATE="$state" "$PYTHON" "$PROVISIONER" --public-origin "https://testing.example/" \
   --kcadm-command "false" 2>&1 || true)"
 assert_contains "$output" "no path and no trailing slash" "a trailing slash is refused before anything is read"
+rm -rf "$state"
+
+# ---------------------------------------------------------------------------
+echo "8. the three retirements of 2026-09-22 converge away from a realm in the old production shape"
+# ---------------------------------------------------------------------------
+# Owner decisions (ADR-0202 amendment): the extractor's code flow and loopback redirects, the two
+# ingest scopes on the app, and the frontend's compose-internal origin. They are the only entries
+# besides REQ-SEC-035 / ADR-0131 that converge in BOTH directions, so the plan against a realm
+# that still has them must remove exactly these and nothing else.
+state="$(mktemp -d)"
+make_stub "$state" empty
+run_provisioner "$state" --apply >/dev/null
+STUB_STATE="$state" "$PYTHON" -c '
+import json, os, pathlib
+p = pathlib.Path(os.environ["STUB_STATE"]) / "state.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+by_id = {c["clientId"]: c for c in d["clients"]}
+ids = {s["name"]: s["id"] for s in d["scopes"]}
+ex = by_id["basetool-sc-extractor"]
+ex["standardFlowEnabled"] = True
+ex["redirectUris"] = ["http://127.0.0.1/*", "http://localhost/*"]
+fe = by_id["basetool-frontend"]
+fe["redirectUris"] = ["http://frontend:18081/*"] + fe["redirectUris"]
+fe["webOrigins"] = ["http://frontend:18081"] + fe["webOrigins"]
+app = by_id["basetool-android"]["id"]
+d["client_default_scopes"][app] += [ids["extractor-ingest"], ids["extractor-ingest-only"]]
+p.write_text(json.dumps(d), encoding="utf-8")
+'
+output="$(run_provisioner "$state")"
+# Only the plan: the report section that follows it uses the same `  - ` bullet.
+planned="$(printf '%s\n' "$output" | sed '/^\[only on this realm/,$d' | grep -E '^  [-+~=] ' | sort)"
+expected="$(printf '%s\n' \
+  "  + attach policy 'krt-mobile-dpop-policy' (merged by name; every other policy carried forward)" \
+  "  - default scope 'extractor-ingest' withheld (ADR-0131 / ingest scopes retired 2026-09-22)" \
+  "  - default scope 'extractor-ingest-only' withheld (ADR-0131 / ingest scopes retired 2026-09-22)" \
+  "  - detach 'krt-mobile-dpop-policy' (1 other policy(ies) carried forward)" \
+  "  - redirect URI http://127.0.0.1/* withheld (unused authorization-code flow retired 2026-09-22)" \
+  "  - redirect URI http://frontend:18081/* withheld (compose-internal origin retired 2026-09-22)" \
+  "  - redirect URI http://localhost/* withheld (unused authorization-code flow retired 2026-09-22)" \
+  "  - web origin http://frontend:18081 withheld (compose-internal origin retired 2026-09-22)" \
+  "  ~ standardFlowEnabled: true -> false" | sort)"
+assert_eq "$planned" "$expected" "the plan removes exactly the retired entries (and detaches for the app's scopes)"
+assert_not_contains "$output" "is not in the production shape" "a retired entry is removed, not merely reported"
+run_provisioner "$state" --apply >/dev/null
+assert_eq "$(cat "${state}/rc")" "0" "the apply succeeds and verifies clean"
+assert_eq "$(query "$state" "client('basetool-sc-extractor')['standardFlowEnabled'], client('basetool-sc-extractor')['redirectUris']")" \
+  "(False, [])" "the extractor has no code flow and no redirect URI"
+assert_eq "$(query "$state" "[n for n in ('extractor-ingest', 'extractor-ingest-only') if n in scope_names('default', 'basetool-android')]")" \
+  "[]" "the app carries neither ingest scope"
+assert_eq "$(query "$state" "[u for u in client('basetool-frontend')['redirectUris'] + client('basetool-frontend')['webOrigins'] if 'frontend:18081' in u]")" \
+  "[]" "the frontend's compose-internal origin is gone"
+assert_eq "$(query "$state" "scope_names('default', 'basetool-sc-extractor')")" \
+  "['acr', 'basic', 'email', 'extractor-ingest', 'extractor-ingest-only', 'profile', 'roles', 'web-origins']" \
+  "the extractor keeps both ingest scopes"
+assert_eq "$(query "$state" "'krt-mobile-dpop-policy' in [p['name'] for p in d['policies']['policies']]")" "True" "the DPoP policy is attached again"
+output="$(run_provisioner "$state" --apply)"
+assert_contains "$output" "No changes" "a second apply is empty"
+assert_eq "$(writes_in "$state")" "0" "and sends no write"
 rm -rf "$state"
 
 # ---------------------------------------------------------------------------

@@ -40,13 +40,15 @@ repositories { mavenCentral() }
 
 dependencies {
   implementation("org.springframework.boot:spring-boot-starter-web")
-  implementation("org.springframework.boot:spring-boot-starter-webflux")
+  // No spring-boot-starter-webflux (ADR-0204): every outbound call -- UEX, SC Wiki, the Keycloak
+  // Admin API -- is blocking and goes through `RestClient` on the JDK HttpClient
+  // (config.RestClientConfig), so WebFlux and Reactor Netty are off the runtime classpath.
   // CBOR on the frontend<->backend hop (ADR-0161 §8.5). No version: the Spring Boot BOM already
   // manages tools.jackson:jackson-bom, and pinning a second one here is how the two Jackson 3
   // module sets drift apart. Its only job is to be PRESENT -- Spring Framework 7 detects
-  // `tools.jackson.dataformat.cbor.CBORMapper` on the classpath and registers the CBOR converter
-  // and the reactive CBOR codecs on its own, so no wiring follows from this line. Which side
-  // actually asks for CBOR is `app.http.codec` on the frontend, and nothing else asks at all.
+  // `tools.jackson.dataformat.cbor.CBORMapper` on the classpath and registers the CBOR message
+  // converter on its own, so no wiring follows from this line. Which side actually asks for CBOR
+  // is `app.http.codec` on the frontend, and nothing else asks at all.
   implementation("tools.jackson.dataformat:jackson-dataformat-cbor")
   // AspectJ is excluded for its licence, not its size (ADR-0197). `spring-boot-data-jpa` pulls
   // `spring-aspects` -> `aspectjweaver`, whose jar is `EPL-2.0 AND BSD-3-Clause AND Apache-1.1`
@@ -158,7 +160,7 @@ dependencies {
   // entities, service-layer code does not touch SecurityContextHolder, REST
   // endpoints are authorisation-annotated, ...). See ArchitectureTest.
   testImplementation(libs.archunit.core)
-  // MockWebServer for UexClient WebClient testing (already in version catalog
+  // MockWebServer for the UEX / SC-Wiki / Keycloak RestClient tests (already in version catalog
   // and used by the frontend module; backend gets the same shared version).
   testImplementation(libs.okhttp3.mockwebserver)
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")

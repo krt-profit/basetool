@@ -90,7 +90,7 @@ class AdditiveTrustManagerTest {
   /** A chain only the JVM defaults know — the public Keycloak. */
   @Test
   void acceptsAChainOnlyTheDefaultsValidate() {
-    X509TrustManager composite = WebClientConfig.additiveTrustManager(accepting(), rejecting());
+    X509TrustManager composite = RestClientConfig.additiveTrustManager(accepting(), rejecting());
 
     assertThatCode(() -> composite.checkServerTrusted(new X509Certificate[0], "RSA"))
         .doesNotThrowAnyException();
@@ -99,7 +99,7 @@ class AdditiveTrustManagerTest {
   /** A chain only the pinned bundle knows — an internal, self-signed Keycloak. */
   @Test
   void acceptsAChainOnlyThePinnedBundleValidates() {
-    X509TrustManager composite = WebClientConfig.additiveTrustManager(rejecting(), accepting());
+    X509TrustManager composite = RestClientConfig.additiveTrustManager(rejecting(), accepting());
 
     assertThatCode(() -> composite.checkServerTrusted(new X509Certificate[0], "RSA"))
         .doesNotThrowAnyException();
@@ -114,7 +114,7 @@ class AdditiveTrustManagerTest {
    */
   @Test
   void stillRefusesAChainNeitherValidates() {
-    X509TrustManager composite = WebClientConfig.additiveTrustManager(rejecting(), rejecting());
+    X509TrustManager composite = RestClientConfig.additiveTrustManager(rejecting(), rejecting());
 
     assertThatThrownBy(() -> composite.checkServerTrusted(new X509Certificate[0], "RSA"))
         .isInstanceOf(CertificateException.class)
@@ -143,7 +143,7 @@ class AdditiveTrustManagerTest {
           }
         };
 
-    X509TrustManager composite = WebClientConfig.additiveTrustManager(one, one);
+    X509TrustManager composite = RestClientConfig.additiveTrustManager(one, one);
 
     assertThat(composite.getAcceptedIssuers()).hasSize(2);
   }

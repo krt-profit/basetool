@@ -49,10 +49,10 @@ row by row against production's configuration snapshot of **2026-09-22**
 
 |         Object          |                                                                                              State                                                                                               |
 |-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `basetool-sc-extractor` | public, no secret, device grant on, direct access grants off, service accounts off, `fullScopeAllowed: false`; default scopes include `extractor-ingest` **and** `extractor-ingest-only`          |
+| `basetool-sc-extractor` | public, no secret, device grant on, direct access grants off, service accounts off, `fullScopeAllowed: false`; default scopes include `extractor-ingest` **and** `extractor-ingest-only`. Still carries the unused standard flow with `http://127.0.0.1/*` + `http://localhost/*` — **retired by owner decision 2026-09-22** (step 1), removed on the provisioner's next production apply |
 | `basetool-ingest-gateway` | confidential, service account only (standard flow and direct access grants off), empty redirect/origin lists — the gateway's own identity for the hop to the backend (step 9); still carries both ingest scopes, inherited from the realm defaults at creation (hardening step 9b leaves that to its own audience needs) |
 | `basetool-frontend`     | carries `extractor-ingest` (so its relayed token has `aud=basetool-backend`), **not** `extractor-ingest-only`                                                                                    |
-| `basetool-android`      | carries **both** ingest scopes as defaults, inherited from the realm defaults when it was provisioned — so an app token has `aud=basetool-ingest` and `extractor-ingest-only` in `scope`, and only the gateway's `azp` allowlist (step 7c) keeps it out of ingest; it also carries its own `aud=basetool-backend` mapper |
+| `basetool-android`      | carries **both** ingest scopes as defaults, inherited from the realm defaults when it was provisioned — so an app token has `aud=basetool-ingest` and `extractor-ingest-only` in `scope`, and only the gateway's `azp` allowlist (step 7c) keeps it out of ingest. **Retired by owner decision 2026-09-22** (`REQ-INGEST-011`): the app requests neither scope and never calls ingest; removed on the provisioner's next production apply. Its own `aud=basetool-backend` mapper stays and is what the backend checks |
 | `extractor-ingest`      | audience mapper `aud-basetool-backend` → `basetool-backend`; `include.in.token.scope: false`; no longer a realm default scope (hardening step 9, 2026-09-09)                                     |
 | `extractor-ingest-only` | audience mapper `aud-basetool-ingest` → `basetool-ingest`; `include.in.token.scope: true`; no longer a realm default scope                                                                       |
 | Realm                   | `revokeRefreshToken: false` (step 4); client policies: only `krt-mobile-dpop`, scoped to `basetool-android` by its marker role — none applies to the extractor (step 8)                         |
@@ -65,13 +65,15 @@ this repository cannot see them:
 | `IRI_BACKEND_EXPECTED_AUDIENCES` | backend                             | `basetool-backend` — enforcing since #1247 (2026-08-28); **required** since 2026-09-22 — blank refuses the prod start (APPSEC-08) |
 | `IRI_INGEST_ALLOWED_CLIENT_IDS`  | ingest                              | `basetool-sc-extractor`                                                                                                            |
 | `IRI_INGEST_CLIENT_AUDIT_ONLY`   | ingest                              | `false` since 2026-08-30 — the `azp` allowlist enforces                                                                            |
-| `IRI_INGEST_EXPECTED_AUDIENCES`  | ingest                              | **must be `basetool-ingest`**; read on 2026-08-28 as the backend's value (wrong, see 7a) and not re-read since — **open**          |
+| `IRI_INGEST_EXPECTED_AUDIENCES`  | ingest                              | `basetool-ingest` since **2026-09-22 21:37 UTC** (host `.env` set, `env.d` re-rendered, `ingest.service` restarted; the container's environment read back as `APP_SECURITY_JWT_EXPECTED_AUDIENCES=basetool-ingest`, container healthy). **Corrected 2026-09-23:** this row said it was read on 2026-08-28 as the backend's value and was open |
 | `IRI_INGEST_REQUIRED_SCOPE`, `IRI_INGEST_ALLOWED_TOOLS` | ingest       | not present in the environment read on 2026-08-28, so inert — **open** (7b, 7c)                                                    |
 | `IRI_INGEST_SERVICE_ACCOUNT_*`, `IRI_INGEST_PUBLIC_BASE_URL`, `IRI_INGEST_GATEWAY_CLIENT_IDS` | ingest / backend | set — the extractor's sends go through this path since v2.7.2, and it refuses by name when a value is missing (step 9) |
 
-The two **open** rows are the remaining work of the client-identity gate: read the host's values
-(a read, needing no approval under the production-host rule), then set them in the order 7b → 7c →
-7a's audience last.
+The **open** row is the remaining work of the client-identity gate: read the host's values (a
+read, needing no approval under the production-host rule), then set them in the order 7b → 7c.
+The audience that 7a says to set last went in first, on 2026-09-22: it refuses with `401` rather
+than `403` and is not softened by `AUDIT_ONLY`, so a send that fails with `401` after a realm
+change points here before anywhere else.
 
 ### Applying an `.env` change on the production host
 
@@ -122,10 +124,12 @@ What to know before running it:
   (`manage-clients` + `manage-realm`). Granting service-account roles needs `manage-users`, which that
   identity deliberately lacks: the script then exits `3` and prints the roles to assign by hand in
   the Admin Console. Everything else is applied.
-- **It reproduces production as it is**, including three things marked `PROD-AS-IS` in the script:
-  the extractor's unused authorization-code flow (the hardening runbook's thirteenth finding), both
-  ingest scopes on `basetool-android` and `basetool-ingest-gateway`, and the compose-internal
-  `http://frontend:18081` pair on the frontend. Deciding any of them is a production decision first.
+- **It reproduces production as it is**, marking what looks unintended `PROD-AS-IS` — except three
+  entries the owner retired on 2026-09-22 (ADR-0202 amendment 1): the extractor's unused
+  authorization-code flow and its loopback redirect URIs, both ingest scopes on `basetool-android`,
+  and the frontend's compose-internal `http://frontend:18081` pair. Those are **removed** wherever
+  the script finds them, production included on its next apply. The gateway keeps both ingest
+  scopes.
 - **It does not do** the realm-wide hardening (Require SSL, events, OTP, default roles —
   [`KEYCLOAK_HARDENING_RUNBOOK.md`](KEYCLOAK_HARDENING_RUNBOOK.md)), the Discord identity provider
   ([`DISCORD_KEYCLOAK_SETUP.md`](keycloak/DISCORD_KEYCLOAK_SETUP.md)), or the realm's default client
@@ -287,8 +291,10 @@ Notes:
   the extractor contains no authorization-code client. The production client still carries
   `standardFlowEnabled: true` with the two loopback wildcards and no PKCE — an unused flow, recorded
   as the thirteenth finding of the
-  [Keycloak hardening runbook](KEYCLOAK_HARDENING_RUNBOOK.md#step-6--basetool-frontend-require-pkce-with-s256--version-sensitive),
-  where closing it is the owner's decision.
+  [Keycloak hardening runbook](KEYCLOAK_HARDENING_RUNBOOK.md#step-6--basetool-frontend-require-pkce-with-s256--version-sensitive).
+  **Decided 2026-09-22: off, redirect URIs removed** (owner; ADR-0202 amendment 1). The table above
+  is the target, `scripts/provision-keycloak-realm.py` applies it, and production follows on the
+  owner's apply.
 - `fullScopeAllowed: false` keeps the token's roles to what the client's scope mappings grant, not
   every realm role the member holds — least privilege. Production carries it since 2026-09-09
   (hardening step 8); before that it was `true`.
@@ -458,8 +464,8 @@ this order; the audit-only pass is what keeps it from locking out the real extra
 **This is the trap.** Step 3 above offered two ways to give the frontend its `basetool-backend`
 audience, and the realm took the shared-scope route: the `extractor-ingest` scope is a **default
 scope on both** `basetool-frontend` **and** `basetool-sc-extractor`. The fix below — a second,
-extractor-only scope — is in place in the deployed realm (2026-09-09 export); the audience variable
-at the end of this section is the part still open (*Configured state*).
+extractor-only scope — is in place in the deployed realm (2026-09-09 export), and the audience
+variable at the end of this section is set in production since 2026-09-22 (*Configured state*).
 
 Two consequences, and both silently defeat step 7 if ignored:
 
@@ -811,9 +817,11 @@ is the defect being fixed, and those installs must update.
 
 - [ ] `basetool-sc-extractor` is **public**, has **no secret**, ROPC **off**, service
   accounts **off**, web origins **empty**.
-- [ ] Device grant only: standard flow off and no redirect URIs (production: open, see step 1).
+- [ ] Device grant only: standard flow off and no redirect URIs (decided 2026-09-22; production
+  until the provisioner is applied there: still on, see step 1).
 - [ ] `extractor-ingest-only` is on the extractor (and any later approved ingest client) only —
-  never on `basetool-frontend` or another browser client.
+  never on `basetool-frontend` or another browser client, and not on `basetool-android` (decided
+  2026-09-22, same caveat). The gateway carries it too, inherited at its creation.
 - [ ] `aud=basetool-backend` verified on **both** the extractor token and the frontend token
   **before** the validator is enabled.
 - [ ] Refresh-token rotation + reuse-detection **off** realm-wide (`"revokeRefreshToken": false`) —

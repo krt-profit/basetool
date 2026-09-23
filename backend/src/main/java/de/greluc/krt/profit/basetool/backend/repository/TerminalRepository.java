@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
 /** Spring Data repository for Terminal. */
 public interface TerminalRepository extends JpaRepository<Terminal, UUID> {
@@ -43,4 +44,14 @@ public interface TerminalRepository extends JpaRepository<Terminal, UUID> {
    * @return matching live terminals, never {@code null}
    */
   List<Terminal> findByTypeAndIsAvailableLiveTrue(String type);
+
+  /**
+   * The UEX terminal id and local id of every terminal. One query for the whole table; the UEX
+   * syncs resolve every row of a run against the resulting map instead of looking the parent up per
+   * row (BE-PERF-09).
+   *
+   * @return one (UEX id, local id) row per Terminal that carries a UEX id
+   */
+  @Query("SELECT e.idTerminal AS uexId, e.id AS id FROM Terminal e WHERE e.idTerminal IS NOT NULL")
+  List<UexKeyRef> findUexTerminalRefs();
 }

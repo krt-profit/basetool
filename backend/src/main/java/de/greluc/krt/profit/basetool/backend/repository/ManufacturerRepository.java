@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.repository;
 import de.greluc.krt.profit.basetool.backend.model.Manufacturer;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -109,4 +110,31 @@ public interface ManufacturerRepository extends LookupTableRepository<Manufactur
       AND m.scwikiDeletedAt IS NULL
       """)
   long countLiveScwikiManufacturers();
+
+  /**
+   * The name and id of every manufacturer, in one query — the item sync's name fallback for a row
+   * whose company id has no alias, resolved in memory instead of per row (BE-PERF-09).
+   *
+   * @return one (name, id) row per manufacturer
+   */
+  @Query("SELECT m.name AS name, m.id AS id FROM Manufacturer m")
+  List<NameRef> findNameRefs();
+
+  /** Projection row of {@link #findNameRefs()}. */
+  interface NameRef {
+
+    /**
+     * The manufacturer's name as stored.
+     *
+     * @return the name
+     */
+    String getName();
+
+    /**
+     * The manufacturer's id.
+     *
+     * @return the id
+     */
+    UUID getId();
+  }
 }

@@ -27,6 +27,18 @@
 # that quietly "improves" on it would make the two disagree in exactly the places nobody looks.
 # Changing one of those is an owner decision for production first, then a one-line change here.
 #
+# THREE SUCH DECISIONS WERE TAKEN ON 2026-09-22 (ADR-0202 amendment). The desired state is
+# therefore production's shape MINUS three entries the owner retired, and each of them converges
+# away wherever it is found — production included, on its next apply:
+#   - `basetool-sc-extractor`: the unused authorization-code flow is off and its two loopback
+#     wildcard redirect URIs are gone (the extractor uses the device grant only; the hardening
+#     runbook's thirteenth finding);
+#   - `basetool-android`: `extractor-ingest` and `extractor-ingest-only` are not assigned (the app
+#     requests neither and never calls ingest; they only made an app token look like an ingest
+#     token to every gate except the `azp` allowlist);
+#   - `basetool-frontend`: the compose-internal `http://frontend:18081` redirect URI and web origin
+#     are gone (the frontend serves HTTPS only on 18081, so no real login could match them).
+#
 # Environment-specific values — the public origin in redirect URIs, web origins and the
 # post-logout list, and Grafana's origin — come from arguments. Nothing production-specific is
 # hard-coded, so running it against testing never writes a production hostname.
@@ -36,12 +48,13 @@
 # * Additive and converging: missing objects are created, managed fields are set to the production
 #   value, missing list entries (redirect URIs, web origins, scope assignments) are added.
 # * Never deletes what it did not create. A client, mapper, redirect URI or scope assignment that
-#   exists only on the target realm is REPORTED and left alone. There are exactly three deliberate
-#   exceptions, each an existing decision rather than a new one:
+#   exists only on the target realm is REPORTED and left alone. The deliberate exceptions are
+#   decisions, each named in a spec's `withheld_*` list or in REQ-SEC-035, never a general rule:
 #     - the Android client's realm-role scope is converged in BOTH directions, because REQ-SEC-035
 #       says a role added by hand must not survive the next provisioning run (the same rule the
 #       mobile provisioner applies);
-#     - `offline_access` is withheld from the Android client (ADR-0131, as the mobile provisioner);
+#     - the `withheld_*` entries: `offline_access` on the Android client (ADR-0131, as the mobile
+#       provisioner), and the three retirements of 2026-09-22 above;
 #     - a client this run CREATED gets exactly its production scope lists: Keycloak attaches the
 #       realm's default scopes on creation, and those are this run's own side effect, not
 #       somebody's configuration.
@@ -202,7 +215,9 @@ class ClientSpec:
 
     `fields` are converged on every run; `create_only` (name, description) is written when the
     client is created and never compared afterwards, because the snapshot does not record them.
-    List fields are unions: missing entries are added, extra ones are reported.
+    List fields are unions: missing entries are added, extra ones are reported — except the
+    `withheld_*` entries, which are removed wherever they are found. Each of those is an owner
+    decision with its reason next to it, never a default.
     """
 
     client_id: str
@@ -215,6 +230,9 @@ class ClientSpec:
     optional_scopes: list[str]
     create_only: dict = field(default_factory=dict)
     withheld_scopes: list[str] = field(default_factory=list)
+    withheld_redirect_uris: list[str] = field(default_factory=list)
+    withheld_web_origins: list[str] = field(default_factory=list)
+    withheld_reason: str = ""
     mappers: list[dict] = field(default_factory=list)
     client_roles: list[dict] = field(default_factory=list)
     realm_role_scope: list[str] | None = None
@@ -331,11 +349,14 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None) -> 
                 "saml.server.signature": "false",
                 "saml_force_name_id_format": "false",
             },
-            # PROD-AS-IS: the compose-internal `http://frontend:18081` pair (hardening step 7 left
-            # it to a decision on the live list).
-            redirect_uris=["http://frontend:18081/*", f"{public_origin}/*",
-                           f"{public_origin}/login/oauth2/code/keycloak"],
-            web_origins=["http://frontend:18081", public_origin],
+            redirect_uris=[f"{public_origin}/*", f"{public_origin}/login/oauth2/code/keycloak"],
+            web_origins=[public_origin],
+            # Owner decision 2026-09-22 (hardening step 7's leftover): the frontend serves HTTPS
+            # only on 18081, and its redirect URI is built from the forwarded public origin, so no
+            # real login can arrive from `http://frontend:18081`. The e2e realm is separate.
+            withheld_redirect_uris=["http://frontend:18081/*"],
+            withheld_web_origins=["http://frontend:18081"],
+            withheld_reason="compose-internal origin retired 2026-09-22",
             # No `acr`, `basic` or `organization`: the client predates them, which is why it
             # carries its own `sub` mapper below.
             default_scopes=["email", "extractor-ingest", "profile", "roles", "web-origins"],
@@ -423,9 +444,11 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None) -> 
         ClientSpec(
             client_id="basetool-sc-extractor",
             kind="public, device grant (the desktop SC Extractor)",
-            # PROD-AS-IS: standardFlowEnabled true with the two loopback wildcards and no PKCE —
-            # the unused authorization-code flow of the hardening runbook's thirteenth finding.
-            fields=_flags(public=True, standard=True, service_accounts=False, full_scope=False,
+            # Owner decision 2026-09-22 (the hardening runbook's thirteenth finding): the extractor
+            # uses the device grant only (`DeviceGrantClient` sends `device_code` and
+            # `refresh_token` grants and nothing else), so the authorization-code flow and its
+            # two loopback wildcard redirect URIs are off. The device grant needs no redirect URI.
+            fields=_flags(public=True, standard=False, service_accounts=False, full_scope=False,
                           frontchannel_logout=True),
             create_only={"name": "Basetool SC Extractor"},
             attributes={
@@ -451,10 +474,12 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None) -> 
                 "token.response.type.bearer.lower-case": "false",
                 "use.refresh.tokens": "true",
             },
-            redirect_uris=["http://127.0.0.1/*", "http://localhost/*"],
+            redirect_uris=[],
             web_origins=[],
             default_scopes=[*_STANDARD_DEFAULT, "extractor-ingest", "extractor-ingest-only"],
             optional_scopes=list(_STANDARD_OPTIONAL),
+            withheld_redirect_uris=["http://127.0.0.1/*", "http://localhost/*"],
+            withheld_reason="unused authorization-code flow retired 2026-09-22",
         ),
     ]
     if grafana_origin:
@@ -518,11 +543,16 @@ def android_spec(public_origin: str) -> ClientSpec:
                     "backchannel.logout.session.required": "true"},
         redirect_uris=rep["redirectUris"],
         web_origins=rep["webOrigins"],
-        # PROD-AS-IS: both ingest scopes, inherited from the realm defaults when the client was
-        # provisioned (before hardening step 9 took them off the defaults).
-        default_scopes=[*_STANDARD_DEFAULT, "extractor-ingest", "extractor-ingest-only"],
+        default_scopes=list(_STANDARD_DEFAULT),
         optional_scopes=[s for s in _STANDARD_OPTIONAL if s != "offline_access"],
-        withheld_scopes=["offline_access"],
+        # offline_access: ADR-0131 — an offline token outlives every session bound of this client.
+        # The two ingest scopes: owner decision 2026-09-22. They were inherited from the realm
+        # defaults when the client was provisioned; the app requests only `openid profile email
+        # roles`, never calls ingest, and takes its `aud=basetool-backend` from its own
+        # `backend-audience` mapper — so all they did was make an app token pass the gateway's
+        # audience and scope gates, leaving the `azp` allowlist as the only thing in the way.
+        withheld_scopes=["offline_access", "extractor-ingest", "extractor-ingest-only"],
+        withheld_reason="ADR-0131 / ingest scopes retired 2026-09-22",
         mappers=[{
             "name": mobile.AUDIENCE_MAPPER,
             "protocolMapper": "oidc-audience-mapper",
@@ -803,6 +833,10 @@ class Planner:
         missing_redirects = [u for u in spec.redirect_uris if u not in (live.get("redirectUris")
                                                                         or [])]
         missing_origins = [o for o in spec.web_origins if o not in (live.get("webOrigins") or [])]
+        retired_redirects = [u for u in spec.withheld_redirect_uris
+                             if u in (live.get("redirectUris") or [])]
+        retired_origins = [o for o in spec.withheld_web_origins
+                           if o in (live.get("webOrigins") or [])]
         for key, value in field_diff.items():
             changes.append(Change(f"~ {key}: {_normalise(live.get(key)) or '<absent>'} -> "
                                   f"{_normalise(value)}", lambda: None, frozen))
@@ -813,14 +847,23 @@ class Planner:
             changes.append(Change(f"+ redirect URI {uri}", lambda: None, frozen))
         for origin in missing_origins:
             changes.append(Change(f"+ web origin {origin}", lambda: None, frozen))
-        if field_diff or attribute_diff or missing_redirects or missing_origins:
+        for uri in retired_redirects:
+            changes.append(Change(f"- redirect URI {uri} withheld ({spec.withheld_reason})",
+                                  lambda: None, frozen))
+        for origin in retired_origins:
+            changes.append(Change(f"- web origin {origin} withheld ({spec.withheld_reason})",
+                                  lambda: None, frozen))
+        if (field_diff or attribute_diff or missing_redirects or missing_origins
+                or retired_redirects or retired_origins):
             changes.append(Change(
                 "  (one update of the client representation)",
                 lambda lv=live: self._update_client(spec, lv), frozen))
-        for uri in sorted(set(live.get("redirectUris") or []) - set(spec.redirect_uris)):
+        for uri in sorted(set(live.get("redirectUris") or []) - set(spec.redirect_uris)
+                          - set(spec.withheld_redirect_uris)):
             self.reports.append(f"{spec.client_id}: redirect URI '{uri}' is not in the "
                                 f"production shape")
-        for origin in sorted(set(live.get("webOrigins") or []) - set(spec.web_origins)):
+        for origin in sorted(set(live.get("webOrigins") or []) - set(spec.web_origins)
+                             - set(spec.withheld_web_origins)):
             self.reports.append(f"{spec.client_id}: web origin '{origin}' is not in the "
                                 f"production shape")
 
@@ -901,10 +944,15 @@ class Planner:
         payload = dict(live)
         payload.update(spec.fields)
         payload["attributes"] = {**(live.get("attributes") or {}), **spec.attributes}
-        payload["redirectUris"] = list(live.get("redirectUris") or []) + [
-            u for u in spec.redirect_uris if u not in (live.get("redirectUris") or [])]
-        payload["webOrigins"] = list(live.get("webOrigins") or []) + [
-            o for o in spec.web_origins if o not in (live.get("webOrigins") or [])]
+        # Union with what the realm has (a target-only entry stays), minus the withheld entries.
+        payload["redirectUris"] = [
+            u for u in list(live.get("redirectUris") or []) + [
+                u for u in spec.redirect_uris if u not in (live.get("redirectUris") or [])]
+            if u not in spec.withheld_redirect_uris]
+        payload["webOrigins"] = [
+            o for o in list(live.get("webOrigins") or []) + [
+                o for o in spec.web_origins if o not in (live.get("webOrigins") or [])]
+            if o not in spec.withheld_web_origins]
         self.kc.write("update", f"clients/{live['id']}", _redact(payload),
                       f"client '{spec.client_id}' updated")
 
@@ -972,8 +1020,7 @@ class Planner:
             for kind, have in (("default", default), ("optional", optional)):
                 if name in have:
                     changes.append(Change(
-                        f"- {kind} scope '{name}' withheld (ADR-0131: an offline token outlives "
-                        f"every session bound of this client)",
+                        f"- {kind} scope '{name}' withheld ({spec.withheld_reason})",
                         lambda n=name, k=kind, sid=have[name]: self._unlink_scope(
                             uuid, k, n, sid, "withheld"), frozen))
         wanted_all = set(spec.default_scopes) | set(spec.optional_scopes) | set(

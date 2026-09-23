@@ -37,8 +37,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.springframework.web.reactive.function.BodyInserters;
-import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.client.RestClient;
 
 /**
  * Obtains and caches the gateway's own access token for the backend hop (ADR-0129).
@@ -95,8 +94,12 @@ public class ServiceAccountTokenProvider {
   /** The gateway's client credentials and cache tuning. */
   private final ServiceAccountProperties properties;
 
-  /** The client the token request is sent with. */
-  private final WebClient keycloakWebClient;
+  /**
+   * The client the token request is sent with. Its request factory bounds the call by {@code
+   * timeoutMillis} (capped at 10&nbsp;s, see {@code RestClientConfig#keycloakRestClient}); the
+   * reactive predecessor bounded it here with {@code block(timeout)}.
+   */
+  private final RestClient keycloakRestClient;
 
   /** Records the minted / cached / failed / backoff outcome of every call. */
   private final MeterRegistry meterRegistry;
@@ -114,15 +117,15 @@ public class ServiceAccountTokenProvider {
    * Creates the provider on the system clock.
    *
    * @param properties the gateway's client credentials and cache tuning
-   * @param keycloakWebClient the client used for the token request
+   * @param keycloakRestClient the client used for the token request
    * @param meterRegistry records the minted/cached/failed/backoff outcome
    */
   @Autowired
   public ServiceAccountTokenProvider(
       @NotNull ServiceAccountProperties properties,
-      @Qualifier("keycloakWebClient") @NotNull WebClient keycloakWebClient,
+      @Qualifier("keycloakRestClient") @NotNull RestClient keycloakRestClient,
       @NotNull MeterRegistry meterRegistry) {
-    this(properties, keycloakWebClient, meterRegistry, Clock.systemUTC());
+    this(properties, keycloakRestClient, meterRegistry, Clock.systemUTC());
   }
 
   /**
@@ -130,17 +133,17 @@ public class ServiceAccountTokenProvider {
    * window without sleeping.
    *
    * @param properties the gateway's client credentials and cache tuning
-   * @param keycloakWebClient the client used for the token request
+   * @param keycloakRestClient the client used for the token request
    * @param meterRegistry records the minted/cached/failed/backoff outcome
    * @param clock the time source for expiry and backoff decisions
    */
   ServiceAccountTokenProvider(
       @NotNull ServiceAccountProperties properties,
-      @NotNull WebClient keycloakWebClient,
+      @NotNull RestClient keycloakRestClient,
       @NotNull MeterRegistry meterRegistry,
       @NotNull Clock clock) {
     this.properties = properties;
-    this.keycloakWebClient = keycloakWebClient;
+    this.keycloakRestClient = keycloakRestClient;
     this.meterRegistry = meterRegistry;
     this.clock = clock;
   }
@@ -244,14 +247,13 @@ public class ServiceAccountTokenProvider {
     Map<String, Object> response;
     try {
       response =
-          keycloakWebClient
+          keycloakRestClient
               .post()
               .uri(properties.tokenUri())
               .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-              .body(BodyInserters.fromFormData(form))
+              .body(form)
               .retrieve()
-              .bodyToMono(TOKEN_ANSWER)
-              .block(Duration.ofMillis(properties.timeoutMillis()));
+              .body(TOKEN_ANSWER);
     } catch (RuntimeException e) {
       failed();
       // Exception class only. Keycloak echoes the client_id in its error body and the stack can

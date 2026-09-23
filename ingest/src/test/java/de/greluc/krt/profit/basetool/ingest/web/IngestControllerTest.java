@@ -38,23 +38,21 @@ import de.greluc.krt.profit.basetool.ingest.model.dto.HandoffKind;
 import de.greluc.krt.profit.basetool.ingest.service.BackendImportClient;
 import de.greluc.krt.profit.basetool.ingest.service.HandoffStagingService;
 import de.greluc.krt.profit.basetool.ingest.support.LogCapture;
-import java.net.URI;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.context.WebApplicationContext;
-import org.springframework.web.reactive.function.client.WebClientRequestException;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 /**
  * End-to-end web-layer test for the gateway: exercises the controller, the {@code IngestService}
@@ -167,12 +165,8 @@ class IngestControllerTest {
   void shouldRelayBackend4xxVerbatim() throws Exception {
     when(backendImportClient.forwardRefineryExtract(anyString(), any(), any()))
         .thenThrow(
-            WebClientResponseException.create(
-                HttpStatus.BAD_REQUEST.value(),
-                "Bad Request",
-                HttpHeaders.EMPTY,
-                new byte[0],
-                null));
+            HttpClientErrorException.create(
+                HttpStatus.BAD_REQUEST, "Bad Request", HttpHeaders.EMPTY, new byte[0], null));
 
     mockMvc
         .perform(
@@ -265,11 +259,8 @@ class IngestControllerTest {
   void shouldReturn502WhenBackendUnreachable() throws Exception {
     when(backendImportClient.forwardRefineryExtract(anyString(), any(), any()))
         .thenThrow(
-            new WebClientRequestException(
-                new RuntimeException("connection refused"),
-                HttpMethod.POST,
-                URI.create("https://backend:11261/api/v1/refinery-orders/import-extract"),
-                HttpHeaders.EMPTY));
+            new ResourceAccessException(
+                "I/O error on POST request", new java.net.ConnectException("connection refused")));
 
     mockMvc
         .perform(

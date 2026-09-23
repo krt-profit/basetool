@@ -34,12 +34,12 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.client.RestClient;
 
 /**
  * Proves the W3C trace-context propagation on the ingest&rarr;backend relay hop (REQ-OBS-009, epic
- * #936 Phase 1b): with tracing enabled, a request through the hand-built {@code backendWebClient}
- * (wired to the observation registry in {@link WebClientConfig}) carries a {@code traceparent}
+ * #936 Phase 1b): with tracing enabled, a request through the hand-built {@code backendRestClient}
+ * (wired to the observation registry in {@link RestClientConfig}) carries a {@code traceparent}
  * header to the (mocked) backend. OTLP export stays off — no exporter, no network export; the
  * propagation path alone is under test.
  */
@@ -53,7 +53,7 @@ class MonitoringTracingPropagationTest {
 
   private static MockWebServer mockBackend;
 
-  @Autowired private WebClient backendWebClient;
+  @Autowired private RestClient backendRestClient;
 
   @MockitoBean private JwtDecoder jwtDecoder;
 
@@ -85,7 +85,7 @@ class MonitoringTracingPropagationTest {
     mockBackend.enqueue(new MockResponse().setResponseCode(200).setBody("{}"));
 
     // When
-    backendWebClient.get().uri("/api/v1/settings").retrieve().toBodilessEntity().block();
+    backendRestClient.get().uri("/api/v1/settings").retrieve().toBodilessEntity();
     RecordedRequest recorded = mockBackend.takeRequest(10, TimeUnit.SECONDS);
 
     // Then: the instrumented client injected the W3C trace context (version-traceId-spanId-flags).

@@ -48,6 +48,10 @@ index.
 Authority: [`data-persistence.md`](../specs/data-persistence.md) (`REQ-DATA-*`),
 [`db/migration/README.md`](../../backend/src/main/resources/db/migration/README.md).
 
+An external catalogue sync never holds a transaction across an HTTP call: it fetches with none open
+and writes through `SyncChunkWriter` — short chunk transactions, a failed chunk replayed row by row —
+so one refused row costs only itself (`REQ-DATA-005`).
+
 ## 8.4 Concurrency — the landmine field
 
 Optimistic locking with `@Version`, surfaced as HTTP 409, with the **finest granularity the data
@@ -101,6 +105,14 @@ a matching log line.
 filter: `WebClient.exchange()` runs on a Reactor-Netty worker thread and a plain `ThreadLocal` is
 not copied there. The accessors that exist cover the active-OrgUnit pin and the correlation id.
 Forgetting one is silent — the holder is simply empty on the worker thread.
+
+**This is a frontend rule only.** The backend and the ingest call HTTP through blocking
+`RestClient`s on the JDK HTTP client (ADR-0204): no WebFlux, no Reactor Netty, and the call runs on
+the thread that holds the MDC. Each module builds its clients in one `config.RestClientConfig`,
+wires the observation registry by hand (neither ships Boot's `spring-boot-restclient`), pins
+HTTP/1.1 and caps the response body with a `ResponseSizeLimitInterceptor`; a new outbound call in
+either module goes through those clients rather than a fresh `RestClient.builder()`, or it is
+neither observed nor bounded.
 
 ## 8.8 Audit
 

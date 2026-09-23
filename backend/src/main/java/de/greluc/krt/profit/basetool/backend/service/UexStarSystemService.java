@@ -28,6 +28,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -54,12 +55,15 @@ public class UexStarSystemService {
   private final UexClient uexClient;
   private final StarSystemRepository starSystemRepository;
 
+  /** Writes the rows in short isolated transactions after the fetch (BE-PERF-09). */
+  private final SyncChunkWriter chunkWriter;
+
   /**
    * Pulls the star-system catalog and upserts each row. An unchanged feed ({@code 304}) and an
    * empty response are both no-ops, but only the latter is reported as a problem — the former is a
    * healthy fully-cached run. Neither wipes local data.
    */
-  @Transactional
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public void fetchAndProcessStarSystems() {
     log.info("Starting synchronization of UEX star systems...");
     UexClient.FetchResult<UexStarSystemDto> fetched = uexClient.getStarSystems();
@@ -75,19 +79,24 @@ public class UexStarSystemService {
       return;
     }
 
-    int processed = 0;
-    for (UexStarSystemDto dto : dtos) {
-      try {
-        processSingleDto(dto);
-        processed++;
-      } catch (Exception e) {
-        log.error(
-            "Failed to process star system dto (id={}, name='{}')",
-            dto.id(),
-            LogSafe.text(dto.name(), MAX_NAME_LOG_LENGTH),
-            e);
-      }
-    }
+    // BE-PERF-09 / REQ-DATA-005: written after the fetch in chunk transactions of their own; a
+    // refused chunk is replayed row by row, so one bad row costs only itself.
+    SyncChunkWriter.Outcome<UexStarSystemDto> outcome =
+        chunkWriter.write(
+            dtos,
+            SyncChunkWriter.DEFAULT_CHUNK_SIZE,
+            chunk -> {
+              chunk.forEach(this::processSingleDto);
+              return chunk;
+            },
+            "star system",
+            dto ->
+                "(id="
+                    + dto.id()
+                    + ", name='"
+                    + LogSafe.text(dto.name(), MAX_NAME_LOG_LENGTH)
+                    + "')");
+    int processed = outcome.results().size();
 
     log.info("Finished synchronization. Processed {} star systems.", processed);
   }
