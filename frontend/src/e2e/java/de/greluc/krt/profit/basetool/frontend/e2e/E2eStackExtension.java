@@ -279,9 +279,11 @@ public final class E2eStackExtension implements BeforeAllCallback {
 
   /**
    * Performs the one-time ephemeral-stack bring-up: stages the realm/keystore, pulls + {@code up}s
-   * the compose stack, seeds the UEX-owned catalog + profit-eligibility + an orderable item, marks
-   * the stack started, and registers the one-time teardown on the JUnit root store. Extracted from
-   * {@link #beforeAll} so the caller can remember a failure and fail the remaining classes fast.
+   * the compose stack, registers the one-time teardown on the JUnit root store as soon as it is up
+   * (so a failed check or seed still tears it down), checks that it serves this checkout, seeds the
+   * UEX-owned catalog + profit-eligibility + an orderable item, and marks the stack started.
+   * Extracted from {@link #beforeAll} so the caller can remember a failure and fail the remaining
+   * classes fast.
    *
    * @param context the JUnit extension context whose root store owns the teardown hook
    * @throws Exception if bootstrap or {@code docker compose up} fails
@@ -295,9 +297,16 @@ public final class E2eStackExtension implements BeforeAllCallback {
     requireFrontendPortFree(root);
     prePullImages(root);
     composeUp(root);
+    // Register the teardown as soon as the stack is up, not after it has been checked and seeded:
+    // a failure in either (the served-build check below, a seeder error) used to leave this
+    // checkout's containers, networks and volumes running, holding the fixed ports and subnets
+    // every later run on the machine needs.
+    context
+        .getRoot()
+        .getStore(ExtensionContext.Namespace.GLOBAL)
+        .put("e2e-docker-stack", (AutoCloseable) () -> composeDown(root));
     // The stack must be THIS checkout's: compare what it serves with the files here, before a
-    // single
-    // test runs against it (ServedBuildCheck).
+    // single test runs against it (ServedBuildCheck).
     ServedBuildCheck.assertServesThisCheckout(
         EPHEMERAL_BASE_URL, root, BackendSeeder.trustingTestCa());
     // Seed UEX-owned catalog reference data (refinery-hosting location, ship type, refining
@@ -328,10 +337,6 @@ public final class E2eStackExtension implements BeforeAllCallback {
           seedFailure.getMessage());
     }
     started = true;
-    context
-        .getRoot()
-        .getStore(ExtensionContext.Namespace.GLOBAL)
-        .put("e2e-docker-stack", (AutoCloseable) () -> composeDown(root));
   }
 
   /**
