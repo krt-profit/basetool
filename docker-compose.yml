@@ -743,14 +743,17 @@ x-backend: &backend-template
     MONITORING_OTLP_ENDPOINT: ${MONITORING_OTLP_ENDPOINT:-http://alloy:4318/v1/traces}
     MONITORING_TRACING_SAMPLING_PROBABILITY: ${MONITORING_TRACING_SAMPLING_PROBABILITY:-1.0}
     # The keystore lives on the host filesystem (bind-mounted below) and is
-    # explicitly NOT packaged into the GHCR image. Both backend and frontend
-    # share the same PKCS12 file because the cert's SAN covers the Docker
-    # network aliases `backend` and `frontend`. If a future operator wants
-    # per-service keystores, set IRI_KEYSTORE_HOST_PATH_BACKEND and
-    # IRI_KEYSTORE_HOST_PATH_FRONTEND separately in .env and override the
-    # volume entry per service.
+    # explicitly NOT packaged into the GHCR image. Each service mounts its own
+    # (IRI_<SERVICE>_KEYSTORE_HOST_PATH, REQ-SEC-070); every one of them falls
+    # back to the shared IRI_KEYSTORE_HOST_PATH, which is what production mounts
+    # until the per-service rollout (docs/deployment.md, "Internal TLS").
     SERVER_SSL_KEY_STORE: file:/run/secrets/keystore.p12
     SERVER_SSL_KEY_STORE_PASSWORD: ${SERVER_SSL_KEY_STORE_PASSWORD:?SERVER_SSL_KEY_STORE_PASSWORD must be set in .env}
+    # REQ-SEC-070 / ADR-0211: the INTERNAL truststore the prod SSL bundles pin -- its own mount
+    # (below), deliberately not the REQ-OPS-022 JVM truststore, which holds public anchors too. Until
+    # the per-service rollout that mount's source IS the shared keystore, so nothing changes.
+    INTERNAL_TLS_TRUSTSTORE: ${INTERNAL_TLS_TRUSTSTORE:-file:/run/secrets/internal-truststore.p12}
+    INTERNAL_TLS_TRUSTSTORE_PASSWORD: ${INTERNAL_TLS_TRUSTSTORE_PASSWORD:-${SERVER_SSL_KEY_STORE_PASSWORD:?SERVER_SSL_KEY_STORE_PASSWORD must be set in .env}}
     # MaxRAMPercentage=57 (was 75) — see the heap-budget rationale in the deploy.resources comment
     # above: at 75 a fully-grown heap plus the measured 438M overhead reached 96% of the limit.
     # InitialRAMPercentage drops 50 -> 35 (717M): it must stay below the 57% max (1167M), and 717M sits
@@ -777,7 +780,9 @@ x-backend: &backend-template
     # and `docker compose --profile dev up -d` works out of the box; the prod
     # `.env` overrides this to `/var/iri/secrets/keystore.p12`. The path is
     # resolved relative to the directory containing docker-compose.yml.
-    - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
+    # This service's OWN key (REQ-SEC-070): unset it is the shared keystore, as it always was;
+    # after the rollout it is /var/iri/secrets/tls/backend.p12, a leaf only this service holds.
+    - ${IRI_BACKEND_KEYSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/keystore.p12:ro
     # Trust anchors for OUTBOUND TLS (REQ-OPS-022). Spring Security fetches the OIDC metadata
     # from KEYCLOAK_ISSUER_URI at startup with a plain RestTemplate, which uses the JVM DEFAULT
     # trust store — NOT an SSL bundle, which only the app's own named clients consult. Where the
@@ -786,6 +791,10 @@ x-backend: &backend-template
     # Unset, this resolves to the SAME file as the keystore mount above, and with
     # IRI_EXTRA_JAVA_OPTS empty nothing reads it — production is therefore unaffected.
     - ${IRI_TRUSTSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/truststore.p12:ro
+    # The INTERNAL truststore (REQ-SEC-070): what the backend-trust / keycloak-trust bundles pin.
+    # Unset it is the shared keystore -- exactly what they pinned before; after the rollout it is
+    # the CA-only /var/iri/secrets/tls/truststore.p12.
+    - ${IRI_INTERNAL_TRUSTSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/internal-truststore.p12:ro
 
 x-redis: &redis-template
   # Same digest pin policy as the Postgres images. Refresh with
@@ -1096,6 +1105,14 @@ x-frontend: &frontend-template
     MONITORING_TRACING_SAMPLING_PROBABILITY: ${MONITORING_TRACING_SAMPLING_PROBABILITY:-1.0}
     SERVER_SSL_KEY_STORE: file:/run/secrets/keystore.p12
     SERVER_SSL_KEY_STORE_PASSWORD: ${SERVER_SSL_KEY_STORE_PASSWORD:?SERVER_SSL_KEY_STORE_PASSWORD must be set in .env}
+    # REQ-SEC-070 / ADR-0211: the INTERNAL truststore the prod SSL bundles pin -- its own mount
+    # (below), deliberately not the REQ-OPS-022 JVM truststore, which holds public anchors too. Until
+    # the per-service rollout that mount's source IS the shared keystore, so nothing changes.
+    INTERNAL_TLS_TRUSTSTORE: ${INTERNAL_TLS_TRUSTSTORE:-file:/run/secrets/internal-truststore.p12}
+    INTERNAL_TLS_TRUSTSTORE_PASSWORD: ${INTERNAL_TLS_TRUSTSTORE_PASSWORD:-${SERVER_SSL_KEY_STORE_PASSWORD:?SERVER_SSL_KEY_STORE_PASSWORD must be set in .env}}
+    # REQ-SEC-070: also check that the backend's certificate names `backend`. Off until the owner's
+    # rollout (docs/deployment.md, Internal TLS); the shared certificate already carries the name.
+    INTERNAL_TLS_VERIFY_HOSTNAME: ${INTERNAL_TLS_VERIFY_HOSTNAME:-false}
     # MaxRAMPercentage=50 at the 1792M limit → an 896M ceiling, comfortably above the 529M this JVM
     # measurably commits on prod. InitialRAMPercentage drops 50 -> 35 (627M): it must stay BELOW the
     # max (at an equal pair the JVM refuses to start or clamps), and sitting just above the measured
@@ -1108,7 +1125,9 @@ x-frontend: &frontend-template
     JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:+UseG1GC -XX:+UseCompactObjectHeaders -XX:MaxRAMPercentage=50.0 -XX:InitialRAMPercentage=35.0 ${IRI_EXTRA_JAVA_OPTS:-}
   volumes:
     - /var/iri/frontend/log:/app/logs
-    - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
+    # This service's OWN key (REQ-SEC-070): unset it is the shared keystore, as it always was;
+    # after the rollout it is /var/iri/secrets/tls/frontend.p12, a leaf only this service holds.
+    - ${IRI_FRONTEND_KEYSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/keystore.p12:ro
     # Trust anchors for OUTBOUND TLS (REQ-OPS-022). Spring Security fetches the OIDC metadata
     # from KEYCLOAK_ISSUER_URI at startup with a plain RestTemplate, which uses the JVM DEFAULT
     # trust store — NOT the SSL bundle above, which only covers the backend WebClient. Where the
@@ -1117,6 +1136,10 @@ x-frontend: &frontend-template
     # Unset, this resolves to the SAME file as the keystore mount above, and with
     # IRI_EXTRA_JAVA_OPTS empty nothing reads it — production is therefore unaffected.
     - ${IRI_TRUSTSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/truststore.p12:ro
+    # The INTERNAL truststore (REQ-SEC-070): what the backend-trust / keycloak-trust bundles pin.
+    # Unset it is the shared keystore -- exactly what they pinned before; after the rollout it is
+    # the CA-only /var/iri/secrets/tls/truststore.p12.
+    - ${IRI_INTERNAL_TRUSTSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/internal-truststore.p12:ro
 
 x-ingest: &ingest-template
   # The desktop one-click ingest gateway (epic #639, ADR-0018) — the ONLY new internet-reachable
@@ -1260,6 +1283,14 @@ x-ingest: &ingest-template
     # did, and which is part of why it was replaced (ADR-0162).
     SERVER_SSL_KEY_STORE: file:/run/secrets/keystore.p12
     SERVER_SSL_KEY_STORE_PASSWORD: ${SERVER_SSL_KEY_STORE_PASSWORD:?SERVER_SSL_KEY_STORE_PASSWORD must be set in .env}
+    # REQ-SEC-070 / ADR-0211: the INTERNAL truststore the prod SSL bundles pin -- its own mount
+    # (below), deliberately not the REQ-OPS-022 JVM truststore, which holds public anchors too. Until
+    # the per-service rollout that mount's source IS the shared keystore, so nothing changes.
+    INTERNAL_TLS_TRUSTSTORE: ${INTERNAL_TLS_TRUSTSTORE:-file:/run/secrets/internal-truststore.p12}
+    INTERNAL_TLS_TRUSTSTORE_PASSWORD: ${INTERNAL_TLS_TRUSTSTORE_PASSWORD:-${SERVER_SSL_KEY_STORE_PASSWORD:?SERVER_SSL_KEY_STORE_PASSWORD must be set in .env}}
+    # REQ-SEC-070: also check that the backend's certificate names `backend`. Off until the owner's
+    # rollout (docs/deployment.md, Internal TLS); the shared certificate already carries the name.
+    INTERNAL_TLS_VERIFY_HOSTNAME: ${INTERNAL_TLS_VERIFY_HOSTNAME:-false}
     # MaxRAMPercentage=60 (was 75) — see the heap-budget rationale in the deploy.resources comment
     # above. InitialRAMPercentage stays 50 (256M): still below the 60% max (307M) — keep Initial < Max,
     # an inverted pair makes the JVM refuse to start — and it happens to match the 248M this service
@@ -1278,7 +1309,9 @@ x-ingest: &ingest-template
     # flag on the AOT-cache training run in `docker/app/Dockerfile`.
     JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:+UseSerialGC -XX:+UseCompactObjectHeaders -XX:MaxRAMPercentage=60.0 -XX:InitialRAMPercentage=50.0 ${IRI_EXTRA_JAVA_OPTS:-}
   volumes:
-    - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
+    # This service's OWN key (REQ-SEC-070): unset it is the shared keystore, as it always was;
+    # after the rollout it is /var/iri/secrets/tls/ingest.p12, a leaf only this service holds.
+    - ${IRI_INGEST_KEYSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/keystore.p12:ro
     # Trust anchors for OUTBOUND TLS (REQ-OPS-022). Spring Security fetches the OIDC metadata
     # from KEYCLOAK_ISSUER_URI at startup with a plain RestTemplate, which uses the JVM DEFAULT
     # trust store — NOT the SSL bundle above, which only covers the backend relay client. Where the
@@ -1287,6 +1320,10 @@ x-ingest: &ingest-template
     # Unset, this resolves to the SAME file as the keystore mount above, and with
     # IRI_EXTRA_JAVA_OPTS empty nothing reads it — production is therefore unaffected.
     - ${IRI_TRUSTSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/truststore.p12:ro
+    # The INTERNAL truststore (REQ-SEC-070): what the backend-trust / keycloak-trust bundles pin.
+    # Unset it is the shared keystore -- exactly what they pinned before; after the rollout it is
+    # the CA-only /var/iri/secrets/tls/truststore.p12.
+    - ${IRI_INTERNAL_TRUSTSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/internal-truststore.p12:ro
     # Log dir mounted like backend/frontend (host dir pre-chowned to uid 10001) so the gateway can
     # write logs/ingest.{log,json} and Alloy can tail logs/ingest.json for Loki (REQ-OBS-007).
     - /var/iri/ingest/log:/app/logs
@@ -1476,7 +1513,7 @@ services:
       # here because a service-level `volumes:` replaces the merged template value.
       - /var/iri/code/keycloak/providers:/opt/keycloak/providers:ro
       - /var/iri/keycloak/log:/var/log/keycloak
-      - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
+      - ${IRI_KEYCLOAK_KEYSTORE_HOST_PATH:-${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/keystore.p12:ro
     depends_on:
       db-keycloak:
         condition: service_healthy

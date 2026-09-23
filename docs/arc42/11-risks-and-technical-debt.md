@@ -178,6 +178,15 @@ not happened.
   renderer and the E2E proof; the switch is the owner's five-step rollout in
   [`deployment.md` → *The Redis ACL*](../deployment.md#the-redis-acl). Closed when `REDIS_DEFAULT_USER`
   is `off` in production.
+- **One internal TLS key is every service's identity until the per-service rollout.** Backend,
+  frontend, ingest and Keycloak serve the same self-signed `keystore.p12`, which is also the anchor
+  every client pins — so the internet-facing ingest container holds the backend's and Keycloak's
+  key, and the relay and the frontend's backend client check no hostname (ING-SEC-04).
+  REQ-SEC-070 / ADR-0211 shipped the minter, the switches, the fallback mounts and the
+  per-service test material; the switch is the owner's four-step rollout in
+  [`deployment.md` → *Internal TLS*](../deployment.md#internal-tls-per-service-certificates-from-a-private-ca).
+  Closed when step 4 has run: the units mount `/var/iri/secrets/tls/<service>.p12`,
+  `INTERNAL_TLS_VERIFY_HOSTNAME=true`, and no anchor carries the old certificate.
 
 ## 11.8 Smaller, known, and deliberately left
 

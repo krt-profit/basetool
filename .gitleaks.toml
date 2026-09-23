@@ -29,7 +29,7 @@ paths = [
   '''\.env\.example$''',
   '''frontend/src/e2e/resources/realm-export\.e2e\.json$''',
   '''docker/test-tls/basetool-test-ca\.crt$''',
-  '''docker/test-tls/basetool-test-keystore\.p12$''',
+  '''docker/test-tls/basetool-test-(backend|frontend|ingest|keycloak|truststore)\.p12$''',
   '''docker/test-redis/users\.acl$''',
 ]
 # Obvious synthetic Discord snowflake used as a throwaway unit-test fixture (the

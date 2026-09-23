@@ -65,6 +65,13 @@ import org.springframework.validation.annotation.Validated;
  *     evicted beyond it, turning an unbounded per-subject footprint into {@code
  *     maxHandoffsPerSubject × maxHandoffBytes}. Overridable via {@code
  *     APP_INGEST_MAX_HANDOFFS_PER_SUBJECT}
+ * @param verifyBackendHostname whether the relay to the backend verifies that the backend's
+ *     certificate names the host it dialled, on top of the pinned {@code backend-trust} chain
+ *     (REQ-SEC-070, ADR-0211). {@code false}, the default, keeps ADR-0204's opt-out: chain only.
+ *     {@code true} once every service serves its own leaf from the internal CA — the anchor then
+ *     vouches for all of them, and the name is what tells the backend's certificate from the
+ *     gateway's own. Bound from {@code INTERNAL_TLS_VERIFY_HOSTNAME}; ignored under {@code
+ *     dev}/{@code test}
  */
 @Validated
 @ConfigurationProperties(prefix = "app.ingest")
@@ -77,7 +84,8 @@ public record IngestProperties(
     @NotNull @DefaultValue("PT30M") Duration handoffTtl,
     @Min(1024) @DefaultValue("2097152") long maxPayloadBytes,
     @Min(1024) @DefaultValue("262144") long maxHandoffBytes,
-    @Min(1) @DefaultValue("10") int maxHandoffsPerSubject) {
+    @Min(1) @DefaultValue("10") int maxHandoffsPerSubject,
+    @DefaultValue("false") boolean verifyBackendHostname) {
 
   /**
    * Normalises an absent public origin to empty, the documented "not configured" value, so {@link

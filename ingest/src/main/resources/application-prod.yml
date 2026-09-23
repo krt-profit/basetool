@@ -15,8 +15,11 @@ spring:
       jks:
         backend-trust:
           truststore:
-            location: ${SERVER_SSL_KEY_STORE:classpath:keystore.p12}
-            password: ${SERVER_SSL_KEY_STORE_PASSWORD}
+            # REQ-SEC-070: the INTERNAL TRUSTSTORE -- the internal CA once the per-service
+            # certificates are rolled out; until then compose points it at the shared keystore,
+            # so nothing changes. Falls back to the own keystore when the variable is absent.
+            location: ${INTERNAL_TLS_TRUSTSTORE:${SERVER_SSL_KEY_STORE:classpath:keystore.p12}}
+            password: ${INTERNAL_TLS_TRUSTSTORE_PASSWORD:${SERVER_SSL_KEY_STORE_PASSWORD}}
             type: PKCS12
         # REQ-SEC-024: pins the same bind-mounted self-signed keystore.p12 as a TRUSTSTORE for the
         # OPT-IN internal JWKS fetch (https://keycloak:18443). Consumed via
@@ -24,8 +27,11 @@ spring:
         # shared cert's SAN carries dns:keycloak. Same env vars — no new compose secret.
         keycloak-trust:
           truststore:
-            location: ${SERVER_SSL_KEY_STORE:classpath:keystore.p12}
-            password: ${SERVER_SSL_KEY_STORE_PASSWORD}
+            # REQ-SEC-070: the INTERNAL TRUSTSTORE -- the internal CA once the per-service
+            # certificates are rolled out; until then compose points it at the shared keystore,
+            # so nothing changes. Falls back to the own keystore when the variable is absent.
+            location: ${INTERNAL_TLS_TRUSTSTORE:${SERVER_SSL_KEY_STORE:classpath:keystore.p12}}
+            password: ${INTERNAL_TLS_TRUSTSTORE_PASSWORD:${SERVER_SSL_KEY_STORE_PASSWORD}}
             type: PKCS12
 
 # OpenAPI document is disabled in prod (parity with the backend) — never reachable from outside.

@@ -35,7 +35,7 @@ staging directory `…/staging/<UTC timestamp>/`:
 | Backend DB `krt_basetool`      | `krt_basetool.dump`                       | `pg_dump -Fc` inside the `db-backend` container                                                                            |
 | Keycloak DB `keycloak`         | `keycloak.dump`                           | `pg_dump -Fc` inside the `db-keycloak` container — **the live source of truth** for realm/users/clients, not `realm-export.json` |
 | Edge TLS material + ACME state | `edge-certs.tar.gz`, `edge-acme-state.tar.gz`, `edge-acme-webroot.tar.gz` | `tar` of the three named volumes through a helper container; a volume that does not exist is logged as skipped |
-| Host secrets/config            | `config/dotenv`, `config/keystore.p12`, `config/realm-export.json`, `config/providers.tar.gz`, `config/users.acl` | `.env`, the keystore, the realm export, `keycloak/providers`, and the **redis ACL** (access control, not session data — redis refuses to start without it) |
+| Host secrets/config            | `config/dotenv`, `config/keystore.p12`, `config/internal-tls.tar`, `config/realm-export.json`, `config/providers.tar.gz`, `config/users.acl` | `.env`, the keystore, the **per-service internal TLS material** (`/var/iri/secrets/tls`, only once rolled out — REQ-SEC-070), the realm export, `keycloak/providers`, and the **redis ACL** (access control, not session data — redis refuses to start without it) |
 | Monitoring plane (ADR-0072)    | `monitoring/grafana.db`, `monitoring/secrets.tar.gz`, `monitoring/alertmanager.tar.gz` | Grafana SQLite (brief `grafana` stop for a consistent copy), `/var/iri/monitoring/{secrets,certs}`, Alertmanager silences + notification log |
 | Prometheus TSDB (Sundays only) | `monitoring/prometheus-tsdb-snapshot.tar.gz` | admin-API snapshot via a throwaway curl container on `net-monitoring-core` |
 
@@ -257,6 +257,18 @@ flock /var/lock/iri-deploy.lock true      # returns once no deploy is running
    # keystore: gid 10001 (backend/frontend/ingest) -> 110000, Keycloak uid 1000 -> 100999
    install -o root -g 110000 -m 0640 "${R}/config/keystore.p12" /var/iri/secrets/keystore.p12
    setfacl -m u:100999:r /var/iri/secrets/keystore.p12
+   # per-service internal TLS (REQ-SEC-070) -- only when the snapshot carries it. Same
+   # ownership as the keystore; keycloak.p12 gets Keycloak's ACL, the truststore and CA are public
+   if [ -s "${R}/config/internal-tls.tar" ]; then
+     install -d -o root -g root -m 0755 /var/iri/secrets/tls
+     tar -C /var/iri/secrets/tls -xf "${R}/config/internal-tls.tar" --no-same-owner
+     chown root:110000 /var/iri/secrets/tls/*.p12
+     chmod 0640 /var/iri/secrets/tls/backend.p12 /var/iri/secrets/tls/frontend.p12 \
+       /var/iri/secrets/tls/ingest.p12 /var/iri/secrets/tls/keycloak.p12
+     chmod 0644 /var/iri/secrets/tls/truststore.p12 /var/iri/secrets/tls/ca.crt
+     setfacl -m u:100999:r /var/iri/secrets/tls/keycloak.p12
+     restorecon -RF /var/iri/secrets/tls
+   fi
    # redis ACL: a plain root-owned file, nothing namespaced about it
    install -o root -g root -m 0644 "${R}/config/users.acl" /var/iri/redis/users.acl
    restorecon -F /var/iri/code/.env /var/iri/code/realm-export.json /var/iri/secrets/keystore.p12 /var/iri/redis/users.acl
@@ -338,7 +350,10 @@ minimum —
 - the **Keycloak admin** bootstrap password and the **OIDC client secrets**
   (`KEYCLOAK_ADMIN_CLIENT_SECRET`) and the **SPI shared secret** (`KRT_DISCORD_SPI_SHARED_SECRET`);
 - the internal **`keystore.p12`** (regenerate per [`deployment.md` → *Internal keystore and certificate rotation*](deployment.md#internal-keystore-and-certificate-rotation) — it must
-  carry `dns:keycloak`) and re-apply its translated ownership and ACL (step 2);
+  carry `dns:keycloak`) and re-apply its translated ownership and ACL (step 2) — or, once the
+  per-service material is rolled out, **re-mint the whole of `/var/iri/secrets/tls`** with
+  `mint-internal-tls.sh` (same section); its CA key no longer exists, so no single file can be
+  re-issued on its own;
 - the **monitoring secrets** (`scrape_password`, `prometheus_web_password`, the Alertmanager
   receiver credentials);
 - the **GHCR pull token** and the **backup** repo password + Nextcloud app password (REQ-OPS-012).

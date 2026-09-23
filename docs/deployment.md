@@ -210,6 +210,7 @@ Shapes and locations only. Values live on the host and in the off-site backup, n
 | `/var/iri/code/.env` | `deploy:deploy 0640` | every environment value the stack reads | the role repairs owner/mode; `deploy.sh` reads it, `render-env-d.py` renders `env.d/` from it. Keep it **LF**: a CRLF file hands the pre-flight a path ending in `\r` (`required file missing` for a file that exists). |
 | `/var/iri/code/env.d/<svc>.env` | `deploy:iri 0640`, dir `2750` | per-service environment, one closed allow-list each | **generated** on every config change; never edit — edit `.env` |
 | `/var/iri/secrets/keystore.p12` | `root:110000 0640` + ACL `u:100999:r`, `u:iri:r` | the shared internal TLS keystore (backend, frontend, ingest, keycloak) | ACL for keycloak and for the backup helper; see [rotation](#internal-keystore-and-certificate-rotation) |
+| `/var/iri/secrets/tls/` | `iri:iri 0755`; `<svc>.p12` `0640` (apps `root:110000` + ACL `u:iri:r`, keycloak `root:root` + ACL `u:100999:r`, `u:iri:r`); `truststore.p12`, `ca.crt` `root:root 0644` | the per-service internal TLS material (REQ-SEC-070) — **absent until the rollout** | minted by the owner with `mint-internal-tls.sh`; see [Internal TLS](#internal-tls-per-service-certificates-from-a-private-ca) |
 | `/var/iri/code/realm-export.json` | `root:100999` + ACL `u:iri:r` | Keycloak realm seed, bind-mounted into keycloak | only seeds an empty realm; the live realm is in `db-keycloak` |
 | `/var/iri/redis/users.acl` | `root:root 0644` | Redis ACL, one user per service, **rendered** by `render-redis-acl.py` (SHA-256 hashes, no password) and **with** a `user default …` line | without that line redis resets `default` to `nopass`; check `grep -c '^user default ' …` = 1 — see [The Redis ACL](#the-redis-acl) |
 | `/etc/iri/ghcr-pull-token` | `deploy:deploy 0600`, dir `0700` | classic PAT, `read:packages` only | optional sidecar `ghcr-pull-token.expiry` (ISO date) |
@@ -369,7 +370,7 @@ a privately signed edge, the JVM truststore (`20-jvm-truststore.conf`). `check-c
 | Path | Written by | Content |
 |---|---|---|
 | `/var/iri/code/` | `deploy.sh` (bundle) | compose files, `docker/{edge,acme,maintenance}`, `keycloak-theme/`, `monitoring/`, `quadlet/` |
-| `/var/iri/code/scripts/` | the role | `deploy.sh`, `backup.sh`, `restore-drill.sh`, `container-cleanup.sh`, `lib/container-runtime.sh`, `render-env-d.py`, the two collectors — `root:root 0755`, so `deploy` cannot rewrite its own deployer |
+| `/var/iri/code/scripts/` | the role | `deploy.sh`, `backup.sh`, `restore-drill.sh`, `container-cleanup.sh`, `lib/container-runtime.sh`, `render-env-d.py`, `render-redis-acl.py`, `mint-internal-tls.sh`, the two collectors — `root:root 0755`, so `deploy` cannot rewrite its own deployer |
 | `/etc/containers/systemd/users/<iri-uid>/` | `deploy.sh` | the 39 units, plus `<svc>.container.d/10-digest-pin.conf` (the release's digest) and the role's host drop-ins |
 | `/var/iri/code/env.d/` | `deploy.sh` via `render-env-d.py` | one rendered environment file per service |
 | `/var/lib/iri/` | `deploy.sh` | digest-pin record and its predecessor, `last-deployed.digests`, backoff records, `config-stage/`, `config-previous/`, `config-blocked.marker`, `edge/` and `monitoring-reload/` snapshots |
@@ -893,7 +894,209 @@ daily that it answers 403/404 from outside.
 
 ---
 
+## Internal TLS: per-service certificates from a private CA
+
+REQ-SEC-070, ADR-0211, audit finding ING-SEC-04. **Every production step below is a write and
+needs @greluc's explicit yes, in chat, per step.** Nothing here happens by itself: the release that
+ships this is inert, and the switches are host files the owner creates and host variables the owner
+sets.
+
+**Why.** The shared `/var/iri/secrets/keystore.p12` is the identity of backend, frontend, ingest and
+Keycloak at once, and — self-signed — also the anchor every one of them trusts. A key read out of
+the internet-facing ingest container is therefore the backend's and Keycloak's key too. After the
+rollout each service holds a leaf of its own, signed by a CA whose key no longer exists, and clients
+trust only that CA and check the name.
+
+**What the release changes on its own: nothing.** Every new mount falls back to the shared keystore
+and every new switch defaults to today's behaviour:
+
+| Knob | Where | Default (= today) | After the rollout |
+|---|---|---|---|
+| `INTERNAL_TLS_VERIFY_HOSTNAME` | host `.env` → `env.d` (frontend, ingest) | `false` | `true` |
+| `IRI_BACKEND_KEYSTORE_HOST_PATH` / `_FRONTEND_` / `_INGEST_` / `_KEYCLOAK_` | baked into the units by `generate-quadlet.py` (`PATH_VARS`) | `/var/iri/secrets/keystore.p12` | `/var/iri/secrets/tls/<service>.p12` |
+| `IRI_INTERNAL_TRUSTSTORE_HOST_PATH` → `/run/secrets/internal-truststore.p12` | baked, as above | `/var/iri/secrets/keystore.p12` | `/var/iri/secrets/tls/truststore.p12` |
+| `/var/iri/monitoring/certs/basetool-ca.crt` (edge, Prometheus, blackbox) | host file | the shared certificate | the internal CA |
+| `/var/iri/secrets/backend-truststore.p12` (Keycloak SPI precheck, if configured) | host file | the backend's shared certificate | the internal CA |
+
+The four `*_KEYSTORE_HOST_PATH` and the truststore path are **baked**: setting them in `.env` does
+nothing on the Podman host (`check-conformance.py` → `env-reaches-the-units` says so). They move with
+the follow-up release that flips `PATH_VARS`, and that release must not be promoted before step 2.
+
+**The transition trick.** Until step 4 the CA-only truststore and `basetool-ca.crt` carry **the old
+shared certificate as a second anchor**. Every client then accepts either certificate, so the order
+in which services restart in step 3 cannot break a handshake, and a rollback to the old release is
+a restart, not a re-mint.
+
+Common prelude for every step (as root on the host):
+
+```bash
+cd /
+IRI_UID=$(id -u iri); B=$(grep '^iri:' /etc/subuid | cut -d: -f2)
+UCTL="sudo -u iri XDG_RUNTIME_DIR=/run/user/${IRI_UID} systemctl --user"; UPOD="sudo -u iri podman"
+```
+
+### Step 0 — tooling on the host
+
+The mint script, the per-mount deploy pre-flight and the backup capture of `/var/iri/secrets/tls`
+reach the host through the role, not through the release (ADR-0188). From the workstation (WSL):
+
+```bash
+ansible-playbook site.yml --limit production --tags scripts --check --diff
+ansible-playbook site.yml --limit production --tags scripts
+```
+
+Expected: `mint-internal-tls.sh`, `deploy.sh`, `backup.sh` changed under `/var/iri/code/scripts/`.
+Rollback: re-run the role from the previous commit.
+
+### Step 1 — check the names (independent of everything else)
+
+The shared certificate already names every service, so hostname verification can go on first. Prove
+it before switching, from inside the stack's network namespace (read-only; `openssl` is the host's):
+
+```bash
+IP=$(${UPOD} inspect backend --format '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' | awk '{print $1}')
+sudo -u iri XDG_RUNTIME_DIR=/run/user/${IRI_UID} podman unshare --rootless-netns \
+  openssl s_client -connect "${IP}:11261" -servername backend -verify_hostname backend \
+  -CAfile /var/iri/monitoring/certs/basetool-ca.crt -verify_return_error </dev/null 2>&1 \
+  | grep -E 'Verify return code|Verification'
+```
+
+Expected: `Verification: OK` and `Verify return code: 0 (ok)`. A `hostname mismatch` stops here. (The
+blackbox `https_internal` probes give the same verdict continuously — `probe_success` of the
+internal targets.)
+
+Then switch it on — the variable reaches the containers through `env.d`:
+
+```bash
+cp -p /var/iri/code/.env /var/iri/code/.env.backup-$(date +%Y%m%d-%H%M%S)
+printf 'INTERNAL_TLS_VERIFY_HOSTNAME=true\n' >> /var/iri/code/.env
+grep -c '^INTERNAL_TLS_VERIFY_HOSTNAME=' /var/iri/code/.env      # 1
+sudo -u deploy /var/iri/code/scripts/render-env-d.py \
+  --env /var/iri/code/.env --templates /var/iri/code/quadlet/env.d --out /var/iri/code/env.d
+grep -H INTERNAL_TLS_VERIFY_HOSTNAME /var/iri/code/env.d/frontend.env /var/iri/code/env.d/ingest.env
+${UCTL} restart ingest.service frontend.service     # each blocks until healthy
+```
+
+Expected: both `=true`, both units healthy (the frontend's readiness follows the same flag, so a
+wrong name fails the restart instead of failing silently later). **Rollback:** delete the line,
+re-render, restart the same two units.
+
+### Step 2 — mint the material and widen every trust anchor
+
+Nothing serves the new certificates yet; this step only makes every client **also** trust them.
+
+```bash
+# 2a. The directory: iri-owned (container root), traversable for the deploy pre-flight.
+install -d -o iri -g iri -m 0755 /var/iri/secrets/tls
+
+# 2b. Mint, through the backend image (the host has no JDK). The password is the keystore password
+#     every consumer already reads (SERVER_SSL_KEY_STORE_PASSWORD / KC_HTTPS_KEY_STORE_PASSWORD),
+#     passed through the environment, never argv.
+IMG=$(${UPOD} container inspect backend --format '{{.ImageName}}')
+export TLS_STORE_PASSWORD="$(sed -n 's/^SERVER_SSL_KEY_STORE_PASSWORD=//p' /var/iri/code/.env | tail -1)"
+sudo --preserve-env=TLS_STORE_PASSWORD -u iri podman run --rm -i --user 0 -e TLS_STORE_PASSWORD \
+  --entrypoint sh -v /var/iri/secrets/tls:/work "${IMG}" -s -- --out /work \
+  --service backend=dns:backend,dns:localhost,ip:127.0.0.1 \
+  --service frontend=dns:frontend,dns:localhost,ip:127.0.0.1 \
+  --service ingest=dns:ingest,dns:localhost,ip:127.0.0.1 \
+  --service keycloak=dns:keycloak,dns:localhost,ip:127.0.0.1 \
+  < /var/iri/code/scripts/mint-internal-tls.sh
+
+# 2c. The old shared certificate as a second anchor in the internal truststore (removed in step 4).
+cp /var/iri/monitoring/certs/basetool-ca.crt /var/iri/secrets/tls/legacy-shared.crt
+sudo --preserve-env=TLS_STORE_PASSWORD -u iri podman run --rm --user 0 -e TLS_STORE_PASSWORD \
+  --entrypoint keytool -v /var/iri/secrets/tls:/work "${IMG}" \
+  -importcert -noprompt -alias legacy-shared -file /work/legacy-shared.crt \
+  -keystore /work/truststore.p12 -storepass:env TLS_STORE_PASSWORD
+unset TLS_STORE_PASSWORD
+
+# 2d. Ownership: app keystores readable by the app group (10001), Keycloak's by its uid (1000), all
+#     by iri for the backup helper; the truststore and the CA hold no key.
+chown root:$((B + 10001 - 1)) /var/iri/secrets/tls/backend.p12 /var/iri/secrets/tls/frontend.p12 /var/iri/secrets/tls/ingest.p12
+chown root:root /var/iri/secrets/tls/keycloak.p12
+chmod 0640 /var/iri/secrets/tls/backend.p12 /var/iri/secrets/tls/frontend.p12 /var/iri/secrets/tls/ingest.p12 /var/iri/secrets/tls/keycloak.p12
+setfacl -m u:iri:r /var/iri/secrets/tls/backend.p12 /var/iri/secrets/tls/frontend.p12 /var/iri/secrets/tls/ingest.p12
+setfacl -m u:$((B + 1000 - 1)):r -m u:iri:r /var/iri/secrets/tls/keycloak.p12
+chown root:root /var/iri/secrets/tls/truststore.p12 /var/iri/secrets/tls/ca.crt /var/iri/secrets/tls/legacy-shared.crt
+chmod 0644 /var/iri/secrets/tls/truststore.p12 /var/iri/secrets/tls/ca.crt /var/iri/secrets/tls/legacy-shared.crt
+restorecon -RF /var/iri/secrets/tls
+ls -l /var/iri/secrets/tls; getfacl -p /var/iri/secrets/tls/keycloak.p12
+
+# 2e. The edge, Prometheus and blackbox anchor: the new CA AND the old certificate.
+cat /var/iri/secrets/tls/ca.crt /var/iri/secrets/tls/legacy-shared.crt > /var/iri/monitoring/certs/basetool-ca.crt
+restorecon -F /var/iri/monitoring/certs/basetool-ca.crt
+${UCTL} restart edge.service prometheus.service blackbox-exporter.service
+
+# 2f. Only if the Keycloak SPI precheck is configured (KRT_BACKEND_TRUSTSTORE_PATH in .env): add the
+#     CA to its truststore the same way (docs/keycloak/DISCORD_KEYCLOAK_SETUP.md §7.3), then
+#     ${UCTL} restart keycloak.service
+```
+
+Expected: the mint prints `The CA key no longer exists.`; `ls` shows `backend.p12 ca.crt
+frontend.p12 ingest.p12 keycloak.p12 legacy-shared.crt truststore.p12`; the edge still serves the
+app (it verifies the unchanged upstreams against the old certificate in the bundle). **Rollback:**
+put the old certificate back into `basetool-ca.crt` (`cp /var/iri/secrets/tls/legacy-shared.crt
+/var/iri/monitoring/certs/basetool-ca.crt`), restart the same three units; `/var/iri/secrets/tls`
+may stay, nothing mounts it yet.
+
+### Step 3 — serve the new certificates
+
+Merge and promote the follow-up release that bakes the step-2 files into the units (`PATH_VARS`) —
+its `deploy.sh` pre-flight refuses the release if any of the files is missing, before anything is
+applied. The deploy recreates backend, frontend, ingest and Keycloak on their own leaves; the
+truststore still carries the old certificate, so the restart order does not matter.
+
+Verify:
+
+```bash
+for svc in backend:11261 frontend:18081 ingest:11262 keycloak:18443; do
+  n=${svc%%:*}; IP=$(${UPOD} inspect "$n" --format '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' | awk '{print $1}')
+  echo "== $n"; sudo -u iri XDG_RUNTIME_DIR=/run/user/${IRI_UID} podman unshare --rootless-netns \
+    openssl s_client -connect "${IP}:${svc##*:}" -servername "$n" -verify_hostname "$n" \
+    -CAfile /var/iri/secrets/tls/ca.crt -verify_return_error </dev/null 2>&1 | grep -E 'Verification|subject='
+done
+${UPOD} logs --since 10m backend frontend ingest 2>&1 | grep -iE 'PKIX|No subject alternative|certificate_unknown' || echo "no TLS errors"
+curl -fsS https://profit-base.online/auth/realms/iri/.well-known/openid-configuration >/dev/null && echo OK
+```
+
+Expected: `Verification: OK` against **the CA alone**, and each `subject=` names its own service.
+**Rollback:** re-promote the previous release (the old units mount the shared keystore, which is
+untouched and still trusted by every client).
+
+### Step 4 — drop the old certificate
+
+Only once step 3 has run for a day without TLS errors:
+
+```bash
+IMG=$(${UPOD} container inspect backend --format '{{.ImageName}}')
+export TLS_STORE_PASSWORD="$(sed -n 's/^SERVER_SSL_KEY_STORE_PASSWORD=//p' /var/iri/code/.env | tail -1)"
+sudo --preserve-env=TLS_STORE_PASSWORD -u iri podman run --rm --user 0 -e TLS_STORE_PASSWORD \
+  --entrypoint keytool -v /var/iri/secrets/tls:/work "${IMG}" \
+  -delete -alias legacy-shared -keystore /work/truststore.p12 -storepass:env TLS_STORE_PASSWORD
+unset TLS_STORE_PASSWORD
+install -m 0644 /var/iri/secrets/tls/ca.crt /var/iri/monitoring/certs/basetool-ca.crt
+restorecon -F /var/iri/monitoring/certs/basetool-ca.crt
+${UCTL} restart edge.service prometheus.service blackbox-exporter.service
+${UCTL} restart backend.service ingest.service frontend.service
+systemctl start iri-cert-expiry.service      # the metric now reports the CA's own expiry
+```
+
+Also drop the old entry from the SPI truststore if 2f was done. From here on, **the old
+`keystore.p12` is no longer a trust anchor anywhere**; keep it until the next backup has captured
+`/var/iri/secrets/tls`, then remove it. **Rollback:** re-import `legacy-shared.crt` as in 2c, rebuild
+the bundle as in 2e, restart the same units.
+
+**Rotation after the rollout** is a re-mint: all leaves and the CA together, into a fresh directory,
+then the same widening (old CA as second anchor) → switch → narrowing. No single leaf can be
+re-issued, by design — the CA key is gone.
+
+---
+
 ## Internal keystore and certificate rotation
+
+> [!note] Applies to the **shared** keystore, i.e. until step 3 of
+> [*Internal TLS: per-service certificates from a private CA*](#internal-tls-per-service-certificates-from-a-private-ca)
+> has run. Afterwards a rotation is a re-mint (the last paragraph of that section).
 
 The shared `/var/iri/secrets/keystore.p12` is the internal TLS identity of backend, frontend,
 ingest and Keycloak, **and** their truststore: frontend and ingest pin it to call the backend, the

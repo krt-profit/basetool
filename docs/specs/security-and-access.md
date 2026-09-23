@@ -704,7 +704,8 @@ re-login · **ADR:** ADR-0122
 ### REQ-SEC-014 — Encrypted transport to Keycloak (no cleartext edge)
 
 Production Keycloak MUST serve **HTTPS only** — `--http-enabled=false --https-port=18443`, with the
-shared bind-mounted `keystore.p12` — so neither edge that reaches it is cleartext:
+shared bind-mounted `keystore.p12` (its own leaf from the internal CA once REQ-SEC-070 is rolled
+out) — so neither edge that reaches it is cleartext:
 
 - **edge &rarr; Keycloak:** the native nginx edge (ADR-0162) terminates the public Let's Encrypt
   cert and re-encrypts to `https://keycloak:18443`, serving Keycloak under `/auth` on the app origin
@@ -4731,6 +4732,57 @@ mismatch · **Runbook:** [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../OAUTH2_C
 · **ADR:** [ADR-0001](../adr/0001-frontend-confidential-oauth2-client.md),
 [ADR-0202](../adr/0202-a-realm-is-brought-to-the-production-shape-by-a-provisioner-that-never-deletes.md)
 amendment 2 · **Related:** REQ-SEC-001, REQ-SEC-012
+
+### REQ-SEC-070 — Each internal service holds its own certificate, and clients trust only the CA
+
+No internal service may hold another service's private key, and no internal client may trust a
+certificate merely for being pinned (audit finding ING-SEC-04). The target shape, which the
+production rollout reaches step by step:
+
+- **One leaf per service** — backend, frontend, ingest, Keycloak — signed by a private CA and naming
+  only that service's docker alias plus `localhost` / `127.0.0.1`. Minted by
+  `scripts/mint-internal-tls.sh`, which **destroys the CA key** at the end of the run: nothing can be
+  added to the set afterwards, and a rotation re-mints the whole set.
+- **Clients pin the CA, not a certificate.** Every internal SSL bundle (`backend-trust`,
+  `keycloak-trust`) reads `INTERNAL_TLS_TRUSTSTORE`, a CA-only truststore mounted at
+  `/run/secrets/internal-truststore.p12`; the edge, Prometheus and the blackbox exporter trust the CA
+  through `basetool-ca.crt`.
+- **Clients check the name.** With `INTERNAL_TLS_VERIFY_HOSTNAME=true` the frontend's backend client
+  (`WebClientConfig`), its backend readiness probe (`BackendHealthIndicator`) and the ingest relay
+  (`RestClientConfig`) verify the backend's hostname, which ADR-0204 §6 had switched off for the
+  relay. The backend's Keycloak client, the edge, Prometheus and the blackbox exporter verified
+  already. `dev` and `test` are unaffected.
+- **Safe to ship before the rollout.** Every per-service mount falls back to the shared keystore
+  and `INTERNAL_TLS_VERIFY_HOSTNAME` defaults to `false`, so a release carrying this changes nothing
+  until the owner mints the material and flips the switches (runbook below).
+- **The committed test material has the same shape** (ADR-0139 amendment 1).
+
+**Acceptance**
+
+- [ ] The mint produces the CA certificate, a CA-only truststore and one keystore per service, and
+  leaves no CA key anywhere; each leaf verifies for each of its own names and for no other service's.
+- [ ] With verification on, the relay and the frontend refuse a backend certificate that chains to
+  the pinned anchor but does not name the host they dialled, and accept one that does; with it off
+  (the default) both behave exactly as before; `dev` is unaffected either way.
+- [ ] The frontend's backend readiness probe follows the same switch.
+- [ ] With nothing configured, every Quadlet unit mounts the shared keystore at every new mount
+  point; the deploy pre-flight refuses a release whose units mount any PKCS#12 the host lacks.
+- [ ] The E2E stack serves each app on its own leaf, and the seeder reaches the backend through the
+  CA-only truststore with the hostname checked.
+
+**Enforced by:** `scripts/mint-internal-tls.test.sh` (`repo-lint.yml`) · `RestClientConfigTest`
+(ingest) · `BackendHostnameVerificationTest` · `BackendHealthIndicatorHostnameTest` ·
+`scripts/deploy.test.sh` (`scenario_podman_missing_per_service_keystore_refuses`) ·
+`generate-quadlet.py --check` · the E2E suite (`docker-compose.e2e.yml`, `BackendSeeder`) ·
+**Code:** `scripts/mint-internal-tls.sh`, `WebClientConfig`, `BackendHealthIndicator`,
+`AppHttpProperties#verifyBackendHostname`, `RestClientConfig` (ingest),
+`IngestProperties#verifyBackendHostname`, the `application-prod.yml` SSL bundles of all three apps,
+`docker-compose.yml`, `scripts/generate-quadlet.py` (`PATH_VARS`), `scripts/deploy.sh`
+(`keystore_mount_sources`), `scripts/backup.sh` · **Monitoring:** unchanged series — the blackbox
+`https_internal` probes and the three app scrapes already verify each service's name against
+`basetool-ca.crt`, and `iri-cert-expiry` reports the CA's expiry once that file is the CA ·
+**Runbook:** [`deployment.md` &rarr; Internal TLS](../deployment.md#internal-tls-per-service-certificates-from-a-private-ca)
+· **ADR:** [ADR-0211](../adr/0211-each-internal-service-holds-its-own-leaf-from-a-private-ca.md) · **Related:** REQ-SEC-014, REQ-OPS-016, REQ-OBS-008, REQ-INGEST-001
 
 ## Out of scope
 

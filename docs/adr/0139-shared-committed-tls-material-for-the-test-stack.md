@@ -97,3 +97,27 @@ which is a subtler bet than simply not publishing a usable CA key.
 **Magisk / Cert-Fixer to reach the system store.** Rejected: it solves for the system store,
 which a `<debug-overrides>` anchor does not need, and adds a rooted-emulator dependency to
 everyone's setup.
+
+## Amendment 1 (2026-09-23) — the material takes production's per-service shape
+
+ADR-0211 gives every internal service its own leaf certificate from a private CA, with only
+the CA distributed as the trust anchor (REQ-SEC-070, ING-SEC-04). The test material follows,
+so the stacks CI and developers run exercise the same trust relationships production has:
+
+|              File              |                                     Contents                                      |
+|--------------------------------|-----------------------------------------------------------------------------------|
+| `basetool-test-ca.crt`         | the trust anchor — a certificate, no key                                          |
+| `basetool-test-<svc>.p12`      | per service (`backend`, `frontend`, `ingest`, `keycloak`): alias `basetool` = that service's key + chain, alias `ca` = the anchor |
+| `basetool-test-truststore.p12` | alias `ca` only — what a client pins                                              |
+| `generate-test-tls.sh`         | a wrapper around `scripts/mint-internal-tls.sh`, the script production mints with |
+
+Everything this ADR decided still holds: the CA key is destroyed at generation time (now by the
+mint script), every SAN list names only loopback, emulator and docker-network hosts, the files are
+bound by hardcoded paths, the password is the published `basetool-test`, the validity is 20 years.
+What changed is that each leaf names only **its own** service, so the SAN list quoted in the
+*Decision* above is now spread across four leaves, and `basetool-test-keystore.p12` no longer
+exists.
+
+The regeneration this needed is the one the *Consequences* section priced in: the old anchor's
+key was gone, so the new leaves chain to a new anchor, and `basetool-android` has to take the new
+`basetool-test-ca.crt` into `app/src/dev/res/raw/basetool_test_ca.crt` in the same change.

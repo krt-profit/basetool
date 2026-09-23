@@ -314,6 +314,10 @@ dependencies {
   testImplementation("org.springframework.security:spring-security-test")
   // MockWebServer for HTTP simulations in WebClient tests
   testImplementation(libs.okhttp3.mockwebserver)
+  // In-memory certificates for the hostname-verification tests of the backend TLS hop
+  // (REQ-SEC-070): one named for the host a test dials and one that is not, which the
+  // committed test material cannot offer — every one of its leaves names localhost.
+  testImplementation(libs.okhttp3.tls)
   // ArchUnit core (no archunit-junit5 — that pulls in a clashing JUnit Platform
   // version; we invoke `.check(CLASSES)` from plain @Test methods). Enforces the
   // frontend's "no JpaRepository / no direct JDBC" rule.
@@ -559,7 +563,7 @@ tasks.named<Test>("test") {
   // classpath and, like the four files above, invisible to Gradle. Rotating the material would
   // otherwise leave those tests UP-TO-DATE against a keystore that no longer exists.
   inputs
-    .file(rootProject.file("docker/test-tls/basetool-test-keystore.p12"))
+    .file(rootProject.file("docker/test-tls/basetool-test-backend.p12"))
     .withPropertyName("testTlsKeystore")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 

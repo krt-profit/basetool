@@ -66,17 +66,30 @@ class RestClientConfigTest {
   private static final HeldCertificate LOCALHOST_CERT =
       new HeldCertificate.Builder().addSubjectAlternativeName("localhost").build();
 
-  private static IngestProperties properties(String backendBaseUrl) {
+  private static IngestProperties properties(String backendBaseUrl, boolean verifyHostname) {
     return TestProperties.ingest(
-        "backend-base-url", backendBaseUrl, "max-payload-bytes", String.valueOf(4096L));
+        "backend-base-url",
+        backendBaseUrl,
+        "max-payload-bytes",
+        String.valueOf(4096L),
+        "verify-backend-hostname",
+        String.valueOf(verifyHostname));
   }
 
   private static RestClientConfig config(
       String backendBaseUrl, String[] activeProfiles, SslBundles sslBundles) {
+    return config(backendBaseUrl, activeProfiles, sslBundles, false);
+  }
+
+  private static RestClientConfig config(
+      String backendBaseUrl,
+      String[] activeProfiles,
+      SslBundles sslBundles,
+      boolean verifyHostname) {
     MockEnvironment environment = new MockEnvironment();
     environment.setActiveProfiles(activeProfiles);
     return new RestClientConfig(
-        properties(backendBaseUrl),
+        properties(backendBaseUrl, verifyHostname),
         TestProperties.serviceAccount(),
         environment,
         sslBundles,
@@ -113,6 +126,52 @@ class RestClientConfigTest {
                   httpsUrl(backend),
                   new String[] {"prod"},
                   TestSslBundles.withTrustStore("backend-trust", trustStoreWith(BACKEND_CERT)))
+              .backendRestClient();
+
+      assertThat(client.get().uri("/api/v1/ping").retrieve().body(String.class)).isEqualTo("{}");
+    }
+  }
+
+  @Test
+  void withHostnameVerificationTheRelayRefusesAPinnedButMisnamedCertificate() throws Exception {
+    // REQ-SEC-070 / ING-SEC-04: once one internal CA signs every service the pinned anchor
+    // vouches for all of them, so the name has to be checked. Same pinned chain as the default
+    // case above, verification on: refused.
+    try (MockWebServer backend = httpsServer(BACKEND_CERT)) {
+      RestClient client =
+          config(
+                  httpsUrl(backend),
+                  new String[] {"prod"},
+                  TestSslBundles.withTrustStore("backend-trust", trustStoreWith(BACKEND_CERT)),
+                  true)
+              .backendRestClient();
+
+      assertThatThrownBy(() -> client.get().uri("/api/v1/ping").retrieve().body(String.class))
+          .isInstanceOf(ResourceAccessException.class);
+    }
+  }
+
+  @Test
+  void withHostnameVerificationTheRelayAcceptsAPinnedCorrectlyNamedCertificate() throws Exception {
+    // ...and the matching name is accepted, so the refusal above was the name and nothing else.
+    try (MockWebServer backend = httpsServer(LOCALHOST_CERT)) {
+      RestClient client =
+          config(
+                  httpsUrl(backend),
+                  new String[] {"prod"},
+                  TestSslBundles.withTrustStore("backend-trust", trustStoreWith(LOCALHOST_CERT)),
+                  true)
+              .backendRestClient();
+
+      assertThat(client.get().uri("/api/v1/ping").retrieve().body(String.class)).isEqualTo("{}");
+    }
+  }
+
+  @Test
+  void underDevAndTestHostnameVerificationChangesNothing() throws Exception {
+    try (MockWebServer backend = httpsServer(BACKEND_CERT)) {
+      RestClient client =
+          config(httpsUrl(backend), new String[] {"dev"}, new DefaultSslBundleRegistry(), true)
               .backendRestClient();
 
       assertThat(client.get().uri("/api/v1/ping").retrieve().body(String.class)).isEqualTo("{}");
@@ -219,7 +278,7 @@ class RestClientConfigTest {
       environment.setActiveProfiles("test");
       RestClient keycloakClient =
           new RestClientConfig(
-                  properties("http://localhost:1/"),
+                  properties("http://localhost:1/", false),
                   serviceAccount,
                   environment,
                   new DefaultSslBundleRegistry(),

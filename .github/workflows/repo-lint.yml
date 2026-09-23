@@ -730,6 +730,13 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/render-redis-acl.py --selftest
 
+      # The internal TLS minter (REQ-SEC-070, ADR-0211): the files it promises and no CA key,
+      # each leaf verifying for its own names and for no other service's. keytool and openssl are
+      # both preinstalled on ubuntu-latest.
+      - name: internal-tls / Self-test the internal TLS minter
+        if: ${{ !cancelled() }}
+        run: bash scripts/mint-internal-tls.test.sh
+
       # The main-push reuse decision of release-images.yml (REQ-OPS-021, ADR-0210). The script decides
       # whether a pushed range changed anything that goes into an image; a wrong "no" would ship a
       # stale image under a new commit's tag, so the self-test pins every branch of the decision and

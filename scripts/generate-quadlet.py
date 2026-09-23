@@ -241,8 +241,17 @@ READ_ONLY: dict[str, dict[str, Any]] = {
     "ingest": {},
 }
 
+#: The per-service keystores and the internal truststore (REQ-SEC-070, ADR-0211) are baked
+#: to the SHARED keystore on purpose: that is what production mounts until the owner has minted
+#: /var/iri/secrets/tls/ on the host. The rollout flips these five to the files in that directory
+#: (docs/deployment.md, "Internal TLS"); a unit naming a file the host lacks would not start.
 PATH_VARS = {
     "IRI_KEYSTORE_HOST_PATH": "/var/iri/secrets/keystore.p12",
+    "IRI_BACKEND_KEYSTORE_HOST_PATH": "/var/iri/secrets/keystore.p12",
+    "IRI_FRONTEND_KEYSTORE_HOST_PATH": "/var/iri/secrets/keystore.p12",
+    "IRI_INGEST_KEYSTORE_HOST_PATH": "/var/iri/secrets/keystore.p12",
+    "IRI_KEYCLOAK_KEYSTORE_HOST_PATH": "/var/iri/secrets/keystore.p12",
+    "IRI_INTERNAL_TRUSTSTORE_HOST_PATH": "/var/iri/secrets/keystore.p12",
     "IRI_TRUSTSTORE_HOST_PATH": "/var/iri/secrets/keystore.p12",
     "IRI_REDIS_ACL_HOST_PATH": "/var/iri/redis/users.acl",
     "IRI_UPSTREAM_CA_HOST_PATH": "/var/iri/monitoring/certs/basetool-ca.crt",

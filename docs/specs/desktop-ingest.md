@@ -156,9 +156,15 @@ network only.
   no `resilience4j-reactor`. Relay: 5 s connect, 15 s read, response body capped at
   `app.ingest.max-payload-bytes`, HTTP/1.1, the `backend` circuit breaker applied with
   `executeSupplier` and ignoring `RestClientResponseException`. Token grant: 5 s connect, read bounded
-  by the smaller of 10 s and `app.ingest.service-account.timeout-millis`. TLS trust is unchanged:
-  outside `dev`/`test` the `backend-trust` bundle is the relay's only anchor **without** a hostname
-  check (the service-alias certificate has no matching SAN), no bundle means the JVM trust store
+  by the smaller of 10 s and `app.ingest.service-account.timeout-millis`. TLS trust: outside
+  `dev`/`test` the `backend-trust` bundle (`INTERNAL_TLS_TRUSTSTORE`) is the relay's only anchor,
+  **without** a hostname check by default and **with** one when
+  `app.ingest.verify-backend-hostname` / `INTERNAL_TLS_VERIFY_HOSTNAME` is true — the state
+  REQ-SEC-070's rollout reaches, once one internal CA signs every service and the pin alone no
+  longer tells them apart. *(Corrected 2026-09-23: the parenthesis here said the service-alias
+  certificate has no matching SAN. It has one — `dns:backend` — and the edge and Prometheus verify
+  it; the check was off because a shared certificate made it meaningless, not impossible.)* No
+  bundle means the JVM trust store
   **with** it, and the token client trusts the JVM anchors plus `keycloak-trust` and always checks the
   hostname. A backend answer whose body cannot be read — a torn connection, a body past the cap — is a
   `502 BACKEND_RELAY_FAILED` like a refused connection, not a `500`. Idle pooled connections are

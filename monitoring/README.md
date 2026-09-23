@@ -410,6 +410,14 @@ chmod 644 /var/iri/monitoring/certs/basetool-ca.crt && restorecon -F /var/iri/mo
 openssl x509 -in /var/iri/monitoring/certs/basetool-ca.crt -noout -subject -ext subjectAltName
 ```
 
+Once the per-service internal TLS is rolled out (REQ-SEC-070) the file is the **internal CA**
+instead — `install -m 0644 /var/iri/secrets/tls/ca.crt /var/iri/monitoring/certs/basetool-ca.crt`
+— and the steps above no longer apply: the per-service keystores hold leaves, not the anchor. Every
+consumer (Prometheus `server_name`, the blackbox module, the edge's `proxy_ssl_name`) already checks
+the service's name, so nothing in their configuration changes; during the rollout the file briefly
+holds the CA **and** the old shared certificate, so either side verifies
+([`deployment.md` → *Internal TLS*](../docs/deployment.md#internal-tls-per-service-certificates-from-a-private-ca)).
+
 **3. `certs/grafana.{crt,key}`** — Grafana's own **self-signed, per-host** leaf. `grafana.container`
 will not start without it. **Never restore it from another host's backup** (the archive carries the
 old host's pair — extract around it, or re-mint afterwards); nothing verifies that leaf, so a wrong

@@ -79,7 +79,7 @@ import org.springframework.web.client.RestClientResponseException;
  * backend serves HTTPS with a self-signed certificate whose SAN is {@code localhost}, not the
  * Docker alias {@code backend} the probe connects to; the probe's TLS trust mirrors {@link
  * de.greluc.krt.profit.basetool.frontend.config.WebClientConfig} (see {@link
- * #backendTls(SslBundles, Environment)}): trust-all in dev/test, and pinned to the {@code
+ * #backendTls(SslBundles, Environment, boolean)}): trust-all in dev/test, and pinned to the {@code
  * backend-trust} bundle in prod with TLS endpoint identity (hostname) verification skipped.
  * Relaxing the certificate-to-hostname binding — never the chain validation, on the prod pinned
  * path — is safe ONLY because the connection lives entirely inside the Compose-internal {@code
@@ -114,12 +114,12 @@ public class BackendHealthIndicator implements HealthIndicator {
   /**
    * Production constructor used by Spring; resolves the backend Actuator base URL from the {@code
    * app.backend-health-url} property and builds a {@link RestClient} with indicator-specific
-   * timeouts and the backend trust policy resolved by {@link #backendTls(SslBundles, Environment)}
-   * — pinned to the {@code backend-trust} bundle (hostname check skipped) in prod, trust-all in
-   * dev/test and as the prod fallback when no bundle is configured (audit L-5). {@link Autowired}
-   * is required because the class declares a second (package-private, test-only) constructor;
-   * without it Spring 4+'s constructor-selection logic falls back to a non-existent default
-   * constructor and fails at startup with {@code NoSuchMethodException: <init>()}.
+   * timeouts and the backend trust policy resolved by {@link #backendTls(SslBundles, Environment,
+   * boolean)} — pinned to the {@code backend-trust} bundle (hostname check skipped) in prod,
+   * trust-all in dev/test and as the prod fallback when no bundle is configured (audit L-5). {@link
+   * Autowired} is required because the class declares a second (package-private, test-only)
+   * constructor; without it Spring 4+'s constructor-selection logic falls back to a non-existent
+   * default constructor and fails at startup with {@code NoSuchMethodException: <init>()}.
    *
    * @param backendHealthUrl base URL of the backend's <em>Actuator</em>, {@code
    *     app.backend-health-url}, defaulting to the API base URL {@code app.backend-url} for every
@@ -127,13 +127,20 @@ public class BackendHealthIndicator implements HealthIndicator {
    * @param sslBundles the application's configured SSL bundles, source of the {@code backend-trust}
    *     truststore used to pin the probe's TLS trust in prod
    * @param environment the active environment, used to pick the trust policy per profile
+   * @param verifyHostname {@code app.http.verify-backend-hostname}: keep the certificate-to-host
+   *     check on the pinned prod path (REQ-SEC-070), exactly as the API client does
    */
   @Autowired
   public BackendHealthIndicator(
       @Value("${app.backend-health-url:${app.backend-url}}") String backendHealthUrl,
       SslBundles sslBundles,
-      Environment environment) {
-    this(backendHealthUrl, CONNECT_TIMEOUT, READ_TIMEOUT, backendTls(sslBundles, environment));
+      Environment environment,
+      @Value("${app.http.verify-backend-hostname:false}") boolean verifyHostname) {
+    this(
+        backendHealthUrl,
+        CONNECT_TIMEOUT,
+        READ_TIMEOUT,
+        backendTls(sslBundles, environment, verifyHostname));
   }
 
   /**
@@ -160,7 +167,7 @@ public class BackendHealthIndicator implements HealthIndicator {
    * it through parameters, so hostname verification is governed entirely by the supplied context's
    * trust managers. Trust-all (dev/test and the prod no-bundle fallback) skips it inherently; the
    * pinned prod context wraps its trust managers to validate the chain while skipping endpoint
-   * identity (see {@link #backendTls(SslBundles, Environment)}).
+   * identity (see {@link #backendTls(SslBundles, Environment, boolean)}).
    *
    * @param backendUrl backend base URL (trailing slash trimmed)
    * @param connectTimeout TCP connect timeout for the probe
@@ -263,11 +270,17 @@ public class BackendHealthIndicator implements HealthIndicator {
    *       forced the probe {@code DOWN} and flapped the deploy.
    * </ul>
    *
+   * <p>With {@code verifyHostname} (REQ-SEC-070) the pinned path keeps the certificate-to-host
+   * check: once every service carries its own leaf from the internal CA, the pinned anchor vouches
+   * for all of them and only the name tells the backend's certificate apart.
+   *
    * @param sslBundles the application's configured SSL bundles
    * @param environment the active environment, for profile detection
+   * @param verifyHostname keep hostname verification on the pinned {@code backend-trust} path
    * @return the resolved {@link SSLContext} for the probe's HTTP client
    */
-  private static SSLContext backendTls(SslBundles sslBundles, @NotNull Environment environment) {
+  static SSLContext backendTls(
+      SslBundles sslBundles, @NotNull Environment environment, boolean verifyHostname) {
     List<String> profiles = Arrays.asList(environment.getActiveProfiles());
     if (profiles.contains("dev") || profiles.contains("test")) {
       return trustAllSslContext();
@@ -279,7 +292,14 @@ public class BackendHealthIndicator implements HealthIndicator {
           TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
       tmf.init(truststore);
       SSLContext context = SSLContext.getInstance("TLS");
-      context.init(null, pinnedTrustSkippingHostname(tmf.getTrustManagers()), null);
+      // The JDK client always asks for HTTPS endpoint identification, so the plain PKIX managers
+      // verify the hostname by themselves; only the wrapper takes that check away.
+      context.init(
+          null,
+          verifyHostname
+              ? tmf.getTrustManagers()
+              : pinnedTrustSkippingHostname(tmf.getTrustManagers()),
+          null);
       return context;
     } catch (NoSuchSslBundleException ignored) {
       log.warn(

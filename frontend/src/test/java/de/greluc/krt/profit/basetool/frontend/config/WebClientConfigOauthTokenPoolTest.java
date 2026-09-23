@@ -92,7 +92,8 @@ class WebClientConfigOauthTokenPoolTest {
             Duration.ofSeconds(3),
             AppHttpProperties.BackendProtocol.H2,
             20,
-            AppHttpProperties.BackendCodec.CBOR));
+            AppHttpProperties.BackendCodec.CBOR,
+            false));
   }
 
   /**
@@ -199,7 +200,8 @@ class WebClientConfigOauthTokenPoolTest {
                     Duration.ofMillis(500),
                     AppHttpProperties.BackendProtocol.H2,
                     20,
-                    AppHttpProperties.BackendCodec.CBOR))
+                    AppHttpProperties.BackendCodec.CBOR,
+                    false))
             .oauthRefreshTokenResponseClient();
     OAuth2RefreshTokenGrantRequest request = refreshRequest(server.url("/token").toString());
 

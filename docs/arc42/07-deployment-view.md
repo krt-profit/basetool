@@ -74,6 +74,12 @@ Consequences worth stating:
   service and SHA-256 hashes only, and is applied live with `ACL LOAD` (REQ-SEC-068, ADR-0207).
   The unit carries `--notify-keyspace-events Egx` and an unauthenticated `PING` health probe, so
   neither depends on which ACL users exist.
+- **Each service mounts its own keystore and an internal truststore** — `/run/secrets/keystore.p12`
+  from `IRI_<SERVICE>_KEYSTORE_HOST_PATH`, `/run/secrets/internal-truststore.p12` from
+  `IRI_INTERNAL_TRUSTSTORE_HOST_PATH` (REQ-SEC-070, ADR-0211). The generator bakes all five to
+  the shared `/var/iri/secrets/keystore.p12` until the owner has minted `/var/iri/secrets/tls/` with
+  `mint-internal-tls.sh` (installed by the role, run through the backend image); a later release
+  flips them. `deploy.sh` refuses a release whose units mount any PKCS#12 the host lacks.
 - **Podman features go through Quadlet keys, not raw arguments** — `RunInit=`, `Ulimit=` and the
   network's `Options=` since 2026-09-22. Only `--cpus` and `--oom-score-adj`, which have no key in
   podman 5.8, remain `PodmanArgs=`.

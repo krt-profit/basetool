@@ -29,11 +29,13 @@ import javax.net.ssl.KeyManagerFactory;
  * The committed test-stack TLS material, loaded for tests that need a real TLS server.
  *
  * <p><b>This is not an exception to "never use production credentials in tests" — it is an
- * application of it</b> (ADR-0139). {@code docker/test-tls/basetool-test-keystore.p12} was built to
+ * application of it</b> (ADR-0139). {@code docker/test-tls/basetool-test-backend.p12} was built to
  * be published: the CA key that signed it was destroyed at generation time, the server key can only
  * serve loopback and docker-network names, and the subject of both certificates says {@code NOT FOR
- * PRODUCTION}. Production keeps its own keystore, bind-mounted at runtime, and {@code .gitignore}
- * refuses the exact name {@code keystore.p12} so the two cannot be confused.
+ * PRODUCTION}. It is the test stack's backend leaf -- one of the per-service leaves the test CA
+ * signed, the same shape production has (REQ-SEC-070). Production keeps its own keystore,
+ * bind-mounted at runtime, and {@code .gitignore} refuses the exact name {@code keystore.p12} so
+ * the two cannot be confused.
  *
  * <p>Using it here rather than generating a throwaway certificate per test run is deliberate:
  * Netty's {@code SelfSignedCertificate} is deprecated and its replacement lives in an artefact this
@@ -51,9 +53,9 @@ final class TestTls {
   /**
    * Builds a {@link KeyManagerFactory} over the test keystore's server key.
    *
-   * <p>The keystore carries two aliases — {@code basetool} (the server key and its chain) and
-   * {@code ca} (the anchor, certificate only) — and the factory selects the one that actually has a
-   * key, so no alias needs naming here.
+   * <p>The backend's keystore carries two aliases — {@code basetool} (the server key and its chain)
+   * and {@code ca} (the anchor, certificate only) — and the factory selects the one that actually
+   * has a key, so no alias needs naming here.
    *
    * @return a factory a TLS server can be built from, initialised with the test server key.
    * @throws IllegalStateException if the material cannot be found or read, which means the working
@@ -61,7 +63,7 @@ final class TestTls {
    *     handshake error that says nothing about the cause.
    */
   static KeyManagerFactory serverKeyManagerFactory() {
-    Path keystore = repoRoot().resolve("docker/test-tls/basetool-test-keystore.p12");
+    Path keystore = repoRoot().resolve("docker/test-tls/basetool-test-backend.p12");
     if (!Files.isReadable(keystore)) {
       throw new IllegalStateException(
           "test TLS material not readable at " + keystore.toAbsolutePath());

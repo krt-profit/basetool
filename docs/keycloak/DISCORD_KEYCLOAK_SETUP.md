@@ -341,6 +341,13 @@ If the truststore is missing or wrong, the HTTPS call fails the handshake and th
 fails open (the login proceeds to the normal PENDING queue). Rotate the secret by changing it on both
 services; rebuild the truststore when the backend certificate is rotated.
 
+**After the per-service internal TLS rollout** (REQ-SEC-070) the backend serves a leaf of the
+internal CA, so the truststore holds **the CA** instead of a backend certificate — import
+`/var/iri/secrets/tls/ca.crt` under its own alias (`-alias internal-ca`) next to the old entry in
+step 2 of the rollout, and delete the old entry in step 4
+([`deployment.md` → *Internal TLS*](../deployment.md#internal-tls-per-service-certificates-from-a-private-ca)).
+From then on a re-mint changes the CA, and this truststore with it.
+
 ### 7.4 Verify
 
 - A new Discord login whose username / server nickname / e-mail matches an existing account → denied
