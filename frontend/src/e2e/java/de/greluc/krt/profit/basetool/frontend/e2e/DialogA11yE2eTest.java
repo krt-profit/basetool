@@ -342,8 +342,11 @@ class DialogA11yE2eTest {
             }
             """,
             id);
-    if (!"".equals(shape)) {
-      findings.add(where + shape);
+    // The probe joins its problems into one string, empty when there are none; anything else
+    // (a null from a probe that threw) is itself a finding, so it is not filtered out here.
+    String problems = String.valueOf(shape);
+    if (!problems.isEmpty()) {
+      findings.add(where + problems);
     }
     page.keyboard().press("Escape");
     if (!closedOrLeft(page, id)) {
