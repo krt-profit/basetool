@@ -103,6 +103,26 @@ sync and the tests read. While a dialog is open the page behind it is inert, so 
 for the user to see or click — a toast, a confirm, a download link — goes into
 `window.krtModal.layerRoot()`, not `document.body`.
 
+**Never write a dialog shell by hand.** Every dialog is a call of `fragments/modal-wrapper :: modal`
+(`SingleModalShapeTest` fails on `.krt-modal-overlay`, `.krt-modal`, `.krt-modal-head` or
+`.krt-modal-close` anywhere else). The page supplies the body:
+
+```html
+<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='x-modal', titleKey='x.title',
+    variant='krt-modal--wide', body=~{::x-modal-body})}">
+    <th:block th:ref="x-modal-body">
+        <form …><div class="krt-modal-body">…</div><div class="krt-modal-foot">…</div></form>
+    </th:block>
+</th:block>
+```
+
+The optional parameters are `titleId` (a script retitles the dialog), `open` (server-rendered open
+state), `closeTrigger` (the ✕'s own handler; `''` when a script binds it by `closeClass`),
+`closeClass` and `closeId`. The wrapper's head comment documents each one. A condition or iteration
+goes on a `<th:block>` around the call. In a fragment file, name the body with its template
+(`~{fragments/x :: x-modal-body}`). A new dialog id also needs `DialogA11yE2eTest` to reach it, or an
+`UNREACHED` entry with the reason.
+
 ## Live update
 
 **Live update is a binding requirement: every part of the frontend must support live update to

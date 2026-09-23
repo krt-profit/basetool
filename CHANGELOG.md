@@ -68,6 +68,10 @@
   Missionsdaten, Lager-Eingabe und Auftrag anlegen sowie die gesperrten Felder in „Raffinerieauftrag
   anlegen“ erscheinen jetzt so, wie sie gestaltet waren.
 
+- **Alle Dialoge haben denselben Kopf.** Titel und Schließen-Kreuz (✕) sehen in jedem Dialog gleich
+  aus. Im Auftrag schließen Eintragung, Notiz, Übergabe, Item-Übergabe und Produktion jetzt auch
+  über das ✕ und mit Escape; beides tat dort bisher nichts.
+
 
 - **Webtool ↔ Backend: keine gzip-Kompression mehr auf der internen Verbindung.** Gemessen kostete
   sie auf dem internen Weg mehr Zeit, als die kleineren Antworten sparten; das Webtool fragt sie

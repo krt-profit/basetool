@@ -1,6 +1,6 @@
 # ADR-0177 — The app has exactly one dialog shape
 
-- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-09-14 (`0a7c1d592`).
+- **Status:** Accepted — implemented; amended 2026-09-23 (native `<dialog>`; one shell). *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-09-14 (`0a7c1d592`).
 - **Date:** 2026-09-14
 - **Deciders:** @greluc (pending)
 - **Related:** specs [`REQ-UI-013`](../specs/ui-design-system.md) (amended here) ·
@@ -169,3 +169,29 @@ Rejected: moving the ninety hand-written shells onto `fragments/modal-wrapper.ht
 change. The behaviour they duplicated is gone; the markup they still duplicate would change on
 every one of them (heading level, close glyph, ids that scripts and tests address) for no
 behavioural gain. Left as an owner decision.
+
+## Amendment 2026-09-23 (later the same day) — one shell: every dialog is rendered by the wrapper
+
+The owner decided the question the first amendment left open: all hand-written shells move onto
+`fragments/modal-wrapper.html`. The "no behavioural gain" above turned out to be wrong. Five
+order-detail dialogs had an ✕ with `close-modal-display` but no `data-modal-id`, so the ✕ closed
+nothing, and Escape (which clicks the ✕) closed nothing either. A shell written once cannot carry
+that mistake.
+
+- **One fragment, no signature.** `modal-wrapper :: modal` takes named parameters (`modalId`,
+  `titleKey`, `body`; optionally `variant`, `titleId`, `open`, `closeTrigger`, `closeClass`,
+  `closeId`), so each of 101 calls names only what it needs. The body is a `th:ref` block inside the
+  call. A condition or iteration wraps the call in a `<th:block>`. A script converted 94 shells and
+  refused anything it could not map. For six of the seven it refused, the unmappable hooks were moved
+  by hand first; the seventh, the bank movement fragment, was converted by hand.
+- **The design system's head.** `<h2>` and the ✕ `.krt-modal-close` everywhere. The accessible name
+  moved onto the `<dialog>`: `aria-labelledby` the heading when a script retitles it, else
+  `aria-label`. A `role="dialog"` frame inside a native dialog announced the dialog twice.
+- **Ids kept; five hooks moved.** No dialog id changed. The attributes the shell could not carry moved:
+  onto the body's form (hangar titles, mission unit presets), or to page-scoped ✕ classes
+  (Materialbörse, Materialgesuch, Leitung), with their scripts adjusted. Class hooks nothing reads
+  were dropped.
+- **Guarded in text and in the browser.** `SingleModalShapeTest` fails on a shell class outside the
+  wrapper. `ModalWrapperRenderTest` renders every parameter shape. `DialogA11yE2eTest` walks every
+  page route plus seeded detail pages and runs the contract on every dialog it finds. A declared
+  dialog it cannot reach must be listed with its reason.

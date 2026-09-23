@@ -125,7 +125,9 @@ Two binding rules shape every UI change:
 - **One dialog contract on native `<dialog>`s** (FE-SIMP-04/04b, 2026-09-23). Every
   `.krt-modal-overlay` is a `<dialog>` opened by `window.krtModal` with `showModal()`: top layer,
   inert page, Escape, focus in and back. Transient overlays go into the open dialog
-  (`krtModal.layerRoot()`). (REQ-UI-013, ADR-0177, `DialogA11yE2eTest`.)
+  (`krtModal.layerRoot()`). Every dialog is rendered by `fragments/modal-wrapper :: modal` (one
+  shell: `<h2>` and ✕; the page supplies the body), and `DialogA11yE2eTest` runs the contract on
+  every dialog it can reach. (REQ-UI-013, ADR-0177, `SingleModalShapeTest`.)
 - **The cascade layer decides, not the load order** (FE-MOD-02, 2026-09-23). Every stylesheet
   declares `@layer base, components, page, migration, utilities;` and keeps its rules inside its
   layer: page CSS beats the design system without specificity bumps, a migrated inline class beats
