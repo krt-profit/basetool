@@ -2,155 +2,159 @@
  * (FE-PERF-02). Linked in the same place the block stood, so the cascade order is
  * unchanged. */
 
-.data-section {
-    margin-bottom: 3rem;
-}
-.form-group label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-family: var(--font-body);
-    font-size: 0.9rem;
-    font-weight: 700;
-}
-/* Checkboxes (the ship modal's "Fitted" toggle) and radios are excluded: width:100% +
+@layer base, components, page, migration, utilities;
+
+@layer page {
+    .data-section {
+        margin-bottom: 3rem;
+    }
+    .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-family: var(--font-body);
+        font-size: 0.9rem;
+        font-weight: 700;
+    }
+    /* Checkboxes (the ship modal's "Fitted" toggle) and radios are excluded: width:100% +
        the 0.5rem padding would deform the 1.2rem KRT squares (styles.css). The exclusions
        sit in :where() so they add ZERO specificity — the rule keeps the plain `.form-group
        input` weight (0,1,1) and stays below the (0,2,0) combobox rule `.krt-combobox
        .krt-combobox__input`. The page's old checkbox-only width:auto override is removed:
        it only restored the width, and with the exclusion in place its (0,2,1) weight would
        instead shrink the global 1.2rem square. */
-.form-group input:where(:not([type='checkbox']):not([type='radio'])),
-.form-group select,
-.form-group textarea {
-    width: 100%;
-    padding: 0.5rem;
-    background-color: var(--color-surface-input);
-    border: 1px solid var(--color-gray-3);
-    color: var(--color-gray-1);
-    font-family: var(--font-body);
-    box-sizing: border-box;
-}
-#ship-modal .btn {
-    font-family: var(--font-body);
-    font-weight: 700;
-}
-/* ---- Fleetview Import Section ---- */
-.import-section {
-    margin-top: 2rem;
-}
-.import-section .form-row {
-    display: flex;
-    align-items: flex-end;
-    gap: 1rem;
-    flex-wrap: wrap;
-}
-.import-section .form-row .form-group {
-    flex: 1 1 260px;
-    margin-bottom: 0;
-}
-.import-section .form-row .btn {
-    flex-shrink: 0;
-    min-height: 44px;
-}
-.import-status-msg {
-    margin-top: 0.75rem;
-    font-family: var(--font-body);
-    font-size: 0.9rem;
-    color: var(--color-primary);
-}
-/* Import result modal */
-#import-result-modal .stat-row {
-    display: flex;
-    justify-content: space-between;
-    border-bottom: 1px solid var(--color-gray-3);
-    padding: 0.4rem 0;
-    font-family: var(--font-body);
-}
-#import-result-modal .stat-row span:first-child {
-    color: var(--color-gray-1);
-}
-#import-result-modal .stat-row span:last-child {
-    /* Result counts read as bright-neutral DATA (like .stat-value), not as
-           an action — orange is reserved for action + identity. */
-    color: var(--color-white);
-    font-weight: 700;
-}
-#import-result-modal .skip-list {
-    margin-top: 0.75rem;
-    max-height: 200px;
-    overflow-y: auto;
-    border: 1px solid var(--color-gray-3);
-    padding: 0.5rem;
-    font-family: var(--font-body);
-    font-size: 0.85rem;
-}
-#import-result-modal .skip-list p {
-    margin: 0.2rem 0;
-    color: var(--color-gray-2-text);
-}
-@media (width <= 768px) {
+    .form-group input:where(:not([type='checkbox']):not([type='radio'])),
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 0.5rem;
+        background-color: var(--color-surface-input);
+        border: 1px solid var(--color-gray-3);
+        color: var(--color-gray-1);
+        font-family: var(--font-body);
+        box-sizing: border-box;
+    }
+    #ship-modal .btn {
+        font-family: var(--font-body);
+        font-weight: 700;
+    }
+    /* ---- Fleetview Import Section ---- */
+    .import-section {
+        margin-top: 2rem;
+    }
     .import-section .form-row {
-        flex-direction: column;
+        display: flex;
+        align-items: flex-end;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+    .import-section .form-row .form-group {
+        flex: 1 1 260px;
+        margin-bottom: 0;
     }
     .import-section .form-row .btn {
-        width: 100%;
+        flex-shrink: 0;
+        min-height: 44px;
     }
-}
-/* ---- Delete All Ships Section ---- */
-.delete-all-section {
-    margin-top: 1.5rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid var(--color-gray-3);
-}
-.delete-all-section .delete-all-row {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    flex-wrap: wrap;
-}
-.delete-all-section .delete-all-row p {
-    margin: 0;
-    flex: 1 1 200px;
-    color: var(--color-gray-2-text);
-    font-family: var(--font-body);
-    font-size: 0.9rem;
-}
-.delete-all-section .delete-all-row .btn-danger {
-    flex-shrink: 0;
-    min-height: 44px;
-}
-@media (width <= 768px) {
+    .import-status-msg {
+        margin-top: 0.75rem;
+        font-family: var(--font-body);
+        font-size: 0.9rem;
+        color: var(--color-primary);
+    }
+    /* Import result modal */
+    #import-result-modal .stat-row {
+        display: flex;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--color-gray-3);
+        padding: 0.4rem 0;
+        font-family: var(--font-body);
+    }
+    #import-result-modal .stat-row span:first-child {
+        color: var(--color-gray-1);
+    }
+    #import-result-modal .stat-row span:last-child {
+        /* Result counts read as bright-neutral DATA (like .stat-value), not as
+           an action — orange is reserved for action + identity. */
+        color: var(--color-white);
+        font-weight: 700;
+    }
+    #import-result-modal .skip-list {
+        margin-top: 0.75rem;
+        max-height: 200px;
+        overflow-y: auto;
+        border: 1px solid var(--color-gray-3);
+        padding: 0.5rem;
+        font-family: var(--font-body);
+        font-size: 0.85rem;
+    }
+    #import-result-modal .skip-list p {
+        margin: 0.2rem 0;
+        color: var(--color-gray-2-text);
+    }
+    @media (width <= 768px) {
+        .import-section .form-row {
+            flex-direction: column;
+        }
+        .import-section .form-row .btn {
+            width: 100%;
+        }
+    }
+    /* ---- Delete All Ships Section ---- */
+    .delete-all-section {
+        margin-top: 1.5rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--color-gray-3);
+    }
     .delete-all-section .delete-all-row {
-        flex-direction: column;
-        align-items: stretch;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+    .delete-all-section .delete-all-row p {
+        margin: 0;
+        flex: 1 1 200px;
+        color: var(--color-gray-2-text);
+        font-family: var(--font-body);
+        font-size: 0.9rem;
     }
     .delete-all-section .delete-all-row .btn-danger {
-        width: 100%;
+        flex-shrink: 0;
+        min-height: 44px;
     }
-}
-/* ---- Server-side ship-type filter above the table ---- */
-.hangar-filter-form {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 1.25rem;
-}
-.hangar-filter {
-    position: relative;
-    width: 360px;
-    max-width: 100%;
-}
-.hangar-filter .hangar-filter-icon {
-    position: absolute;
-    left: 0.85rem;
-    top: 50%;
-    transform: translateY(-50%);
-    display: inline-flex;
-    color: var(--color-gray-2-text);
-    pointer-events: none;
-}
-.hangar-filter input[type='search'] {
-    width: 100%;
-    padding-left: 2.6rem;
+    @media (width <= 768px) {
+        .delete-all-section .delete-all-row {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .delete-all-section .delete-all-row .btn-danger {
+            width: 100%;
+        }
+    }
+    /* ---- Server-side ship-type filter above the table ---- */
+    .hangar-filter-form {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 1.25rem;
+    }
+    .hangar-filter {
+        position: relative;
+        width: 360px;
+        max-width: 100%;
+    }
+    .hangar-filter .hangar-filter-icon {
+        position: absolute;
+        left: 0.85rem;
+        top: 50%;
+        transform: translateY(-50%);
+        display: inline-flex;
+        color: var(--color-gray-2-text);
+        pointer-events: none;
+    }
+    .hangar-filter input[type='search'] {
+        width: 100%;
+        padding-left: 2.6rem;
+    }
 }

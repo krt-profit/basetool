@@ -2,72 +2,76 @@
  * (FE-PERF-02). Linked in the same place the block stood, so the cascade order is
  * unchanged. */
 
-.details-row {
-    display: none;
-}
-/* Toggled per row by the inline details handler below. A
+@layer base, components, page, migration, utilities;
+
+@layer page {
+    .details-row {
+        display: none;
+    }
+    /* Toggled per row by the inline details handler below. A
    tr:has(details[open]) sibling rule here forced a style recalculation
    across the whole table on every expand and visibly janked the UI
    (same fix as blueprint-overview, REQ-INV-012). */
-.details-row.sq-expanded {
-    display: table-row;
-}
-.details-row td {
-    border-left: 2px solid var(--color-primary) !important;
-    padding: 0 !important;
-    background-color: rgba(0, 0, 0, 0.1);
-}
-.sub-table {
-    width: 100%;
-    margin: 0;
-    border-collapse: collapse;
-    border: none !important;
-}
-.sub-table th {
-    background-color: rgba(231, 126, 35, 0.05) !important;
-    color: var(--color-gray-1) !important;
-    font-family: var(--font-headline) !important;
-    font-size: 0.7rem !important;
-    letter-spacing: 0.05em;
-    padding: 0.5rem 1rem !important;
-    border-bottom: 1px solid rgba(231, 126, 35, 0.2) !important;
-    text-transform: uppercase;
-}
-.sub-table td {
-    padding: 0.5rem 1rem !important;
-    font-size: 0.85rem !important;
-    border-bottom: 1px solid var(--color-gray-3) !important;
-    color: var(--color-gray-1) !important;
-}
-.sub-table tr:last-child td {
-    border-bottom: none !important;
-}
-.sub-table tr:hover {
-    background-color: rgba(231, 126, 35, 0.05) !important;
-}
-/* ---- Server-side ship-type filter above the table ---- */
-.squadron-filter-form {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 1.25rem;
-}
-.hangar-filter {
-    position: relative;
-    width: 360px;
-    max-width: 100%;
-}
-.hangar-filter .hangar-filter-icon {
-    position: absolute;
-    left: 0.85rem;
-    top: 50%;
-    transform: translateY(-50%);
-    display: inline-flex;
-    color: var(--color-gray-2-text);
-    pointer-events: none;
-}
-.hangar-filter input[type='search'] {
-    width: 100%;
-    padding-left: 2.6rem;
+    .details-row.sq-expanded {
+        display: table-row;
+    }
+    .details-row td {
+        border-left: 2px solid var(--color-primary);
+        padding: 0;
+        background-color: rgba(0, 0, 0, 0.1);
+    }
+    .sub-table {
+        width: 100%;
+        margin: 0;
+        border-collapse: collapse;
+        border: none;
+    }
+    .sub-table th {
+        background-color: rgba(231, 126, 35, 0.05);
+        color: var(--color-gray-1);
+        font-family: var(--font-headline);
+        font-size: 0.7rem;
+        letter-spacing: 0.05em;
+        padding: 0.5rem 1rem;
+        border-bottom: 1px solid rgba(231, 126, 35, 0.2);
+        text-transform: uppercase;
+    }
+    .sub-table td {
+        padding: 0.5rem 1rem;
+        font-size: 0.85rem;
+        border-bottom: 1px solid var(--color-gray-3);
+        color: var(--color-gray-1);
+    }
+    .sub-table tr:last-child td {
+        border-bottom: none;
+    }
+    .sub-table tr:hover {
+        background-color: rgba(231, 126, 35, 0.05);
+    }
+    /* ---- Server-side ship-type filter above the table ---- */
+    .squadron-filter-form {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 1.25rem;
+    }
+    .hangar-filter {
+        position: relative;
+        width: 360px;
+        max-width: 100%;
+    }
+    .hangar-filter .hangar-filter-icon {
+        position: absolute;
+        left: 0.85rem;
+        top: 50%;
+        transform: translateY(-50%);
+        display: inline-flex;
+        color: var(--color-gray-2-text);
+        pointer-events: none;
+    }
+    .hangar-filter input[type='search'] {
+        width: 100%;
+        padding-left: 2.6rem;
+    }
 }

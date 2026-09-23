@@ -2,74 +2,78 @@
  * (FE-PERF-02). Linked in the same place the block stood, so the cascade order is
  * unchanged. */
 
-.details-row {
-    display: none;
-}
-/* Toggled per row by blueprint-overview.js. A tr:has(details[open]) sibling
+@layer base, components, page, migration, utilities;
+
+@layer page {
+    .details-row {
+        display: none;
+    }
+    /* Toggled per row by blueprint-overview.js. A tr:has(details[open]) sibling
    rule here forced a style recalculation across the whole (up to 1000-row)
    table on every expand and visibly janked the UI (REQ-INV-012). */
-.details-row.bp-expanded {
-    display: table-row;
-}
-.details-row td {
-    border-left: 2px solid var(--color-primary) !important;
-    padding: 0 !important;
-    background-color: rgba(0, 0, 0, 0.1);
-}
-.bp-owners-panel {
-    padding: 0.75rem 1rem;
-}
-.bp-owners-loading,
-.bp-owners-empty,
-.bp-owners-error {
-    font-size: 0.85rem;
-    color: var(--color-gray-2-text);
-}
-.bp-owners-error {
-    color: var(--color-danger);
-}
-.bp-owners-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-}
-.bp-owners-list .bp-owner {
-    padding: 0.2rem 0.6rem;
-    font-size: 0.85rem;
-    color: var(--color-gray-1);
-    background-color: rgba(231, 126, 35, 0.08);
-    border: 1px solid rgba(231, 126, 35, 0.25);
-}
-/* Discreet marker for an owner shown only via global blueprint sharing
+    .details-row.bp-expanded {
+        display: table-row;
+    }
+    .details-row td {
+        border-left: 2px solid var(--color-primary);
+        padding: 0;
+        background-color: rgba(0, 0, 0, 0.1);
+    }
+    .bp-owners-panel {
+        padding: 0.75rem 1rem;
+    }
+    .bp-owners-loading,
+    .bp-owners-empty,
+    .bp-owners-error {
+        font-size: 0.85rem;
+        color: var(--color-gray-2-text);
+    }
+    .bp-owners-error {
+        color: var(--color-danger);
+    }
+    .bp-owners-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+    }
+    .bp-owners-list .bp-owner {
+        padding: 0.2rem 0.6rem;
+        font-size: 0.85rem;
+        color: var(--color-gray-1);
+        background-color: rgba(231, 126, 35, 0.08);
+        border: 1px solid rgba(231, 126, 35, 0.25);
+    }
+    /* Discreet marker for an owner shown only via global blueprint sharing
    (REQ-INV-018) — not a member of the caller's oversight org unit. */
-.bp-owners-list .bp-owner-external {
-    margin-left: 0.4rem;
-    color: var(--color-gray-2-text);
-    font-size: 0.78rem;
-    font-style: italic;
-}
-.bp-owner-count {
-    font-weight: 700;
-}
-/* ---- Blueprint live filter ---- */
-.bp-filter {
-    position: relative;
-    max-width: 360px;
-    margin-bottom: 1.25rem;
-}
-.bp-filter .bp-filter-icon {
-    position: absolute;
-    left: 0.85rem;
-    top: 50%;
-    transform: translateY(-50%);
-    display: inline-flex;
-    color: var(--color-gray-2-text);
-    pointer-events: none;
-}
-.bp-filter input[type='search'] {
-    width: 100%;
-    padding-left: 2.6rem;
+    .bp-owners-list .bp-owner-external {
+        margin-left: 0.4rem;
+        color: var(--color-gray-2-text);
+        font-size: 0.78rem;
+        font-style: italic;
+    }
+    .bp-owner-count {
+        font-weight: 700;
+    }
+    /* ---- Blueprint live filter ---- */
+    .bp-filter {
+        position: relative;
+        max-width: 360px;
+        margin-bottom: 1.25rem;
+    }
+    .bp-filter .bp-filter-icon {
+        position: absolute;
+        left: 0.85rem;
+        top: 50%;
+        transform: translateY(-50%);
+        display: inline-flex;
+        color: var(--color-gray-2-text);
+        pointer-events: none;
+    }
+    .bp-filter input[type='search'] {
+        width: 100%;
+        padding-left: 2.6rem;
+    }
 }

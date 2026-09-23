@@ -2,210 +2,214 @@
  * (FE-PERF-02). Linked in the same place the block stood, so the cascade order is
  * unchanged. */
 
-.data-section {
-    margin-bottom: 3rem;
-}
-.form-group label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-family: var(--font-body);
-    font-size: 0.8rem;
-}
-/* Checkboxes and radios are excluded: width:100% + the padding would stretch the 1.2rem
+@layer base, components, page, migration, utilities;
+
+@layer page {
+    .data-section {
+        margin-bottom: 3rem;
+    }
+    .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-family: var(--font-body);
+        font-size: 0.8rem;
+    }
+    /* Checkboxes and radios are excluded: width:100% + the padding would stretch the 1.2rem
    KRT squares (styles.css) full-width. The exclusions sit in :where() so they add ZERO
    specificity — the rule keeps the plain `.form-group input` weight (0,1,1) and stays
    below the (0,2,0) combobox rule `.krt-combobox .krt-combobox__input`. No .form-group
    checkbox/radio exists here today; the exclusion closes the latent trap that broke
    admin/materials when its flag checkboxes were added later. */
-.form-group input:where(:not([type='checkbox']):not([type='radio'])),
-.form-group select,
-.form-group textarea {
-    width: 100%;
-    padding: 0.5rem;
-    background-color: var(--color-surface-input);
-    border: 1px solid var(--color-gray-3);
-    color: var(--color-gray-1);
-    font-family: var(--font-body);
-    box-sizing: border-box;
-}
-/* Active state for the segmented override buttons (UEX / Yes / No).
+    .form-group input:where(:not([type='checkbox']):not([type='radio'])),
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 0.5rem;
+        background-color: var(--color-surface-input);
+        border: 1px solid var(--color-gray-3);
+        color: var(--color-gray-1);
+        font-family: var(--font-body);
+        box-sizing: border-box;
+    }
+    /* Active state for the segmented override buttons (UEX / Yes / No).
    Strong orange fill plus an inset bright-orange ring makes the currently
    selected variant unmistakable next to its muted gray siblings. */
-.btn-active {
-    background-color: var(--color-primary);
-    color: var(--color-bg-black);
-    box-shadow: inset 0 0 0 2px var(--color-accent-light);
-    cursor: default;
-}
-.btn-active:hover {
-    background-color: var(--color-primary);
-    color: var(--color-bg-black);
-}
-/* UEX-source chip mirrors the terminals page: "UEX: yes/no/–" foot label
+    .btn-active {
+        background-color: var(--color-primary);
+        color: var(--color-bg-black);
+        box-shadow: inset 0 0 0 2px var(--color-accent-light);
+        cursor: default;
+    }
+    .btn-active:hover {
+        background-color: var(--color-primary);
+        color: var(--color-bg-black);
+    }
+    /* UEX-source chip mirrors the terminals page: "UEX: yes/no/–" foot label
    under the segmented control, with an amber tint when the on-screen
    override disagrees with the most recent UEX sweep. */
-.uex-source-chip {
-    display: flex;
-    align-items: baseline;
-    gap: 0.35rem;
-    margin-top: 0.35rem;
-    font-family: var(--font-body);
-    font-size: 0.7rem;
-    line-height: 1;
-    color: var(--color-gray-1);
-}
-.uex-source-chip .uex-source-chip__label {
-    color: var(--color-gray-2-text);
-    font-family: var(--font-body);
-    letter-spacing: 0.04em;
-}
-.uex-source-chip .uex-source-chip__value {
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-}
-.uex-source-chip.mismatch .uex-source-chip__value {
-    color: var(--color-accent-light);
-}
-.uex-source-chip .uex-source-chip__value.unknown {
-    color: var(--color-gray-2-text);
-    font-style: italic;
-    text-transform: none;
-    letter-spacing: 0;
-}
-/* Global "last UEX sweep" stamp + summary chips at the top. Visually
+    .uex-source-chip {
+        display: flex;
+        align-items: baseline;
+        gap: 0.35rem;
+        margin-top: 0.35rem;
+        font-family: var(--font-body);
+        font-size: 0.7rem;
+        line-height: 1;
+        color: var(--color-gray-1);
+    }
+    .uex-source-chip .uex-source-chip__label {
+        color: var(--color-gray-2-text);
+        font-family: var(--font-body);
+        letter-spacing: 0.04em;
+    }
+    .uex-source-chip .uex-source-chip__value {
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+    }
+    .uex-source-chip.mismatch .uex-source-chip__value {
+        color: var(--color-accent-light);
+    }
+    .uex-source-chip .uex-source-chip__value.unknown {
+        color: var(--color-gray-2-text);
+        font-style: italic;
+        text-transform: none;
+        letter-spacing: 0;
+    }
+    /* Global "last UEX sweep" stamp + summary chips at the top. Visually
    quiet (gray-1, small caps label) so they sit alongside the H1 without
    competing with it. */
-.uex-sync-stamp {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 0.4rem;
-    margin-top: 0.6rem;
-    font-family: var(--font-body);
-    font-size: 0.8rem;
-    color: var(--color-gray-1);
-}
-.uex-sync-stamp__label {
-    color: var(--color-gray-2-text);
-    font-family: var(--font-body);
-    font-size: 0.7rem;
-    letter-spacing: 0.06em;
-}
-.uex-sync-stamp__value.unknown {
-    color: var(--color-gray-2-text);
-    font-style: italic;
-}
-.uex-summary-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    margin-top: 0.6rem;
-    font-family: var(--font-body);
-    font-size: 0.8rem;
-}
-.uex-summary-chips .chip {
-    color: var(--color-gray-1);
-}
-.uex-summary-chips .chip strong {
-    color: var(--data-fg);
-    font-family: var(--font-body);
-    margin-right: 0.3rem;
-}
-/* Hierarchical disclosure styling. <details>/<summary> is the native
+    .uex-sync-stamp {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 0.4rem;
+        margin-top: 0.6rem;
+        font-family: var(--font-body);
+        font-size: 0.8rem;
+        color: var(--color-gray-1);
+    }
+    .uex-sync-stamp__label {
+        color: var(--color-gray-2-text);
+        font-family: var(--font-body);
+        font-size: 0.7rem;
+        letter-spacing: 0.06em;
+    }
+    .uex-sync-stamp__value.unknown {
+        color: var(--color-gray-2-text);
+        font-style: italic;
+    }
+    .uex-summary-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-top: 0.6rem;
+        font-family: var(--font-body);
+        font-size: 0.8rem;
+    }
+    .uex-summary-chips .chip {
+        color: var(--color-gray-1);
+    }
+    .uex-summary-chips .chip strong {
+        color: var(--data-fg);
+        font-family: var(--font-body);
+        margin-right: 0.3rem;
+    }
+    /* Hierarchical disclosure styling. <details>/<summary> is the native
    accessible disclosure widget — keyboard- and screen-reader-friendly
    out of the box; we only restyle the marker and chrome to fit the
    KRT HUD palette. */
-details.uex-system,
-details.uex-parent {
-    border: 1px solid var(--color-gray-3);
-    background-color: var(--color-surface-input);
-    margin-bottom: 1.25rem;
-}
-details.uex-system > summary,
-details.uex-parent > summary {
-    cursor: pointer;
-    list-style: none;
-    padding: 0.75rem 1rem;
-    color: var(--color-gray-1);
-    font-family: var(--font-headline);
-    letter-spacing: 0.04em;
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-}
-details.uex-system > summary::-webkit-details-marker,
-details.uex-parent > summary::-webkit-details-marker {
-    display: none;
-}
-details.uex-system > summary::before,
-details.uex-parent > summary::before {
-    content: '\25B6';
-    color: var(--color-primary);
-    font-size: 0.7rem;
-    transition: transform 0.15s ease-out;
-    display: inline-block;
-}
-details[open].uex-system > summary::before,
-details[open].uex-parent > summary::before {
-    transform: rotate(90deg);
-}
-details.uex-system > .uex-system-body,
-details.uex-parent > .uex-parent-body {
-    padding: 0.5rem 1rem 1rem 1rem;
-}
-details.uex-system > summary {
-    font-size: 1.05rem;
-}
-details.uex-parent > summary {
-    font-size: 0.95rem;
-}
-details.uex-parent {
-    background-color: var(--color-bg-black);
-}
-.uex-subsection-title {
-    color: var(--color-primary);
-    font-family: var(--font-headline);
-    font-size: 0.85rem;
-    letter-spacing: 0.04em;
-    margin: 1.25rem 0 0.5rem 0;
-    text-transform: uppercase;
-}
-.uex-empty-hint {
-    color: var(--color-gray-2-text);
-    font-style: italic;
-    font-size: 0.85rem;
-    margin: 0.25rem 0 0.75rem 0;
-}
-.uex-system-counts {
-    margin-left: auto;
-    font-family: var(--font-body);
-    font-size: 0.8rem;
-    color: var(--color-gray-1);
-    letter-spacing: 0;
-    text-transform: none;
-}
-.uex-system-counts strong {
-    color: var(--data-fg);
-    margin-right: 0.25rem;
-}
-.uex-parent-counts {
-    font-family: var(--font-body);
-    color: var(--color-gray-2-text);
-    letter-spacing: 0;
-    text-transform: none;
-    font-size: 0.8rem;
-}
-/* Parent-row summary lays out [name • planet] on the left and the
+    details.uex-system,
+    details.uex-parent {
+        border: 1px solid var(--color-gray-3);
+        background-color: var(--color-surface-input);
+        margin-bottom: 1.25rem;
+    }
+    details.uex-system > summary,
+    details.uex-parent > summary {
+        cursor: pointer;
+        list-style: none;
+        padding: 0.75rem 1rem;
+        color: var(--color-gray-1);
+        font-family: var(--font-headline);
+        letter-spacing: 0.04em;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+    details.uex-system > summary::-webkit-details-marker,
+    details.uex-parent > summary::-webkit-details-marker {
+        display: none;
+    }
+    details.uex-system > summary::before,
+    details.uex-parent > summary::before {
+        content: '\25B6';
+        color: var(--color-primary);
+        font-size: 0.7rem;
+        transition: transform 0.15s ease-out;
+        display: inline-block;
+    }
+    details[open].uex-system > summary::before,
+    details[open].uex-parent > summary::before {
+        transform: rotate(90deg);
+    }
+    details.uex-system > .uex-system-body,
+    details.uex-parent > .uex-parent-body {
+        padding: 0.5rem 1rem 1rem 1rem;
+    }
+    details.uex-system > summary {
+        font-size: 1.05rem;
+    }
+    details.uex-parent > summary {
+        font-size: 0.95rem;
+    }
+    details.uex-parent {
+        background-color: var(--color-bg-black);
+    }
+    .uex-subsection-title {
+        color: var(--color-primary);
+        font-family: var(--font-headline);
+        font-size: 0.85rem;
+        letter-spacing: 0.04em;
+        margin: 1.25rem 0 0.5rem 0;
+        text-transform: uppercase;
+    }
+    .uex-empty-hint {
+        color: var(--color-gray-2-text);
+        font-style: italic;
+        font-size: 0.85rem;
+        margin: 0.25rem 0 0.75rem 0;
+    }
+    .uex-system-counts {
+        margin-left: auto;
+        font-family: var(--font-body);
+        font-size: 0.8rem;
+        color: var(--color-gray-1);
+        letter-spacing: 0;
+        text-transform: none;
+    }
+    .uex-system-counts strong {
+        color: var(--data-fg);
+        margin-right: 0.25rem;
+    }
+    .uex-parent-counts {
+        font-family: var(--font-body);
+        color: var(--color-gray-2-text);
+        letter-spacing: 0;
+        text-transform: none;
+        font-size: 0.8rem;
+    }
+    /* Parent-row summary lays out [name • planet] on the left and the
    override-button cluster on the right so toggling the disclosure is
    still a single click on the name. We stopPropagation on the form
    submits in the script below to keep the disclosure state stable
    when a button is clicked. */
-.uex-parent > summary .uex-parent-controls {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-.terminal-table {
-    width: 100%;
+    .uex-parent > summary .uex-parent-controls {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .terminal-table {
+        width: 100%;
+    }
 }

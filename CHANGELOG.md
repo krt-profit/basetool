@@ -63,6 +63,11 @@
   Fokus beim Öffnen in sein erstes Eingabefeld und gibt ihn beim Schließen an den auslösenden
   Knopf zurück; die Seite dahinter ist gesperrt, solange er offen ist (native `<dialog>`-Elemente).
 
+- **Kleine Darstellungskorrekturen durch die CSS-Ebenen.** Die Unterzeile im Seitenkopf der Bank-
+  und Log-Seiten, von Spezialkommandos und Organigramm, die Checkbox-Beschriftungen in
+  Missionsdaten, Lager-Eingabe und Auftrag anlegen sowie die gesperrten Felder in „Raffinerieauftrag
+  anlegen“ erscheinen jetzt so, wie sie gestaltet waren.
+
 
 - **Webtool ↔ Backend: keine gzip-Kompression mehr auf der internen Verbindung.** Gemessen kostete
   sie auf dem internen Weg mehr Zeit, als die kleineren Antworten sparten; das Webtool fragt sie

@@ -2,114 +2,117 @@
  * (FE-PERF-02). Linked in the same place the block stood, so the cascade order is
  * unchanged. */
 
-/* ================================================================
+@layer base, components, page, migration, utilities;
+
+@layer page {
+    /* ================================================================
    TOOLBAR (search, filters, bulk, expand/collapse, CSV, queue)
    ================================================================ */
-.pm-toolbar {
-    display: flex;
-    gap: 0.75rem;
-    align-items: center;
-    margin-bottom: 0.75rem;
-    flex-wrap: wrap;
-}
-.pm-toolbar .pm-search {
-    flex: 1 1 240px;
-    min-width: 180px;
-    max-width: 320px;
-}
-.pm-toolbar .pm-spacer {
-    flex: 1;
-}
-.pm-toolbar .btn-tiny {
-    padding: 0.4rem 0.75rem;
-    font-size: 0.75rem;
-    min-height: 38px;
-}
-.pm-filter-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.35rem 0.6rem;
-    border: 1px solid var(--color-gray-3);
-    background-color: var(--color-bg-dark-gray);
-    color: var(--color-gray-1);
-    font-size: 0.8rem;
-    cursor: pointer;
-    user-select: none;
-    min-height: 38px;
-    box-sizing: border-box;
-}
-.pm-filter-chip:has(input:checked) {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-}
-.pm-filter-chip input[type='checkbox'] {
-    width: 1rem;
-    height: 1rem;
-}
+    .pm-toolbar {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+        margin-bottom: 0.75rem;
+        flex-wrap: wrap;
+    }
+    .pm-toolbar .pm-search {
+        flex: 1 1 240px;
+        min-width: 180px;
+        max-width: 320px;
+    }
+    .pm-toolbar .pm-spacer {
+        flex: 1;
+    }
+    .pm-toolbar .btn-tiny {
+        padding: 0.4rem 0.75rem;
+        font-size: 0.75rem;
+        min-height: 38px;
+    }
+    .pm-filter-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.35rem 0.6rem;
+        border: 1px solid var(--color-gray-3);
+        background-color: var(--color-bg-dark-gray);
+        color: var(--color-gray-1);
+        font-size: 0.8rem;
+        cursor: pointer;
+        user-select: none;
+        min-height: 38px;
+        box-sizing: border-box;
+    }
+    .pm-filter-chip:has(input:checked) {
+        border-color: var(--color-primary);
+        color: var(--color-primary);
+    }
+    .pm-filter-chip input[type='checkbox'] {
+        width: 1rem;
+        height: 1rem;
+    }
 
-/*
+    /*
  * Queue indicator: small spinner + counter shown while saves are
  * in flight. We piggy-back on the global .krt-spinner styling so
  * the rotation animation, sizing and colour palette stay in sync.
  */
-.pm-queue-indicator {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.25rem 0.6rem;
-    border: 1px solid var(--color-primary);
-    color: var(--color-primary);
-    font-family: var(--font-headline);
-    text-transform: uppercase;
-    font-size: 0.7rem;
-    letter-spacing: 0.05em;
-    min-height: 38px;
-}
-.pm-queue-indicator[hidden] {
-    display: none;
-}
-.pm-queue-indicator .krt-spinner {
-    width: 14px;
-    height: 14px;
-    border-width: 2px;
-}
+    .pm-queue-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.25rem 0.6rem;
+        border: 1px solid var(--color-primary);
+        color: var(--color-primary);
+        font-family: var(--font-headline);
+        text-transform: uppercase;
+        font-size: 0.7rem;
+        letter-spacing: 0.05em;
+        min-height: 38px;
+    }
+    .pm-queue-indicator[hidden] {
+        display: none;
+    }
+    .pm-queue-indicator .krt-spinner {
+        width: 14px;
+        height: 14px;
+        border-width: 2px;
+    }
 
-/* ================================================================
+    /* ================================================================
    BULK-EDIT PANEL (visible while ≥1 row checkbox is checked)
    ================================================================ */
-.pm-bulk-panel {
-    display: none;
-    gap: 0.5rem;
-    align-items: center;
-    flex-wrap: wrap;
-    padding: 0.6rem 0.75rem;
-    margin-bottom: 0.75rem;
-    border: 1px solid var(--color-primary);
-    background-color: rgba(231, 126, 35, 0.06);
-}
-.pm-bulk-panel.visible {
-    display: flex;
-}
-.pm-bulk-count {
-    font-family: var(--font-headline);
-    text-transform: uppercase;
-    font-size: 0.75rem;
-    color: var(--color-primary);
-    letter-spacing: 0.05em;
-    margin-right: 0.5rem;
-}
-.pm-bulk-panel select {
-    min-width: 11rem;
-    min-height: 38px;
-    font-size: 0.85rem;
-    padding: 0.3rem 1.75rem 0.3rem 0.5rem;
-}
+    .pm-bulk-panel {
+        display: none;
+        gap: 0.5rem;
+        align-items: center;
+        flex-wrap: wrap;
+        padding: 0.6rem 0.75rem;
+        margin-bottom: 0.75rem;
+        border: 1px solid var(--color-primary);
+        background-color: rgba(231, 126, 35, 0.06);
+    }
+    .pm-bulk-panel.visible {
+        display: flex;
+    }
+    .pm-bulk-count {
+        font-family: var(--font-headline);
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        color: var(--color-primary);
+        letter-spacing: 0.05em;
+        margin-right: 0.5rem;
+    }
+    .pm-bulk-panel select {
+        min-width: 11rem;
+        min-height: 38px;
+        font-size: 0.85rem;
+        padding: 0.3rem 1.75rem 0.3rem 0.5rem;
+    }
 
-/* ================================================================
+    /* ================================================================
    SCROLL VIEWPORT & MATRIX TABLE
    ================================================================ */
-/*
+    /*
  * Vertical AND horizontal scroll happen inside this wrapper, NOT on
  * the page itself — that is what makes `position: sticky` actually
  * stick. Without a bounded max-height the browser cannot scroll the
@@ -129,144 +132,144 @@
  * column-stacked (taller) mobile footer. Mirrors the .table-wrapper cap
  * in materials-overview.css / materials-profit-calculation.html.
  */
-.pm-matrix-wrapper {
-    overflow: auto;
-    /* The viewport term and its dvh fallback are --krt-panel-viewport-rest in
+    .pm-matrix-wrapper {
+        overflow: auto;
+        /* The viewport term and its dvh fallback are --krt-panel-viewport-rest in
        styles.css; 25rem is this panel's own reserve for the chrome above it. */
-    max-height: max(16rem, calc(var(--krt-panel-viewport-rest) - 25rem));
-    border: 1px solid var(--color-gray-3);
-    background-color: var(--color-bg-dark-gray);
-}
-.pm-matrix {
-    width: max-content;
-    border-collapse: separate;
-    border-spacing: 0;
-    margin-top: 0;
-    background-color: var(--color-bg-dark-gray);
-}
-.pm-matrix th,
-.pm-matrix td {
-    padding: 0.5rem 0.75rem;
-    text-align: left;
-    border-bottom: 1px solid var(--color-gray-3);
-    border-right: 1px solid var(--color-gray-3);
-    vertical-align: middle;
-    background-color: var(--color-bg-dark-gray);
-    background-clip: padding-box;
-}
-.pm-matrix tbody tr:hover td {
-    background-color: var(--color-surface-input);
-}
-.pm-matrix tbody tr:hover .pm-checkbox-cell,
-.pm-matrix tbody tr:hover .pm-member-cell,
-.pm-matrix tbody tr:hover .pm-eligibility-cell {
-    background-color: var(--color-surface-input);
-}
-.pm-matrix tbody tr.pm-row-selected td {
-    background-color: rgba(231, 126, 35, 0.06);
-}
-.pm-matrix tbody tr.pm-row-selected .pm-checkbox-cell,
-.pm-matrix tbody tr.pm-row-selected .pm-member-cell,
-.pm-matrix tbody tr.pm-row-selected .pm-eligibility-cell {
-    background-color: rgba(231, 126, 35, 0.06);
-}
+        max-height: max(16rem, calc(var(--krt-panel-viewport-rest) - 25rem));
+        border: 1px solid var(--color-gray-3);
+        background-color: var(--color-bg-dark-gray);
+    }
+    .pm-matrix {
+        width: max-content;
+        border-collapse: separate;
+        border-spacing: 0;
+        margin-top: 0;
+        background-color: var(--color-bg-dark-gray);
+    }
+    .pm-matrix th,
+    .pm-matrix td {
+        padding: 0.5rem 0.75rem;
+        text-align: left;
+        border-bottom: 1px solid var(--color-gray-3);
+        border-right: 1px solid var(--color-gray-3);
+        vertical-align: middle;
+        background-color: var(--color-bg-dark-gray);
+        background-clip: padding-box;
+    }
+    .pm-matrix tbody tr:hover td {
+        background-color: var(--color-surface-input);
+    }
+    .pm-matrix tbody tr:hover .pm-checkbox-cell,
+    .pm-matrix tbody tr:hover .pm-member-cell,
+    .pm-matrix tbody tr:hover .pm-eligibility-cell {
+        background-color: var(--color-surface-input);
+    }
+    .pm-matrix tbody tr.pm-row-selected td {
+        background-color: rgba(231, 126, 35, 0.06);
+    }
+    .pm-matrix tbody tr.pm-row-selected .pm-checkbox-cell,
+    .pm-matrix tbody tr.pm-row-selected .pm-member-cell,
+    .pm-matrix tbody tr.pm-row-selected .pm-eligibility-cell {
+        background-color: rgba(231, 126, 35, 0.06);
+    }
 
-/* Sticky header rows. Two-row header: topic group on top, categories beneath. */
-.pm-matrix thead tr.pm-row-topic th {
-    position: sticky;
-    top: 0;
-    z-index: 20;
-    background-color: var(--color-surface-input);
-    color: var(--color-primary);
-    font-family: var(--font-headline);
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    border-bottom: 1px solid var(--color-primary);
-    text-align: center;
-}
-.pm-matrix thead tr.pm-row-category th {
-    position: sticky;
-    top: 2.55rem; /* height of the topic row */
-    z-index: 20;
-    background-color: var(--color-surface-input);
-    color: var(--color-primary);
-    font-family: var(--font-body);
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    border-bottom: 2px solid var(--color-primary);
-    white-space: normal;
-    line-height: 1.2;
-}
+    /* Sticky header rows. Two-row header: topic group on top, categories beneath. */
+    .pm-matrix thead tr.pm-row-topic th {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        background-color: var(--color-surface-input);
+        color: var(--color-primary);
+        font-family: var(--font-headline);
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border-bottom: 1px solid var(--color-primary);
+        text-align: center;
+    }
+    .pm-matrix thead tr.pm-row-category th {
+        position: sticky;
+        top: 2.55rem; /* height of the topic row */
+        z-index: 20;
+        background-color: var(--color-surface-input);
+        color: var(--color-primary);
+        font-family: var(--font-body);
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        border-bottom: 2px solid var(--color-primary);
+        white-space: normal;
+        line-height: 1.2;
+    }
 
-/*
+    /*
  * Sticky column widths and offsets.
  * Order from left to right: checkbox (2.5rem) | Mitglied (14rem) | Beförderbar (11rem)
  * Sticky `left` offsets MUST be the cumulative sum so cells stack flush.
  */
-.pm-matrix .pm-checkbox-col {
-    width: 2.5rem;
-    min-width: 2.5rem;
-    max-width: 2.5rem;
-    text-align: center;
-}
-.pm-matrix .pm-member-col {
-    width: 14rem;
-    min-width: 14rem;
-    max-width: 14rem;
-}
-.pm-matrix .pm-eligibility-col {
-    width: 11rem;
-    min-width: 11rem;
-    max-width: 11rem;
-}
-.pm-matrix .pm-cat-col {
-    width: 10rem;
-    min-width: 10rem;
-    max-width: 10rem;
-}
-.pm-matrix .pm-checkbox-cell,
-.pm-matrix thead .pm-checkbox-cell {
-    position: sticky;
-    left: 0;
-    z-index: 16;
-    border-right: 1px solid var(--color-gray-3);
-    text-align: center;
-}
-.pm-matrix .pm-member-cell,
-.pm-matrix thead .pm-member-cell {
-    position: sticky;
-    left: 2.5rem; /* width of checkbox column */
-    z-index: 15;
-    font-weight: 700;
-    color: var(--color-primary);
-}
-.pm-matrix .pm-eligibility-cell,
-.pm-matrix thead .pm-eligibility-cell {
-    position: sticky;
-    left: 16.5rem; /* 2.5 (checkbox) + 14 (member) */
-    z-index: 14;
-    border-right: 2px solid var(--color-primary);
-}
-.pm-matrix thead .pm-checkbox-cell {
-    z-index: 41;
-    background-color: var(--color-surface-input);
-}
-.pm-matrix thead .pm-member-cell {
-    z-index: 40;
-    background-color: var(--color-surface-input);
-}
-.pm-matrix thead .pm-eligibility-cell {
-    z-index: 39;
-    background-color: var(--color-surface-input);
-}
-.pm-matrix thead tr.pm-row-topic .pm-member-cell,
-.pm-matrix thead tr.pm-row-topic .pm-eligibility-cell {
-    text-align: left;
-    text-transform: uppercase;
-}
-/*
+    .pm-matrix .pm-checkbox-col {
+        width: 2.5rem;
+        min-width: 2.5rem;
+        max-width: 2.5rem;
+        text-align: center;
+    }
+    .pm-matrix .pm-member-col {
+        width: 14rem;
+        min-width: 14rem;
+        max-width: 14rem;
+    }
+    .pm-matrix .pm-eligibility-col {
+        width: 11rem;
+        min-width: 11rem;
+        max-width: 11rem;
+    }
+    .pm-matrix .pm-cat-col {
+        width: 10rem;
+        min-width: 10rem;
+        max-width: 10rem;
+    }
+    .pm-matrix .pm-checkbox-cell,
+    .pm-matrix thead .pm-checkbox-cell {
+        position: sticky;
+        left: 0;
+        z-index: 16;
+        border-right: 1px solid var(--color-gray-3);
+        text-align: center;
+    }
+    .pm-matrix .pm-member-cell,
+    .pm-matrix thead .pm-member-cell {
+        position: sticky;
+        left: 2.5rem; /* width of checkbox column */
+        z-index: 15;
+        font-weight: 700;
+        color: var(--color-primary);
+    }
+    .pm-matrix .pm-eligibility-cell,
+    .pm-matrix thead .pm-eligibility-cell {
+        position: sticky;
+        left: 16.5rem; /* 2.5 (checkbox) + 14 (member) */
+        z-index: 14;
+        border-right: 2px solid var(--color-primary);
+    }
+    .pm-matrix thead .pm-checkbox-cell {
+        z-index: 41;
+        background-color: var(--color-surface-input);
+    }
+    .pm-matrix thead .pm-member-cell {
+        z-index: 40;
+        background-color: var(--color-surface-input);
+    }
+    .pm-matrix thead .pm-eligibility-cell {
+        z-index: 39;
+        background-color: var(--color-surface-input);
+    }
+    .pm-matrix thead tr.pm-row-topic .pm-member-cell,
+    .pm-matrix thead tr.pm-row-topic .pm-eligibility-cell {
+        text-align: left;
+        text-transform: uppercase;
+    }
+    /*
  * The pinned columns (checkbox / Mitglied / Beförderbar) are rendered
  * as two separate sticky cells — one in the topic row, one in the
  * category row — instead of a single rowspan="2" cell. The browser
@@ -277,91 +280,91 @@
  * makes the pair read as one continuous cell while letting each row
  * use its natural height — so both sides of the header now line up.
  */
-.pm-matrix thead tr.pm-row-topic .pm-checkbox-cell,
-.pm-matrix thead tr.pm-row-topic .pm-member-cell,
-.pm-matrix thead tr.pm-row-topic .pm-eligibility-cell {
-    border-bottom: none;
-}
-.pm-matrix thead tr.pm-row-category .pm-checkbox-cell,
-.pm-matrix thead tr.pm-row-category .pm-member-cell,
-.pm-matrix thead tr.pm-row-category .pm-eligibility-cell {
-    padding: 0;
-}
+    .pm-matrix thead tr.pm-row-topic .pm-checkbox-cell,
+    .pm-matrix thead tr.pm-row-topic .pm-member-cell,
+    .pm-matrix thead tr.pm-row-topic .pm-eligibility-cell {
+        border-bottom: none;
+    }
+    .pm-matrix thead tr.pm-row-category .pm-checkbox-cell,
+    .pm-matrix thead tr.pm-row-category .pm-member-cell,
+    .pm-matrix thead tr.pm-row-category .pm-eligibility-cell {
+        padding: 0;
+    }
 
-/* ================================================================
+    /* ================================================================
    SORT TOGGLE on the Mitglied header
    ================================================================ */
-.pm-sort-toggle {
-    background: none;
-    border: none;
-    color: inherit;
-    font: inherit;
-    text-transform: inherit;
-    letter-spacing: inherit;
-    cursor: pointer;
-    padding: 0.25rem 0;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-.pm-sort-toggle:hover {
-    color: var(--color-accent-light);
-}
-.pm-sort-toggle .pm-sort-indicator {
-    font-family: var(--font-body);
-    font-size: 0.7rem;
-    font-weight: 400;
-    color: var(--color-gray-2-text);
-    text-transform: none;
-    letter-spacing: 0;
-    border: 1px solid var(--color-gray-3);
-    padding: 0.1rem 0.4rem;
-    white-space: nowrap;
-}
-.pm-sort-toggle[data-pm-sort-mode='0'] .pm-sort-indicator {
-    color: var(--color-gray-2-text);
-}
-.pm-sort-toggle:not([data-pm-sort-mode='0']) .pm-sort-indicator {
-    color: var(--color-primary);
-    border-color: var(--color-primary);
-}
+    .pm-sort-toggle {
+        background: none;
+        border: none;
+        color: inherit;
+        font: inherit;
+        text-transform: inherit;
+        letter-spacing: inherit;
+        cursor: pointer;
+        padding: 0.25rem 0;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .pm-sort-toggle:hover {
+        color: var(--color-accent-light);
+    }
+    .pm-sort-toggle .pm-sort-indicator {
+        font-family: var(--font-body);
+        font-size: 0.7rem;
+        font-weight: 400;
+        color: var(--color-gray-2-text);
+        text-transform: none;
+        letter-spacing: 0;
+        border: 1px solid var(--color-gray-3);
+        padding: 0.1rem 0.4rem;
+        white-space: nowrap;
+    }
+    .pm-sort-toggle[data-pm-sort-mode='0'] .pm-sort-indicator {
+        color: var(--color-gray-2-text);
+    }
+    .pm-sort-toggle:not([data-pm-sort-mode='0']) .pm-sort-indicator {
+        color: var(--color-primary);
+        border-color: var(--color-primary);
+    }
 
-/* ================================================================
+    /* ================================================================
    TOPIC TOGGLE (collapse / expand)
    ================================================================ */
-.pm-topic-toggle {
-    background: none;
-    border: none;
-    color: inherit;
-    font: inherit;
-    text-transform: inherit;
-    letter-spacing: inherit;
-    cursor: pointer;
-    padding: 0.25rem 0.5rem;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    width: 100%;
-    justify-content: center;
-}
-.pm-topic-toggle:hover {
-    color: var(--color-accent-light);
-}
-.pm-topic-toggle .pm-topic-icon {
-    display: inline-block;
-    width: 1rem;
-    font-family: var(--font-body);
-    font-weight: 700;
-    color: var(--color-primary);
-}
-.pm-topic-toggle[aria-expanded='false'] .pm-topic-icon::before {
-    content: '+';
-}
-.pm-topic-toggle[aria-expanded='true'] .pm-topic-icon::before {
-    content: '\2212';
-}
+    .pm-topic-toggle {
+        background: none;
+        border: none;
+        color: inherit;
+        font: inherit;
+        text-transform: inherit;
+        letter-spacing: inherit;
+        cursor: pointer;
+        padding: 0.25rem 0.5rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        width: 100%;
+        justify-content: center;
+    }
+    .pm-topic-toggle:hover {
+        color: var(--color-accent-light);
+    }
+    .pm-topic-toggle .pm-topic-icon {
+        display: inline-block;
+        width: 1rem;
+        font-family: var(--font-body);
+        font-weight: 700;
+        color: var(--color-primary);
+    }
+    .pm-topic-toggle[aria-expanded='false'] .pm-topic-icon::before {
+        content: '+';
+    }
+    .pm-topic-toggle[aria-expanded='true'] .pm-topic-icon::before {
+        content: '\2212';
+    }
 
-/*
+    /*
  * Collapsed topic state.
  *
  * The category-row and body-row cells of a collapsed topic shrink
@@ -381,173 +384,174 @@
  * the 48px content area minus 2x 12px TH padding) and the
  * surrounding ring of TH padding looked clickable but wasn't.
  */
-.pm-matrix [data-pm-topic-collapsed='true'] {
-    width: 0;
-    min-width: 0;
-    max-width: 0;
-    padding: 0;
-    border-right: 0;
-    visibility: hidden;
-}
-.pm-matrix th.pm-topic-cell[data-pm-collapsed='true'] {
-    width: 3rem;
-    min-width: 3rem;
-    max-width: 3rem;
-    padding: 0;
-}
-.pm-matrix th.pm-topic-cell[data-pm-collapsed='true'] .pm-topic-label {
-    display: none;
-}
-.pm-matrix th.pm-topic-cell[data-pm-collapsed='true'] .pm-topic-toggle {
-    padding: 0.5rem 0;
-    width: 100%;
-    min-height: 44px;
-}
-.pm-matrix th.pm-topic-cell[data-pm-collapsed='true'] .pm-topic-icon {
-    font-size: 1.1rem;
-}
+    .pm-matrix [data-pm-topic-collapsed='true'] {
+        width: 0;
+        min-width: 0;
+        max-width: 0;
+        padding: 0;
+        border-right: 0;
+        visibility: hidden;
+    }
+    .pm-matrix th.pm-topic-cell[data-pm-collapsed='true'] {
+        width: 3rem;
+        min-width: 3rem;
+        max-width: 3rem;
+        padding: 0;
+    }
+    .pm-matrix th.pm-topic-cell[data-pm-collapsed='true'] .pm-topic-label {
+        display: none;
+    }
+    .pm-matrix th.pm-topic-cell[data-pm-collapsed='true'] .pm-topic-toggle {
+        padding: 0.5rem 0;
+        width: 100%;
+        min-height: 44px;
+    }
+    .pm-matrix th.pm-topic-cell[data-pm-collapsed='true'] .pm-topic-icon {
+        font-size: 1.1rem;
+    }
 
-/* ================================================================
+    /* ================================================================
    LEVEL SELECT
    ================================================================ */
-.level-select {
-    background: var(--color-surface-input);
-    color: var(--color-gray-1);
-    border: 1px solid var(--color-gray-3);
-    padding: 0.375rem 1.75rem 0.375rem 0.5rem;
-    font-size: 0.85rem;
-    min-height: 38px;
-    width: 100%;
-    cursor: pointer;
-    font-family: var(--font-body);
-}
-.level-select:focus {
-    border-color: var(--color-primary);
-    outline: none;
-}
-.level-select.pm-pending {
-    opacity: 0.55;
-    cursor: progress;
-}
-.level-select[data-level='LEVEL_A'] {
-    border-color: var(--color-success);
-}
-.level-select[data-level='LEVEL_B'] {
-    border-color: var(--color-warning);
-}
-.level-select[data-level='LEVEL_C'] {
-    border-color: var(--color-danger);
-}
+    .level-select {
+        background: var(--color-surface-input);
+        color: var(--color-gray-1);
+        border: 1px solid var(--color-gray-3);
+        padding: 0.375rem 1.75rem 0.375rem 0.5rem;
+        font-size: 0.85rem;
+        min-height: 38px;
+        width: 100%;
+        cursor: pointer;
+        font-family: var(--font-body);
+    }
+    .level-select:focus {
+        border-color: var(--color-primary);
+        outline: none;
+    }
+    .level-select.pm-pending {
+        opacity: 0.55;
+        cursor: progress;
+    }
+    .level-select[data-level='LEVEL_A'] {
+        border-color: var(--color-success);
+    }
+    .level-select[data-level='LEVEL_B'] {
+        border-color: var(--color-warning);
+    }
+    .level-select[data-level='LEVEL_C'] {
+        border-color: var(--color-danger);
+    }
 
-/*
+    /*
  * Diff flash on the cell after a save returns 200. Uses inset
  * box-shadow so the highlight stays *inside* the cell border and
  * does not mess with the sticky layout. 800ms is long enough to
  * register peripheral, short enough to not clutter when multiple
  * cells finish in quick succession.
  */
-@keyframes pm-flash-saved {
-    0% {
-        box-shadow: inset 0 0 0 2px var(--color-success);
+    @keyframes pm-flash-saved {
+        0% {
+            box-shadow: inset 0 0 0 2px var(--color-success);
+        }
+        100% {
+            box-shadow: inset 0 0 0 2px transparent;
+        }
     }
-    100% {
-        box-shadow: inset 0 0 0 2px transparent;
+    .pm-cell-saved {
+        animation: pm-flash-saved 800ms ease-out;
     }
-}
-.pm-cell-saved {
-    animation: pm-flash-saved 800ms ease-out;
-}
 
-/* ================================================================
+    /* ================================================================
    MEMBER CELL META
    ================================================================ */
-.pm-member-name {
-    display: block;
-}
-.pm-member-rank,
-.pm-member-last-eval {
-    display: block;
-    color: var(--color-gray-2-text);
-    font-weight: 400;
-    font-size: 0.72rem;
-    margin-top: 0.1rem;
-}
-.pm-member-last-eval {
-    font-style: italic;
-}
-.pm-member-last-eval[data-pm-empty='true'] {
-    display: none;
-}
+    .pm-member-name {
+        display: block;
+    }
+    .pm-member-rank,
+    .pm-member-last-eval {
+        display: block;
+        color: var(--color-gray-2-text);
+        font-weight: 400;
+        font-size: 0.72rem;
+        margin-top: 0.1rem;
+    }
+    .pm-member-last-eval {
+        font-style: italic;
+    }
+    .pm-member-last-eval[data-pm-empty='true'] {
+        display: none;
+    }
 
-/* ================================================================
+    /* ================================================================
    ELIGIBILITY CHIP
    ================================================================ */
-.eligibility-chip {
-    display: inline-block;
-    padding: 0.1rem 0.4rem;
-    margin: 0 0.15rem 0.15rem 0;
-    border: 1px solid;
-    font-family: var(--font-headline);
-    font-size: 0.65rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-.eligibility-chip.is-eligible {
-    color: #4caf50;
-    border-color: #4caf50;
-}
-.eligibility-chip.not-eligible {
-    color: #d35400;
-    border-color: #d35400;
-    opacity: 0.6;
-}
-.pm-eligibility-none {
-    color: var(--color-gray-3);
-    font-size: 0.75rem;
-}
+    .eligibility-chip {
+        display: inline-block;
+        padding: 0.1rem 0.4rem;
+        margin: 0 0.15rem 0.15rem 0;
+        border: 1px solid;
+        font-family: var(--font-headline);
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+    .eligibility-chip.is-eligible {
+        color: #4caf50;
+        border-color: #4caf50;
+    }
+    .eligibility-chip.not-eligible {
+        color: #d35400;
+        border-color: #d35400;
+        opacity: 0.6;
+    }
+    .pm-eligibility-none {
+        color: var(--color-gray-3);
+        font-size: 0.75rem;
+    }
 
-/* ================================================================
+    /* ================================================================
    EMPTY / HIDDEN ROWS
    ================================================================ */
-.pm-empty {
-    padding: 1.5rem;
-    text-align: center;
-    color: var(--color-gray-2-text);
-    font-style: italic;
-}
-.pm-row-hidden {
-    display: none;
-}
+    .pm-empty {
+        padding: 1.5rem;
+        text-align: center;
+        color: var(--color-gray-2-text);
+        font-style: italic;
+    }
+    .pm-row-hidden {
+        display: none;
+    }
 
-/* ================================================================
+    /* ================================================================
    RESPONSIVE: tablet/smartphone
    ================================================================ */
-@media (width <= 1024px) {
-    .pm-matrix .pm-member-col {
-        width: 11rem;
-        min-width: 11rem;
-        max-width: 11rem;
-    }
-    .pm-matrix .pm-eligibility-col {
-        width: 10rem;
-        min-width: 10rem;
-        max-width: 10rem;
-    }
-    .pm-matrix .pm-cat-col {
-        width: 9rem;
-        min-width: 9rem;
-        max-width: 9rem;
-    }
-    /* Member column shifts left to accommodate the checkbox-col change. */
-    .pm-matrix .pm-member-cell,
-    .pm-matrix thead .pm-member-cell {
-        left: 2.5rem;
-    }
-    /* Below 1024px the eligibility column drops out of the sticky stack
+    @media (width <= 1024px) {
+        .pm-matrix .pm-member-col {
+            width: 11rem;
+            min-width: 11rem;
+            max-width: 11rem;
+        }
+        .pm-matrix .pm-eligibility-col {
+            width: 10rem;
+            min-width: 10rem;
+            max-width: 10rem;
+        }
+        .pm-matrix .pm-cat-col {
+            width: 9rem;
+            min-width: 9rem;
+            max-width: 9rem;
+        }
+        /* Member column shifts left to accommodate the checkbox-col change. */
+        .pm-matrix .pm-member-cell,
+        .pm-matrix thead .pm-member-cell {
+            left: 2.5rem;
+        }
+        /* Below 1024px the eligibility column drops out of the sticky stack
        so the smaller viewport keeps a sensible amount of "real" data
        visible without overflowing the sticky area. */
-    .pm-matrix .pm-eligibility-cell,
-    .pm-matrix thead .pm-eligibility-cell {
-        position: static;
+        .pm-matrix .pm-eligibility-cell,
+        .pm-matrix thead .pm-eligibility-cell {
+            position: static;
+        }
     }
 }
