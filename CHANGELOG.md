@@ -138,6 +138,10 @@
 
 ### Fixed
 
+- **Sicherheit: die Sitzungs-Typliste kennt jetzt alle Werte einer echten Anmeldung.** Im Modus
+  `enforce` hätte sie das ID-Token jedes Mitglieds abgelehnt (eine Adresse und Zahlen in den
+  Token-Angaben) und damit alle abgemeldet. Produktion läuft mit `report` und war nicht betroffen.
+
 - **Einsätze: „Leiter" in der Kopfzeile zeigt wieder den Einsatzleiter.** Das Backend schickte die
   Einsatzleiter-Markierung der geplanten Rolle eines Teilnehmers nicht mit, deshalb stand dort immer
   der Besitzer des Einsatzes, auch wenn ein Einsatzleiter eingetragen war.

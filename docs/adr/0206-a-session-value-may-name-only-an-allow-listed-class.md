@@ -86,6 +86,25 @@ production's real sessions before it refuses anything.
   Jackson can use — the flash list is dropped on the redirect's GET. The parity test keeps it in its
   sample so whoever fixes it finds the list already covering it.
 
+## Amendment 1 — 2026-09-23: final types in containers
+
+The decision assumed a final type never carries a type id, so `java.lang`, `java.math` and
+`java.net` were left off the list. That holds for a session attribute at the top level and not
+inside a container: in an `Object`-typed slot of a map or list, Jackson writes a final type as
+`["java.lang.Long", 1788…]`. A real login produces exactly that — the ID token's claims map holds
+`iss` as `java.net.URL` (Spring's OIDC claim conversion), numeric claims as `java.lang.Long` and a
+nested claim as Nimbus's `com.nimbusds.jose.shaded.gson.internal.LinkedTreeMap`; Spring Session's
+session-created payload holds `Long` timestamps. Under `enforce` every member's security context
+would have been unreadable.
+
+Production was never exposed: it ships `report`, which would have named each class on the first
+read — the mode did its job. The E2E stack runs `enforce` and was exposed from the merge of #2018.
+The list gains the boxed scalars of `java.lang` (by exact name, never the package), `BigDecimal`,
+`BigInteger`, `URL`, `URI` and the Nimbus map, and the parity test now builds its ID token with the
+real decoder instead of a hand-written claims map, which is what hid the gap. `URL`'s `hashCode`
+resolves its host; a writer able to plant that could forge a security context outright, so the DNS
+query is accepted rather than refusing every ID token.
+
 ## Alternatives rejected
 
 - **Enforce on merge.** One wrong entry would sign members out on the next deploy, and the only way

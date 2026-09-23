@@ -3262,12 +3262,24 @@ Redis, which three services reach (APPSEC-05, improvement audit 2026-09-22).
 | Entry | Why it is in a session |
 | --- | --- |
 | `java.util.*`, `java.time.*` — direct members only | collections, dates and durations written by Spring Session, Spring Security and our filters; `java.util.logging` / `java.util.concurrent` are **not** covered |
+| the boxed scalars of `java.lang` (`Boolean` … `String`), `java.math.BigDecimal` / `BigInteger`, `java.net.URL` / `URI` — exact names | a final type in an `Object` slot of a container is written with a type id after all: the ID token's `iss` claim (`URL`), numeric claims and the session-created event's timestamps (`Long`), a flashed count |
+| `com.nimbusds.jose.shaded.gson.internal.LinkedTreeMap` — exact name | a nested ID-token claim (`realm_access`) as Nimbus decodes it |
 | `org.springframework.security.*` | security context, OAuth2 login and authorized-client state, CSRF token, saved request (the Security Jackson modules add their own exact types on top) |
 | `org.springframework.web.servlet.FlashMap`, `org.springframework.util.LinkedMultiValueMap`, direct members of `org.springframework.validation` | a redirect's flash attributes; `validation.beanvalidation` is **not** covered |
 | `de.greluc.krt.profit.basetool.frontend.model.*` | the application's own forms and DTOs, flashed across a redirect |
 | `CONTAINER_WRITTEN_FINAL_SESSION_TYPES` | Tomcat's WebSocket binding listener (REQ-SEC-049) |
 
 A new session attribute of a type outside the list is a change to this table, in the same PR.
+
+> [!warning] Corrected 2026-09-23 — the first list refused every signed-in member under `enforce`
+> The list as merged (PR #2018) had no `java.lang`, `java.math` or `java.net` entry and not the
+> Nimbus map, on the belief that final types never carry a type id. Inside a container's
+> `Object` slot they do. A real login's ID token carries `iss` as `java.net.URL`, so `enforce` would
+> have made the security context unreadable for every member, and the session-created event's
+> `Long` timestamps unreadable for the active-sessions gauge. Production ran `report` and was never
+> exposed; the E2E stack, which runs `enforce`, was. The parity sample now takes its ID token from
+> the real Nimbus decoder and Spring's OIDC claim conversion rather than a hand-built map, which is
+> how the gap was missed.
 
 **Three modes**, `app.session.type-allow-list` / `APP_SESSION_TYPE_ALLOW_LIST`:
 
@@ -3285,7 +3297,9 @@ touches no stored session and needs no migration.
 
 **Acceptance**
 
-- [ ] Every value a production session holds — the OIDC security context, the authorized client
+- [ ] Every value a production session holds — the OIDC security context with an ID token decoded by
+  the real Nimbus decoder and Spring's claim conversion, the session-created event payload, the
+  authorized client
   with both tokens, the pre-login authorization request, the CSRF token, the saved request, the flash
   maps, our filters' attributes, Tomcat's listener — reads back under `enforce` byte-identically to
   the permissive validator.
