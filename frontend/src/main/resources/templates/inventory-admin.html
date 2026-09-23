@@ -390,13 +390,8 @@
     </div>
 </main>
 
-<dialog id="bookOutModal" class="krt-modal-overlay" th:classappend="${showBookOutModal != null} ? 'krtm-modal-open' : 'krtm-hidden'">
-    <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{inventory.bookout.title}">
-        <div class="krt-modal-head">
-            <h2 th:text="#{inventory.bookout.title}">Eintrag ausbuchen</h2>
-            <button type="button" class="krt-modal-close" data-trigger="inv-admin-close-bookout"
-                    th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-        </div>
+<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bookOutModal', titleKey='inventory.bookout.title', variant='krt-modal--wide', open=${showBookOutModal != null}, closeTrigger='inv-admin-close-bookout', body=~{::bookOutModal-body})}">
+    <th:block th:ref="bookOutModal-body">
         <form id="bookOutForm" th:action="@{/inventory/{id}/book-out(id=${showBookOutModal != null ? showBookOutModal : ''})}" method="post" th:object="${inventoryBookOutForm}">
             <div class="krt-modal-body">
             <div th:if="${#fields.hasErrors('*')}" class="hud-box hud-box-error">
@@ -473,19 +468,14 @@
                 <button type="button" class="btn btn-ghost" data-trigger="inv-admin-close-bookout" th:text="#{inventory.bookout.cancel}">Abbrechen</button>
             </div>
         </form>
-    </div>
-</dialog>
+    </th:block>
+</th:block>
 
 <!--/* Umbuchen (rebooking) modal — the transfer (Ort/Nutzer) mode relocated out of the Ausbuchen
      dialog so the two share the Lager's Umbuchen concept. The squadron-wide /all view rebooks only
      between Ort/Nutzer/OrgUnit; the personal<->shared toggle lives on the owner-scoped /my view. */-->
-<dialog id="umbuchenModal" class="krt-modal-overlay">
-    <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{inventory.rebook.title}">
-        <div class="krt-modal-head">
-            <h2 th:text="#{inventory.rebook.title}">Umbuchen</h2>
-            <button type="button" class="krt-modal-close" data-trigger="inv-admin-close-umbuchen"
-                    th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-        </div>
+<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='umbuchenModal', titleKey='inventory.rebook.title', variant='krt-modal--wide', closeTrigger='inv-admin-close-umbuchen', body=~{::umbuchenModal-body})}">
+    <th:block th:ref="umbuchenModal-body">
         <form id="umbuchenForm">
             <div class="krt-modal-body">
             <input type="hidden" id="umbuchenVersion">
@@ -557,16 +547,11 @@
                 <button type="button" class="btn btn-ghost" data-trigger="inv-admin-close-umbuchen" th:text="#{inventory.rebook.cancel}">Abbrechen</button>
             </div>
         </form>
-    </div>
-</dialog>
+    </th:block>
+</th:block>
 
-<dialog id="noteModal" class="krt-modal-overlay">
-    <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{inventory.note.label}">
-        <div class="krt-modal-head">
-            <h2 th:text="#{inventory.note.label}">Notiz</h2>
-            <button type="button" class="krt-modal-close" data-trigger="inv-admin-close-note"
-                    th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-        </div>
+<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='noteModal', titleKey='inventory.note.label', variant='krt-modal--wide', closeTrigger='inv-admin-close-note', body=~{::noteModal-body})}">
+    <th:block th:ref="noteModal-body">
         <div class="krt-modal-body">
         <div class="form-group mb-1">
             <label for="noteModalTextarea" class="form-label" th:text="#{inventory.note.label}">Notiz</label>
@@ -582,16 +567,12 @@
             <button type="button" class="btn btn-quiet-danger" data-trigger="inv-admin-remove-note"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{inventory.note.remove}">Entfernen</span></button>
             <button type="button" class="btn btn-ghost krtm-min-height-44px-margin-left-auto-85bf" data-trigger="inv-admin-close-note" th:text="#{inventory.note.cancel}">Abbrechen</button>
         </div>
-    </div>
-</dialog>
+    </th:block>
+</th:block>
 
-<dialog sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" id="delete-all-global-inventory-modal" class="krt-modal-overlay krtm-display-none-z-index-3300-c2c8">
-    <div class="krt-modal krt-modal--wide krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{inventory.deleteAll.modal.title}">
-        <div class="krt-modal-head">
-            <h2 th:text="#{inventory.deleteAll.modal.title}">Globales Lager leeren</h2>
-            <button type="button" class="krt-modal-close" data-trigger="close-modal-display" data-modal-id="delete-all-global-inventory-modal"
-                    th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-        </div>
+<th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='delete-all-global-inventory-modal', titleKey='inventory.deleteAll.modal.title', variant='krt-modal--wide krt-modal--danger', body=~{::delete-all-global-inventory-modal-body})}">
+    <th:block th:ref="delete-all-global-inventory-modal-body">
         <div class="krt-modal-body">
         <p th:text="#{inventory.deleteAll.modal.body}" class="mb-2">Alle globalen Lagereinträge wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden. Persönliche Lagereinträge bleiben erhalten.</p>
         </div>
@@ -599,8 +580,9 @@
             <button type="button" id="delete-all-global-inventory-cancel-btn" class="btn btn-ghost" th:text="#{general.cancel}">Abbrechen</button>
             <button type="button" id="delete-all-global-inventory-confirm-btn" class="btn btn-danger" th:text="#{inventory.deleteAll.modal.confirm}">Ja, alle löschen</button>
         </div>
-    </div>
-</dialog>
+    </th:block>
+</th:block>
+</th:block>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
