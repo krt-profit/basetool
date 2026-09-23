@@ -2,7 +2,7 @@
 #
 # failure-threshold: warning — info-level findings are reported but do not fail
 # the build, mirroring the SpotBugs "HIGH confidence only" posture already used
-# in this repo. The two Dockerfiles intentionally rely on word-splitting in a
+# in this repo. docker/app/Dockerfile intentionally relies on word-splitting in a
 # `set -- $matches` / shell loop to assemble an argument list (SC2086, info),
 # which is correct there; quoting would break it. error- and warning-level
 # findings still block.

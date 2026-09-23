@@ -212,6 +212,24 @@ The README is the canonical place. The relevant sections:
 - [Running tests](README.md#tests) — Gradle wrapper only, never the IDE test runner.
 - [Linting, static analysis and SBOM](README.md#linting-static-analysis-and-sbom) — `./gradlew check`, Checkstyle, SpotBugs, Spotless, CycloneDX.
 
+### Building an app image
+
+The backend, frontend and ingest images share one Dockerfile, built from the repository root:
+
+```bash
+docker build -f docker/app/Dockerfile --build-arg MODULE=backend -t basetool-backend:local .
+```
+
+(`docker-compose.build.yml` does the same for all three.) The image build runs `:<module>:bootJar` and
+nothing else — tests and linters are CI's job, so a green image says nothing about them. It then
+trains the image's AOT cache by starting the application as far as the end of the Spring context
+refresh, with stubs for everything a build container cannot reach. **If you add a bean that talks to
+a database, Keycloak, Redis or the backend while the context refreshes, the image build fails** with
+`[AOT] FAILED: the training run did not complete the context refresh` and the stack trace above it:
+give that bean's dependency a stub in the module's `case` branch of the training `RUN` (the existing
+ones show the patterns — an unresolvable `aot-training.invalid` host, a JWK set URI instead of an
+issuer, a property that skips a startup call). ADR-0209 has the reasons.
+
 Hard project rule: **always use the Gradle wrapper** (`./gradlew`).
 Never the IDE test runner; never `mvn`; never a system-installed Gradle.
 This is what CI runs, this is what every contributor's machine runs,

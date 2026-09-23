@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-07-20
 - **Deciders:** @greluc
-- **Related:** `frontend/src/main/resources/application.yml` (`spring.data.redis.timeout` / `connect-timeout`) · `frontend/Dockerfile` (HEALTHCHECK) · REQ-OPS-003 (`docs/specs/deployment-delivery.md`) · ADR-0084 (readiness health-group composition) · ADR-0088 (Redis-backed two-tier session) · the 2026-07-20 edge / reactive-degradation incident
+- **Related:** `frontend/src/main/resources/application.yml` (`spring.data.redis.timeout` / `connect-timeout`) · `docker/app/Dockerfile` (HEALTHCHECK, stage `runtime-frontend`; `frontend/Dockerfile` until 2026-09-23) · REQ-OPS-003 (`docs/specs/deployment-delivery.md`) · ADR-0084 (readiness health-group composition) · ADR-0088 (Redis-backed two-tier session) · the 2026-07-20 edge / reactive-degradation incident
 
 ## Context
 
