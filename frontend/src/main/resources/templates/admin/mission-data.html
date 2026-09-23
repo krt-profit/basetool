@@ -240,7 +240,7 @@
     </div>
 
     <!--/* Squadron Modal */-->
-    <div id="squadron-modal" class="krt-modal-overlay" th:classappend="${openModal == 'squadron-modal'} ? 'krtm-modal-open' : 'krtm-hidden'">
+    <dialog id="squadron-modal" class="krt-modal-overlay" th:classappend="${openModal == 'squadron-modal'} ? 'krtm-modal-open' : 'krtm-hidden'">
         <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{admin.squadron.create}">
             <div class="krt-modal-head">
                 <h2 id="squadron-modal-title" th:text="#{admin.squadron.create}">Staffel</h2>
@@ -271,10 +271,10 @@
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 
     <!--/* JobType Modal */-->
-    <div id="jobtype-modal" class="krt-modal-overlay" th:classappend="${openModal == 'jobtype-modal'} ? 'krtm-modal-open' : 'krtm-hidden'">
+    <dialog id="jobtype-modal" class="krt-modal-overlay" th:classappend="${openModal == 'jobtype-modal'} ? 'krtm-modal-open' : 'krtm-hidden'">
         <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{admin.job_type.create}">
             <div class="krt-modal-head">
                 <h2 id="jobtype-modal-title" th:text="#{admin.job_type.create}">Job</h2>
@@ -323,10 +323,10 @@
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 
     <!--/* FrequencyType Modal */-->
-    <div id="frequency-type-modal" class="krt-modal-overlay" th:classappend="${openModal == 'frequency-type-modal'} ? 'krtm-modal-open' : 'krtm-hidden'">
+    <dialog id="frequency-type-modal" class="krt-modal-overlay" th:classappend="${openModal == 'frequency-type-modal'} ? 'krtm-modal-open' : 'krtm-hidden'">
         <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{admin.frequency_type.create}">
             <div class="krt-modal-head">
                 <h2 id="freqtype-modal-title" th:text="#{admin.frequency_type.create}">Frequenztyp</h2>
@@ -352,10 +352,10 @@
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 
     <!--/* Delete Confirmation Modal */-->
-    <div id="delete-confirm-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
+    <dialog id="delete-confirm-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
         <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{info.delete.confirm.title}">
             <div class="krt-modal-head">
                 <h2 th:text="#{info.delete.confirm.title}">Löschen bestätigen</h2>
@@ -371,7 +371,7 @@
                 </form>
             </div>
         </div>
-    </div>
+    </dialog>
 </main>
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">

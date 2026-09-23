@@ -266,7 +266,7 @@
     <!--/* ============ Modals ============ */-->
 
     <!--/* Create account */-->
-    <div class="krt-modal-overlay" id="bank-create-account-modal">
+    <dialog class="krt-modal-overlay" id="bank-create-account-modal">
         <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.createAccount.title}">
             <div class="krt-modal-head">
                 <h3 th:text="#{bank.modal.createAccount.title}">Konto anlegen</h3>
@@ -320,10 +320,10 @@
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 
     <!--/* Rename account */-->
-    <div class="krt-modal-overlay" id="bank-rename-modal">
+    <dialog class="krt-modal-overlay" id="bank-rename-modal">
         <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.rename.title}">
             <div class="krt-modal-head">
                 <h3 th:text="#{bank.modal.rename.title}">Konto umbenennen</h3>
@@ -351,10 +351,10 @@
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 
     <!--/* Set / clear balance target (REQ-BANK-036): bank staff with access to the account. */-->
-    <div class="krt-modal-overlay" id="bank-target-modal">
+    <dialog class="krt-modal-overlay" id="bank-target-modal">
         <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.target.title}">
             <div class="krt-modal-head">
                 <h3 th:text="#{bank.modal.target.title}">Zielkontostand</h3>
@@ -383,10 +383,10 @@
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 
     <!--/* Close account (zero balance enforced server-side too) */-->
-    <div class="krt-modal-overlay" id="bank-close-modal">
+    <dialog class="krt-modal-overlay" id="bank-close-modal">
         <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.close.title}">
             <div class="krt-modal-head">
                 <h3 th:text="#{bank.modal.close.title}">Konto schlie&szlig;en</h3>
@@ -409,10 +409,10 @@
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 
     <!--/* Reopen account */-->
-    <div class="krt-modal-overlay" id="bank-reopen-modal">
+    <dialog class="krt-modal-overlay" id="bank-reopen-modal">
         <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.reopen.title}">
             <div class="krt-modal-head">
                 <h3 th:text="#{bank.modal.reopen.title}">Konto wieder&ouml;ffnen</h3>
@@ -435,10 +435,10 @@
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 
     <!--/* Register holder */-->
-    <div class="krt-modal-overlay" id="bank-register-holder-modal">
+    <dialog class="krt-modal-overlay" id="bank-register-holder-modal">
         <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.registerHolder.title}">
             <div class="krt-modal-head">
                 <h3 th:text="#{bank.modal.registerHolder.title}">Halter registrieren</h3>
@@ -470,10 +470,10 @@
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 
     <!--/* Deactivate holder */-->
-    <div class="krt-modal-overlay" id="bank-holder-deactivate-modal">
+    <dialog class="krt-modal-overlay" id="bank-holder-deactivate-modal">
         <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.holderDeactivate.title}">
             <div class="krt-modal-head">
                 <h3 th:text="#{bank.modal.holderDeactivate.title}">Halter deaktivieren</h3>
@@ -497,10 +497,10 @@
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 
     <!--/* Reactivate holder */-->
-    <div class="krt-modal-overlay" id="bank-holder-reactivate-modal">
+    <dialog class="krt-modal-overlay" id="bank-holder-reactivate-modal">
         <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.holderReactivate.title}">
             <div class="krt-modal-head">
                 <h3 th:text="#{bank.modal.holderReactivate.title}">Halter reaktivieren</h3>
@@ -524,11 +524,11 @@
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 
     <!--/* Holder-to-holder Umbuchung (REQ-BANK-031): moves custody between holders, no account touched.
          Open to every bank employee; the source holder may go negative (reconciliation tool). */-->
-    <div class="krt-modal-overlay" id="bank-holder-transfer-modal">
+    <dialog class="krt-modal-overlay" id="bank-holder-transfer-modal">
         <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.holderTransfer.title}">
             <div class="krt-modal-head">
                 <h3 th:text="#{bank.modal.holderTransfer.title}">Halter-Umbuchung</h3>
@@ -581,7 +581,7 @@
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 </main>
 
 <th:block th:replace="~{fragments/toast :: toast}" />

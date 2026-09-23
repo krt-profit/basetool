@@ -140,7 +140,7 @@
 </main>
 
 <!--/* Create Modal */-->
-<div id="modal-create" class="krt-modal-overlay" role="dialog" aria-modal="true">
+<dialog id="modal-create" class="krt-modal-overlay" role="dialog" aria-modal="true">
     <div class="krt-modal krt-modal--wide">
         <div class="krt-modal-head">
             <h2 th:text="#{promotion.admin.ranks.modal.create.title}">Neue Rangvoraussetzung</h2>
@@ -203,10 +203,10 @@
             <button class="btn btn--cta" data-trigger="ar-submit-create" th:text="#{promotion.admin.ranks.new}">Anlegen</button>
         </div>
     </div>
-</div>
+</dialog>
 
 <!--/* Edit Modal */-->
-<div id="modal-edit" class="krt-modal-overlay" role="dialog" aria-modal="true">
+<dialog id="modal-edit" class="krt-modal-overlay" role="dialog" aria-modal="true">
     <div class="krt-modal krt-modal--wide">
         <div class="krt-modal-head">
             <h2 th:text="#{promotion.admin.ranks.modal.edit.title}">Rangvoraussetzung bearbeiten</h2>
@@ -270,7 +270,7 @@
             <button class="btn btn--cta" data-trigger="ar-submit-edit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{promotion.admin.ranks.edit}">Speichern</span></button>
         </div>
     </div>
-</div>
+</dialog>
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}" th:unless="${isAllSquadronsMode}">
     /*<![CDATA[*/

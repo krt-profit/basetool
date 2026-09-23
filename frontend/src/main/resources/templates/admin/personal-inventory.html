@@ -130,7 +130,7 @@
     </div>
 </main>
 
-<div id="krt-pi-modal" class="krt-modal-overlay" th:classappend="${showItemModal != null} ? 'krtm-modal-open' : 'krtm-hidden'">
+<dialog id="krt-pi-modal" class="krt-modal-overlay" th:classappend="${showItemModal != null} ? 'krtm-modal-open' : 'krtm-hidden'">
     <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{personalInventory.modal.create.title}">
         <div class="krt-modal-head">
             <h2 id="krt-pi-modal-title" th:text="#{personalInventory.modal.create.title}">Eintrag anlegen</h2>
@@ -179,9 +179,9 @@
             </div>
         </form>
     </div>
-</div>
+</dialog>
 
-<div id="krt-pi-delete-modal" class="krt-modal-overlay">
+<dialog id="krt-pi-delete-modal" class="krt-modal-overlay">
     <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{personalInventory.action.delete.confirm.title}">
         <div class="krt-modal-head">
             <h2 th:text="#{personalInventory.action.delete.confirm.title}">Eintrag loeschen</h2>
@@ -198,7 +198,7 @@
             </div>
         </form>
     </div>
-</div>
+</dialog>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">

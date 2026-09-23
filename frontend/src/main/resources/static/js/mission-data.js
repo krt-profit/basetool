@@ -122,7 +122,7 @@ document.addEventListener('DOMContentLoaded', function () {
             document.getElementById('sq-shorthand').value = '';
             document.getElementById('sq-desc').value = '';
             document.getElementById('edit-squadron-version').value = '0';
-            sqModal.style.display = 'flex';
+            window.krtModal.open(sqModal);
         };
     }
 
@@ -136,10 +136,10 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('sq-shorthand').value = btn.getAttribute('data-shorthand');
         document.getElementById('sq-desc').value = btn.getAttribute('data-desc');
         document.getElementById('edit-squadron-version').value = btn.getAttribute('data-version');
-        sqModal.style.display = 'flex';
+        window.krtModal.open(sqModal);
     });
 
-    if (sqClose) sqClose.onclick = () => (sqModal.style.display = 'none');
+    if (sqClose) sqClose.onclick = () => window.krtModal.close(sqModal);
 
     // JobType Modal
     const jtModal = document.getElementById('jobtype-modal');
@@ -199,7 +199,7 @@ document.addEventListener('DOMContentLoaded', function () {
             document.getElementById('jt-missionlead').checked = false;
             document.getElementById('edit-jobtype-version').value = '0';
             updateLeadershipVisibility();
-            jtModal.style.display = 'flex';
+            window.krtModal.open(jtModal);
         };
     }
 
@@ -218,10 +218,10 @@ document.addEventListener('DOMContentLoaded', function () {
             btn.getAttribute('data-mission-lead') === 'true';
         document.getElementById('edit-jobtype-version').value = btn.getAttribute('data-version');
         updateLeadershipVisibility();
-        jtModal.style.display = 'flex';
+        window.krtModal.open(jtModal);
     });
 
-    if (jtClose) jtClose.onclick = () => (jtModal.style.display = 'none');
+    if (jtClose) jtClose.onclick = () => window.krtModal.close(jtModal);
 
     // FrequencyType Modal
     const ftModal = document.getElementById('frequency-type-modal');
@@ -240,7 +240,7 @@ document.addEventListener('DOMContentLoaded', function () {
             document.getElementById('ft-name').value = '';
             document.getElementById('ft-desc').value = '';
             document.getElementById('edit-freqtype-version').value = '0';
-            ftModal.style.display = 'flex';
+            window.krtModal.open(ftModal);
         };
     }
 
@@ -253,15 +253,15 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('ft-name').value = btn.getAttribute('data-name');
         document.getElementById('ft-desc').value = btn.getAttribute('data-desc');
         document.getElementById('edit-freqtype-version').value = btn.getAttribute('data-version');
-        ftModal.style.display = 'flex';
+        window.krtModal.open(ftModal);
     });
 
-    if (ftClose) ftClose.onclick = () => (ftModal.style.display = 'none');
+    if (ftClose) ftClose.onclick = () => window.krtModal.close(ftModal);
 
     window.onclick = function (event) {
-        if (event.target === sqModal) sqModal.style.display = 'none';
-        if (event.target === jtModal) jtModal.style.display = 'none';
-        if (event.target === ftModal) ftModal.style.display = 'none';
+        if (event.target === sqModal) window.krtModal.close(sqModal);
+        if (event.target === jtModal) window.krtModal.close(jtModal);
+        if (event.target === ftModal) window.krtModal.close(ftModal);
     };
     // Delete Modal Logic
     const deleteModal = document.getElementById('delete-confirm-modal');
@@ -277,18 +277,18 @@ document.addEventListener('DOMContentLoaded', function () {
                 btn.getAttribute('data-action'),
                 deleteForm.action,
             );
-            deleteModal.style.display = 'flex';
+            window.krtModal.open(deleteModal);
         });
 
         deleteClose.forEach((btn) => {
             btn.onclick = function () {
-                deleteModal.style.display = 'none';
+                window.krtModal.close(deleteModal);
             };
         });
 
         window.addEventListener('click', function (event) {
             if (event.target === deleteModal) {
-                deleteModal.style.display = 'none';
+                window.krtModal.close(deleteModal);
             }
         });
     }
@@ -325,7 +325,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             missionWrite(form, MISSION_MSG.saved, function () {
                 if (modal) {
-                    modal.style.display = 'none';
+                    window.krtModal.close(modal);
                 }
             });
         });
@@ -343,7 +343,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             missionWrite(deleteForm, MISSION_MSG.deleted, function () {
                 if (deleteModal) {
-                    deleteModal.style.display = 'none';
+                    window.krtModal.close(deleteModal);
                 }
             });
         });

@@ -131,7 +131,7 @@
     </div>
 
     <!--/* Reject reason modal (no native dialogs, REQ-UI) */-->
-    <div id="reject-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
+    <dialog id="reject-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
         <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{admin.discordRegistrations.reject.modal.title}">
             <div class="krt-modal-head">
                 <h2 th:text="#{admin.discordRegistrations.reject.modal.title}">Registrierung ablehnen</h2>
@@ -147,11 +147,11 @@
                 <button type="button" class="btn btn-danger" id="reject-confirm" th:text="#{admin.discordRegistrations.reject}">Ablehnen</button>
             </div>
         </div>
-    </div>
+    </dialog>
 
     <!--/* Reopen-confirmation modal (no native dialogs, REQ-UI). Carries an optional note that lands
          in the approval audit alongside the REOPENED decision (REQ-SEC-034). */-->
-    <div id="reopen-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
+    <dialog id="reopen-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
         <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{admin.discordRegistrations.reopen.modal.title}">
             <div class="krt-modal-head">
                 <h2 th:text="#{admin.discordRegistrations.reopen.modal.title}">Registrierung wiederöffnen</h2>
@@ -168,12 +168,12 @@
                 <button type="button" class="btn btn--cta" id="reopen-confirm" th:text="#{admin.discordRegistrations.reopen}">Wiederöffnen</button>
             </div>
         </div>
-    </div>
+    </dialog>
 
     <!--/* Link-to-existing-account modal (no native dialogs, REQ-UI). Server-searched account picker
          (remote-users combobox) so an admin can find the existing account even when the Discord
          handle differs from the in-app name (REQ-SEC-026). */-->
-    <div id="link-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
+    <dialog id="link-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
         <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{admin.discordRegistrations.link.modal.title}">
             <div class="krt-modal-head">
                 <h2 th:text="#{admin.discordRegistrations.link.modal.title}">Mit bestehendem Account verbinden</h2>
@@ -193,13 +193,13 @@
                 <button type="button" class="btn btn--cta" id="link-confirm" th:text="#{admin.discordRegistrations.link}">Verknüpfen</button>
             </div>
         </div>
-    </div>
+    </dialog>
     <!--/* Merge-an-older-account modal (no native dialogs, REQ-UI). The remedy for the queue's
          duplicate-callsign marker: a login whose subject matches no account no longer adopts one
          found by name, so a member who ended up with two accounts needs their data moved onto the
          one they can reach (REQ-SEC-045). Same server-searched account picker as the link modal --
          the two differ in what moves, not in how the account is chosen. */-->
-    <div id="merge-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
+    <dialog id="merge-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
         <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{admin.discordRegistrations.merge.modal.title}">
             <div class="krt-modal-head">
                 <h2 th:text="#{admin.discordRegistrations.merge.modal.title}">Konten zusammenführen</h2>
@@ -219,7 +219,7 @@
                 <button type="button" class="btn btn--cta" id="merge-confirm" th:text="#{admin.discordRegistrations.merge}">Zusammenführen</button>
             </div>
         </div>
-    </div>
+    </dialog>
 </main>
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">

@@ -252,7 +252,7 @@
         </div>
     </div>
 
-    <div id="storeModal" class="krt-modal-overlay" th:classappend="${showStoreModal} ? 'krtm-modal-open' : 'krtm-hidden'">
+    <dialog id="storeModal" class="krt-modal-overlay" th:classappend="${showStoreModal} ? 'krtm-modal-open' : 'krtm-hidden'">
         <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{refineryorder.action.store}">
             <div class="krt-modal-head">
                 <h2 th:text="#{refineryorder.action.store}">Einlagern</h2>
@@ -376,7 +376,7 @@
             </th:block>
             </div>
         </div>
-    </div>
+    </dialog>
 
     <!--/* Section-sized inline error for an unknown / failed ?fragment= render (REQ-FE-015): a
          peer-driven refresh that names a section the controller does not know degrades to this

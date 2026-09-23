@@ -419,7 +419,7 @@
     </div>
 </main>
 
-<div id="bookOutModal" class="krt-modal-overlay" th:classappend="${showBookOutModal != null} ? 'krtm-modal-open' : 'krtm-hidden'">
+<dialog id="bookOutModal" class="krt-modal-overlay" th:classappend="${showBookOutModal != null} ? 'krtm-modal-open' : 'krtm-hidden'">
     <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{inventory.bookout.title}">
         <div class="krt-modal-head">
             <h2 th:text="#{inventory.bookout.title}">Eintrag ausbuchen</h2>
@@ -503,7 +503,7 @@
             </div>
         </form>
     </div>
-</div>
+</dialog>
 
 <!--/* Umbuchen (rebooking) modal — REQ-INV-007 + the transfer consolidation. Hosts two modes:
      LOCATION (the relocated book-out TRANSFER: move stock to another Ort/Nutzer/OrgUnit) and
@@ -511,7 +511,7 @@
      PERSONAL mode is inferred from the source row's personal flag. All inputs are plain (no
      th:field) with umbuchen-prefixed ids so they never collide with the Ausbuchen modal; the write
      is JS-driven through krtFetch. */-->
-<div id="umbuchenModal" class="krt-modal-overlay">
+<dialog id="umbuchenModal" class="krt-modal-overlay">
     <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{inventory.rebook.title}">
         <div class="krt-modal-head">
             <h2 th:text="#{inventory.rebook.title}">Umbuchen</h2>
@@ -610,9 +610,9 @@
             </div>
         </form>
     </div>
-</div>
+</dialog>
 
-<div id="noteModal" class="krt-modal-overlay">
+<dialog id="noteModal" class="krt-modal-overlay">
     <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{inventory.note.label}">
         <div class="krt-modal-head">
             <h2 th:text="#{inventory.note.label}">Notiz</h2>
@@ -635,9 +635,9 @@
             <button type="button" class="btn btn-ghost krtm-min-height-44px-margin-left-auto-85bf" data-trigger="inv-my-close-note" th:text="#{inventory.note.cancel}">Abbrechen</button>
         </div>
     </div>
-</div>
+</dialog>
 
-<div id="bulkCheckoutModal" class="krt-modal-overlay">
+<dialog id="bulkCheckoutModal" class="krt-modal-overlay">
     <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{inventory.bulk.checkout.modal.title}">
         <div class="krt-modal-head">
             <h2 th:text="#{inventory.bulk.checkout.modal.title}">Massenausbuchung bestätigen</h2>
@@ -654,7 +654,7 @@
                     th:text="#{inventory.bulk.checkout.modal.cancel}">Abbrechen</button>
         </div>
     </div>
-</div>
+</dialog>
 
 <!--/* Massen-Umbuchen modal (REQ-INV-036) — the bulk counterpart of #umbuchenModal. Two differences
      from the single-row dialog: there is no amount input (every marked row moves in full, since the
@@ -662,7 +662,7 @@
      and the two personal directions are OWN radio options instead of one direction inferred from the
      source row — a bulk selection can mix personal and shared stock, so the target state is stated
      explicitly and rows already in it are skipped server-side. */-->
-<div id="bulkRebookModal" class="krt-modal-overlay">
+<dialog id="bulkRebookModal" class="krt-modal-overlay">
     <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{inventory.bulk.rebook.modal.title}">
         <div class="krt-modal-head">
             <h2 th:text="#{inventory.bulk.rebook.modal.title}">Markierte umbuchen</h2>
@@ -733,7 +733,7 @@
         </div>
         </form>
     </div>
-</div>
+</dialog>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 <!--/* Shared Materialbörse release / edit modal, reused by the "Für Börse freigeben" leaf checkbox */-->

@@ -45,7 +45,7 @@ function openNoteModal(btn) {
     const note = btn.getAttribute('data-note') || '';
     ta.value = note;
     updateNoteCounter();
-    modal.style.display = 'flex';
+    window.krtModal.open(modal);
     setTimeout(function () {
         ta.focus();
     }, 0);
@@ -53,7 +53,7 @@ function openNoteModal(btn) {
 
 function closeNoteModal() {
     const modal = document.getElementById('noteModal');
-    modal.style.display = 'none';
+    window.krtModal.close(modal);
     activeNoteButton = null;
 }
 

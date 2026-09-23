@@ -331,7 +331,7 @@
          bank administration's holder menu (REQ-BANK-031). */-->
 
     <!--/* Reversal confirm (management only). */-->
-    <div class="krt-modal-overlay" id="bank-reverse-modal" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)">
+    <dialog class="krt-modal-overlay" id="bank-reverse-modal" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)">
         <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.reverse.title}">
             <div class="krt-modal-head">
                 <h3 th:text="#{bank.modal.reverse.title}">Buchung stornieren</h3>
@@ -360,10 +360,10 @@
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 
     <!--/* Statement export (REQ-BANK-014): period picker -> PDF blob download via the proxy. */-->
-    <div class="krt-modal-overlay" id="bank-statement-modal">
+    <dialog class="krt-modal-overlay" id="bank-statement-modal">
         <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.statement.title}">
             <div class="krt-modal-head">
                 <h3 th:text="#{bank.modal.statement.title}">Kontoauszug exportieren</h3>
@@ -406,7 +406,7 @@
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
     </th:block>
     </div>
 </main>

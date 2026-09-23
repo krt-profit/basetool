@@ -103,16 +103,16 @@
     const closeBtn = document.querySelector('#add-member-modal .close-add-member-modal');
     if (modal && openBtn) {
         openBtn.addEventListener('click', function () {
-            modal.style.display = 'flex';
+            window.krtModal.open(modal);
         });
         if (closeBtn) {
             closeBtn.addEventListener('click', function () {
-                modal.style.display = 'none';
+                window.krtModal.close(modal);
             });
         }
         modal.addEventListener('click', function (e) {
             if (e.target === modal) {
-                modal.style.display = 'none';
+                window.krtModal.close(modal);
             }
         });
         const addForm = modal.querySelector('form');
@@ -124,7 +124,7 @@
                     return;
                 }
                 memberWrite(addForm, MEMBER_MSG.saved, function () {
-                    modal.style.display = 'none';
+                    window.krtModal.close(modal);
                     addForm.reset();
                 });
             });

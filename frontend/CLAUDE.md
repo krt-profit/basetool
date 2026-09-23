@@ -75,6 +75,17 @@ whatever it has to run goes into `document.addEventListener('DOMContentLoaded', 
 `bindX()` or IIFE that touches `window.krtFetch` silently does nothing. `InlineScriptLoadOrderTest`
 fails the build on it, `ScriptLoadOrderE2eTest` checks it in the browser.
 
+### Dialogs: one contract (binding)
+
+Every dialog is a `<dialog class="krt-modal-overlay">` > `.krt-modal` (REQ-UI-013, ADR-0177) and
+opens and closes **only** through `window.krtModal.open(el | id)` / `window.krtModal.close(el | id)`
+— or the shared `data-trigger="open-modal-display"` / `"close-modal-display"` triggers, which call
+it. Never write `overlay.style.display`, never toggle `krtm-modal-open` yourself: the contract
+calls `showModal()`, moves focus in and back, handles Escape, and keeps the class state that live
+sync and the tests read. While a dialog is open the page behind it is inert, so anything you append
+for the user to see or click — a toast, a confirm, a download link — goes into
+`window.krtModal.layerRoot()`, not `document.body`.
+
 ## Live update
 
 **Live update is a binding requirement: every part of the frontend must support live update to

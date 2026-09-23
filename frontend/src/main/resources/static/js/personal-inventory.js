@@ -367,7 +367,7 @@
         if (titleEl && i18n.createTitle) titleEl.textContent = i18n.createTitle;
         form.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
         clearForm();
-        modal.style.display = 'flex';
+        window.krtModal.open(modal);
     }
 
     function openEdit(btn) {
@@ -384,11 +384,11 @@
         if (hiddenLocationType)
             hiddenLocationType.value = btn.getAttribute('data-location-type') || '';
         if (searchInput) searchInput.value = btn.getAttribute('data-location-name') || '';
-        modal.style.display = 'flex';
+        window.krtModal.open(modal);
     }
 
     function closeModal() {
-        if (modal) modal.style.display = 'none';
+        if (modal) window.krtModal.close(modal);
     }
 
     function openDelete(btn) {
@@ -405,11 +405,11 @@
                     ? window.krtPersonalInventoryI18n.confirmBody + ' (' + name + ')'
                     : msgEl.textContent;
         }
-        deleteModal.style.display = 'flex';
+        window.krtModal.open(deleteModal);
     }
 
     function closeDelete() {
-        if (deleteModal) deleteModal.style.display = 'none';
+        if (deleteModal) window.krtModal.close(deleteModal);
     }
 
     function setField(name, value) {

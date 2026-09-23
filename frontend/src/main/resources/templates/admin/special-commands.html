@@ -113,7 +113,7 @@
 </main>
 
 <!--/* SpecialCommand Modal (create + edit, action URL toggled by JS) */-->
-<div id="specialcommand-modal" class="krt-modal-overlay" th:classappend="${openModal == 'specialcommand-modal'} ? 'krtm-modal-open' : 'krtm-hidden'">
+<dialog id="specialcommand-modal" class="krt-modal-overlay" th:classappend="${openModal == 'specialcommand-modal'} ? 'krtm-modal-open' : 'krtm-hidden'">
     <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{admin.specialcommands.create}">
         <div class="krt-modal-head">
             <h2 id="sc-modal-title" th:text="#{admin.specialcommands.create}">Spezialkommando</h2>
@@ -144,12 +144,12 @@
             </div>
         </form>
     </div>
-</div>
+</dialog>
 
 <!--/* Delete confirmation modal — the per-row trash button is a soft-delete (deactivate, reversible
      via "Aktivieren"); the form action is set to the clicked SK's delete URL by the script below.
      No native confirm() per the design system's "no native browser dialogs" rule. */-->
-<div id="sc-delete-modal" class="krt-modal-overlay">
+<dialog id="sc-delete-modal" class="krt-modal-overlay">
     <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{info.delete.confirm.title}">
         <div class="krt-modal-head">
             <h2 th:text="#{info.delete.confirm.title}">Löschen bestätigen</h2>
@@ -166,7 +166,7 @@
             </form>
         </div>
     </div>
-</div>
+</dialog>
 
 <!--/* Modal wiring: open create on +button, open edit prefilled from data-* on Edit button, close on x */-->
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">

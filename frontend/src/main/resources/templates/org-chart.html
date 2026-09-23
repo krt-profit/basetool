@@ -216,7 +216,7 @@
 </main>
 
 <!--/* Assign / reassign / add-staff modal (admins only) */-->
-<div id="oc-modal" class="krt-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="oc-modal-title"
+<dialog id="oc-modal" class="krt-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="oc-modal-title"
      sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
     <div class="krt-modal krt-modal--wide">
         <div class="krt-modal-head">
@@ -262,7 +262,7 @@
                     th:text="#{orgChart.modal.submit}">Zuweisen</button>
         </div>
     </div>
-</div>
+</dialog>
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     // Thymeleaf-interpolated i18n strings only; the imperative logic lives in the org-chart.js

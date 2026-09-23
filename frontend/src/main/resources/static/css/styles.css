@@ -6037,6 +6037,27 @@ textarea:focus-visible,
     padding: 20px;
     z-index: 3000;
 }
+/* Every overlay is a native <dialog> (FE-SIMP-04b, ADR-0177). `window.krtModal.open` shows it with
+   showModal(): top layer, the rest of the page inert, Escape raised as `cancel`. The user-agent
+   dialog box is undone here so the element is the same full-viewport scrim the <div> was — in the
+   top layer and equally when it is shown by the `krtm-modal-open` class alone (a server-rendered
+   open dialog before the script upgrades it, the layout guard revealing every dialog). The UA
+   `::backdrop` is made transparent because the overlay IS the scrim; keeping both would darken
+   the page twice. The overlay keeps its class: live sync, the layout guard and the tests key on
+   `.krt-modal-overlay` and its computed display. */
+dialog.krt-modal-overlay {
+    width: auto;
+    height: auto;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    border: 0;
+    color: inherit;
+    overflow: visible;
+}
+dialog.krt-modal-overlay::backdrop {
+    background: transparent;
+}
 /* The frame itself must NOT scroll: its ::before/::after corner brackets sit
    2px outside the box and would register as permanent overflow, forcing
    scrollbars even when the content fits. Scrolling happens in .krt-modal-body

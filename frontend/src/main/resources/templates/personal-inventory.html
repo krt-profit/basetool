@@ -120,7 +120,7 @@
 </main>
 
 <!--/* Create / Edit modal (KRT modal frame, no native dialogs) */-->
-<div id="krt-pi-modal" class="krt-modal-overlay" role="dialog" aria-modal="true"
+<dialog id="krt-pi-modal" class="krt-modal-overlay" role="dialog" aria-modal="true"
      aria-labelledby="krt-pi-modal-title"
      th:classappend="${showItemModal != null} ? 'krtm-modal-open' : 'krtm-hidden'">
     <div class="krt-modal krt-modal--wide">
@@ -176,10 +176,10 @@
             </div>
         </form>
     </div>
-</div>
+</dialog>
 
 <!--/* Delete confirmation modal (KRT danger frame; the body names what is deleted) */-->
-<div id="krt-pi-delete-modal" class="krt-modal-overlay krtm-display-none-5790" role="dialog" aria-modal="true" th:aria-label="#{personalInventory.action.delete.confirm.title}">
+<dialog id="krt-pi-delete-modal" class="krt-modal-overlay krtm-display-none-5790" role="dialog" aria-modal="true" th:aria-label="#{personalInventory.action.delete.confirm.title}">
     <div class="krt-modal krt-modal--danger">
         <div class="krt-modal-head">
             <h2 th:text="#{personalInventory.action.delete.confirm.title}">Eintrag loeschen</h2>
@@ -196,7 +196,7 @@
             </div>
         </form>
     </div>
-</div>
+</dialog>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">

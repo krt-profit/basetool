@@ -10,7 +10,7 @@
   kinds.
 */-->
 <th:block th:fragment="requestModal">
-    <div id="mg-modal" class="krt-modal-overlay">
+    <dialog id="mg-modal" class="krt-modal-overlay">
         <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true"
              aria-labelledby="mg-modal-title" data-mg-modal>
             <div class="krt-modal-head">
@@ -94,7 +94,7 @@
                 </button>
             </div>
         </div>
-    </div>
+    </dialog>
     <script th:inline="javascript" th:attr="nonce=${cspNonce}">
         window.materialgesuchI18n = Object.assign(window.materialgesuchI18n || {}, {
             requestTitle: /*[[#{materialgesuch.modal.request.title}]]*/ 'Material suchen',

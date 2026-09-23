@@ -44,7 +44,7 @@
     </div>
 
     <!--/* Delete Confirmation Modal */-->
-    <div id="delete-confirm-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
+    <dialog id="delete-confirm-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
         <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{info.delete.confirm.title}">
             <div class="krt-modal-head">
                 <h2 th:text="#{info.delete.confirm.title}">Löschen bestätigen</h2>
@@ -60,7 +60,7 @@
                 </form>
             </div>
         </div>
-    </div>
+    </dialog>
 </main>
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     const ANNOUNCE_MSG = {

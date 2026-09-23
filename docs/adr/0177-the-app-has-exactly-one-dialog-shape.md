@@ -143,3 +143,29 @@ nothing at all when clicked, and looks perfect in a screenshot.
   set as `.krt-modal`. Cheaper, and it cements three shapes and their three contracts rather than
   removing them. It would also have left the live-sync probe blind, since that keys on the root
   class and not on the box.
+
+## Amendment 2026-09-23 — one behaviour, and the shape is a native `<dialog>` (FE-SIMP-04 / 04b)
+
+One shape did not yet mean one behaviour. Ninety of the ninety-six dialogs carried their own
+open/close code and 107 call sites wrote `overlay.style.display`, so Escape, focus-in, focus return
+and the inline-versus-class trap differed dialog by dialog. `window.krtModal` (`krt-modal.js`) is now
+the only open/close path, and every overlay element is a `<dialog>` opened with `showModal()`.
+
+Decided alongside:
+
+- **The class stays on the element.** `.krt-modal-overlay` / `krtm-modal-open` / `krtm-hidden` are
+  still the state the rest of the app reads — live sync's busy probe, the layout guard, the tests.
+  The dialog's own `[open]` follows the class through the contract, and a `MutationObserver` keeps
+  the two in step for any path that bypasses it. An invisible dialog left in the top layer would
+  make the whole page inert, and that is the one failure this design must not allow.
+- **Escape clicks the dialog's own close control** rather than hiding the dialog, so a page's close
+  logic (reset an unsaved-changes flag, clear a picker) runs for Escape as for ✕.
+- **Transient overlays go into the open dialog** (`layerRoot()`): toasts, the KRT confirm, the
+  download anchors. Outside it they would be inert and painted beneath the top layer.
+- **Focus lands on a field, never on a button**, so a confirmation opened by mouse cannot be
+  answered by an accidental Enter.
+
+Rejected: moving the ninety hand-written shells onto `fragments/modal-wrapper.html` in the same
+change. The behaviour they duplicated is gone; the markup they still duplicate would change on
+every one of them (heading level, close glyph, ids that scripts and tests address) for no
+behavioural gain. Left as an owner decision.

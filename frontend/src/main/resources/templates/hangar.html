@@ -145,7 +145,7 @@
     </div>
 
     <!--/* Ship Modal */-->
-    <div id="ship-modal" class="krt-modal-overlay" th:data-title-add="#{hangar.ship.add}" th:data-title-edit="#{hangar.ship.edit}">
+    <dialog id="ship-modal" class="krt-modal-overlay" th:data-title-add="#{hangar.ship.add}" th:data-title-edit="#{hangar.ship.edit}">
         <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{hangar.ship.modal_title}">
             <div class="krt-modal-head">
                 <h2 id="modal-title" th:text="#{hangar.ship.modal_title}">Schiff</h2>
@@ -205,7 +205,7 @@
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 
     <!--/* Fleetview Import Section */-->
     <div class="hud-box mt-2 import-section">
@@ -239,7 +239,7 @@
     </div>
 
     <!--/* Fleetview Import Result Modal */-->
-    <div id="import-result-modal" class="krt-modal-overlay krtm-display-none-z-index-3200-e00a">
+    <dialog id="import-result-modal" class="krt-modal-overlay krtm-display-none-z-index-3200-e00a">
         <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{hangar.import.result.title}">
             <div class="krt-modal-head">
                 <h2 id="import-result-title" th:text="#{hangar.import.result.title}">Import-Ergebnis</h2>
@@ -271,10 +271,10 @@
                 <button id="import-result-close" class="btn btn-ghost" type="button" th:text="#{hangar.import.result.close}">Schließen</button>
             </div>
         </div>
-    </div>
+    </dialog>
 
     <!--/* Delete All Ships Confirmation Modal */-->
-    <div id="delete-all-confirm-modal" class="krt-modal-overlay krtm-display-none-z-index-3300-c2c8">
+    <dialog id="delete-all-confirm-modal" class="krt-modal-overlay krtm-display-none-z-index-3300-c2c8">
         <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{hangar.delete_all.modal.title}">
             <div class="krt-modal-head">
                 <h2 th:text="#{hangar.delete_all.modal.title}">Hangar leeren</h2>
@@ -289,10 +289,10 @@
                 <button type="button" id="delete-all-confirm-btn" class="btn btn-danger" th:text="#{hangar.delete_all.modal.confirm}">Ja, alle löschen</button>
             </div>
         </div>
-    </div>
+    </dialog>
 
     <!--/* Set Home Location Modal */-->
-    <div id="home-location-modal" class="krt-modal-overlay krtm-display-none-z-index-3300-c2c8">
+    <dialog id="home-location-modal" class="krt-modal-overlay krtm-display-none-z-index-3300-c2c8">
         <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{hangar.home_location.modal.title}">
             <div class="krt-modal-head">
                 <h2 th:text="#{hangar.home_location.modal.title}">Home-Location setzen</h2>
@@ -326,10 +326,10 @@
                 </div>
             </th:block>
         </div>
-    </div>
+    </dialog>
 
     <!--/* Delete Confirmation Modal */-->
-    <div id="delete-confirm-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
+    <dialog id="delete-confirm-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
         <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{info.delete.confirm.title}">
             <div class="krt-modal-head">
                 <h2 th:text="#{info.delete.confirm.title}">Löschen bestätigen</h2>
@@ -345,7 +345,7 @@
                 </form>
             </div>
         </div>
-    </div>
+    </dialog>
 </main>
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">

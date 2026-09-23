@@ -39,7 +39,7 @@ function openDeleteModal(id) {
         '/operations/' + id + '/delete',
         deleteForm.action,
     );
-    document.getElementById('delete-operation-modal').style.display = 'flex';
+    window.krtModal.open(document.getElementById('delete-operation-modal'));
 }
 
 // CSP-safe delegated binding (replaces onclick="openDeleteModal(this.getAttribute('data-id'))").
@@ -65,7 +65,7 @@ function opsConflictStrings() {
 
 function closeOperationModal(id) {
     const modal = document.getElementById(id);
-    if (modal) modal.style.display = 'none';
+    if (modal) window.krtModal.close(modal);
 }
 
 function reloadOperationsList() {

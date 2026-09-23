@@ -475,7 +475,7 @@
     </div>
 
     <!--/* Statement export (REQ-BANK-038): period picker -> Halter-redacted PDF via the org-unit proxy. */-->
-    <div class="krt-modal-overlay" id="org-unit-statement-modal" th:if="${detail.canExportStatement()}">
+    <dialog class="krt-modal-overlay" id="org-unit-statement-modal" th:if="${detail.canExportStatement()}">
         <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.statement.title}">
             <div class="krt-modal-head">
                 <h3 th:text="#{bank.modal.statement.title}">Kontoauszug exportieren</h3>
@@ -518,7 +518,7 @@
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 </main>
 
 <th:block th:replace="~{fragments/toast :: toast}" />

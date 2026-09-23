@@ -203,11 +203,11 @@ document.addEventListener('DOMContentLoaded', function () {
         if (reasonInput) {
             reasonInput.value = '';
         }
-        modal.style.display = 'flex';
+        window.krtModal.open(modal);
     }
 
     function closeReject() {
-        modal.style.display = 'none';
+        window.krtModal.close(modal);
         rejectTarget = null;
     }
 
@@ -217,11 +217,11 @@ document.addEventListener('DOMContentLoaded', function () {
         if (picker && picker.krtCombobox) {
             picker.krtCombobox.setValue('');
         }
-        linkModal.style.display = 'flex';
+        window.krtModal.open(linkModal);
     }
 
     function closeLink() {
-        linkModal.style.display = 'none';
+        window.krtModal.close(linkModal);
         linkTarget = null;
     }
 
@@ -231,11 +231,11 @@ document.addEventListener('DOMContentLoaded', function () {
         if (picker && picker.krtCombobox) {
             picker.krtCombobox.setValue('');
         }
-        mergeModal.style.display = 'flex';
+        window.krtModal.open(mergeModal);
     }
 
     function closeMerge() {
-        mergeModal.style.display = 'none';
+        window.krtModal.close(mergeModal);
         mergeTarget = null;
     }
 
@@ -244,11 +244,11 @@ document.addEventListener('DOMContentLoaded', function () {
         if (reopenReasonInput) {
             reopenReasonInput.value = '';
         }
-        reopenModal.style.display = 'flex';
+        window.krtModal.open(reopenModal);
     }
 
     function closeReopen() {
-        reopenModal.style.display = 'none';
+        window.krtModal.close(reopenModal);
         reopenTarget = null;
     }
 

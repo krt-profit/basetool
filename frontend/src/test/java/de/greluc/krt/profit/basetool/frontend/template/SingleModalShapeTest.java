@@ -173,6 +173,41 @@ class SingleModalShapeTest {
   }
 
   /**
+   * Asserts that every canonical overlay is a native {@code <dialog>} (FE-SIMP-04b, ADR-0177).
+   *
+   * <p>{@code window.krtModal.open} shows an overlay with {@code showModal()}: top layer, the page
+   * behind it inert, Escape raised as {@code cancel}. A {@code .krt-modal-overlay} left as a {@code
+   * <div>} would still open — by its class — but without any of that, so the app would be back to
+   * two dialog behaviours under one class name, which is the split this test exists to prevent.
+   *
+   * @throws IOException if a template cannot be read
+   * @throws URISyntaxException if the templates classpath root cannot be resolved
+   */
+  @Test
+  void everyOverlayIsANativeDialog() throws IOException, URISyntaxException {
+    Pattern overlayTag =
+        Pattern.compile(
+            "<(\\w+)\\b[^>]*class=\"[^\"]*(?<![-\\w])krt-modal-overlay(?![-\\w])[^\"]*\"");
+    List<String> offenders = new ArrayList<>();
+    int dialogs = 0;
+    for (Path template : templates()) {
+      String html =
+          Files.readString(template, StandardCharsets.UTF_8).replaceAll("(?s)<!--.*?-->", "");
+      Matcher tag = overlayTag.matcher(html);
+      while (tag.find()) {
+        if ("dialog".equals(tag.group(1))) {
+          dialogs++;
+        } else {
+          offenders.add(
+              template.getFileName() + " -> <" + tag.group(1) + " class=krt-modal-overlay>");
+        }
+      }
+    }
+    assertThat(offenders).as("every .krt-modal-overlay is a <dialog>").isEmpty();
+    assertThat(dialogs).as("the dialogs are still there to be checked").isGreaterThan(50);
+  }
+
+  /**
    * Asserts that a dialog's submit button is inside the {@code <form>} it submits.
    *
    * <p>The canonical shell puts the actions in a {@code .krt-modal-foot} that is a sibling of
@@ -214,14 +249,15 @@ class SingleModalShapeTest {
 
   /**
    * Splits a template into the source text of each dialog, from a {@code .krt-modal-overlay}
-   * opening tag to the matching {@code </div>}.
+   * opening tag to the matching closing tag ({@code </dialog>} since FE-SIMP-04b).
    *
    * @param html the template source
    * @return one string per dialog found
    */
   private static List<String> dialogBlocks(String html) {
-    Pattern overlay = Pattern.compile("<div\\b[^>]*class=\"[^\"]*krt-modal-overlay[^\"]*\"[^>]*>");
-    Pattern div = Pattern.compile("<div\\b[^>]*?(/)?>|</div>");
+    Pattern overlay =
+        Pattern.compile("<(?:div|dialog)\\b[^>]*class=\"[^\"]*krt-modal-overlay[^\"]*\"[^>]*>");
+    Pattern div = Pattern.compile("<(?:div|dialog)\\b[^>]*?(/)?>|</(?:div|dialog)>");
     List<String> blocks = new ArrayList<>();
     Matcher start = overlay.matcher(html);
     while (start.find()) {

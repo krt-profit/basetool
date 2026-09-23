@@ -59,6 +59,11 @@
 
 ### Changed
 
+- **Dialoge verhalten sich überall gleich.** Jeder Dialog schließt jetzt mit Escape, setzt den
+  Fokus beim Öffnen in sein erstes Eingabefeld und gibt ihn beim Schließen an den auslösenden
+  Knopf zurück; die Seite dahinter ist gesperrt, solange er offen ist (native `<dialog>`-Elemente).
+
+
 - **Webtool ↔ Backend: keine gzip-Kompression mehr auf der internen Verbindung.** Gemessen kostete
   sie auf dem internen Weg mehr Zeit, als die kleineren Antworten sparten; das Webtool fragt sie
   deshalb nicht mehr an. Für Aufrufer von außen ändert sich nichts (ADR-0161).

@@ -12,7 +12,7 @@
          .krt-modal-overlay contract); the global styles.css default keeps it display:none
          until then, so no `hidden` attribute is used (that left the CSS display:none intact
          and the modal opened invisibly). */-->
-    <div id="mb-modal" class="krt-modal-overlay">
+    <dialog id="mb-modal" class="krt-modal-overlay">
         <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true"
              aria-labelledby="mb-modal-title" data-mb-modal>
             <div class="krt-modal-head">
@@ -100,7 +100,7 @@
                 </button>
             </div>
         </div>
-    </div>
+    </dialog>
     <script th:inline="javascript" th:attr="nonce=${cspNonce}">
         window.materialboerseI18n = Object.assign(window.materialboerseI18n || {}, {
             releaseTitle: /*[[#{materialboerse.modal.release.title}]]*/ 'Material für die Börse freigeben',

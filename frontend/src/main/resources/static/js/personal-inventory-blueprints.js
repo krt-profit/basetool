@@ -445,11 +445,11 @@
         setValue('krt-bp-edit-note', btn.getAttribute('data-note'));
         const productEl = $('krt-bp-edit-product');
         if (productEl) productEl.textContent = btn.getAttribute('data-name') || '';
-        editModal.style.display = 'flex';
+        window.krtModal.open(editModal);
     }
 
     function closeEdit() {
-        if (editModal) editModal.style.display = 'none';
+        if (editModal) window.krtModal.close(editModal);
     }
 
     function openDelete(btn) {
@@ -460,21 +460,21 @@
         if (msgEl && name) {
             msgEl.textContent = (i18n().removeBody || msgEl.textContent) + ' (' + name + ')';
         }
-        deleteModal.style.display = 'flex';
+        window.krtModal.open(deleteModal);
     }
 
     function closeDelete() {
-        if (deleteModal) deleteModal.style.display = 'none';
+        if (deleteModal) window.krtModal.close(deleteModal);
     }
 
     // Delete-all confirm modal (REQ-INV-023): no per-row context, so the danger frame's server text
     // (which names that defaults are kept) is shown as-is.
     function openDeleteAll() {
-        if (deleteAllModal) deleteAllModal.style.display = 'flex';
+        if (deleteAllModal) window.krtModal.open(deleteAllModal);
     }
 
     function closeDeleteAll() {
-        if (deleteAllModal) deleteAllModal.style.display = 'none';
+        if (deleteAllModal) window.krtModal.close(deleteAllModal);
     }
 
     function setValue(id, value) {

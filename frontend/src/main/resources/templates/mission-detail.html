@@ -1260,7 +1260,7 @@
     <!--/* ===== Modals (KRT modal frame: orange top edge + HUD corner brackets) ===== */-->
 
     <!--/* Add Participant Modal */-->
-    <div id="participant-modal" class="krt-modal-overlay" th:classappend="${openModal == 'participant-modal'} ? 'krtm-modal-open' : 'krtm-hidden'" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{mission.participant.add}">
+    <dialog id="participant-modal" class="krt-modal-overlay" th:classappend="${openModal == 'participant-modal'} ? 'krtm-modal-open' : 'krtm-hidden'" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{mission.participant.add}">
         <div class="krt-modal krt-modal--wide">
             <div class="krt-modal-head">
                 <h2 th:text="#{mission.participant.add}">Anmelden</h2>
@@ -1321,10 +1321,10 @@
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 
     <!--/* Edit Participant Modal */-->
-    <div id="edit-participant-modal" class="krt-modal-overlay krtm-display-none-5790" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{members.edit}">
+    <dialog id="edit-participant-modal" class="krt-modal-overlay krtm-display-none-5790" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{members.edit}">
         <div class="krt-modal krt-modal--wide">
             <div class="krt-modal-head">
                 <h2 id="edit-participant-title" th:text="#{members.edit}">Bearbeiten</h2>
@@ -1410,10 +1410,10 @@
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 
     <!--/* Add Unit Modal */-->
-    <div id="add-unit-modal" class="krt-modal-overlay" th:classappend="${openModal == 'unit-modal'} ? 'krtm-modal-open' : 'krtm-hidden'" th:if="${!isNew and mission.canEdit}" role="dialog" aria-modal="true" th:aria-label="#{mission.unit.add}">
+    <dialog id="add-unit-modal" class="krt-modal-overlay" th:classappend="${openModal == 'unit-modal'} ? 'krtm-modal-open' : 'krtm-hidden'" th:if="${!isNew and mission.canEdit}" role="dialog" aria-modal="true" th:aria-label="#{mission.unit.add}">
         <div class="krt-modal krt-modal--wide"
              th:data-init-shiptype="${unitForm.shipTypeId != null ? unitForm.shipTypeId : ''}"
              th:data-init-ship="${unitForm.shipId != null ? unitForm.shipId : ''}">
@@ -1480,10 +1480,10 @@
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 
     <!--/* Frequency Modal */-->
-    <div id="frequency-modal" class="krt-modal-overlay krtm-display-none-5790" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{admin.mission_data.frequency_types}">
+    <dialog id="frequency-modal" class="krt-modal-overlay krtm-display-none-5790" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{admin.mission_data.frequency_types}">
         <div class="krt-modal">
             <div class="krt-modal-head">
                 <h2 th:text="#{admin.mission_data.frequency_types}">Frequenz zuweisen</h2>
@@ -1503,13 +1503,13 @@
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 
     <!--/* Custom (mission-specific) frequency modal (REQ-MISSION-014) — add & edit share it; the hidden
          id/version discriminate (empty id = add). Pure-JS submit against the /frequencies/custom
          AJAX proxies; on success the "Weitere Frequenzen" editor + overview Funk panel refresh in
          place. Lives outside every swap fragment so its .freq-input listener persists across swaps. */-->
-    <div id="custom-frequency-modal" class="krt-modal-overlay krtm-display-none-5790" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{mission.frequency.custom.section}">
+    <dialog id="custom-frequency-modal" class="krt-modal-overlay krtm-display-none-5790" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{mission.frequency.custom.section}">
         <div class="krt-modal">
             <div class="krt-modal-head">
                 <h2 id="custom-frequency-modal-title" th:text="#{mission.frequency.custom.add}">Frequenz hinzuf&uuml;gen</h2>
@@ -1535,10 +1535,10 @@
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 
     <!--/* Edit Unit Modal */-->
-    <div id="edit-unit-modal" class="krt-modal-overlay" th:classappend="${openModal == 'edit-unit-modal'} ? 'krtm-modal-open' : 'krtm-hidden'" th:if="${!isNew and mission.canEdit}" role="dialog" aria-modal="true" th:aria-label="#{mission.unit.edit}">
+    <dialog id="edit-unit-modal" class="krt-modal-overlay" th:classappend="${openModal == 'edit-unit-modal'} ? 'krtm-modal-open' : 'krtm-hidden'" th:if="${!isNew and mission.canEdit}" role="dialog" aria-modal="true" th:aria-label="#{mission.unit.edit}">
         <div class="krt-modal krt-modal--wide"
              th:data-init-shiptype="${unitForm.shipTypeId != null ? unitForm.shipTypeId : ''}"
              th:data-init-ship="${unitForm.shipId != null ? unitForm.shipId : ''}">
@@ -1603,10 +1603,10 @@
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 
     <!--/* Edit Crew Modal (multi function selection; quick single change runs via the board chip-select) */-->
-    <div id="edit-crew-modal" class="krt-modal-overlay" th:classappend="${openModal == 'edit-crew-modal'} ? 'krtm-modal-open' : 'krtm-hidden'" th:if="${!isNew and mission.canEdit}" role="dialog" aria-modal="true" th:aria-label="#{mission.unit.edit_crew}">
+    <dialog id="edit-crew-modal" class="krt-modal-overlay" th:classappend="${openModal == 'edit-crew-modal'} ? 'krtm-modal-open' : 'krtm-hidden'" th:if="${!isNew and mission.canEdit}" role="dialog" aria-modal="true" th:aria-label="#{mission.unit.edit_crew}">
         <div class="krt-modal">
             <div class="krt-modal-head">
                 <h2 th:text="#{mission.unit.edit_crew}">Crew bearbeiten</h2>
@@ -1629,10 +1629,10 @@
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 
     <!--/* Add Finance Entry Modal */-->
-    <div id="finance-modal" class="krt-modal-overlay" th:classappend="${openModal == 'finance-entry-modal'} ? 'krtm-modal-open' : 'krtm-hidden'" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{mission.finance.add}">
+    <dialog id="finance-modal" class="krt-modal-overlay" th:classappend="${openModal == 'finance-entry-modal'} ? 'krtm-modal-open' : 'krtm-hidden'" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{mission.finance.add}">
         <div class="krt-modal krt-modal--wide">
             <div class="krt-modal-head">
                 <h2 th:text="#{mission.finance.add}">Finanzeintrag hinzuf&uuml;gen</h2>
@@ -1679,10 +1679,10 @@
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 
     <!--/* Edit Finance Entry Modal */-->
-    <div id="edit-finance-entry-modal" class="krt-modal-overlay" th:classappend="${openModal == 'edit-finance-entry-modal'} ? 'krtm-modal-open' : 'krtm-hidden'" sec:authorize="isAuthenticated()" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{mission.finance.edit}">
+    <dialog id="edit-finance-entry-modal" class="krt-modal-overlay" th:classappend="${openModal == 'edit-finance-entry-modal'} ? 'krtm-modal-open' : 'krtm-hidden'" sec:authorize="isAuthenticated()" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{mission.finance.edit}">
         <div class="krt-modal krt-modal--wide">
             <div class="krt-modal-head">
                 <h2 th:text="#{mission.finance.edit}">Finanzeintrag bearbeiten</h2>
@@ -1717,10 +1717,10 @@
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 
     <!--/* Delete Confirmation Modal (danger variant; the body names the consequence per sub-section) */-->
-    <div id="delete-confirm-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb" role="dialog" aria-modal="true" th:aria-label="#{info.delete.confirm.title}">
+    <dialog id="delete-confirm-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb" role="dialog" aria-modal="true" th:aria-label="#{info.delete.confirm.title}">
         <div class="krt-modal krt-modal--danger">
             <div class="krt-modal-head">
                 <h2 th:text="#{info.delete.confirm.title}">L&ouml;schen best&auml;tigen</h2>
@@ -1736,7 +1736,7 @@
                 </form>
             </div>
         </div>
-    </div>
+    </dialog>
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     const MSG_ERROR_PAYOUT_UPDATE = /*[[#{error.mission.payout.update}]]*/ 'Error updating payout preference';
     const MSG_ERROR_PERMISSION_DENIED = /*[[#{error.permission.denied}]]*/ 'Permission denied';

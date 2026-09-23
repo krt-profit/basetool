@@ -123,7 +123,7 @@
 </main>
 
 <!--/* Add-Member Modal */-->
-<div id="add-member-modal" class="krt-modal-overlay">
+<dialog id="add-member-modal" class="krt-modal-overlay">
     <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{admin.specialcommands.members.add}">
         <div class="krt-modal-head">
             <h2 th:text="#{admin.specialcommands.members.add}">Mitglied hinzufügen</h2>
@@ -145,7 +145,7 @@
             </div>
         </form>
     </div>
-</div>
+</dialog>
 
 <!--/* Add-Member modal wiring + in-place member CRUD (#582) */-->
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
