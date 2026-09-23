@@ -53,8 +53,10 @@ public interface RankRequirementMapper {
    * @param request validated payload describing the new requirement
    * @return a transient entity ready to be persisted
    */
+  @Mapping(target = "id", ignore = true)
   @Mapping(target = "topic", ignore = true)
   @Mapping(target = "category", ignore = true)
+  @Mapping(target = "owningSquadron", ignore = true)
   RankRequirement toEntity(RankRequirementWriteRequest request);
 
   /**
@@ -71,5 +73,6 @@ public interface RankRequirementMapper {
   @Mapping(target = "updatedAt", ignore = true)
   @Mapping(target = "topic", ignore = true)
   @Mapping(target = "category", ignore = true)
+  @Mapping(target = "owningSquadron", ignore = true)
   void updateEntity(@MappingTarget RankRequirement entity, RankRequirementWriteRequest request);
 }

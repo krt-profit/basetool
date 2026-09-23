@@ -44,7 +44,9 @@ import de.greluc.krt.profit.basetool.backend.repository.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.service.SyncReportService;
+import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -92,13 +94,33 @@ class ScWikiItemSyncServiceBackfillTest {
   private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
 
   private ScWikiProperties properties;
+
+  /** The configured keys, relative to the record's prefix; {@link #rebuild()} binds them. */
+  private final Map<String, Object> config = new HashMap<>();
+
   private ScWikiItemSyncService service;
 
   @BeforeEach
   void setUp() {
-    properties = new ScWikiProperties();
-    properties.setItemSyncEnabled(true);
-    properties.setSyncAllItems(true);
+    config.putAll(Map.of("item-sync-enabled", true, "sync-all-items", true));
+    rebuild();
+    lenient().when(syncReportService.beginRun()).thenReturn(UUID.randomUUID());
+    // fetchAllPagesResult returns a FetchResult record (not a List), so Mockito's unstubbed default
+    // is null rather than an empty list. Restore the old "unstubbed endpoint -> empty page"
+    // behaviour that stubPass relies on: Mode B pages every kind endpoint, and a test stubs only
+    // the
+    // one(s) it cares about — the rest must resolve to an empty, non-304 page, not NPE (#1182).
+    lenient()
+        .when(scWikiClient.fetchAllPagesResult(any(), any(), any(), any(), any()))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of()));
+  }
+
+  /**
+   * Binds the properties record from {@link #config} and builds the object under test over it. The
+   * record is immutable (BE-MOD-04), so a test that changes a key rebuilds.
+   */
+  private void rebuild() {
+    properties = BoundProperties.bind(ScWikiProperties.class, config);
     service =
         new ScWikiItemSyncService(
             scWikiClient,
@@ -110,15 +132,6 @@ class ScWikiItemSyncServiceBackfillTest {
             meterRegistry,
             self);
     lenient().when(self.getObject()).thenReturn(service);
-    lenient().when(syncReportService.beginRun()).thenReturn(UUID.randomUUID());
-    // fetchAllPagesResult returns a FetchResult record (not a List), so Mockito's unstubbed default
-    // is null rather than an empty list. Restore the old "unstubbed endpoint -> empty page"
-    // behaviour that stubPass relies on: Mode B pages every kind endpoint, and a test stubs only
-    // the
-    // one(s) it cares about — the rest must resolve to an empty, non-304 page, not NPE (#1182).
-    lenient()
-        .when(scWikiClient.fetchAllPagesResult(any(), any(), any(), any(), any()))
-        .thenReturn(ScWikiClient.FetchResult.of(List.of()));
   }
 
   // ---- mode selection -------------------------------------------------------------------------
@@ -136,7 +149,8 @@ class ScWikiItemSyncServiceBackfillTest {
 
   @Test
   void syncItems_dispatchesToClosure_whenSyncAllItemsFalse() {
-    properties.setSyncAllItems(false);
+    config.put("sync-all-items", false);
+    rebuild();
     UUID uuid = UUID.randomUUID();
     when(gameItemRepository.findAllExternalUuids()).thenReturn(List.of(uuid));
     when(blueprintRepository.findReferencedItemUuids()).thenReturn(List.of());
@@ -150,7 +164,8 @@ class ScWikiItemSyncServiceBackfillTest {
 
   @Test
   void syncItems_isNoOp_whenFeatureFlagOff_evenWithSyncAllItemsTrue() {
-    properties.setItemSyncEnabled(false);
+    config.put("item-sync-enabled", false);
+    rebuild();
 
     service.syncItems();
 
@@ -270,7 +285,8 @@ class ScWikiItemSyncServiceBackfillTest {
 
   @Test
   void backfill_skipsKindPassThatExceedsSanityCap_butStillRunsOtherPasses() {
-    properties.setBackfillKindSanityCap(2);
+    config.put("backfill-kind-sanity-cap", 2);
+    rebuild();
     UUID a = UUID.randomUUID();
     UUID b = UUID.randomUUID();
     UUID c = UUID.randomUUID();
@@ -569,7 +585,8 @@ class ScWikiItemSyncServiceBackfillTest {
 
   @Test
   void backfill_skipsReconciliation_whenFlagOff_evenWithAMatchingUexRow() {
-    properties.setReconcileUuidlessByName(false);
+    config.put("reconcile-uuidless-by-name", false);
+    rebuild();
     UUID wikiUuid = UUID.randomUUID();
     when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
     stubPass(VEHICLE_ITEMS, itemDto(wikiUuid, "Avionics Blade"));

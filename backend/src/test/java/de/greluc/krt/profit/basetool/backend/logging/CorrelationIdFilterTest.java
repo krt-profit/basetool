@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.config.LoggingProperties;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
+import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import java.io.IOException;
@@ -55,7 +56,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
  */
 class CorrelationIdFilterTest {
 
-  private final LoggingProperties props = new LoggingProperties();
+  private final LoggingProperties props = BoundProperties.defaults(LoggingProperties.class);
   private final AuthHelperService authHelperService = mock(AuthHelperService.class);
   private final OwnerScopeService ownerScopeService = mock(OwnerScopeService.class);
   private final CorrelationIdFilter filter =
@@ -80,46 +81,46 @@ class CorrelationIdFilterTest {
     MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/missions");
     MockHttpServletResponse response = new MockHttpServletResponse();
     AtomicReference<String> mdcDuringChain = new AtomicReference<>();
-    FilterChain chain = (req, res) -> mdcDuringChain.set(MDC.get(props.getCorrelationIdMdcKey()));
+    FilterChain chain = (req, res) -> mdcDuringChain.set(MDC.get(props.correlationIdMdcKey()));
 
     // When
     filter.doFilter(request, response, chain);
 
     // Then
-    String echoed = response.getHeader(props.getCorrelationIdHeader());
+    String echoed = response.getHeader(props.correlationIdHeader());
     assertThat(echoed).isNotBlank();
     assertThat(echoed).hasSize(36); // UUID length with dashes
     assertThat(mdcDuringChain.get()).isEqualTo(echoed);
     // MDC cleaned up in finally
-    assertThat(MDC.get(props.getCorrelationIdMdcKey())).isNull();
+    assertThat(MDC.get(props.correlationIdMdcKey())).isNull();
   }
 
   @Test
   void inboundHeader_ShouldBeReused() throws ServletException, IOException {
     // Given
     MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/missions");
-    request.addHeader(props.getCorrelationIdHeader(), "req-abc-123");
+    request.addHeader(props.correlationIdHeader(), "req-abc-123");
     MockHttpServletResponse response = new MockHttpServletResponse();
 
     // When
     filter.doFilter(request, response, (req, res) -> {});
 
     // Then
-    assertThat(response.getHeader(props.getCorrelationIdHeader())).isEqualTo("req-abc-123");
+    assertThat(response.getHeader(props.correlationIdHeader())).isEqualTo("req-abc-123");
   }
 
   @Test
   void unsafeInboundHeader_ShouldBeReplacedWithUuid() throws ServletException, IOException {
     // Given: CR/LF injection attempt
     MockHttpServletRequest request = new MockHttpServletRequest("GET", "/");
-    request.addHeader(props.getCorrelationIdHeader(), "abc\ninjected: evil");
+    request.addHeader(props.correlationIdHeader(), "abc\ninjected: evil");
     MockHttpServletResponse response = new MockHttpServletResponse();
 
     // When
     filter.doFilter(request, response, (req, res) -> {});
 
     // Then
-    String echoed = response.getHeader(props.getCorrelationIdHeader());
+    String echoed = response.getHeader(props.correlationIdHeader());
     assertThat(echoed).doesNotContain("\n", "injected");
     assertThat(echoed).hasSize(36);
   }
@@ -135,14 +136,14 @@ class CorrelationIdFilterTest {
     MockHttpServletRequest request = new MockHttpServletRequest("GET", "/");
     MockHttpServletResponse response = new MockHttpServletResponse();
     AtomicReference<String> userIdDuringChain = new AtomicReference<>();
-    FilterChain chain = (req, res) -> userIdDuringChain.set(MDC.get(props.getUserIdMdcKey()));
+    FilterChain chain = (req, res) -> userIdDuringChain.set(MDC.get(props.userIdMdcKey()));
 
     // When
     filter.doFilter(request, response, chain);
 
     // Then
     assertThat(userIdDuringChain.get()).isEqualTo("user-sub-42");
-    assertThat(MDC.get(props.getUserIdMdcKey())).isNull();
+    assertThat(MDC.get(props.userIdMdcKey())).isNull();
   }
 
   @Test
@@ -158,7 +159,7 @@ class CorrelationIdFilterTest {
 
     // When
     filter.doFilter(
-        request, response, (req, res) -> userIdDuringChain.set(MDC.get(props.getUserIdMdcKey())));
+        request, response, (req, res) -> userIdDuringChain.set(MDC.get(props.userIdMdcKey())));
 
     // Then
     assertThat(userIdDuringChain.get()).isEqualTo("anonymous");

@@ -19,9 +19,10 @@
 
 package de.greluc.krt.profit.basetool.frontend.e2e;
 
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
+
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
-import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
@@ -43,11 +44,20 @@ class BlueprintsMockupCheckE2eTest {
   private static Playwright playwright;
   private static Browser browser;
 
-  /** Boots a headless Chromium for the walk-through. */
+  /**
+   * Skips the class unless {@code BP_CHECK=true}, then boots the headless browser of the configured
+   * engine ({@code -Pe2e.browser}) through {@link E2eSupport#launchBrowser}. The assumption runs
+   * <em>before</em> any browser launch: a CI matrix cell installs only its own engine, so an
+   * unconditional launch of a hard-coded one fails the whole class with a {@code DriverException}
+   * instead of skipping it.
+   */
   @BeforeAll
   static void setUp() {
+    assumeTrue(
+        "true".equals(System.getenv("BP_CHECK")),
+        "ad-hoc harness: set BP_CHECK=true against an already running local stack");
     playwright = Playwright.create();
-    browser = playwright.chromium().launch(new BrowserType.LaunchOptions().setHeadless(true));
+    browser = E2eSupport.launchBrowser(playwright, false);
   }
 
   /** Releases the browser and driver process. */
@@ -64,10 +74,6 @@ class BlueprintsMockupCheckE2eTest {
   /** Walks empty state, add flow, and master-detail rendering; captures screenshots. */
   @Test
   void walkBlueprintsPage() {
-    if (!"true".equals(System.getenv("BP_CHECK"))) {
-      System.out.println("[bp-check] BP_CHECK env missing - skipping");
-      return;
-    }
     String baseUrl = System.getenv().getOrDefault("E2E_BASE_URL", "https://localhost:18081");
     try (BrowserContext context =
         browser.newContext(new Browser.NewContextOptions().setIgnoreHTTPSErrors(true))) {

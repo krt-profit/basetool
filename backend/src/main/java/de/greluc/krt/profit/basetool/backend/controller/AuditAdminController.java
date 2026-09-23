@@ -37,6 +37,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -136,7 +137,7 @@ public class AuditAdminController {
       @UserZone ZoneId userZone) {
     byte[] pdf = auditReportService.generateAuditLogPdf(domain, from, to, userZone);
     return PdfResponses.pdfAttachment(
-        pdf, "audit-" + domain.name().toLowerCase(java.util.Locale.ROOT) + ".pdf");
+        pdf, "audit-" + domain.name().toLowerCase(Locale.ROOT) + ".pdf");
   }
 
   /**
@@ -159,7 +160,7 @@ public class AuditAdminController {
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.APPLICATION_JSON);
     headers.setContentDispositionFormData(
-        "attachment", "audit-" + domain.name().toLowerCase(java.util.Locale.ROOT) + ".json");
+        "attachment", "audit-" + domain.name().toLowerCase(Locale.ROOT) + ".json");
     return ResponseEntity.ok().headers(headers).body(events);
   }
 

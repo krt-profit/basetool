@@ -28,7 +28,4 @@ import org.mapstruct.Mapper;
 public interface AnnouncementMapper {
   /** Maps an {@link Announcement} entity to its outbound DTO. */
   AnnouncementDto toDto(Announcement announcement);
-
-  /** Builds a new {@link Announcement} entity from the inbound DTO. */
-  Announcement toEntity(AnnouncementDto dto);
 }

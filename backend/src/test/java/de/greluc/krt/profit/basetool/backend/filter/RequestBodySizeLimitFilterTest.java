@@ -48,22 +48,28 @@ class RequestBodySizeLimitFilterTest {
 
   private static final String CAPPED_PATH = "/api/v1/refinery-orders/import-extract";
 
-  private RequestBodyLimitProperties properties;
   private SimpleMeterRegistry meterRegistry;
   private RequestBodySizeLimitFilter filter;
 
   @BeforeEach
   void setUp() {
-    properties = new RequestBodyLimitProperties();
-    properties.setEnabled(true);
-    properties.setMaxBytes(100); // tiny cap so tests hit it with small bodies
-    properties.setPaths(List.of(CAPPED_PATH));
-
-    AppProblemProperties problemProperties = new AppProblemProperties();
-    problemProperties.setBaseUri("https://profit-base.online/problems/");
-
     meterRegistry = new SimpleMeterRegistry();
-    filter = new RequestBodySizeLimitFilter(properties, problemProperties, meterRegistry);
+    filter = newFilter(true);
+  }
+
+  /**
+   * Builds the filter under test over a tiny 100-byte cap on {@link #CAPPED_PATH}, so the tests hit
+   * it with small bodies. The properties are an immutable record (BE-MOD-04), so switching the cap
+   * off means building a new filter.
+   *
+   * @param enabled whether the cap is active
+   * @return the filter under test
+   */
+  private RequestBodySizeLimitFilter newFilter(boolean enabled) {
+    return new RequestBodySizeLimitFilter(
+        new RequestBodyLimitProperties(enabled, 100, List.of(CAPPED_PATH)),
+        new AppProblemProperties("https://profit-base.online/problems/"),
+        meterRegistry);
   }
 
   @Test
@@ -157,7 +163,7 @@ class RequestBodySizeLimitFilterTest {
 
   @Test
   void disabled_passesEverythingThrough() throws Exception {
-    properties.setEnabled(false);
+    filter = newFilter(false);
     MockHttpServletRequest req = jsonRequest(CAPPED_PATH, "x".repeat(500));
     MockHttpServletResponse resp = new MockHttpServletResponse();
     TrackingChain chain = new TrackingChain();

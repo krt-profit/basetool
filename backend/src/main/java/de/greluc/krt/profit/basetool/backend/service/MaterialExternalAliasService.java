@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExternalAlias;
@@ -81,10 +82,8 @@ public class MaterialExternalAliasService {
    * @throws NotFoundException if no row exists for the given id
    */
   public MaterialExternalAlias findById(UUID id) {
-    return repository
-        .findById(id)
-        .orElseThrow(
-            () -> new NotFoundException("Material external alias " + id + " does not exist."));
+    return Entities.require(
+        repository.findById(id), () -> "Material external alias " + id + " does not exist.");
   }
 
   /**
@@ -141,11 +140,9 @@ public class MaterialExternalAliasService {
     MaterialExternalAliasSource source =
         MaterialExternalAliasSource.valueOf(request.sourceSystem());
     Material material =
-        materialRepository
-            .findById(request.materialId())
-            .orElseThrow(
-                () ->
-                    new NotFoundException("Material " + request.materialId() + " does not exist."));
+        Entities.require(
+            materialRepository.findById(request.materialId()),
+            () -> "Material " + request.materialId() + " does not exist.");
     assertNoAliasConflict(source, request.externalName(), null);
 
     MaterialExternalAlias alias = new MaterialExternalAlias();
@@ -180,11 +177,9 @@ public class MaterialExternalAliasService {
     MaterialExternalAliasSource source =
         MaterialExternalAliasSource.valueOf(request.sourceSystem());
     Material material =
-        materialRepository
-            .findById(request.materialId())
-            .orElseThrow(
-                () ->
-                    new NotFoundException("Material " + request.materialId() + " does not exist."));
+        Entities.require(
+            materialRepository.findById(request.materialId()),
+            () -> "Material " + request.materialId() + " does not exist.");
     assertNoAliasConflict(source, request.externalName(), id);
 
     applyWritableFields(alias, material, source, request);

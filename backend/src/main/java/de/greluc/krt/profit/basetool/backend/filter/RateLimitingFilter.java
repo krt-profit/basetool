@@ -184,19 +184,19 @@ public class RateLimitingFilter extends OncePerRequestFilter {
    *     syntax
    */
   private void precompileAndValidatePatterns(@NotNull RateLimitProperties properties) {
-    List<String> globalPaths = properties.getPaths();
+    List<String> globalPaths = properties.paths();
     if (globalPaths != null) {
       for (String pattern : globalPaths) {
         compileOrFail(pattern, "app.rate-limit.paths");
       }
     }
-    List<RateLimitProperties.Rule> rules = properties.getRules();
+    List<RateLimitProperties.Rule> rules = properties.rules();
     if (rules != null) {
       for (RateLimitProperties.Rule rule : rules) {
-        List<String> rulePaths = rule.getPaths();
+        List<String> rulePaths = rule.paths();
         if (rulePaths != null) {
           for (String pattern : rulePaths) {
-            compileOrFail(pattern, "app.rate-limit.rules[" + rule.getName() + "].paths");
+            compileOrFail(pattern, "app.rate-limit.rules[" + rule.name() + "].paths");
           }
         }
       }
@@ -238,11 +238,11 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
   @Override
   protected boolean shouldNotFilter(HttpServletRequest request) {
-    if (!properties.isEnabled()) {
+    if (!properties.enabled()) {
       return true;
     }
     String path = request.getRequestURI();
-    List<String> patterns = properties.getPaths();
+    List<String> patterns = properties.paths();
     if (patterns == null || patterns.isEmpty()) {
       return true;
     }
@@ -345,27 +345,26 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     PathContainer parsedPath = PathContainer.parsePath(path);
     List<BucketSlot> slots = new ArrayList<>();
 
-    String globalPattern = firstMatchingPattern(parsedPath, properties.getPaths());
+    String globalPattern = firstMatchingPattern(parsedPath, properties.paths());
     if (globalPattern != null) {
       slots.add(
           new BucketSlot(
               "path:" + globalPattern,
-              properties.getCapacity(),
-              properties.getRefillTokens(),
-              properties.getRefillPeriod()));
+              properties.capacity(),
+              properties.refillTokens(),
+              properties.refillPeriod()));
     }
 
-    List<RateLimitProperties.Rule> rules = properties.getRules();
+    List<RateLimitProperties.Rule> rules = properties.rules();
     if (rules != null) {
       for (RateLimitProperties.Rule rule : rules) {
-        if (matchesMethod(rule.getMethods(), method)
-            && matchesAnyPath(rule.getPaths(), parsedPath)) {
+        if (matchesMethod(rule.methods(), method) && matchesAnyPath(rule.paths(), parsedPath)) {
           slots.add(
               new BucketSlot(
-                  "rule:" + rule.getName(),
-                  rule.getCapacity(),
-                  rule.getRefillTokens(),
-                  rule.getRefillPeriod()));
+                  "rule:" + rule.name(),
+                  rule.capacity(),
+                  rule.refillTokens(),
+                  rule.refillPeriod()));
         }
       }
     }
@@ -562,7 +561,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     String body =
         "{"
             + "\"type\":\""
-            + problemProperties.getBaseUri()
+            + problemProperties.baseUri()
             + "rate-limit-exceeded\","
             + "\"title\":\""
             + titleEscaped

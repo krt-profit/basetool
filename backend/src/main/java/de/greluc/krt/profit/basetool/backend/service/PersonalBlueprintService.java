@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.Res
 import de.greluc.krt.profit.basetool.backend.support.LogSafe;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import jakarta.persistence.EntityNotFoundException;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -424,7 +425,7 @@ public class PersonalBlueprintService {
    */
   @NotNull
   private PersonalBlueprint newOwned(
-      UUID ownerUserId, ResolvedProduct product, java.time.Instant acquiredAt, String note) {
+      UUID ownerUserId, ResolvedProduct product, Instant acquiredAt, String note) {
     PersonalBlueprint entity = new PersonalBlueprint();
     entity.setOwnerUserId(ownerUserId);
     entity.setProductKey(product.productKey());

@@ -1,3 +1,13 @@
+// Security override on the ROOT buildscript classpath, where `app.cash.licensee` is loaded (`apply
+// false` below): licensee 1.14.1 -> maven-model-builder 3.9.11 pins plexus-utils 3.6.0, which
+// carries CVE-2025-67030 (Expand.extractFile directory traversal, Dependabot alert #13). The
+// subprojects' classloaders delegate to this one first, so the root's version is the one every
+// module's licensee task runs with -- and every subproject classpath already asks for 3.6.1 through
+// the CycloneDX and Spring Boot plugins. Build-time only; the dependency-submission workflow
+// reports every build classpath, which is how Dependabot saw it. The version, the reasoning and
+// the removal condition live on `plexusUtils` in the version catalog.
+buildscript { dependencies { constraints { classpath(libs.plexus.utils) } } }
+
 plugins {
   id("idea")
   // `base` gives the root project the `check` lifecycle task that Spotless's

@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.BankConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.BankAccountMapper;
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;
@@ -280,9 +281,7 @@ public class BankAccountService {
           throw new BadRequestException("An ORG_UNIT account must not carry an area name");
         }
         OrgUnit orgUnit =
-            orgUnitRepository
-                .findById(request.orgUnitId())
-                .orElseThrow(() -> new NotFoundException("Org unit not found"));
+            Entities.require(orgUnitRepository.findById(request.orgUnitId()), "Org unit not found");
         // Epic #692 Phase 6 (REQ-ORG-019): since Bereich/OL are first-class org_unit rows now, an
         // ORG_UNIT account must reference a Staffel/SK — a Bereich is an AREA account and the OL
         // the
@@ -307,9 +306,7 @@ public class BankAccountService {
         }
         requireNoAreaName(request);
         OrgUnit bereich =
-            orgUnitRepository
-                .findById(request.orgUnitId())
-                .orElseThrow(() -> new NotFoundException("Org unit not found"));
+            Entities.require(orgUnitRepository.findById(request.orgUnitId()), "Org unit not found");
         if (bereich.getKind() != OrgUnitKind.BEREICH) {
           throw new BadRequestException("An AREA account must reference a Bereich org unit");
         }
@@ -329,9 +326,8 @@ public class BankAccountService {
         }
         if (request.orgUnitId() != null) {
           OrgUnit ol =
-              orgUnitRepository
-                  .findById(request.orgUnitId())
-                  .orElseThrow(() -> new NotFoundException("Org unit not found"));
+              Entities.require(
+                  orgUnitRepository.findById(request.orgUnitId()), "Org unit not found");
           if (ol.getKind() != OrgUnitKind.ORGANISATIONSLEITUNG) {
             throw new BadRequestException(
                 "The CARTEL account must reference the Organisationsleitung");
@@ -644,9 +640,7 @@ public class BankAccountService {
    * @return the account entity
    */
   private BankAccount requireAccount(@NotNull UUID accountId) {
-    return accountRepository
-        .findById(accountId)
-        .orElseThrow(() -> new NotFoundException("Bank account not found"));
+    return Entities.require(accountRepository.findById(accountId), "Bank account not found");
   }
 
   /**

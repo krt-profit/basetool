@@ -27,20 +27,23 @@ import org.slf4j.MDC;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.TaskDecorator;
+import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 /**
  * Dedicated bounded executors for {@code @Async} workloads.
  *
- * <p>{@code @EnableAsync} itself lives on {@link UexProperties} (it is the historic single owner of
- * the UEX scheduler timing). Without an explicit {@link Executor} bean Spring falls back to the
- * unbounded {@code SimpleAsyncTaskExecutor}, which spawns a new thread per {@code @Async} call and
- * never reuses or caps them — under a slow UEX upstream that latches into a thread leak. This class
- * publishes {@link #uexExecutor()} as a fixed pool with an abort policy so a stuck sync surfaces as
- * a {@link java.util.concurrent.RejectedExecutionException} in the logs instead of accumulating
- * thread state silently.
+ * <p>Also the one place {@code @EnableAsync} is declared. It used to sit on {@link UexProperties},
+ * the historic owner of the UEX sync timing, until that became an immutable record (BE-MOD-04) — a
+ * record cannot be a configuration class. Without an explicit {@link Executor} bean Spring falls
+ * back to the unbounded {@code SimpleAsyncTaskExecutor}, which spawns a new thread per
+ * {@code @Async} call and never reuses or caps them — under a slow UEX upstream that latches into a
+ * thread leak. This class publishes {@link #uexExecutor()} as a fixed pool with an abort policy so
+ * a stuck sync surfaces as a {@link java.util.concurrent.RejectedExecutionException} in the logs
+ * instead of accumulating thread state silently.
  */
 @Configuration
+@EnableAsync
 public class AsyncConfig {
 
   /** Spring-bean name of the UEX executor, referenced from {@code @Async("uexExecutor")}. */

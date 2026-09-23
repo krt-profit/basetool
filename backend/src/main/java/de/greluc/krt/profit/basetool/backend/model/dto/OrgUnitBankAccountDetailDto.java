@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
+import java.math.BigDecimal;
+import org.jetbrains.annotations.Nullable;
+
 /**
  * The read-only account detail an org-unit viewer sees when they open an account from the org-unit
  * bank page (REQ-BANK-038). Wraps the same {@link BankAccountDetailDto} the bank-staff detail page
@@ -55,5 +58,5 @@ public record OrgUnitBankAccountDetailDto(
     boolean canConfigureVisibility,
     boolean canRequest,
     boolean canConfigureApprovalLimits,
-    @org.jetbrains.annotations.Nullable java.math.BigDecimal applicableLimit,
+    @Nullable BigDecimal applicableLimit,
     boolean approvalExempt) {}

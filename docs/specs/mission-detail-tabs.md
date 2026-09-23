@@ -481,6 +481,13 @@ on every overview refresh. Because the leader derives from a participant's plann
 participant **edit** and **unregister** flows additionally refresh `['…','overview']` so the cell never
 goes stale (REQ-FE-010).
 
+> **Corrected 2026-09-23 (BE-MOD-05b).** Until then the backend never delivered the designation the
+> cell keys on: the job type a mission embeds (`MissionMapper.toDto(JobType)`) mapped
+> `isLeadershipRole` but not `isMissionLead`, so every participant's `plannedMissionJobType` arrived
+> with `isMissionLead = null` and the cell always showed the owner fallback. The central MapStruct
+> policy `unmappedTargetPolicy = IGNORE` had hidden it; with `ERROR` it failed the build. Guarded by
+> `MissionMapperJobTypeTest`.
+
 **Einsatzleiter designation.** "Einsatzleiter" is **not** hard-coded: it is a single, admin-set
 designation on the job-type reference data. `JobType` carries a `isMissionLead` flag; **at most one**
 job type may hold it (DB-enforced by a partial unique index, V200) and only a `MISSION`-archetype

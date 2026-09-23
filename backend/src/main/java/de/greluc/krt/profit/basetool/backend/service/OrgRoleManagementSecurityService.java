@@ -28,7 +28,10 @@ import de.greluc.krt.profit.basetool.backend.model.dto.BereichLeadershipRole;
 import de.greluc.krt.profit.basetool.backend.repository.KommandoGroupRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.support.RequestMemo;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,8 +40,6 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.context.request.RequestAttributes;
-import org.springframework.web.context.request.RequestContextHolder;
 
 /**
  * SpEL-level authorisation for the delegated appointment ladder (epic #800, REQ-ROLE-004). It
@@ -76,8 +77,8 @@ import org.springframework.web.context.request.RequestContextHolder;
 public class OrgRoleManagementSecurityService {
 
   /** Request-attribute key prefix of the per-request caller-membership memo. */
-  private static final String CALLER_MEMBERSHIPS_ATTR =
-      OrgRoleManagementSecurityService.class.getName() + ".callerMemberships.";
+  private static final RequestMemo.Key<Map<UUID, List<OrgUnitMembership>>> CALLER_MEMBERSHIPS =
+      RequestMemo.Key.of(OrgRoleManagementSecurityService.class, "callerMemberships");
 
   private final AuthHelperService authHelperService;
   private final OrgUnitMembershipRepository membershipRepository;
@@ -287,17 +288,13 @@ public class OrgRoleManagementSecurityService {
     if (callerId == null) {
       return List.of();
     }
-    RequestAttributes attrs = RequestContextHolder.getRequestAttributes();
-    if (attrs == null) {
+    Map<UUID, List<OrgUnitMembership>> memo =
+        RequestMemo.getIfBound(CALLER_MEMBERSHIPS, HashMap::new);
+    if (memo == null) {
       return membershipRepository.findAllByIdUserId(callerId);
     }
-    String key = CALLER_MEMBERSHIPS_ATTR + callerId;
-    if (attrs.getAttribute(key, RequestAttributes.SCOPE_REQUEST) instanceof List<?> cached) {
-      return cached.stream().map(OrgUnitMembership.class::cast).toList();
-    }
-    List<OrgUnitMembership> rows = List.copyOf(membershipRepository.findAllByIdUserId(callerId));
-    attrs.setAttribute(key, rows, RequestAttributes.SCOPE_REQUEST);
-    return rows;
+    return memo.computeIfAbsent(
+        callerId, id -> List.copyOf(membershipRepository.findAllByIdUserId(id)));
   }
 
   /**

@@ -132,7 +132,7 @@ public class OwnerScopeService {
    * @return the squadron id set the user-list queries filter on, or {@code null} for the unfiltered
    *     admin/leadership all-scope.
    */
-  @org.jetbrains.annotations.Nullable
+  @Nullable
   public Set<UUID> currentUserListScopeSquadronIds() {
     return requestScopeResolver.currentUserListScopeSquadronIds();
   }
@@ -154,7 +154,7 @@ public class OwnerScopeService {
    * @return the caller's effective membership/cascade org-unit ids, never {@code null}.
    */
   @NotNull
-  public java.util.Set<UUID> currentMemberOrgUnitIds() {
+  public Set<UUID> currentMemberOrgUnitIds() {
     return requestScopeResolver.currentMemberOrgUnitIds();
   }
 
@@ -166,7 +166,7 @@ public class OwnerScopeService {
    * @return the caller's direct-membership org-unit ids, never {@code null}.
    */
   @NotNull
-  public java.util.Set<UUID> currentDirectMembershipOrgUnitIds() {
+  public Set<UUID> currentDirectMembershipOrgUnitIds() {
     return requestScopeResolver.currentDirectMembershipOrgUnitIds();
   }
 
@@ -376,9 +376,8 @@ public class OwnerScopeService {
    * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when a non-null
    *     target id does not resolve to a known org unit.
    */
-  @org.jetbrains.annotations.Nullable
-  public OrgUnit resolveReassignTargetOrgUnit(
-      @org.jetbrains.annotations.Nullable UUID targetOrgUnitId) {
+  @Nullable
+  public OrgUnit resolveReassignTargetOrgUnit(@Nullable UUID targetOrgUnitId) {
     return orgUnitStampingService.resolveReassignTargetOrgUnit(targetOrgUnitId);
   }
 

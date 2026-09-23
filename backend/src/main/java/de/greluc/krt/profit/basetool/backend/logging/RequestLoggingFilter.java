@@ -79,7 +79,7 @@ public class RequestLoggingFilter extends OncePerRequestFilter implements Ordere
       int status = response.getStatus();
       String method = request.getMethod();
       String path = request.getRequestURI();
-      boolean slow = durationMs >= loggingProperties.getSlowRequestThresholdMs();
+      boolean slow = durationMs >= loggingProperties.slowRequestThresholdMs();
       if (slow && !STREAM_PATH.equals(path)) {
         log.warn("Slow request {} {} -> {} in {} ms", method, path, status, durationMs);
       } else if (log.isInfoEnabled()) {

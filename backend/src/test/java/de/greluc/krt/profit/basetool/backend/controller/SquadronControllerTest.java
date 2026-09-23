@@ -31,10 +31,13 @@ import de.greluc.krt.profit.basetool.backend.model.dto.SquadronDto;
 import de.greluc.krt.profit.basetool.backend.service.SquadronService;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
@@ -52,7 +55,45 @@ class SquadronControllerTest {
   @Mock private SquadronService service;
   @Mock private SquadronMapper mapper;
 
-  @InjectMocks private SquadronController controller;
+  private SquadronController controller;
+
+  @BeforeEach
+  void setUp() {
+    controller = new SquadronController(service, mapper, RoleGateFixture.realAuthHelper());
+  }
+
+  @AfterEach
+  void clearSecurityContext() {
+    RoleGateFixture.clear();
+  }
+
+  static java.util.stream.Stream<String> callers() {
+    return RoleGateFixture.callers();
+  }
+
+  /**
+   * BE-SIMP-07: the {@code includeInactive} gate moved from a raw {@code "ROLE_ADMIN"} scan of the
+   * injected {@code Authentication} to {@code AuthHelperService.isAdmin()}. Every caller shape must
+   * still get exactly the answer the raw scan gave: an admin reaches the service, everyone else is
+   * refused before it.
+   */
+  @ParameterizedTest
+  @MethodSource("callers")
+  void getAll_includeInactive_isAdminOnlyForEveryCallerShape(String caller) {
+    boolean admitted = RoleGateFixture.rawCheckAccepted(caller, "ROLE_ADMIN");
+    RoleGateFixture.authenticateAs(caller);
+    if (admitted) {
+      when(service.getAllSquadrons(any(Pageable.class), eq(true)))
+          .thenReturn(new PageImpl<>(List.of()));
+      controller.getAllSquadrons(null, null, null, true);
+      verify(service).getAllSquadrons(any(Pageable.class), eq(true));
+    } else {
+      assertThrows(
+          org.springframework.security.access.AccessDeniedException.class,
+          () -> controller.getAllSquadrons(null, null, null, true));
+      verify(service, never()).getAllSquadrons(any(Pageable.class), any(Boolean.class));
+    }
+  }
 
   @Test
   void getAll_wrapsServicePageIntoPageResponseAndMapsContent() {
@@ -65,7 +106,7 @@ class SquadronControllerTest {
     when(mapper.toDto(entity)).thenReturn(dto);
 
     // When
-    PageResponse<SquadronDto> resp = controller.getAllSquadrons(0, 20, null, false, null);
+    PageResponse<SquadronDto> resp = controller.getAllSquadrons(0, 20, null, false);
 
     // Then
     assertEquals(1, resp.totalElements());
@@ -78,16 +119,10 @@ class SquadronControllerTest {
     when(service.getAllSquadrons(any(Pageable.class), eq(true)))
         .thenReturn(new PageImpl<>(List.of()));
 
-    // M-6: includeInactive=true now requires ROLE_ADMIN. Provide an admin Authentication so the
+    // M-6: includeInactive=true now requires ROLE_ADMIN. Authenticate as an admin so the
     // delegation-contract test still exercises the pass-through to the service.
-    org.springframework.security.core.Authentication adminAuth =
-        new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
-            "admin",
-            null,
-            java.util.List.of(
-                new org.springframework.security.core.authority.SimpleGrantedAuthority(
-                    "ROLE_ADMIN")));
-    controller.getAllSquadrons(null, null, null, true, adminAuth);
+    RoleGateFixture.authenticateAs("ROLE_ADMIN");
+    controller.getAllSquadrons(null, null, null, true);
 
     // The boolean flag controls whether inactive squadrons appear in the result;
     // mis-routing it would silently hide deleted-but-still-required entries.
@@ -99,7 +134,7 @@ class SquadronControllerTest {
     when(service.getAllSquadrons(any(Pageable.class), eq(false)))
         .thenReturn(new PageImpl<>(List.of()));
 
-    controller.getAllSquadrons(3, 75, "name,desc", false, null);
+    controller.getAllSquadrons(3, 75, "name,desc", false);
 
     ArgumentCaptor<Pageable> pgCap = ArgumentCaptor.forClass(Pageable.class);
     verify(service).getAllSquadrons(pgCap.capture(), eq(false));

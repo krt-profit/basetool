@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.mapper.RefineryOrderMapper;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
+import de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderListDto;
@@ -83,8 +84,7 @@ public class RefineryOrderController {
   @Transactional(readOnly = true)
   public PageResponse<RefineryOrderListDto> getMyRefineryOrders(
       @AuthenticationPrincipal Jwt jwt,
-      @RequestParam(required = false)
-          List<de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus> status,
+      @RequestParam(required = false) List<RefineryOrderStatus> status,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort) {
@@ -279,8 +279,7 @@ public class RefineryOrderController {
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public PageResponse<RefineryOrderListDto> getAllRefineryOrders(
-      @RequestParam(required = false)
-          List<de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus> status,
+      @RequestParam(required = false) List<RefineryOrderStatus> status,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort) {

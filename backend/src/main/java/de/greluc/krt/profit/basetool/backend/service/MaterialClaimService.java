@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper;
@@ -439,9 +440,8 @@ public class MaterialClaimService {
     JobOrder order = loadOrder(jobOrderId);
     assertClaimable(order);
     MaterialClaim claim =
-        materialClaimRepository
-            .findById(claimId)
-            .orElseThrow(() -> new NotFoundException("MaterialClaim not found: " + claimId));
+        Entities.require(
+            materialClaimRepository.findById(claimId), () -> "MaterialClaim not found: " + claimId);
     if (!claim.getJobOrder().getId().equals(jobOrderId)) {
       throw new NotFoundException(
           "MaterialClaim " + claimId + " does not belong to order " + jobOrderId);
@@ -654,9 +654,8 @@ public class MaterialClaimService {
    * @throws NotFoundException when the order does not exist.
    */
   private JobOrder loadOrder(UUID jobOrderId) {
-    return jobOrderRepository
-        .findById(jobOrderId)
-        .orElseThrow(() -> new NotFoundException("JobOrder not found: " + jobOrderId));
+    return Entities.require(
+        jobOrderRepository.findById(jobOrderId), () -> "JobOrder not found: " + jobOrderId);
   }
 
   /**

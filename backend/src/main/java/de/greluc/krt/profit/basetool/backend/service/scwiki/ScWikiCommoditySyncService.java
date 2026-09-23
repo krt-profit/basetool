@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.service.MaterialExternalAliasServic
 import de.greluc.krt.profit.basetool.backend.service.MaterialNameCanonicalizer;
 import de.greluc.krt.profit.basetool.backend.service.SyncReportService;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -129,7 +130,7 @@ public class ScWikiCommoditySyncService {
    */
   @Transactional
   public int syncCommodities() {
-    if (!Boolean.TRUE.equals(properties.getCommoditySyncEnabled())) {
+    if (!Boolean.TRUE.equals(properties.commoditySyncEnabled())) {
       log.info(
           "SC Wiki commodity sync invoked but disabled "
               + "(krt.scwiki.commodity-sync-enabled=false) — skipping.");
@@ -139,7 +140,7 @@ public class ScWikiCommoditySyncService {
     log.info("Starting SC Wiki commodity merge...");
     ScWikiClient.FetchResult<ScWikiCommodityDto> fetchResult =
         scWikiClient.fetchAllPagesResult(
-            properties.getCommoditiesEndpoint(),
+            properties.commoditiesEndpoint(),
             new ParameterizedTypeReference<ScWikiResponseDto<ScWikiCommodityDto>>() {},
             "commodities");
     if (fetchResult.notModified()) {
@@ -292,7 +293,7 @@ public class ScWikiCommoditySyncService {
     if (canon != null && !canon.isBlank()) {
       List<Material> candidates = canonicalIndex.getOrDefault(canon, List.of());
       if (candidates.size() == 1) {
-        return ResolveResult.matched(candidates.get(0));
+        return ResolveResult.matched(candidates.getFirst());
       }
       if (candidates.size() > 1) {
         String names =
@@ -330,7 +331,7 @@ public class ScWikiCommoditySyncService {
       if (canon == null || canon.isBlank()) {
         continue;
       }
-      index.computeIfAbsent(canon, k -> new java.util.ArrayList<>()).add(material);
+      index.computeIfAbsent(canon, k -> new ArrayList<>()).add(material);
     }
     return index;
   }

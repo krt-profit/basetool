@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 /** Spring Data repository for Job Type. */
@@ -64,7 +65,6 @@ public interface JobTypeRepository extends LookupTableRepository<JobType, UUID> 
    *
    * @return the designated mission-lead job types (normally zero or one)
    */
-  @org.springframework.data.jpa.repository.Query(
-      "SELECT j FROM JobType j WHERE j.isMissionLead = true")
+  @Query("SELECT j FROM JobType j WHERE j.isMissionLead = true")
   List<JobType> findAllMissionLead();
 }

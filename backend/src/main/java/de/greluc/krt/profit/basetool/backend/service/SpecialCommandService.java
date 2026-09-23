@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.dto.SpecialCommandDto;
@@ -111,9 +112,7 @@ public class SpecialCommandService {
    * @throws NotFoundException if no SK matches the given id.
    */
   public SpecialCommand getSpecialCommandById(@NotNull UUID id) {
-    return specialCommandRepository
-        .findById(id)
-        .orElseThrow(() -> new NotFoundException("SpecialCommand not found"));
+    return Entities.require(specialCommandRepository.findById(id), "SpecialCommand not found");
   }
 
   /**

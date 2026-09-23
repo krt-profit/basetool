@@ -34,6 +34,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.springframework.beans.factory.annotation.Autowired;
 
 /** MapStruct mapper between Job Order entities and DTOs. */
 @Mapper(
@@ -50,14 +51,14 @@ public abstract class JobOrderMapper {
   // Field injection, because MapStruct's generated subclass has a no-arg constructor — the same
   // shape as MissionMapper. Depends only on the support-package leaf interface, never on the
   // service layer or SecurityContextHolder (ArchUnit mapperLayerShouldNotReachIntoSecurityContext).
-  @org.springframework.beans.factory.annotation.Autowired protected StockViewerAccess stockAccess;
+  @Autowired protected StockViewerAccess stockAccess;
 
   /**
    * The same {@link UserMapper} the generated subclass maps each assignee's {@code UserDto} with,
    * injected under its own name so {@link #mapAndSortAssignees(Set)} can seed its request memo for
    * the whole Bearbeiter list first.
    */
-  @org.springframework.beans.factory.annotation.Autowired protected UserMapper assigneeUserMapper;
+  @Autowired protected UserMapper assigneeUserMapper;
 
   /**
    * Resolves the caller-dependent {@code canEdit} projection of one job order.
@@ -98,6 +99,10 @@ public abstract class JobOrderMapper {
   // (JobOrderService.getJobOrderById) via JobOrderDto#withRedacted, so the mapper leaves it false.
   @Mapping(target = "redacted", ignore = true)
   @Mapping(target = "canEdit", expression = "java(resolveCanEdit(jobOrder))")
+  // MapStruct reads a record's wither as a fluent setter of a property named after it; there
+  // is no such property, so it is ignored.
+  @Mapping(target = "withAssignees", ignore = true)
+  @Mapping(target = "withRedacted", ignore = true)
   public abstract JobOrderDto toDto(JobOrder jobOrder);
 
   /**

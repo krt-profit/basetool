@@ -20,9 +20,13 @@
 package de.greluc.krt.profit.basetool.backend.repository;
 
 import de.greluc.krt.profit.basetool.backend.model.MissionOwnership;
+import de.greluc.krt.profit.basetool.backend.model.User;
 import java.util.Optional;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
 
 /** Spring Data repository for Mission Ownership. */
 public interface MissionOwnershipRepository extends JpaRepository<MissionOwnership, UUID> {
@@ -46,10 +50,7 @@ public interface MissionOwnershipRepository extends JpaRepository<MissionOwnersh
    * @param oldUser the user being removed, whose owned companion rows are reassigned
    * @param newUser the replacement owner (the fallback admin)
    */
-  @org.springframework.data.jpa.repository.Modifying
-  @org.springframework.data.jpa.repository.Query(
-      "UPDATE MissionOwnership mo SET mo.owner = :newUser WHERE mo.owner = :oldUser")
-  void updateOwner(
-      @org.jetbrains.annotations.NotNull de.greluc.krt.profit.basetool.backend.model.User oldUser,
-      @org.jetbrains.annotations.NotNull de.greluc.krt.profit.basetool.backend.model.User newUser);
+  @Modifying
+  @Query("UPDATE MissionOwnership mo SET mo.owner = :newUser WHERE mo.owner = :oldUser")
+  void updateOwner(@NotNull User oldUser, @NotNull User newUser);
 }

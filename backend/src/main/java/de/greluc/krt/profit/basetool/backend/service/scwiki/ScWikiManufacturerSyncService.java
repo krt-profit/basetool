@@ -99,7 +99,7 @@ public class ScWikiManufacturerSyncService {
    */
   @Transactional
   public int syncManufacturers() {
-    if (!Boolean.TRUE.equals(properties.getManufacturerSyncEnabled())) {
+    if (!Boolean.TRUE.equals(properties.manufacturerSyncEnabled())) {
       log.info(
           "SC Wiki manufacturer sync invoked but disabled "
               + "(krt.scwiki.manufacturer-sync-enabled=false) — skipping.");
@@ -109,7 +109,7 @@ public class ScWikiManufacturerSyncService {
     log.info("Starting SC Wiki manufacturer reconciliation...");
     ScWikiClient.FetchResult<ScWikiManufacturerDto> result =
         scWikiClient.fetchAllPagesResult(
-            properties.getManufacturersEndpoint(),
+            properties.manufacturersEndpoint(),
             new ParameterizedTypeReference<ScWikiResponseDto<ScWikiManufacturerDto>>() {},
             "manufacturers");
     if (result.notModified()) {

@@ -30,7 +30,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
-import org.springframework.test.util.ReflectionTestUtils;
 
 class OperationMapperTest {
 
@@ -38,10 +37,9 @@ class OperationMapperTest {
 
   @BeforeEach
   void setUp() {
-    // OperationMapperImpl @Autowires SquadronMapper for the owningSquadron projection — wire it
-    // manually since we are running without a Spring context.
-    mapper = Mappers.getMapper(OperationMapper.class);
-    ReflectionTestUtils.setField(mapper, "squadronMapper", Mappers.getMapper(SquadronMapper.class));
+    // OperationMapperImpl receives SquadronMapper for the owningSquadron projection through its
+    // constructor (CentralMapperConfig: injectionStrategy = CONSTRUCTOR).
+    mapper = new OperationMapperImpl(Mappers.getMapper(SquadronMapper.class));
   }
 
   @Test

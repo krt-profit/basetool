@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.OperationPayoutSummaryDto
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationUpdateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.OperationFinanceService;
 import de.greluc.krt.profit.basetool.backend.service.OperationPayoutService;
 import de.greluc.krt.profit.basetool.backend.service.OperationService;
@@ -52,8 +53,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -98,6 +97,7 @@ public class OperationController {
   private final OperationPayoutService operationPayoutService;
   private final OperationMapper operationMapper;
   private final OperationFinanceService operationFinanceService;
+  private final AuthHelperService authHelperService;
 
   // hasRole('MISSION_MANAGER') below also matches users with app_user.is_mission_manager=true —
   // CustomJwtGrantedAuthoritiesConverter injects ROLE_MISSION_MANAGER from the DB flag at
@@ -464,7 +464,6 @@ public class OperationController {
    *
    * @param id operation id
    * @param updateDto update payload (carries expected version + new status)
-   * @param authentication current Spring Security authentication
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
@@ -488,17 +487,11 @@ public class OperationController {
     @ApiResponse(responseCode = "409", description = "Optimistic lock conflict — fetch and retry.")
   })
   public OperationDto updateOperation(
-      @PathVariable UUID id,
-      @Valid @RequestBody OperationUpdateDto updateDto,
-      Authentication authentication) {
+      @PathVariable UUID id, @Valid @RequestBody OperationUpdateDto updateDto) {
     // Resolve the "can override the state machine" flag here, at the HTTP boundary,
     // so the service stays pure business logic and does not have to read the
     // SecurityContextHolder itself (architecture rule enforced by ArchitectureTest).
-    boolean canOverrideStatus =
-        authentication != null
-            && authentication.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .anyMatch("ROLE_ADMIN"::equals);
+    boolean canOverrideStatus = authHelperService.isAdmin();
     return operationMapper.toDto(
         operationService.updateOperation(id, updateDto, canOverrideStatus));
   }

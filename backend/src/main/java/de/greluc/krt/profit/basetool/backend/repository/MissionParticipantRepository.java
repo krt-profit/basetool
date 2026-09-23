@@ -21,11 +21,15 @@ package de.greluc.krt.profit.basetool.backend.repository;
 
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.model.projection.MissionParticipantCount;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /** Spring Data repository for Mission Participant. */
 public interface MissionParticipantRepository extends JpaRepository<MissionParticipant, UUID> {
@@ -41,11 +45,10 @@ public interface MissionParticipantRepository extends JpaRepository<MissionParti
    * @param orgUnitId the org-unit id to check for any participant affiliation.
    * @return {@code true} iff at least one participant references the org unit.
    */
-  @org.springframework.data.jpa.repository.Query(
+  @Query(
       "SELECT COUNT(mp) > 0 FROM MissionParticipant mp JOIN mp.orgUnits ou WHERE ou.id ="
           + " :orgUnitId")
-  boolean existsByOrgUnitId(
-      @org.springframework.data.repository.query.Param("orgUnitId") UUID orgUnitId);
+  boolean existsByOrgUnitId(@Param("orgUnitId") UUID orgUnitId);
 
   /**
    * Derived Spring-Data check - returns {@code true} iff at least one row matches {@code
@@ -70,10 +73,9 @@ public interface MissionParticipantRepository extends JpaRepository<MissionParti
    * used by the user-delete flow so mission history (guest name, status) survives but the personal
    * link is removed.
    */
-  @org.springframework.data.jpa.repository.Modifying
-  @org.springframework.data.jpa.repository.Query(
-      "UPDATE MissionParticipant mp SET mp.user = null WHERE mp.user.id = :userId")
-  void unlinkUser(@org.springframework.data.repository.query.Param("userId") java.util.UUID userId);
+  @Modifying
+  @Query("UPDATE MissionParticipant mp SET mp.user = null WHERE mp.user.id = :userId")
+  void unlinkUser(@Param("userId") UUID userId);
 
   /**
    * Clears the derived {@code is_mission_lead_participant} flag on every participant whose planned
@@ -87,12 +89,11 @@ public interface MissionParticipantRepository extends JpaRepository<MissionParti
    * @param jobTypeId the job type that is no longer the mission lead.
    * @return the number of participant rows whose flag was cleared.
    */
-  @org.springframework.data.jpa.repository.Modifying
-  @org.springframework.data.jpa.repository.Query(
+  @Modifying
+  @Query(
       "UPDATE MissionParticipant p SET p.missionLeadParticipant = false "
           + "WHERE p.plannedMissionJobType.id = :jobTypeId AND p.missionLeadParticipant = true")
-  int clearMissionLeadFlagForJobType(
-      @org.springframework.data.repository.query.Param("jobTypeId") UUID jobTypeId);
+  int clearMissionLeadFlagForJobType(@Param("jobTypeId") UUID jobTypeId);
 
   /**
    * Atomically clamps the {@code endTime} of every checked-in participant of a mission to {@code
@@ -109,14 +110,12 @@ public interface MissionParticipantRepository extends JpaRepository<MissionParti
    * @param end the mission's actual end time to clamp late/open check-outs to.
    * @return the number of participant rows clamped.
    */
-  @org.springframework.data.jpa.repository.Modifying(flushAutomatically = true)
-  @org.springframework.data.jpa.repository.Query(
+  @Modifying(flushAutomatically = true)
+  @Query(
       "UPDATE MissionParticipant p SET p.endTime = :end, p.version = p.version + 1 "
           + "WHERE p.mission.id = :missionId AND p.startTime IS NOT NULL "
           + "AND (p.endTime IS NULL OR p.endTime > :end)")
-  int clampCheckedInEndTimes(
-      @org.springframework.data.repository.query.Param("missionId") UUID missionId,
-      @org.springframework.data.repository.query.Param("end") java.time.Instant end);
+  int clampCheckedInEndTimes(@Param("missionId") UUID missionId, @Param("end") Instant end);
 
   /**
    * Registration counts for a whole page of missions in ONE grouped statement.
@@ -129,12 +128,11 @@ public interface MissionParticipantRepository extends JpaRepository<MissionParti
    * @param missionIds the missions on the page; an empty collection yields an empty list.
    * @return one count row per mission that has at least one participant.
    */
-  @org.springframework.data.jpa.repository.Query(
+  @Query(
       """
       SELECT new de.greluc.krt.profit.basetool.backend.model.projection.MissionParticipantCount(
         p.mission.id, COUNT(p))
       FROM MissionParticipant p WHERE p.mission.id IN :missionIds GROUP BY p.mission.id
       """)
-  List<MissionParticipantCount> countByMissions(
-      @org.springframework.data.repository.query.Param("missionIds") Collection<UUID> missionIds);
+  List<MissionParticipantCount> countByMissions(@Param("missionIds") Collection<UUID> missionIds);
 }

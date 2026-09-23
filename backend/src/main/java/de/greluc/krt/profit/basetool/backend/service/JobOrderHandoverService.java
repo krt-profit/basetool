@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderHandoverMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -152,9 +152,7 @@ public class JobOrderHandoverService {
   @Transactional
   public JobOrderHandoverDto createHandover(UUID jobOrderId, JobOrderHandoverCreateDto dto) {
     JobOrder jobOrder =
-        jobOrderRepository
-            .findById(jobOrderId)
-            .orElseThrow(() -> new NotFoundException("JobOrder not found"));
+        Entities.require(jobOrderRepository.findById(jobOrderId), "JobOrder not found");
 
     if (jobOrder.getType() == JobOrderType.ITEM) {
       // A material handover must never run against an ITEM order. An item order's linked stock IS
@@ -220,9 +218,9 @@ public class JobOrderHandoverService {
       // NOT referenced from JobOrderHandoverItem anymore so that emptying the inventory does not
       // break historical handover records (see CHANGELOG / V64 migration).
       InventoryItem inventoryItem =
-          inventoryItemRepository
-              .findByIdForUpdate(itemDto.inventoryItemId())
-              .orElseThrow(() -> new NotFoundException("Inventory item not found"));
+          Entities.require(
+              inventoryItemRepository.findByIdForUpdate(itemDto.inventoryItemId()),
+              "Inventory item not found");
 
       if (inventoryItem.getJobOrderAllocations().stream()
           .noneMatch(a -> a.getJobOrder() != null && a.getJobOrder().getId().equals(jobOrderId))) {
@@ -365,9 +363,7 @@ public class JobOrderHandoverService {
     // with up-to-date {@code @Version}s. The previous bulk unlinks (and any auto-flush) have
     // already detached the original {@code jobOrder} reference from the session.
     JobOrder managedJobOrder =
-        jobOrderRepository
-            .findById(jobOrderId)
-            .orElseThrow(() -> new NotFoundException("JobOrder not found"));
+        Entities.require(jobOrderRepository.findById(jobOrderId), "JobOrder not found");
 
     boolean allFulfilled =
         managedJobOrder.getMaterials().stream()

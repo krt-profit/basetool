@@ -42,9 +42,8 @@ class ShipMapperTest {
 
   @BeforeEach
   void setUp() {
-    // ShipMapperImpl @Autowires UserMapper for owner mapping — wire it
-    // manually since we are running without a Spring context.
-    mapper = Mappers.getMapper(ShipMapper.class);
+    // ShipMapperImpl receives UserMapper and SquadronMapper through its constructor
+    // (CentralMapperConfig: injectionStrategy = CONSTRUCTOR).
     UserMapper userMapper = Mappers.getMapper(UserMapper.class);
     // Post-R9 D3 (V101): UserMapper derives squadron + flags from org_unit_membership — wire the
     // membership repository plus the StaffelMembershipResolver collaborator (both mocked / empty
@@ -63,8 +62,7 @@ class ShipMapperTest {
                 de.greluc.krt.profit.basetool.backend.repository.SquadronRepository.class),
             org.mockito.Mockito.mock(
                 de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository.class)));
-    ReflectionTestUtils.setField(mapper, "userMapper", userMapper);
-    ReflectionTestUtils.setField(mapper, "squadronMapper", Mappers.getMapper(SquadronMapper.class));
+    mapper = new ShipMapperImpl(userMapper, Mappers.getMapper(SquadronMapper.class));
   }
 
   @Test

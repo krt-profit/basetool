@@ -85,16 +85,16 @@ public class CorrelationIdFilter extends OncePerRequestFilter implements Ordered
     final String userId = resolveUserId();
     final String orgUnitId = resolveSquadronId();
 
-    MDC.put(loggingProperties.getCorrelationIdMdcKey(), correlationId);
-    MDC.put(loggingProperties.getUserIdMdcKey(), userId);
-    MDC.put(loggingProperties.getOrgUnitIdMdcKey(), orgUnitId);
-    response.setHeader(loggingProperties.getCorrelationIdHeader(), correlationId);
+    MDC.put(loggingProperties.correlationIdMdcKey(), correlationId);
+    MDC.put(loggingProperties.userIdMdcKey(), userId);
+    MDC.put(loggingProperties.orgUnitIdMdcKey(), orgUnitId);
+    response.setHeader(loggingProperties.correlationIdHeader(), correlationId);
     try {
       filterChain.doFilter(request, response);
     } finally {
-      MDC.remove(loggingProperties.getCorrelationIdMdcKey());
-      MDC.remove(loggingProperties.getUserIdMdcKey());
-      MDC.remove(loggingProperties.getOrgUnitIdMdcKey());
+      MDC.remove(loggingProperties.correlationIdMdcKey());
+      MDC.remove(loggingProperties.userIdMdcKey());
+      MDC.remove(loggingProperties.orgUnitIdMdcKey());
     }
   }
 
@@ -123,7 +123,7 @@ public class CorrelationIdFilter extends OncePerRequestFilter implements Ordered
 
   @NotNull
   private String resolveCorrelationId(@NotNull HttpServletRequest request) {
-    String inbound = request.getHeader(loggingProperties.getCorrelationIdHeader());
+    String inbound = request.getHeader(loggingProperties.correlationIdHeader());
     if (inbound == null || inbound.isBlank()) {
       return UUID.randomUUID().toString();
     }

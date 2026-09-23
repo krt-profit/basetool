@@ -29,6 +29,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -54,20 +55,24 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.ErrorResponseException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import tools.jackson.databind.DatabindException;
 
 /**
  * Central RFC7807 exception handler.
@@ -139,7 +144,7 @@ public class GlobalExceptionHandler {
   private final MeterRegistry meterRegistry;
 
   private URI type(String suffix) {
-    return URI.create(problemProperties.getBaseUri() + suffix);
+    return URI.create(problemProperties.baseUri() + suffix);
   }
 
   /**
@@ -203,9 +208,7 @@ public class GlobalExceptionHandler {
    * can tell "key not in bundle" apart from "key resolved to a string that happens to equal the
    * input".
    */
-  private String resolveDetail(
-      @org.jetbrains.annotations.Nullable String message,
-      @org.jetbrains.annotations.NotNull String fallbackKey) {
+  private String resolveDetail(@Nullable String message, @NotNull String fallbackKey) {
     if (message == null || message.isBlank()) {
       return tr(fallbackKey);
     }
@@ -250,10 +253,10 @@ public class GlobalExceptionHandler {
    * @param extra optional structured context appended verbatim (no PII); may be {@code null}/empty.
    */
   private void logProblem(
-      @org.jetbrains.annotations.NotNull HttpServletRequest req,
+      @NotNull HttpServletRequest req,
       ProblemDetail pd,
-      @org.jetbrains.annotations.NotNull String shortMessage,
-      @org.jetbrains.annotations.Nullable Map<String, ?> extra) {
+      @NotNull String shortMessage,
+      @Nullable Map<String, ?> extra) {
     logProblem(req, pd, shortMessage, extra, false);
   }
 
@@ -278,10 +281,10 @@ public class GlobalExceptionHandler {
    * @param debug {@code true} to log at {@code DEBUG} instead of {@code WARN}.
    */
   private void logProblem(
-      @org.jetbrains.annotations.NotNull HttpServletRequest req,
-      @org.jetbrains.annotations.NotNull ProblemDetail pd,
-      @org.jetbrains.annotations.NotNull String shortMessage,
-      @org.jetbrains.annotations.Nullable Map<String, ?> extra,
+      @NotNull HttpServletRequest req,
+      @NotNull ProblemDetail pd,
+      @NotNull String shortMessage,
+      @Nullable Map<String, ?> extra,
       boolean debug) {
     Object cid = pd.getProperties() != null ? pd.getProperties().get("correlationId") : null;
     Object code = pd.getProperties() != null ? pd.getProperties().get("code") : null;
@@ -653,7 +656,7 @@ public class GlobalExceptionHandler {
     } else {
       ex.extraProperties().forEach(pd::setProperty);
       // logExtra() is null for most kinds, so this cannot be a copy-constructor.
-      java.util.Map<String, Object> extra = new java.util.LinkedHashMap<>();
+      Map<String, Object> extra = new LinkedHashMap<>();
       if (ex.logExtra() != null) {
         extra.putAll(ex.logExtra());
       }
@@ -688,8 +691,8 @@ public class GlobalExceptionHandler {
    * @return {@code File.java:123} for the innermost frame belonging to this application, or {@code
    *     null} when the stack has none (a proxy-only stack, or one stripped by the JVM).
    */
-  @org.jetbrains.annotations.Nullable
-  private static String originOf(@org.jetbrains.annotations.NotNull Throwable ex) {
+  @Nullable
+  private static String originOf(@NotNull Throwable ex) {
     for (StackTraceElement frame : ex.getStackTrace()) {
       if (frame.getClassName().startsWith(APP_PACKAGE) && frame.getFileName() != null) {
         return frame.getFileName() + ":" + frame.getLineNumber();
@@ -849,10 +852,9 @@ public class GlobalExceptionHandler {
    * @param request servlet request for instance URI + access-log enrichment
    * @return RFC 7807 problem-detail response
    */
-  @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+  @ExceptionHandler(HttpMessageNotReadableException.class)
   public ResponseEntity<ProblemDetail> handleHttpMessageNotReadable(
-      @NotNull org.springframework.http.converter.HttpMessageNotReadableException ex,
-      HttpServletRequest request) {
+      @NotNull HttpMessageNotReadableException ex, HttpServletRequest request) {
     // Most-specific cause carries the actual JSON parse error (path, line, column) which is the
     // information needed to triage "400 BAD_REQUEST" reports without a reproduction.
     Throwable rootCause = ex.getMostSpecificCause();
@@ -873,8 +875,7 @@ public class GlobalExceptionHandler {
       // any double-quoted segment (the offending user value) while keeping the structural triage
       // text (type, reason, path/line/column) a 400 report needs.
       extra.put("causeMessage", maskQuotedValues(rootCause.getMessage()));
-      if (rootCause instanceof tools.jackson.databind.DatabindException jme
-          && jme.getPath() != null) {
+      if (rootCause instanceof DatabindException jme && jme.getPath() != null) {
         StringBuilder path = new StringBuilder();
         jme.getPath()
             .forEach(
@@ -969,11 +970,9 @@ public class GlobalExceptionHandler {
    * @param request servlet request for instance URI + access-log enrichment
    * @return RFC 7807 problem-detail response
    */
-  @ExceptionHandler(
-      org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
+  @ExceptionHandler(MethodArgumentTypeMismatchException.class)
   public ResponseEntity<ProblemDetail> handleTypeMismatch(
-      @NotNull org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex,
-      HttpServletRequest request) {
+      @NotNull MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
     ProblemDetail pd =
         problem(
             HttpStatus.BAD_REQUEST,
@@ -1008,10 +1007,9 @@ public class GlobalExceptionHandler {
    * @param request the request, for the {@code instance} URI and the correlation id.
    * @return a {@code 415} RFC 7807 problem naming the type that was refused.
    */
-  @ExceptionHandler(org.springframework.web.HttpMediaTypeNotSupportedException.class)
+  @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
   public ResponseEntity<ProblemDetail> handleMediaTypeNotSupported(
-      @NotNull org.springframework.web.HttpMediaTypeNotSupportedException ex,
-      HttpServletRequest request) {
+      @NotNull HttpMediaTypeNotSupportedException ex, HttpServletRequest request) {
     ProblemDetail pd =
         problem(
             HttpStatus.UNSUPPORTED_MEDIA_TYPE,
@@ -1055,7 +1053,7 @@ public class GlobalExceptionHandler {
         Map.of(
             "supportedMethods",
             String.valueOf(
-                java.util.Arrays.toString(
+                Arrays.toString(
                     ex.getSupportedMethods() == null ? new String[0] : ex.getSupportedMethods()))));
     return toEntity(pd);
   }

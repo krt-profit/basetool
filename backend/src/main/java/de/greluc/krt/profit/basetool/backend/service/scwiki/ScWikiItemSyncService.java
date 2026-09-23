@@ -138,13 +138,13 @@ public class ScWikiItemSyncService {
    * @return the number of {@code game_item} rows written this run
    */
   public int syncItems() {
-    if (!Boolean.TRUE.equals(properties.getItemSyncEnabled())) {
+    if (!Boolean.TRUE.equals(properties.itemSyncEnabled())) {
       log.info(
           "SC Wiki item sync invoked but disabled (krt.scwiki.item-sync-enabled=false) —"
               + " skipping.");
       return 0;
     }
-    if (Boolean.TRUE.equals(properties.getSyncAllItems())) {
+    if (Boolean.TRUE.equals(properties.syncAllItems())) {
       return syncItemsBackfill();
     }
     return syncItemsClosure();
@@ -183,7 +183,7 @@ public class ScWikiItemSyncService {
       try {
         ScWikiItemDto dto =
             scWikiClient.fetchOne(
-                properties.getItemsEndpoint() + "/" + uuid, ScWikiItemDto.class, "item");
+                properties.itemsEndpoint() + "/" + uuid, ScWikiItemDto.class, "item");
         ClosureOutcome outcome =
             self.getObject().fillClosureItemWithinTransaction(runId, uuid, dto, now);
         if (outcome == ClosureOutcome.FILLED) {
@@ -303,7 +303,7 @@ public class ScWikiItemSyncService {
    */
   private int syncItemsBackfill() {
     log.info("Starting SC Wiki item sync (FULL BACKFILL mode) — paging every kind endpoint...");
-    boolean reconcile = Boolean.TRUE.equals(properties.getReconcileUuidlessByName());
+    boolean reconcile = Boolean.TRUE.equals(properties.reconcileUuidlessByName());
     List<GameItem> uuidlessUexRows =
         reconcile
             ? gameItemRepository.findByExternalUuidIsNullAndSourceSystems(
@@ -330,7 +330,7 @@ public class ScWikiItemSyncService {
     // sanity cap — it legitimately returns the whole pool.
     KindPassResult residual =
         runKindPass(
-            new KindPass(properties.getItemsEndpoint(), GameItemKind.GENERIC, null, false), ctx);
+            new KindPass(properties.itemsEndpoint(), GameItemKind.GENERIC, null, false), ctx);
     allPassesSucceeded &= residual.succeeded();
 
     if ((allPassesSucceeded || residualVouchesForPool(residual, ctx)) && !ctx.seen.isEmpty()) {
@@ -417,34 +417,27 @@ public class ScWikiItemSyncService {
   private List<KindPass> kindPasses() {
     return List.of(
         new KindPass(
-            properties.getWeaponAttachmentsEndpoint(),
+            properties.weaponAttachmentsEndpoint(),
             GameItemKind.WEAPON_ATTACHMENT,
-            properties.getWeaponAttachmentsFilter(),
+            properties.weaponAttachmentsFilter(),
             true),
         new KindPass(
-            properties.getWeaponsEndpoint(),
-            GameItemKind.WEAPON,
-            properties.getWeaponsFilter(),
-            true),
+            properties.weaponsEndpoint(), GameItemKind.WEAPON, properties.weaponsFilter(), true),
         new KindPass(
-            properties.getVehicleWeaponsEndpoint(),
+            properties.vehicleWeaponsEndpoint(),
             GameItemKind.VEHICLE_WEAPON,
-            properties.getVehicleWeaponsFilter(),
+            properties.vehicleWeaponsFilter(),
             true),
         new KindPass(
-            properties.getVehicleItemsEndpoint(),
+            properties.vehicleItemsEndpoint(),
             GameItemKind.VEHICLE_ITEM,
-            properties.getVehicleItemsFilter(),
+            properties.vehicleItemsFilter(),
             true),
         new KindPass(
-            properties.getArmorEndpoint(), GameItemKind.ARMOR, properties.getArmorFilter(), true),
+            properties.armorEndpoint(), GameItemKind.ARMOR, properties.armorFilter(), true),
         new KindPass(
-            properties.getClothesEndpoint(),
-            GameItemKind.CLOTHING,
-            properties.getClothesFilter(),
-            true),
-        new KindPass(
-            properties.getFoodEndpoint(), GameItemKind.FOOD, properties.getFoodFilter(), true));
+            properties.clothesEndpoint(), GameItemKind.CLOTHING, properties.clothesFilter(), true),
+        new KindPass(properties.foodEndpoint(), GameItemKind.FOOD, properties.foodFilter(), true));
   }
 
   /**
@@ -495,7 +488,7 @@ public class ScWikiItemSyncService {
       ctx.failedPasses++;
       return KindPassResult.notEnumerated();
     }
-    if (pass.applySanityCap() && fetched.size() > properties.getBackfillKindSanityCap()) {
+    if (pass.applySanityCap() && fetched.size() > properties.backfillKindSanityCap()) {
       log.error(
           "Wiki kind pass {} ({}) returned {} rows, exceeding the sanity cap {} — assuming the"
               + " §3.4 full-pool quirk (missing/blank filter[classification]) and SKIPPING it to"
@@ -503,7 +496,7 @@ public class ScWikiItemSyncService {
           pass.endpoint(),
           pass.kind(),
           fetched.size(),
-          properties.getBackfillKindSanityCap(),
+          properties.backfillKindSanityCap(),
           pass.kind());
       ctx.failedPasses++;
       return KindPassResult.notEnumerated();

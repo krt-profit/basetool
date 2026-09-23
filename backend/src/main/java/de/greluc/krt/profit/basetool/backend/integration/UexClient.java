@@ -179,7 +179,7 @@ public class UexClient {
   void initClient() {
     this.client =
         restClientBuilder
-            .baseUrl(uexProperties.getApiUrl())
+            .baseUrl(uexProperties.apiUrl())
             .requestInterceptor(new ResponseSizeLimitInterceptor(MAX_RESPONSE_BYTES))
             .build();
   }
@@ -192,9 +192,7 @@ public class UexClient {
    */
   public FetchResult<UexCommodityDto> getCommodities() {
     return fetchListWithOutcome(
-        uexProperties.getCommoditiesEndpoint(),
-        new ParameterizedTypeReference<>() {},
-        "commodities");
+        uexProperties.commoditiesEndpoint(), new ParameterizedTypeReference<>() {}, "commodities");
   }
 
   /**
@@ -206,7 +204,7 @@ public class UexClient {
    */
   public FetchResult<UexCommodityPriceDto> getCommoditiesPricesAll() {
     return fetchListWithOutcome(
-        uexProperties.getCommoditiesPricesEndpoint(),
+        uexProperties.commoditiesPricesEndpoint(),
         new ParameterizedTypeReference<>() {},
         "commodities prices");
   }
@@ -221,9 +219,7 @@ public class UexClient {
    */
   public FetchResult<UexItemPriceDto> getItemPrices() {
     return fetchListWithOutcome(
-        uexProperties.getItemsPricesEndpoint(),
-        new ParameterizedTypeReference<>() {},
-        "item prices");
+        uexProperties.itemsPricesEndpoint(), new ParameterizedTypeReference<>() {}, "item prices");
   }
 
   /**
@@ -234,9 +230,7 @@ public class UexClient {
    */
   public FetchResult<UexStarSystemDto> getStarSystems() {
     return fetchListWithOutcome(
-        uexProperties.getStarSystemsEndpoint(),
-        new ParameterizedTypeReference<>() {},
-        "star systems");
+        uexProperties.starSystemsEndpoint(), new ParameterizedTypeReference<>() {}, "star systems");
   }
 
   /**
@@ -247,7 +241,7 @@ public class UexClient {
    */
   public FetchResult<UexCompanyDto> getCompanies() {
     return fetchListWithOutcome(
-        uexProperties.getCompaniesEndpoint(), new ParameterizedTypeReference<>() {}, "companies");
+        uexProperties.companiesEndpoint(), new ParameterizedTypeReference<>() {}, "companies");
   }
 
   /**
@@ -258,7 +252,7 @@ public class UexClient {
    */
   public FetchResult<UexVehicleDto> getVehicles() {
     return fetchListWithOutcome(
-        uexProperties.getVehiclesEndpoint(), new ParameterizedTypeReference<>() {}, "vehicles");
+        uexProperties.vehiclesEndpoint(), new ParameterizedTypeReference<>() {}, "vehicles");
   }
 
   /**
@@ -269,7 +263,7 @@ public class UexClient {
    */
   public FetchResult<UexCityDto> getCities() {
     return fetchListWithOutcome(
-        uexProperties.getCitiesEndpoint(), new ParameterizedTypeReference<>() {}, "cities");
+        uexProperties.citiesEndpoint(), new ParameterizedTypeReference<>() {}, "cities");
   }
 
   /**
@@ -280,7 +274,7 @@ public class UexClient {
    */
   public FetchResult<UexFactionDto> getFactions() {
     return fetchListWithOutcome(
-        uexProperties.getFactionsEndpoint(), new ParameterizedTypeReference<>() {}, "factions");
+        uexProperties.factionsEndpoint(), new ParameterizedTypeReference<>() {}, "factions");
   }
 
   /**
@@ -292,7 +286,7 @@ public class UexClient {
    */
   public FetchResult<UexJurisdictionDto> getJurisdictions() {
     return fetchListWithOutcome(
-        uexProperties.getJurisdictionsEndpoint(),
+        uexProperties.jurisdictionsEndpoint(),
         new ParameterizedTypeReference<>() {},
         "jurisdictions");
   }
@@ -305,7 +299,7 @@ public class UexClient {
    */
   public FetchResult<UexMoonDto> getMoons() {
     return fetchListWithOutcome(
-        uexProperties.getMoonsEndpoint(), new ParameterizedTypeReference<>() {}, "moons");
+        uexProperties.moonsEndpoint(), new ParameterizedTypeReference<>() {}, "moons");
   }
 
   /**
@@ -316,7 +310,7 @@ public class UexClient {
    */
   public FetchResult<UexOrbitDto> getOrbits() {
     return fetchListWithOutcome(
-        uexProperties.getOrbitsEndpoint(), new ParameterizedTypeReference<>() {}, "orbits");
+        uexProperties.orbitsEndpoint(), new ParameterizedTypeReference<>() {}, "orbits");
   }
 
   /**
@@ -327,7 +321,7 @@ public class UexClient {
    */
   public FetchResult<UexOutpostDto> getOutposts() {
     return fetchListWithOutcome(
-        uexProperties.getOutpostsEndpoint(), new ParameterizedTypeReference<>() {}, "outposts");
+        uexProperties.outpostsEndpoint(), new ParameterizedTypeReference<>() {}, "outposts");
   }
 
   /**
@@ -338,7 +332,7 @@ public class UexClient {
    */
   public FetchResult<UexPlanetDto> getPlanets() {
     return fetchListWithOutcome(
-        uexProperties.getPlanetsEndpoint(), new ParameterizedTypeReference<>() {}, "planets");
+        uexProperties.planetsEndpoint(), new ParameterizedTypeReference<>() {}, "planets");
   }
 
   /**
@@ -350,7 +344,7 @@ public class UexClient {
    */
   public FetchResult<UexPoiDto> getPoi() {
     return fetchListWithOutcome(
-        uexProperties.getPoiEndpoint(), new ParameterizedTypeReference<>() {}, "pois");
+        uexProperties.poiEndpoint(), new ParameterizedTypeReference<>() {}, "pois");
   }
 
   /**
@@ -361,7 +355,7 @@ public class UexClient {
    */
   public FetchResult<UexSpaceStationDto> getSpaceStations() {
     return fetchListWithOutcome(
-        uexProperties.getSpaceStationsEndpoint(),
+        uexProperties.spaceStationsEndpoint(),
         new ParameterizedTypeReference<>() {},
         "spacestations");
   }
@@ -375,7 +369,7 @@ public class UexClient {
    */
   public FetchResult<UexTerminalDto> getTerminals() {
     return fetchListWithOutcome(
-        uexProperties.getTerminalsEndpoint(), new ParameterizedTypeReference<>() {}, "terminals");
+        uexProperties.terminalsEndpoint(), new ParameterizedTypeReference<>() {}, "terminals");
   }
 
   /**
@@ -390,7 +384,7 @@ public class UexClient {
    */
   public List<UexRefiningMethodDto> getRefineriesMethods() {
     return fetchList(
-        uexProperties.getRefineriesMethodsEndpoint(),
+        uexProperties.refineriesMethodsEndpoint(),
         new ParameterizedTypeReference<>() {},
         "refineries methods");
   }
@@ -405,7 +399,7 @@ public class UexClient {
    */
   public List<UexRefineryYieldDto> getRefineriesYields() {
     return fetchList(
-        uexProperties.getRefineriesYieldsEndpoint(),
+        uexProperties.refineriesYieldsEndpoint(),
         new ParameterizedTypeReference<>() {},
         "refineries yields");
   }
@@ -419,7 +413,7 @@ public class UexClient {
    */
   public FetchResult<UexCategoryDto> getCategories() {
     return fetchListWithOutcome(
-        uexProperties.getCategoriesEndpoint(), new ParameterizedTypeReference<>() {}, "categories");
+        uexProperties.categoriesEndpoint(), new ParameterizedTypeReference<>() {}, "categories");
   }
 
   /**
@@ -444,7 +438,7 @@ public class UexClient {
    *     / 304 / empty-200
    */
   public FetchResult<UexItemDto> getItemsForCategory(int categoryId) {
-    String endpoint = uexProperties.getItemsEndpoint() + "?id_category=" + categoryId;
+    String endpoint = uexProperties.itemsEndpoint() + "?id_category=" + categoryId;
     return fetchListWithOutcome(
         endpoint, new ParameterizedTypeReference<>() {}, "items (category=" + categoryId + ")");
   }

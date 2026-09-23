@@ -20,12 +20,16 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.MissionParticipantRequiredException;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
+import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Material;
+import de.greluc.krt.profit.basetool.backend.model.MaterialType;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.RefineryGood;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
@@ -49,6 +53,7 @@ import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -105,9 +110,7 @@ public class RefineryOrderService {
    * @return paged orders owned by the user
    */
   public Page<RefineryOrder> getMyRefineryOrders(
-      @NotNull UUID userId,
-      List<de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus> statuses,
-      @NotNull Pageable pageable) {
+      @NotNull UUID userId, List<RefineryOrderStatus> statuses, @NotNull Pageable pageable) {
     if (statuses != null && !statuses.isEmpty()) {
       return refineryOrderRepository.findByOwnerIdAndStatusIn(userId, statuses, pageable);
     }
@@ -253,8 +256,7 @@ public class RefineryOrderService {
    * @return paged orders across all users
    */
   public Page<RefineryOrder> getAllRefineryOrders(
-      List<de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus> statuses,
-      @NotNull Pageable pageable) {
+      List<RefineryOrderStatus> statuses, @NotNull Pageable pageable) {
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
     if (statuses != null && !statuses.isEmpty()) {
       return refineryOrderRepository.findByStatusInScoped(
@@ -288,12 +290,7 @@ public class RefineryOrderService {
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no match
    */
   public RefineryOrder getRefineryOrder(@NotNull UUID id) {
-    return refineryOrderRepository
-        .findById(id)
-        .orElseThrow(
-            () ->
-                new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                    "error.refinery_order.not_found"));
+    return Entities.require(refineryOrderRepository.findById(id), "error.refinery_order.not_found");
   }
 
   /**
@@ -335,13 +332,7 @@ public class RefineryOrderService {
     order.setId(null);
     order.setVersion(null);
 
-    User user =
-        userRepository
-            .findById(userId)
-            .orElseThrow(
-                () ->
-                    new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                        "error.user.not_found"));
+    User user = Entities.require(userRepository.findById(userId), "error.user.not_found");
 
     order.setOwner(user);
     order.setOwningOrgUnit(
@@ -349,16 +340,12 @@ public class RefineryOrderService {
 
     if (order.getLocation() != null && order.getLocation().getId() != null) {
       order.setLocation(
-          locationRepository
-              .findById(order.getLocation().getId())
-              .orElseThrow(
-                  () ->
-                      new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                          "error.location.not_found")));
+          Entities.require(
+              locationRepository.findById(order.getLocation().getId()),
+              "error.location.not_found"));
       validateLocationHasRefinery(order.getLocation());
     } else {
-      throw new de.greluc.krt.profit.basetool.backend.exception.BadRequestException(
-          "error.refinery_order.location_required");
+      throw new BadRequestException("error.refinery_order.location_required");
     }
 
     if (order.getMission() != null && order.getMission().getId() != null) {
@@ -369,12 +356,9 @@ public class RefineryOrderService {
 
     if (order.getRefiningMethod() != null && order.getRefiningMethod().getId() != null) {
       order.setRefiningMethod(
-          refiningMethodRepository
-              .findById(order.getRefiningMethod().getId())
-              .orElseThrow(
-                  () ->
-                      new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                          "error.refining_method.not_found")));
+          Entities.require(
+              refiningMethodRepository.findById(order.getRefiningMethod().getId()),
+              "error.refining_method.not_found"));
     } else {
       order.setRefiningMethod(null);
     }
@@ -385,7 +369,7 @@ public class RefineryOrderService {
     }
 
     if (order.getStartedAt() == null) {
-      order.setStartedAt(java.time.Instant.now());
+      order.setStartedAt(Instant.now());
     }
 
     // Monetary fields (expenses, otherExpenses, oreSales) are optional. Both null and 0
@@ -433,12 +417,7 @@ public class RefineryOrderService {
    */
   private Mission resolveMissionForOwner(@NotNull UUID missionId, @Nullable User owner) {
     Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(
-                () ->
-                    new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                        "error.mission.not_found"));
+        Entities.require(missionRepository.findById(missionId), "error.mission.not_found");
     if (owner == null
         || owner.getId() == null
         || missionParticipantRepository
@@ -490,12 +469,9 @@ public class RefineryOrderService {
 
     if (details.getLocation() != null && details.getLocation().getId() != null) {
       order.setLocation(
-          locationRepository
-              .findById(details.getLocation().getId())
-              .orElseThrow(
-                  () ->
-                      new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                          "error.location.not_found")));
+          Entities.require(
+              locationRepository.findById(details.getLocation().getId()),
+              "error.location.not_found"));
       validateLocationHasRefinery(order.getLocation());
     }
 
@@ -515,18 +491,14 @@ public class RefineryOrderService {
 
     if (details.getRefiningMethod() != null && details.getRefiningMethod().getId() != null) {
       order.setRefiningMethod(
-          refiningMethodRepository
-              .findById(details.getRefiningMethod().getId())
-              .orElseThrow(
-                  () ->
-                      new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                          "error.refining_method.not_found")));
+          Entities.require(
+              refiningMethodRepository.findById(details.getRefiningMethod().getId()),
+              "error.refining_method.not_found"));
     } else if (details.getRefiningMethod() == null) {
       order.setRefiningMethod(null);
     }
 
-    order.setStartedAt(
-        details.getStartedAt() != null ? details.getStartedAt() : java.time.Instant.now());
+    order.setStartedAt(details.getStartedAt() != null ? details.getStartedAt() : Instant.now());
     order.setDurationMinutes(details.getDurationMinutes());
     // Money fields: 0 is treated as "not set" and persisted as null (see createRefineryOrder).
     order.setExpenses(zeroToNull(details.getExpenses()));
@@ -576,15 +548,12 @@ public class RefineryOrderService {
    */
   private void resolveGood(RefineryGood good, RefineryOrder order) {
     if (good.getInputMaterial() != null && good.getInputMaterial().getId() != null) {
-      de.greluc.krt.profit.basetool.backend.model.Material inMat =
-          materialRepository
-              .findById(good.getInputMaterial().getId())
-              .orElseThrow(
-                  () ->
-                      new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                          "error.material.input.not_found"));
+      Material inMat =
+          Entities.require(
+              materialRepository.findById(good.getInputMaterial().getId()),
+              "error.material.input.not_found");
 
-      if (inMat.getType() != de.greluc.krt.profit.basetool.backend.model.MaterialType.RAW
+      if (inMat.getType() != MaterialType.RAW
           && !Boolean.TRUE.equals(inMat.getIsManualRawMaterial())) {
         throw new IllegalArgumentException(
             "Refinery goods input must be of type RAW. Material '"
@@ -595,13 +564,10 @@ public class RefineryOrderService {
       good.setInputMaterial(inMat);
 
       if (good.getOutputMaterial() != null && good.getOutputMaterial().getId() != null) {
-        de.greluc.krt.profit.basetool.backend.model.Material outMat =
-            materialRepository
-                .findById(good.getOutputMaterial().getId())
-                .orElseThrow(
-                    () ->
-                        new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                            "error.material.output.not_found"));
+        Material outMat =
+            Entities.require(
+                materialRepository.findById(good.getOutputMaterial().getId()),
+                "error.material.output.not_found");
 
         if (inMat.getRefinedMaterial() != null
             && !outMat.getId().equals(inMat.getRefinedMaterial().getId())) {
@@ -618,8 +584,7 @@ public class RefineryOrderService {
         }
       }
     } else {
-      throw new de.greluc.krt.profit.basetool.backend.exception.BadRequestException(
-          "error.refinery_order.input_material_required");
+      throw new BadRequestException("error.refinery_order.input_material_required");
     }
     good.setRefineryOrder(order);
   }
@@ -643,7 +608,7 @@ public class RefineryOrderService {
     }
 
     final RefineryOrderStatus previousStatus = order.getStatus();
-    order.setStatus(de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus.CANCELED);
+    order.setStatus(RefineryOrderStatus.CANCELED);
     refineryOrderRepository.save(order);
     auditService.record(
         AuditEventType.REFINERY_ORDER_CANCELED,
@@ -688,8 +653,7 @@ public class RefineryOrderService {
       boolean isLogistician) {
     RefineryOrder order = getRefineryOrder(orderId);
 
-    if (order.getStatus()
-        == de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus.COMPLETED) {
+    if (order.getStatus() == RefineryOrderStatus.COMPLETED) {
       // A client-side condition (a second store of the same order), so a 400 with a localized
       // detail — a raw IllegalStateException is answered as a 500 (APPSEC-06).
       throw new BadRequestException("error.refinery_order.already_stored");
@@ -705,21 +669,15 @@ public class RefineryOrderService {
     final RefineryOrderStatus previousStatus = order.getStatus();
 
     for (RefineryOrderStoreItemDto itemDto : dto.items()) {
-      final de.greluc.krt.profit.basetool.backend.model.Material mat =
-          materialRepository
-              .findById(itemDto.materialId())
-              .orElseThrow(
-                  () ->
-                      new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                          "Material not found: " + itemDto.materialId()));
+      final Material mat =
+          Entities.require(
+              materialRepository.findById(itemDto.materialId()),
+              () -> "Material not found: " + itemDto.materialId());
 
-      final de.greluc.krt.profit.basetool.backend.model.Location loc =
-          locationRepository
-              .findById(itemDto.locationId())
-              .orElseThrow(
-                  () ->
-                      new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                          "Location not found: " + itemDto.locationId()));
+      final Location loc =
+          Entities.require(
+              locationRepository.findById(itemDto.locationId()),
+              () -> "Location not found: " + itemDto.locationId());
 
       // REQ-SEC-039: the per-item userId names the RECEIVING inventory owner, so it decides whose
       // ledger the output lands in. The order-ownership check above does not cover that — it
@@ -757,12 +715,9 @@ public class RefineryOrderService {
       User assignee;
       if (itemDto.userId() != null) {
         assignee =
-            userRepository
-                .findById(itemDto.userId())
-                .orElseThrow(
-                    () ->
-                        new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                            "User not found: " + itemDto.userId()));
+            Entities.require(
+                userRepository.findById(itemDto.userId()),
+                () -> "User not found: " + itemDto.userId());
       } else {
         assignee = order.getOwner();
       }
@@ -774,19 +729,16 @@ public class RefineryOrderService {
       // guards.
       final boolean personal = Boolean.TRUE.equals(itemDto.personal());
       if (personal && itemDto.jobOrderId() != null) {
-        throw new de.greluc.krt.profit.basetool.backend.exception.BadRequestException(
+        throw new BadRequestException(
             "Personal items cannot be assigned to a mission or job order");
       }
 
-      de.greluc.krt.profit.basetool.backend.model.JobOrder jobOrder = null;
+      JobOrder jobOrder = null;
       if (itemDto.jobOrderId() != null) {
         jobOrder =
-            jobOrderRepository
-                .findById(itemDto.jobOrderId())
-                .orElseThrow(
-                    () ->
-                        new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                            "JobOrder not found: " + itemDto.jobOrderId()));
+            Entities.require(
+                jobOrderRepository.findById(itemDto.jobOrderId()),
+                () -> "JobOrder not found: " + itemDto.jobOrderId());
       }
 
       // Resolve the assignee's owning org-unit pool up front — the eighth identity dimension — so
@@ -801,7 +753,7 @@ public class RefineryOrderService {
       // behalf). It 400s a multi-membership assignee with no pick, or a pick foreign to BOTH the
       // assignee's memberships and the caller's editable scope. See InventoryItemService and
       // OwnerScopeService.resolveStampedOrgUnit.
-      final de.greluc.krt.profit.basetool.backend.model.OrgUnit owningOrgUnit =
+      final OrgUnit owningOrgUnit =
           ownerScopeService.resolveOrgUnitForPickerOutputNullable(
               assignee, itemDto.owningOrgUnitId());
 
@@ -861,7 +813,7 @@ public class RefineryOrderService {
       updateGoodOutputQuantity(order, itemDto);
     }
 
-    order.setStatus(de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus.COMPLETED);
+    order.setStatus(RefineryOrderStatus.COMPLETED);
     refineryOrderRepository.save(order);
     auditService.record(
         AuditEventType.REFINERY_ORDER_STORED,
@@ -927,13 +879,12 @@ public class RefineryOrderService {
     // material alone put every item of that material on the first of them: the later item overwrote
     // the earlier one and the second good was never updated. The grade-less fallback keeps callers
     // that send no quality working exactly as before.
-    de.greluc.krt.profit.basetool.backend.model.RefineryGood target =
-        findGood(order, itemDto.materialId(), itemDto.quality());
+    RefineryGood target = findGood(order, itemDto.materialId(), itemDto.quality());
     if (target == null) {
       target = findGood(order, itemDto.materialId(), null);
     }
     if (target != null) {
-      de.greluc.krt.profit.basetool.backend.model.RefineryGood good = target;
+      RefineryGood good = target;
       double amount = itemDto.amount();
       String quantityTypeName =
           good.getOutputMaterial().getQuantityType() != null
@@ -960,9 +911,8 @@ public class RefineryOrderService {
    * @return the good, or {@code null} when none matches
    */
   @Nullable
-  private de.greluc.krt.profit.basetool.backend.model.RefineryGood findGood(
-      RefineryOrder order, java.util.UUID materialId, Integer quality) {
-    for (de.greluc.krt.profit.basetool.backend.model.RefineryGood good : order.getGoods()) {
+  private RefineryGood findGood(RefineryOrder order, UUID materialId, Integer quality) {
+    for (RefineryGood good : order.getGoods()) {
       if (good.getOutputMaterial() == null || good.getOutputMaterial().getId() == null) {
         continue;
       }
@@ -1054,8 +1004,7 @@ public class RefineryOrderService {
    * @param location the order's chosen location
    * @throws IllegalArgumentException when the location hosts no live refinery terminal
    */
-  private void validateLocationHasRefinery(
-      de.greluc.krt.profit.basetool.backend.model.Location location) {
+  private void validateLocationHasRefinery(Location location) {
     boolean hasRefinery = false;
     if (location.getCity() != null
         && Boolean.TRUE.equals(location.getCity().getHasRefineryTerminal())) {

@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -89,7 +90,7 @@ public class BankAuditReportService {
     }
     ensureWithinExportCap(bankAuditEventRepository.countForExport(from, to));
     List<BankAuditEvent> events = bankAuditEventRepository.findForExport(from, to);
-    Map<java.util.UUID, String> accountNos = resolveAccountNos(events);
+    Map<UUID, String> accountNos = resolveAccountNos(events);
 
     List<AuditLogPdfFormat.Row> rows =
         events.stream()
@@ -140,7 +141,7 @@ public class BankAuditReportService {
     }
     ensureWithinExportCap(bankAuditEventRepository.countForExport(from, to));
     List<BankAuditEvent> events = bankAuditEventRepository.findForExport(from, to);
-    Map<java.util.UUID, String> accountNos = resolveAccountNos(events);
+    Map<UUID, String> accountNos = resolveAccountNos(events);
     List<BankAuditEventDto> dtos =
         events.stream()
             .map(
@@ -185,8 +186,8 @@ public class BankAuditReportService {
    * @param events the audit events
    * @return account id → display number, for the referenced accounts that still exist
    */
-  private Map<java.util.UUID, String> resolveAccountNos(@NotNull List<BankAuditEvent> events) {
-    List<java.util.UUID> accountIds =
+  private Map<UUID, String> resolveAccountNos(@NotNull List<BankAuditEvent> events) {
+    List<UUID> accountIds =
         events.stream()
             .map(BankAuditEvent::getAccountId)
             .filter(Objects::nonNull)

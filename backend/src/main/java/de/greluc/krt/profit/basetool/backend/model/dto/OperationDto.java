@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.model.OperationStatus;
 import java.time.Instant;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Data transfer record carrying Operation payload.
@@ -67,7 +68,7 @@ public record OperationDto(
    * @return a new {@code OperationDto} identical to this one except for {@code payoutPreliminary}
    */
   @NotNull
-  public OperationDto withPayoutPreliminary(@org.jetbrains.annotations.Nullable Boolean value) {
+  public OperationDto withPayoutPreliminary(@Nullable Boolean value) {
     return new OperationDto(
         id, name, description, status, owningSquadron, version, createdAt, updatedAt, value);
   }

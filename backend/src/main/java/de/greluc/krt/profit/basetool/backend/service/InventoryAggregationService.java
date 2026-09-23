@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
@@ -30,11 +31,14 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedInventoryDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryStackDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemStockEntryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCollectionEntryDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.projection.InventoryItemStackAggregate;
 import de.greluc.krt.profit.basetool.backend.model.projection.InventoryStackAggregate;
 import de.greluc.krt.profit.basetool.backend.model.projection.OwnedStockSlice;
@@ -43,9 +47,15 @@ import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
@@ -105,7 +115,7 @@ public class InventoryAggregationService {
    * @return one slice per (material, quality) the user owns, with the summed SCU; never {@code
    *     null}
    */
-  public List<OwnedStockSlice> getOwnedStockSlices(@org.jetbrains.annotations.NotNull UUID userId) {
+  public List<OwnedStockSlice> getOwnedStockSlices(@NotNull UUID userId) {
     return inventoryItemRepository.sumOwnedStockByMaterialAndQuality(userId);
   }
 
@@ -167,9 +177,7 @@ public class InventoryAggregationService {
    */
   public Page<InventoryItemDto> getInventoryByMaterial(UUID materialId, Pageable pageable) {
     Material material =
-        materialRepository
-            .findById(materialId)
-            .orElseThrow(() -> new NotFoundException("Material not found"));
+        Entities.require(materialRepository.findById(materialId), "Material not found");
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
     return inventoryItemRepository
         .findByMaterialAndPersonalFalseScoped(
@@ -193,9 +201,7 @@ public class InventoryAggregationService {
    */
   public Page<InventoryItemDto> getInventoryByGameItem(UUID gameItemId, Pageable pageable) {
     GameItem gameItem =
-        gameItemRepository
-            .findById(gameItemId)
-            .orElseThrow(() -> new NotFoundException("Game item not found"));
+        Entities.require(gameItemRepository.findById(gameItemId), "Game item not found");
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
     return inventoryItemRepository
         .findByGameItemAndPersonalFalseScoped(
@@ -217,10 +223,7 @@ public class InventoryAggregationService {
    * @return paged material inventory rows owned by the user
    */
   public Page<InventoryItemDto> getUserInventory(UUID userId, Pageable pageable) {
-    User user =
-        userRepository
-            .findPlainById(userId)
-            .orElseThrow(() -> new NotFoundException("User not found"));
+    User user = Entities.require(userRepository.findPlainById(userId), "User not found");
     return inventoryItemRepository
         .findMaterialRowsByUser(user, pageable)
         .map(inventoryItemMapper::toDto);
@@ -236,10 +239,7 @@ public class InventoryAggregationService {
    * @throws NotFoundException when the user id is unknown
    */
   public Page<InventoryItemDto> getUserItemInventory(UUID userId, Pageable pageable) {
-    User user =
-        userRepository
-            .findPlainById(userId)
-            .orElseThrow(() -> new NotFoundException("User not found"));
+    User user = Entities.require(userRepository.findPlainById(userId), "User not found");
     return inventoryItemRepository
         .findItemRowsByUser(user, pageable)
         .map(inventoryItemMapper::toDto);
@@ -252,8 +252,7 @@ public class InventoryAggregationService {
    * @param userId owner id
    * @return aggregated items grouped by material
    */
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
-      getMyAggregatedInventory(UUID userId) {
+  public List<GroupedInventoryDto> getMyAggregatedInventory(UUID userId) {
     return getMyAggregatedInventory(userId, null, null, null, null);
   }
 
@@ -265,8 +264,8 @@ public class InventoryAggregationService {
    * @param missionIds optional mission filter
    * @return aggregated items
    */
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
-      getMyAggregatedInventory(UUID userId, List<UUID> jobOrderIds, List<UUID> missionIds) {
+  public List<GroupedInventoryDto> getMyAggregatedInventory(
+      UUID userId, List<UUID> jobOrderIds, List<UUID> missionIds) {
     return getMyAggregatedInventory(userId, null, null, jobOrderIds, missionIds);
   }
 
@@ -283,13 +282,12 @@ public class InventoryAggregationService {
    * @return aggregated items
    * @throws NotFoundException when the user id is unknown
    */
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
-      getMyAggregatedInventory(
-          UUID userId,
-          List<UUID> materialIds,
-          Integer minQuality,
-          List<UUID> jobOrderIds,
-          List<UUID> missionIds) {
+  public List<GroupedInventoryDto> getMyAggregatedInventory(
+      UUID userId,
+      List<UUID> materialIds,
+      Integer minQuality,
+      List<UUID> jobOrderIds,
+      List<UUID> missionIds) {
     return getMyAggregatedInventory(
         userId, materialIds, null, minQuality, jobOrderIds, missionIds, false, false);
   }
@@ -315,20 +313,16 @@ public class InventoryAggregationService {
    * @return aggregated items
    * @throws NotFoundException when the user id is unknown
    */
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
-      getMyAggregatedInventory(
-          UUID userId,
-          List<UUID> materialIds,
-          List<UUID> locationIds,
-          Integer minQuality,
-          List<UUID> jobOrderIds,
-          List<UUID> missionIds,
-          boolean personalOnly,
-          boolean nonPersonalOnly) {
-    User user =
-        userRepository
-            .findPlainById(userId)
-            .orElseThrow(() -> new NotFoundException("User not found"));
+  public List<GroupedInventoryDto> getMyAggregatedInventory(
+      UUID userId,
+      List<UUID> materialIds,
+      List<UUID> locationIds,
+      Integer minQuality,
+      List<UUID> jobOrderIds,
+      List<UUID> missionIds,
+      boolean personalOnly,
+      boolean nonPersonalOnly) {
+    User user = Entities.require(userRepository.findPlainById(userId), "User not found");
     boolean hasMaterials = materialIds != null && !materialIds.isEmpty();
     boolean hasLocations = locationIds != null && !locationIds.isEmpty();
     boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
@@ -359,8 +353,8 @@ public class InventoryAggregationService {
    * @param minQuality optional min-quality filter
    * @return aggregated squadron-wide items
    */
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
-      getAllAggregatedInventory(List<UUID> materialIds, Integer minQuality) {
+  public List<GroupedInventoryDto> getAllAggregatedInventory(
+      List<UUID> materialIds, Integer minQuality) {
     return getAllAggregatedInventory(materialIds, null, minQuality, null, null);
   }
 
@@ -376,13 +370,12 @@ public class InventoryAggregationService {
    * @param missionIds optional mission filter
    * @return aggregated items grouped by material
    */
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
-      getAllAggregatedInventory(
-          List<UUID> materialIds,
-          List<UUID> locationIds,
-          Integer minQuality,
-          List<UUID> jobOrderIds,
-          List<UUID> missionIds) {
+  public List<GroupedInventoryDto> getAllAggregatedInventory(
+      List<UUID> materialIds,
+      List<UUID> locationIds,
+      Integer minQuality,
+      List<UUID> jobOrderIds,
+      List<UUID> missionIds) {
     boolean hasMaterials = materialIds != null && !materialIds.isEmpty();
     boolean hasLocations = locationIds != null && !locationIds.isEmpty();
     boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
@@ -426,18 +419,14 @@ public class InventoryAggregationService {
    * @return item groups, each carrying its sorted stacks and item-wide total
    * @throws NotFoundException when the user id is unknown
    */
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
-      getMyAggregatedItemInventory(
-          UUID userId,
-          List<UUID> gameItemIds,
-          List<UUID> locationIds,
-          List<UUID> jobOrderIds,
-          boolean personalOnly,
-          boolean nonPersonalOnly) {
-    User user =
-        userRepository
-            .findPlainById(userId)
-            .orElseThrow(() -> new NotFoundException("User not found"));
+  public List<GroupedInventoryDto> getMyAggregatedItemInventory(
+      UUID userId,
+      List<UUID> gameItemIds,
+      List<UUID> locationIds,
+      List<UUID> jobOrderIds,
+      boolean personalOnly,
+      boolean nonPersonalOnly) {
+    User user = Entities.require(userRepository.findPlainById(userId), "User not found");
     boolean hasGameItems = gameItemIds != null && !gameItemIds.isEmpty();
     boolean hasLocations = locationIds != null && !locationIds.isEmpty();
     boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
@@ -487,10 +476,7 @@ public class InventoryAggregationService {
       List<UUID> missionIds,
       boolean personalOnly,
       boolean nonPersonalOnly) {
-    User user =
-        userRepository
-            .findPlainById(userId)
-            .orElseThrow(() -> new NotFoundException("User not found"));
+    User user = Entities.require(userRepository.findPlainById(userId), "User not found");
     boolean hasMaterials = materialIds != null && !materialIds.isEmpty();
     boolean hasLocations = locationIds != null && !locationIds.isEmpty();
     boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
@@ -534,10 +520,7 @@ public class InventoryAggregationService {
       List<UUID> jobOrderIds,
       boolean personalOnly,
       boolean nonPersonalOnly) {
-    User user =
-        userRepository
-            .findPlainById(userId)
-            .orElseThrow(() -> new NotFoundException("User not found"));
+    User user = Entities.require(userRepository.findPlainById(userId), "User not found");
     boolean hasGameItems = gameItemIds != null && !gameItemIds.isEmpty();
     boolean hasLocations = locationIds != null && !locationIds.isEmpty();
     boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
@@ -565,9 +548,8 @@ public class InventoryAggregationService {
    * @param jobOrderIds optional job-order filter
    * @return item groups, each carrying its sorted stacks and item-wide total
    */
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
-      getAllAggregatedItemInventory(
-          List<UUID> gameItemIds, List<UUID> locationIds, List<UUID> jobOrderIds) {
+  public List<GroupedInventoryDto> getAllAggregatedItemInventory(
+      List<UUID> gameItemIds, List<UUID> locationIds, List<UUID> jobOrderIds) {
     boolean hasGameItems = gameItemIds != null && !gameItemIds.isEmpty();
     boolean hasLocations = locationIds != null && !locationIds.isEmpty();
     boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
@@ -596,18 +578,16 @@ public class InventoryAggregationService {
    * @param aggregates the SQL-grouped per-stack rows for the current scope/filter
    * @return the materials, each carrying its sorted stacks and material-wide totals
    */
-  private List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
-      buildGroupedFromStacks(@NotNull List<InventoryStackAggregate> aggregates) {
+  private List<GroupedInventoryDto> buildGroupedFromStacks(
+      @NotNull List<InventoryStackAggregate> aggregates) {
     return aggregates.stream()
         .collect(
-            java.util.stream.Collectors.groupingBy(
-                aggregate -> aggregate.material().getId(),
-                java.util.LinkedHashMap::new,
-                java.util.stream.Collectors.toList()))
+            Collectors.groupingBy(
+                aggregate -> aggregate.material().getId(), LinkedHashMap::new, Collectors.toList()))
         .values()
         .stream()
         .map(this::buildMaterialGroup)
-        .sorted(java.util.Comparator.comparing(g -> g.material().name()))
+        .sorted(Comparator.comparing(g -> g.material().name()))
         .toList();
   }
 
@@ -622,10 +602,9 @@ public class InventoryAggregationService {
    * @return the populated material group with its nested stacks
    */
   @NotNull
-  private de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto buildMaterialGroup(
-      @NotNull List<InventoryStackAggregate> matStacks) {
-    List<InventoryStackDto> stacks = new java.util.ArrayList<>(matStacks.size());
-    de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto material = null;
+  private GroupedInventoryDto buildMaterialGroup(@NotNull List<InventoryStackAggregate> matStacks) {
+    List<InventoryStackDto> stacks = new ArrayList<>(matStacks.size());
+    MaterialReferenceDto material = null;
     double totalAmount = 0.0;
     double weightedQualitySum = 0.0;
     int maxQuality = 0;
@@ -658,8 +637,7 @@ public class InventoryAggregationService {
     stacks.sort(STACK_ORDER);
     double avgQuality =
         totalAmount > 0 ? Math.round((weightedQualitySum / totalAmount) * 100.0) / 100.0 : 0.0;
-    return new de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto(
-        material, null, totalAmount, avgQuality, maxQuality, stacks);
+    return new GroupedInventoryDto(material, null, totalAmount, avgQuality, maxQuality, stacks);
   }
 
   /**
@@ -671,18 +649,16 @@ public class InventoryAggregationService {
    * @param aggregates the SQL-grouped per-item-stack rows for the current scope/filter
    * @return the game-item groups, each carrying its sorted stacks and item-wide total
    */
-  private List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
-      buildGroupedFromItemStacks(@NotNull List<InventoryItemStackAggregate> aggregates) {
+  private List<GroupedInventoryDto> buildGroupedFromItemStacks(
+      @NotNull List<InventoryItemStackAggregate> aggregates) {
     return aggregates.stream()
         .collect(
-            java.util.stream.Collectors.groupingBy(
-                aggregate -> aggregate.gameItem().getId(),
-                java.util.LinkedHashMap::new,
-                java.util.stream.Collectors.toList()))
+            Collectors.groupingBy(
+                aggregate -> aggregate.gameItem().getId(), LinkedHashMap::new, Collectors.toList()))
         .values()
         .stream()
         .map(this::buildItemGroup)
-        .sorted(java.util.Comparator.comparing(g -> g.gameItem().name()))
+        .sorted(Comparator.comparing(g -> g.gameItem().name()))
         .toList();
   }
 
@@ -696,10 +672,10 @@ public class InventoryAggregationService {
    * @return the populated game-item group with its nested stacks
    */
   @NotNull
-  private de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto buildItemGroup(
+  private GroupedInventoryDto buildItemGroup(
       @NotNull List<InventoryItemStackAggregate> itemStacks) {
-    List<InventoryStackDto> stacks = new java.util.ArrayList<>(itemStacks.size());
-    de.greluc.krt.profit.basetool.backend.model.dto.InventoryGameItemReferenceDto gameItem = null;
+    List<InventoryStackDto> stacks = new ArrayList<>(itemStacks.size());
+    InventoryGameItemReferenceDto gameItem = null;
     double totalAmount = 0.0;
     for (InventoryItemStackAggregate aggregate : itemStacks) {
       InventoryItemDto refs = mapItemAggregateRefs(aggregate);
@@ -721,8 +697,7 @@ public class InventoryAggregationService {
       totalAmount += amt;
     }
     stacks.sort(STACK_ORDER);
-    return new de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto(
-        null, gameItem, totalAmount, null, null, stacks);
+    return new GroupedInventoryDto(null, gameItem, totalAmount, null, null, stacks);
   }
 
   /**
@@ -795,10 +770,7 @@ public class InventoryAggregationService {
       Boolean personal,
       UUID owningOrgUnitId,
       Pageable pageable) {
-    User user =
-        userRepository
-            .findPlainById(userId)
-            .orElseThrow(() -> new NotFoundException("User not found"));
+    User user = Entities.require(userRepository.findPlainById(userId), "User not found");
     return inventoryItemRepository
         .findUserStackEntries(
             user.getId(),
@@ -872,10 +844,7 @@ public class InventoryAggregationService {
       Boolean personal,
       UUID owningOrgUnitId,
       Pageable pageable) {
-    User user =
-        userRepository
-            .findPlainById(userId)
-            .orElseThrow(() -> new NotFoundException("User not found"));
+    User user = Entities.require(userRepository.findPlainById(userId), "User not found");
     return inventoryItemRepository
         .findUserItemStackEntries(
             user.getId(),
@@ -1015,9 +984,7 @@ public class InventoryAggregationService {
    * @throws NotFoundException when the job order is unknown
    */
   public List<MaterialCollectionEntryDto> getMaterialCollection(UUID jobOrderId) {
-    jobOrderRepository
-        .findById(jobOrderId)
-        .orElseThrow(() -> new NotFoundException("Job order not found"));
+    Entities.require(jobOrderRepository.findById(jobOrderId), "Job order not found");
     return inventoryItemRepository.findByJobOrderIdOrdered(jobOrderId).stream()
         .map(
             item -> {
@@ -1079,14 +1046,12 @@ public class InventoryAggregationService {
   @NotNull
   public List<JobOrderItemStockGroupDto> getItemStockForJobOrder(UUID jobOrderId) {
     JobOrder jobOrder =
-        jobOrderRepository
-            .findById(jobOrderId)
-            .orElseThrow(() -> new NotFoundException("Job order not found"));
+        Entities.require(jobOrderRepository.findById(jobOrderId), "Job order not found");
 
     // Per-gameItem ordered/manufactured context from the order's own item lines (REQ-ORDERS-025).
     // getId() on the lazy GameItem proxy resolves from the FK without initialising it, so this
     // walk issues no per-line catalogue queries; the set is empty for MATERIAL orders.
-    java.util.Map<UUID, int[]> lineTotals = new java.util.HashMap<>();
+    Map<UUID, int[]> lineTotals = new HashMap<>();
     for (JobOrderItem line : jobOrder.getItems()) {
       if (line.getGameItem() == null) {
         continue;
@@ -1099,19 +1064,17 @@ public class InventoryAggregationService {
     // Group the earmarked rows per game item (keyed by id — entity identity is irrelevant here).
     // The query sorts by owner/location/name, so within a group the entries already carry the
     // display order; the LinkedHashMap only collects them.
-    java.util.Map<UUID, List<InventoryItem>> byGameItem = new java.util.LinkedHashMap<>();
+    Map<UUID, List<InventoryItem>> byGameItem = new LinkedHashMap<>();
     for (InventoryItem row :
         inventoryItemRepository.findGameItemRowsByJobOrderIdOrdered(jobOrderId)) {
-      byGameItem
-          .computeIfAbsent(row.getGameItem().getId(), k -> new java.util.ArrayList<>())
-          .add(row);
+      byGameItem.computeIfAbsent(row.getGameItem().getId(), k -> new ArrayList<>()).add(row);
     }
 
-    List<JobOrderItemStockGroupDto> groups = new java.util.ArrayList<>();
+    List<JobOrderItemStockGroupDto> groups = new ArrayList<>();
     byGameItem.forEach(
         (gameItemId, rows) -> {
-          GameItem gameItem = rows.get(0).getGameItem();
-          List<JobOrderItemStockEntryDto> entries = new java.util.ArrayList<>();
+          GameItem gameItem = rows.getFirst().getGameItem();
+          List<JobOrderItemStockEntryDto> entries = new ArrayList<>();
           long allocatedTotal = 0L;
           for (InventoryItem row : rows) {
             String ownerName =
@@ -1152,7 +1115,7 @@ public class InventoryAggregationService {
                   entries));
         });
     groups.sort(
-        java.util.Comparator.<JobOrderItemStockGroupDto, String>comparing(
+        Comparator.<JobOrderItemStockGroupDto, String>comparing(
                 g -> g.gameItem() != null && g.gameItem().name() != null ? g.gameItem().name() : "",
                 String.CASE_INSENSITIVE_ORDER)
             .thenComparing(g -> g.gameItem() != null ? String.valueOf(g.gameItem().id()) : ""));
@@ -1163,14 +1126,13 @@ public class InventoryAggregationService {
    * Display order of the stacks within a material: highest quality first, then location name
    * ascending, then largest total amount first — mirrors the previous per-row ordering.
    */
-  private static final java.util.Comparator<InventoryStackDto> STACK_ORDER =
-      java.util.Comparator.<InventoryStackDto, Integer>comparing(
-              s -> s.quality() != null ? s.quality() : 0)
+  private static final Comparator<InventoryStackDto> STACK_ORDER =
+      Comparator.<InventoryStackDto, Integer>comparing(s -> s.quality() != null ? s.quality() : 0)
           .reversed()
           .thenComparing(
               s -> s.location() != null && s.location().name() != null ? s.location().name() : "")
           .thenComparing(
-              java.util.Comparator.<InventoryStackDto, Double>comparing(
+              Comparator.<InventoryStackDto, Double>comparing(
                       s -> s.totalAmount() != null ? s.totalAmount() : 0.0)
                   .reversed());
 }

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.OrgChartPositionMapper;
 import de.greluc.krt.profit.basetool.backend.model.KommandoGroup;
@@ -38,9 +39,9 @@ import de.greluc.krt.profit.basetool.backend.repository.OrgChartPositionReposito
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -138,7 +139,7 @@ public class OrgChartService {
   public OrgChartPositionDto createPosition(@NotNull OrgChartPositionCreateRequest request) {
     OrgChartPositionType type = request.positionType();
     OrgChartScope scope = type.scope();
-    final String displayName = trimToNull(request.displayName());
+    final String displayName = StringNormalization.trimToNull(request.displayName());
     final User user = resolveHolderForCreate(type, request.userId(), displayName);
 
     OrgUnit orgUnit = resolveScopeOrgUnit(scope, request.orgUnitId());
@@ -211,9 +212,8 @@ public class OrgChartService {
   public OrgChartPositionDto updatePosition(
       @NotNull UUID id, @NotNull OrgChartPositionUpdateRequest request) {
     OrgChartPosition position =
-        positionRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("OrgChartPosition not found: " + id));
+        Entities.require(
+            positionRepository.findById(id), () -> "OrgChartPosition not found: " + id);
     OptimisticLock.check(position.getVersion(), request.version(), OrgChartPosition.class, id);
     // The chart editor may not assign an account, nor touch a seat the rank mirror manages — an
     // account-held or kommando_group-linked position reflects the functional ranks and is edited
@@ -225,23 +225,23 @@ public class OrgChartService {
     // Symmetric with createPosition: a position is held by an account OR a free-text name, never
     // both, so a single update may not set both at once. A bare userId still clears any existing
     // free-text name below (the regression-free swap); only supplying both together is ambiguous.
-    if (request.userId() != null && trimToNull(request.displayName()) != null) {
+    if (request.userId() != null && StringNormalization.trimToNull(request.displayName()) != null) {
       throw new BadRequestException(ERR_HOLDER_AMBIGUOUS);
     }
     if (request.name() != null) {
       if (position.getPositionType() != OrgChartPositionType.COMMAND_LEAD) {
         throw new BadRequestException(ERR_NAME_NOT_ALLOWED);
       }
-      position.setName(trimToNull(request.name()));
+      position.setName(StringNormalization.trimToNull(request.name()));
     }
     if (request.userId() != null) {
       // Account holder: assign (if changed) and clear any free-text name in the same transaction.
       User current = position.getUser();
       if (current == null || !request.userId().equals(current.getId())) {
         User newUser =
-            userRepository
-                .findById(request.userId())
-                .orElseThrow(() -> new NotFoundException("User not found: " + request.userId()));
+            Entities.require(
+                userRepository.findById(request.userId()),
+                () -> "User not found: " + request.userId());
         validateUserUnique(
             position.getPositionType().scope(), position.getOrgUnit(), request.userId());
         position.setUser(newUser);
@@ -250,7 +250,7 @@ public class OrgChartService {
     } else if (request.displayName() != null) {
       // Free-text holder: a non-blank typed name replaces the account holder; a blank value clears
       // it, which is only allowed where a holder is optional (a COMMAND_LEAD Kommando).
-      String typed = trimToNull(request.displayName());
+      String typed = StringNormalization.trimToNull(request.displayName());
       if (typed == null
           && position.getUser() == null
           && position.getPositionType() != OrgChartPositionType.COMMAND_LEAD) {
@@ -287,9 +287,8 @@ public class OrgChartService {
   @Transactional
   public OrgChartPositionDto vacateCommandLeader(@NotNull UUID id, long version) {
     OrgChartPosition position =
-        positionRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("OrgChartPosition not found: " + id));
+        Entities.require(
+            positionRepository.findById(id), () -> "OrgChartPosition not found: " + id);
     if (position.getPositionType() != OrgChartPositionType.COMMAND_LEAD) {
       throw new BadRequestException(ERR_VACATE_NOT_COMMAND);
     }
@@ -317,9 +316,8 @@ public class OrgChartService {
   @Transactional
   public void deletePosition(@NotNull UUID id) {
     OrgChartPosition position =
-        positionRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("OrgChartPosition not found: " + id));
+        Entities.require(
+            positionRepository.findById(id), () -> "OrgChartPosition not found: " + id);
     // A mirror-managed seat (account-held, or a kommando_group-linked Kommando) reflects a
     // functional rank — it is removed by clearing the rank / deleting the Kommandogruppe under
     // Organisation -> Leitung (epic #800, REQ-ROLE-006), not from the chart. Free-text holders and
@@ -818,13 +816,11 @@ public class OrgChartService {
       }
       throw new BadRequestException(ERR_USER_REQUIRED);
     }
-    return userRepository
-        .findById(userId)
-        .orElseThrow(() -> new NotFoundException("User not found: " + userId));
+    return Entities.require(userRepository.findById(userId), () -> "User not found: " + userId);
   }
 
   private String validateAndNormalizeName(OrgChartPositionType type, String rawName) {
-    String normalized = trimToNull(rawName);
+    String normalized = StringNormalization.trimToNull(rawName);
     if (normalized != null && type != OrgChartPositionType.COMMAND_LEAD) {
       throw new BadRequestException(ERR_NAME_NOT_ALLOWED);
     }
@@ -843,9 +839,8 @@ public class OrgChartService {
       throw new BadRequestException(ERR_SCOPE_MISMATCH);
     }
     OrgUnit unit =
-        orgUnitRepository
-            .findById(orgUnitId)
-            .orElseThrow(() -> new NotFoundException("OrgUnit not found: " + orgUnitId));
+        Entities.require(
+            orgUnitRepository.findById(orgUnitId), () -> "OrgUnit not found: " + orgUnitId);
     OrgUnitKind expectedKind =
         switch (scope) {
           case SQUADRON -> OrgUnitKind.SQUADRON;
@@ -895,9 +890,8 @@ public class OrgChartService {
 
   private OrgChartPosition loadCommandLeadParent(UUID parentId, OrgUnit orgUnit) {
     OrgChartPosition parent =
-        positionRepository
-            .findById(parentId)
-            .orElseThrow(() -> new NotFoundException("Parent position not found: " + parentId));
+        Entities.require(
+            positionRepository.findById(parentId), () -> "Parent position not found: " + parentId);
     if (parent.getPositionType() != OrgChartPositionType.COMMAND_LEAD
         || parent.getOrgUnit() == null
         || !parent.getOrgUnit().getId().equals(orgUnit.getId())) {
@@ -968,15 +962,5 @@ public class OrgChartService {
     if (alreadyAssigned) {
       throw new BadRequestException(ERR_USER_ASSIGNED);
     }
-  }
-
-  @Contract("null -> null")
-  @Nullable
-  private static String trimToNull(String value) {
-    if (value == null) {
-      return null;
-    }
-    String trimmed = value.trim();
-    return trimmed.isEmpty() ? null : trimmed;
   }
 }

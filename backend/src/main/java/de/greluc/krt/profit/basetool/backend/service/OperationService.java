@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.Operation;
 import de.greluc.krt.profit.basetool.backend.model.OperationStatus;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.model.dto.OperationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationUpdateDto;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
@@ -162,8 +163,7 @@ public class OperationService {
    *     list, filtered by the caller's squadron scope and the status/recency bound
    */
   @NotNull
-  public java.util.List<de.greluc.krt.profit.basetool.backend.model.dto.OperationReferenceDto>
-      findAllReference() {
+  public List<OperationReferenceDto> findAllReference() {
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
     Instant terminalCutoff =
         OffsetDateTime.now(ZoneOffset.UTC)

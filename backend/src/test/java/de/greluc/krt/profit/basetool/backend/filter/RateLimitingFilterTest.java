@@ -31,6 +31,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import de.greluc.krt.profit.basetool.backend.support.RateLimitProperties;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -65,9 +66,15 @@ import org.springframework.mock.web.MockHttpServletResponse;
  */
 class RateLimitingFilterTest {
 
-  private RateLimitProperties properties;
+  /** The configuration the current test describes; see {@link Spec}. */
+  private Spec properties;
+
   private AppProblemProperties problemProperties;
-  private RateLimitingFilter filter;
+
+  /** The filter {@link #filter()} built last, and the configuration it was built from. */
+  private RateLimitingFilter builtFilter;
+
+  private RateLimitProperties builtFrom;
 
   /**
    * Empty message source: unresolved keys fall back to the English default passed at the call site,
@@ -79,17 +86,32 @@ class RateLimitingFilterTest {
 
   @BeforeEach
   void setUp() {
-    properties = new RateLimitProperties();
+    properties = new Spec();
     properties.setEnabled(true);
     properties.setPaths(List.of("/api/**"));
     properties.setCapacity(2); // tight bucket so we can hit the limit quickly
     properties.setRefillTokens(2);
     properties.setRefillPeriod(Duration.ofMinutes(1));
 
-    problemProperties = new AppProblemProperties();
-    problemProperties.setBaseUri("https://profit-base.online/problems/");
+    problemProperties = new AppProblemProperties("https://profit-base.online/problems/");
+  }
 
-    filter = new RateLimitingFilter(properties, problemProperties, messageSource, meterRegistry);
+  /**
+   * The filter under test, rebuilt whenever the test changed {@link #properties} since the last
+   * build. The properties are an immutable record (BE-MOD-04), so a changed configuration means a
+   * new filter, exactly as a restart would; the buckets survive for as long as the configuration
+   * does.
+   *
+   * @return the filter over the current configuration
+   */
+  private RateLimitingFilter filter() {
+    RateLimitProperties current = properties.toProperties();
+    if (builtFilter == null || !current.equals(builtFrom)) {
+      builtFilter =
+          new RateLimitingFilter(current, problemProperties, messageSource, meterRegistry);
+      builtFrom = current;
+    }
+    return builtFilter;
   }
 
   /**
@@ -132,7 +154,7 @@ class RateLimitingFilterTest {
       MockHttpServletRequest req = newRequest("/api/v1/missions");
 
       assertTrue(
-          filter.shouldNotFilter(req), "enabled=false must short-circuit before path matching");
+          filter().shouldNotFilter(req), "enabled=false must short-circuit before path matching");
     }
 
     @Test
@@ -140,7 +162,7 @@ class RateLimitingFilterTest {
       properties.setPaths(null);
       MockHttpServletRequest req = newRequest("/api/v1/missions");
 
-      assertTrue(filter.shouldNotFilter(req));
+      assertTrue(filter().shouldNotFilter(req));
     }
 
     @Test
@@ -148,7 +170,7 @@ class RateLimitingFilterTest {
       properties.setPaths(List.of());
       MockHttpServletRequest req = newRequest("/api/v1/missions");
 
-      assertTrue(filter.shouldNotFilter(req));
+      assertTrue(filter().shouldNotFilter(req));
     }
 
     @Test
@@ -157,7 +179,9 @@ class RateLimitingFilterTest {
       MockHttpServletRequest req = newRequest("/api/v1/missions");
 
       assertEquals(
-          false, filter.shouldNotFilter(req), "matching path must NOT be skipped (filter applies)");
+          false,
+          filter().shouldNotFilter(req),
+          "matching path must NOT be skipped (filter applies)");
     }
 
     @Test
@@ -165,7 +189,7 @@ class RateLimitingFilterTest {
       properties.setPaths(List.of("/api/**"));
       MockHttpServletRequest req = newRequest("/health");
 
-      assertTrue(filter.shouldNotFilter(req));
+      assertTrue(filter().shouldNotFilter(req));
     }
 
     @Test
@@ -173,21 +197,7 @@ class RateLimitingFilterTest {
       properties.setPaths(List.of("/health", "/api/**"));
       MockHttpServletRequest req = newRequest("/api/v1/missions");
 
-      assertEquals(false, filter.shouldNotFilter(req));
-    }
-
-    @Test
-    void unparseablePattern_mutatedAfterStartup_isIgnored_doesNotThrow() {
-      // Configured patterns are validated at construction (see StartupValidationTests). This case
-      // mutates the paths to an unparseable value AFTER the filter was built — the runtime
-      // defense-in-depth fallback (tryParse) must then treat it as a permanent non-match and never
-      // 500 the request, even though such a mid-path ** can no longer survive a fresh startup.
-      properties.setPaths(List.of("/api/**/legacy/**"));
-      MockHttpServletRequest req = newRequest("/api/v1/legacy/x");
-
-      assertTrue(
-          filter.shouldNotFilter(req),
-          "an unparseable pattern must be ignored (treated as non-matching), never thrown");
+      assertEquals(false, filter().shouldNotFilter(req));
     }
 
     @Test
@@ -196,8 +206,8 @@ class RateLimitingFilterTest {
       // must match a one-segment id but NOT a deeper path, where only `**` would.
       properties.setPaths(List.of("/api/v1/missions/*"));
 
-      assertEquals(false, filter.shouldNotFilter(newRequest("/api/v1/missions/m1")));
-      assertTrue(filter.shouldNotFilter(newRequest("/api/v1/missions/m1/participants")));
+      assertEquals(false, filter().shouldNotFilter(newRequest("/api/v1/missions/m1")));
+      assertTrue(filter().shouldNotFilter(newRequest("/api/v1/missions/m1/participants")));
     }
 
     @Test
@@ -206,10 +216,10 @@ class RateLimitingFilterTest {
       // a real request can take under the umbrella — a deep sub-path and a trailing-slash variant.
       properties.setPaths(List.of("/api/**"));
 
-      assertEquals(false, filter.shouldNotFilter(newRequest("/api/v1/missions")));
+      assertEquals(false, filter().shouldNotFilter(newRequest("/api/v1/missions")));
       assertEquals(
-          false, filter.shouldNotFilter(newRequest("/api/v1/missions/m1/participants/p1")));
-      assertEquals(false, filter.shouldNotFilter(newRequest("/api/")));
+          false, filter().shouldNotFilter(newRequest("/api/v1/missions/m1/participants/p1")));
+      assertEquals(false, filter().shouldNotFilter(newRequest("/api/")));
     }
   }
 
@@ -225,13 +235,15 @@ class RateLimitingFilterTest {
     void constructor_failsFast_onUnparseableGlobalPattern() {
       // A mid-path ** is rejected by PathPattern. The filter must refuse to start rather than boot
       // with an umbrella that silently never matches — that would leave /api/** unprotected.
-      RateLimitProperties bad = newValidProperties();
+      Spec bad = newValidProperties();
       bad.setPaths(List.of("/api/**/legacy/**"));
 
       IllegalStateException ex =
           assertThrows(
               IllegalStateException.class,
-              () -> new RateLimitingFilter(bad, problemProperties, messageSource, meterRegistry),
+              () ->
+                  new RateLimitingFilter(
+                      bad.toProperties(), problemProperties, messageSource, meterRegistry),
               "an unparseable global pattern must abort startup");
       assertTrue(
           ex.getMessage().contains("/api/**/legacy/**"),
@@ -244,20 +256,18 @@ class RateLimitingFilterTest {
     @Test
     void constructor_failsFast_onUnparseableRulePattern() {
       // The same guard covers per-rule patterns, naming the rule so the operator can find it.
-      RateLimitProperties bad = newValidProperties();
-      RateLimitProperties.Rule rule = new RateLimitProperties.Rule();
-      rule.setName("broken-rule");
-      rule.setMethods(List.of("POST"));
-      rule.setPaths(List.of("/api/**/x/**"));
-      rule.setCapacity(1);
-      rule.setRefillTokens(1);
-      rule.setRefillPeriod(Duration.ofMinutes(1));
+      Spec bad = newValidProperties();
+      RateLimitProperties.Rule rule =
+          new RateLimitProperties.Rule(
+              "broken-rule", List.of("/api/**/x/**"), List.of("POST"), 1, 1, Duration.ofMinutes(1));
       bad.setRules(List.of(rule));
 
       IllegalStateException ex =
           assertThrows(
               IllegalStateException.class,
-              () -> new RateLimitingFilter(bad, problemProperties, messageSource, meterRegistry));
+              () ->
+                  new RateLimitingFilter(
+                      bad.toProperties(), problemProperties, messageSource, meterRegistry));
       assertTrue(
           ex.getMessage().contains("broken-rule"),
           "the failure must name the offending rule: " + ex.getMessage());
@@ -265,34 +275,38 @@ class RateLimitingFilterTest {
 
     @Test
     void constructor_failsFast_onBlankPattern() {
-      RateLimitProperties bad = newValidProperties();
+      Spec bad = newValidProperties();
       bad.setPaths(List.of("   "));
 
       assertThrows(
           IllegalStateException.class,
-          () -> new RateLimitingFilter(bad, problemProperties, messageSource, meterRegistry));
+          () ->
+              new RateLimitingFilter(
+                  bad.toProperties(), problemProperties, messageSource, meterRegistry));
     }
 
     @Test
     void constructor_succeeds_onAllValidPatterns() {
       // A representative valid configuration (global umbrella + a single-* + final-** rule) must
       // construct cleanly — proving the validator does not reject the shapes actually shipped.
-      RateLimitProperties ok = newValidProperties();
-      RateLimitProperties.Rule rule = new RateLimitProperties.Rule();
-      rule.setName("participant-mutations");
-      rule.setMethods(List.of("POST", "PUT", "DELETE"));
-      rule.setPaths(
-          List.of("/api/v1/missions/*/participants", "/api/v1/missions/*/participants/**"));
-      rule.setCapacity(30);
-      rule.setRefillTokens(30);
-      rule.setRefillPeriod(Duration.ofMinutes(1));
+      Spec ok = newValidProperties();
+      RateLimitProperties.Rule rule =
+          new RateLimitProperties.Rule(
+              "participant-mutations",
+              List.of("/api/v1/missions/*/participants", "/api/v1/missions/*/participants/**"),
+              List.of("POST", "PUT", "DELETE"),
+              30,
+              30,
+              Duration.ofMinutes(1));
       ok.setRules(List.of(rule));
 
-      assertNotNull(new RateLimitingFilter(ok, problemProperties, messageSource, meterRegistry));
+      assertNotNull(
+          new RateLimitingFilter(
+              ok.toProperties(), problemProperties, messageSource, meterRegistry));
     }
 
-    private RateLimitProperties newValidProperties() {
-      RateLimitProperties p = new RateLimitProperties();
+    private Spec newValidProperties() {
+      Spec p = new Spec();
       p.setEnabled(true);
       p.setPaths(List.of("/api/**"));
       p.setCapacity(300);
@@ -406,14 +420,14 @@ class RateLimitingFilterTest {
       first.setRemoteAddr("10.0.0.1");
       first.addHeader("X-Forwarded-For", "1.1.1.1, 198.51.100.99");
       MockHttpServletResponse firstResponse = new MockHttpServletResponse();
-      runChain(filter, first, firstResponse);
+      runChain(filter(), first, firstResponse);
       assertEquals(200, firstResponse.getStatus(), "first request must consume cleanly");
 
       MockHttpServletRequest second = newRequest("/api/v1/missions");
       second.setRemoteAddr("10.0.0.1");
       second.addHeader("X-Forwarded-For", "2.2.2.2, 198.51.100.99");
       MockHttpServletResponse secondResponse = new MockHttpServletResponse();
-      runChain(filter, second, secondResponse);
+      runChain(filter(), second, secondResponse);
 
       assertEquals(
           429,
@@ -474,7 +488,7 @@ class RateLimitingFilterTest {
       req1.setRemoteAddr("198.51.100.10");
       req1.addHeader("X-Forwarded-For", "1.1.1.1");
       MockHttpServletResponse resp1 = new MockHttpServletResponse();
-      filter.doFilter(req1, resp1, new MockFilterChain());
+      filter().doFilter(req1, resp1, new MockFilterChain());
       assertEquals(200, resp1.getStatus(), "first request must pass");
 
       // Second request: same remote, different spoofed XFF -> would have been a
@@ -483,7 +497,7 @@ class RateLimitingFilterTest {
       req2.setRemoteAddr("198.51.100.10");
       req2.addHeader("X-Forwarded-For", "2.2.2.2");
       MockHttpServletResponse resp2 = new MockHttpServletResponse();
-      filter.doFilter(req2, resp2, new MockFilterChain());
+      filter().doFilter(req2, resp2, new MockFilterChain());
 
       assertEquals(
           429,
@@ -515,11 +529,11 @@ class RateLimitingFilterTest {
       properties.setRefillTokens(1);
 
       MockHttpServletResponse resp1 = new MockHttpServletResponse();
-      runChain(filter, copy(req), resp1);
+      runChain(filter(), copy(req), resp1);
       assertEquals(200, resp1.getStatus(), "first request must consume cleanly");
 
       MockHttpServletResponse resp2 = new MockHttpServletResponse();
-      runChain(filter, copy(req), resp2);
+      runChain(filter(), copy(req), resp2);
       assertEquals(
           429,
           resp2.getStatus(),
@@ -551,7 +565,7 @@ class RateLimitingFilterTest {
       req.setRemoteAddr("192.0.2.10");
       MockHttpServletResponse resp = new MockHttpServletResponse();
 
-      filter.doFilter(req, resp, new MockFilterChain());
+      filter().doFilter(req, resp, new MockFilterChain());
 
       assertEquals(200, resp.getStatus());
       assertEquals("2", resp.getHeader("X-Rate-Limit-Limit"), "capacity exposed via header");
@@ -569,11 +583,11 @@ class RateLimitingFilterTest {
       req.setRemoteAddr("192.0.2.20");
 
       // Drain the bucket.
-      filter.doFilter(req, new MockHttpServletResponse(), new MockFilterChain());
+      filter().doFilter(req, new MockHttpServletResponse(), new MockFilterChain());
 
       // Second hit: rejected.
       MockHttpServletResponse resp2 = new MockHttpServletResponse();
-      filter.doFilter(copyRequest(req), resp2, new MockFilterChain());
+      filter().doFilter(copyRequest(req), resp2, new MockFilterChain());
 
       assertEquals(429, resp2.getStatus());
       assertEquals("application/problem+json", resp2.getContentType());
@@ -595,7 +609,7 @@ class RateLimitingFilterTest {
       assertTrue(body.contains("\"title\":\"Too Many Requests\""), body);
       assertTrue(body.contains("\"instance\":\"/api/v1/missions\""), body);
       assertTrue(
-          body.contains(problemProperties.getBaseUri() + "rate-limit-exceeded"),
+          body.contains(problemProperties.baseUri() + "rate-limit-exceeded"),
           "type URI must be built off AppProblemProperties.baseUri");
       assertTrue(
           body.contains("\"code\":\"RATE_LIMIT_EXCEEDED\""),
@@ -652,7 +666,7 @@ class RateLimitingFilterTest {
     MockHttpServletResponse resp = new MockHttpServletResponse();
 
     InvocationTrackingChain chain = new InvocationTrackingChain();
-    filter.doFilter(req, resp, chain);
+    filter().doFilter(req, resp, chain);
 
     assertTrue(chain.wasCalled, "the next filter in the chain must be invoked");
   }
@@ -665,14 +679,14 @@ class RateLimitingFilterTest {
     MockHttpServletRequest req = newRequest("/api/v1/missions");
     req.setRemoteAddr("192.0.2.40");
     // Drain
-    filter.doFilter(req, new MockHttpServletResponse(), new MockFilterChain());
+    filter().doFilter(req, new MockHttpServletResponse(), new MockFilterChain());
 
     MockHttpServletRequest req2 = new MockHttpServletRequest("GET", "/api/v1/missions");
     req2.setRemoteAddr("192.0.2.40");
     MockHttpServletResponse resp2 = new MockHttpServletResponse();
     InvocationTrackingChain chain = new InvocationTrackingChain();
 
-    filter.doFilter(req2, resp2, chain);
+    filter().doFilter(req2, resp2, chain);
 
     assertEquals(429, resp2.getStatus());
     assertEquals(
@@ -868,14 +882,8 @@ class RateLimitingFilterTest {
 
     private RateLimitProperties.Rule newRule(
         String name, List<String> methods, List<String> paths, int capacity) {
-      RateLimitProperties.Rule r = new RateLimitProperties.Rule();
-      r.setName(name);
-      r.setMethods(methods);
-      r.setPaths(paths);
-      r.setCapacity(capacity);
-      r.setRefillTokens(capacity);
-      r.setRefillPeriod(Duration.ofMinutes(1));
-      return r;
+      return new RateLimitProperties.Rule(
+          name, paths, methods, capacity, capacity, Duration.ofMinutes(1));
     }
 
     private int post(String path, String ip) throws ServletException, IOException {
@@ -887,7 +895,7 @@ class RateLimitingFilterTest {
       MockHttpServletRequest req = new MockHttpServletRequest("POST", path);
       req.setRemoteAddr(ip);
       MockHttpServletResponse resp = new MockHttpServletResponse();
-      filter.doFilter(req, resp, new MockFilterChain());
+      filter().doFilter(req, resp, new MockFilterChain());
       return resp;
     }
 
@@ -895,7 +903,7 @@ class RateLimitingFilterTest {
       MockHttpServletRequest req = new MockHttpServletRequest("GET", path);
       req.setRemoteAddr(ip);
       MockHttpServletResponse resp = new MockHttpServletResponse();
-      filter.doFilter(req, resp, new MockFilterChain());
+      filter().doFilter(req, resp, new MockFilterChain());
       return resp.getStatus();
     }
 
@@ -903,7 +911,7 @@ class RateLimitingFilterTest {
       MockHttpServletRequest req = new MockHttpServletRequest("PUT", path);
       req.setRemoteAddr(ip);
       MockHttpServletResponse resp = new MockHttpServletResponse();
-      filter.doFilter(req, resp, new MockFilterChain());
+      filter().doFilter(req, resp, new MockFilterChain());
       return resp.getStatus();
     }
   }
@@ -929,7 +937,8 @@ class RateLimitingFilterTest {
       properties.setCapacity(1);
       properties.setRefillTokens(1);
       RateLimitingFilter freshFilter =
-          new RateLimitingFilter(properties, problemProperties, messageSource, meterRegistry);
+          new RateLimitingFilter(
+              properties.toProperties(), problemProperties, messageSource, meterRegistry);
       runChain(freshFilter, request(remoteAddr, xff), new MockHttpServletResponse());
       MockHttpServletResponse rejected = new MockHttpServletResponse();
       runChain(freshFilter, request(remoteAddr, xff), rejected);
@@ -1007,7 +1016,8 @@ class RateLimitingFilterTest {
       properties.setCapacity(1);
       properties.setRefillTokens(1);
       RateLimitingFilter lone =
-          new RateLimitingFilter(properties, problemProperties, messageSource, meterRegistry);
+          new RateLimitingFilter(
+              properties.toProperties(), problemProperties, messageSource, meterRegistry);
 
       lone.doFilter(
           request("10.0.0.1", "203.0.113.7"), new MockHttpServletResponse(), new MockFilterChain());
@@ -1080,6 +1090,76 @@ class RateLimitingFilterTest {
     public void doFilter(
         jakarta.servlet.ServletRequest request, jakarta.servlet.ServletResponse response) {
       wasCalled = true;
+    }
+  }
+
+  /**
+   * A mutable description of {@code app.rate-limit.*} for the tests to adjust, in the shape the
+   * JavaBean properties class used to have. {@link RateLimitProperties} is an immutable record
+   * since BE-MOD-04; {@link #toProperties()} turns the current description into one, and {@link
+   * RateLimitingFilterTest#filter()} rebuilds the filter whenever it changed.
+   */
+  private static final class Spec {
+    /** The production per-subject budget, bound once; this filter does not read it. */
+    private static final RateLimitProperties.Subject DEFAULT_SUBJECT =
+        BoundProperties.defaults(RateLimitProperties.class).subject();
+
+    private boolean enabled = true;
+    private List<String> paths = List.of("/api/**");
+    private int capacity = 5000;
+    private int refillTokens = 5000;
+    private Duration refillPeriod = Duration.ofMinutes(1);
+    private List<RateLimitProperties.Rule> rules = List.of();
+    private List<String> trustedProxies = List.of();
+
+    void setEnabled(boolean enabled) {
+      this.enabled = enabled;
+    }
+
+    void setPaths(List<String> paths) {
+      this.paths = paths;
+    }
+
+    void setCapacity(int capacity) {
+      this.capacity = capacity;
+    }
+
+    void setRefillTokens(int refillTokens) {
+      this.refillTokens = refillTokens;
+    }
+
+    void setRefillPeriod(Duration refillPeriod) {
+      this.refillPeriod = refillPeriod;
+    }
+
+    void setRules(List<RateLimitProperties.Rule> rules) {
+      this.rules = rules;
+    }
+
+    void setTrustedProxies(List<String> trustedProxies) {
+      this.trustedProxies = trustedProxies;
+    }
+
+    List<String> getTrustedProxies() {
+      return trustedProxies;
+    }
+
+    /**
+     * Builds the record this description stands for; the per-subject budget, which this filter does
+     * not read, keeps its production default.
+     *
+     * @return the rate-limit properties
+     */
+    RateLimitProperties toProperties() {
+      return new RateLimitProperties(
+          enabled,
+          paths,
+          capacity,
+          refillTokens,
+          refillPeriod,
+          rules,
+          trustedProxies,
+          DEFAULT_SUBJECT);
     }
   }
 }

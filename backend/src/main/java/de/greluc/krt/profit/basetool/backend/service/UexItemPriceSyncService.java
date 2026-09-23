@@ -96,7 +96,7 @@ public class UexItemPriceSyncService {
    */
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public void syncItemPrices() {
-    if (!Boolean.TRUE.equals(uexProperties.getItemPriceSyncEnabled())) {
+    if (!Boolean.TRUE.equals(uexProperties.itemPriceSyncEnabled())) {
       log.info(
           "UEX item-price sync invoked but disabled (krt.uex.item-price-sync-enabled=false) —"
               + " skipping.");

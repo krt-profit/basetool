@@ -273,7 +273,7 @@ public class JobOrderItemService {
                   e.getKey().quality(),
                   QuantityTypeRounding.roundForQuantityType(e.getValue(), material),
                   null,
-                  java.util.List.of(),
+                  List.of(),
                   null);
             })
         .sorted(

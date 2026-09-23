@@ -22,8 +22,8 @@ package de.greluc.krt.profit.basetool.backend.support;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
 import java.time.Duration;
-import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
@@ -45,15 +45,23 @@ import org.springframework.validation.annotation.Validated;
  * class the {@code service} layer reads would close a package cycle that {@code
  * ArchitectureTest.backendPackagesShouldBeFreeOfDependencyCycles} forbids. Registered via
  * {@code @ConfigurationPropertiesScan} on {@code BackendApplication}, which scans regardless of
- * package.
+ * package. An immutable record (BE-MOD-04).
+ *
+ * @param ttl how long an assembled authority collection is reused for a given {@code (sub, token
+ *     issuedAt, azp)} key before the next request re-runs the full resolution. Defaults to five
+ *     minutes (ADR-0174), raised from the original hard-coded 30 seconds: roles, permissions and
+ *     memberships change on the order of once a week, so a 30-second window made an actively
+ *     clicking member pay the full query storm twice a minute for facts that had not moved. A fresh
+ *     login always misses regardless of this value, because the token's {@code issuedAt} is part of
+ *     the cache key — so a re-authentication picks up new authorities immediately, and this TTL
+ *     only bounds staleness <em>within</em> one token's life.
  */
-@Data
 @Validated
 @ConfigurationProperties(prefix = "app.security.authorities-cache")
-public class AuthoritiesCacheProperties {
+public record AuthoritiesCacheProperties(@DefaultValue("5m") @NotNull Duration ttl) {
 
   /**
-   * Hard ceiling on {@link #ttl}, enforced at startup by {@link #isTtlWithinBounds()}.
+   * Hard ceiling on {@code ttl}, enforced at startup by {@link #isTtlWithinBounds()}.
    *
    * <p>The TTL is a security-relevant staleness window: until it expires, a revoked role, a
    * withdrawn permission, a reversed approval or a removed org-unit membership stays effective for
@@ -64,30 +72,16 @@ public class AuthoritiesCacheProperties {
   public static final Duration MAX_TTL = Duration.ofMinutes(15);
 
   /**
-   * How long an assembled authority collection is reused for a given {@code (sub, token issuedAt,
-   * azp)} key before the next request re-runs the full resolution.
+   * Validates that {@code ttl} is strictly positive and does not exceed {@link #MAX_TTL}.
    *
-   * <p>Defaults to five minutes (ADR-0174), raised from the original hard-coded 30 seconds. Roles,
-   * permissions and memberships change on the order of once a week, so a 30-second window made an
-   * actively clicking member pay the full query storm twice a minute for facts that had not moved.
-   *
-   * <p>A fresh login always misses regardless of this value, because the token's {@code issuedAt}
-   * is part of the cache key — so a re-authentication picks up new authorities immediately, and
-   * this TTL only bounds staleness <em>within</em> one token's life.
-   */
-  @NotNull private Duration ttl = Duration.ofMinutes(5);
-
-  /**
-   * Validates that {@link #ttl} is strictly positive and does not exceed {@link #MAX_TTL}.
-   *
-   * <p>Runs at startup because the class is {@code @Validated}: a zero or negative value would
+   * <p>Runs at startup because the record is {@code @Validated}: a zero or negative value would
    * disable the cache and silently restore the query storm this property exists to bound, and a
    * value above the ceiling would widen the revocation window past what the access model assumes.
    * Both fail the context rather than degrading at run time.
    *
-   * @return {@code true} when {@link #ttl} is positive and at most {@link #MAX_TTL}, or when it is
-   *     {@code null} — the {@code null} case is reported by {@link #ttl}'s own {@code @NotNull}, so
-   *     this check does not duplicate that message
+   * @return {@code true} when {@code ttl} is positive and at most {@link #MAX_TTL}, or when it is
+   *     {@code null} — the {@code null} case is reported by the component's own {@code @NotNull},
+   *     so this check does not duplicate that message
    */
   @AssertTrue(
       message =

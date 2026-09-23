@@ -20,13 +20,15 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.JobOrderAuditLabel;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -77,9 +79,7 @@ public class JobOrderPriorityService {
   @Transactional
   public JobOrderDto updateJobOrderPriority(UUID id, Integer newPriority) {
     JobOrder targetOrder =
-        jobOrderRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
+        Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
 
     Integer oldPriority = targetOrder.getPriority();
     if (oldPriority == null) {
@@ -93,11 +93,11 @@ public class JobOrderPriorityService {
     List<JobOrder> allOrders = jobOrderRepository.lockAllJobOrders();
 
     List<JobOrder> activeOrders =
-        new java.util.ArrayList<>(
+        new ArrayList<>(
             allOrders.stream()
                 .filter(o -> o.getPriority() != null)
                 .sorted(
-                    java.util.Comparator.comparing(JobOrder::getPriority)
+                    Comparator.comparing(JobOrder::getPriority)
                         .thenComparing(JobOrder::getCreatedAt))
                 .toList());
 
@@ -145,8 +145,7 @@ public class JobOrderPriorityService {
         jobOrderRepository.lockAllJobOrders().stream()
             .filter(o -> o.getPriority() != null)
             .sorted(
-                java.util.Comparator.comparing(JobOrder::getPriority)
-                    .thenComparing(JobOrder::getCreatedAt))
+                Comparator.comparing(JobOrder::getPriority).thenComparing(JobOrder::getCreatedAt))
             .toList();
 
     int currentPriority = 1;
