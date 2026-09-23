@@ -21,22 +21,37 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.LiveSyncTopic;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-/** Room bookkeeping and delivery of the app's live-sync SSE registry (ADR-0143). */
+/**
+ * Room bookkeeping and delivery of the app's live-sync SSE registry (ADR-0143).
+ *
+ * <p>Most cases run the service over a direct executor, so a drain happens inside the call that
+ * queued the frame and the recorded order is observable without waiting. The BE-PERF-13 cases at
+ * the end run it over real virtual threads, because what they prove — a blocked subscriber does not
+ * hold the publisher, order survives concurrency, a full queue drops — only exists off-thread.
+ */
 class LiveSyncStreamServiceTest {
 
   private static final UUID ALICE = UUID.fromString("11111111-1111-4111-8111-111111111111");
@@ -46,11 +61,17 @@ class LiveSyncStreamServiceTest {
 
   private MeterRegistry meterRegistry;
   private RecordingStreamService service;
+  private final ExecutorService virtualThreads = Executors.newVirtualThreadPerTaskExecutor();
 
   @BeforeEach
   void setUp() {
     meterRegistry = new SimpleMeterRegistry();
-    service = new RecordingStreamService(meterRegistry);
+    service = new RecordingStreamService(meterRegistry, Runnable::run);
+  }
+
+  @AfterEach
+  void tearDown() {
+    virtualThreads.shutdownNow();
   }
 
   @Test
@@ -179,6 +200,102 @@ class LiveSyncStreamServiceTest {
     assertThatIllegalArgumentException().isThrownBy(() -> service.subscribe(ALICE, List.of()));
   }
 
+  @Test
+  @DisplayName(
+      "BE-PERF-13: a subscriber whose write blocks does not hold the publisher or its peers")
+  void aBlockedSubscriberDoesNotHoldThePublisher() throws InterruptedException {
+    meterRegistry =
+        new SimpleMeterRegistry(); // the setUp service already owns the gauges on the old one
+    RecordingStreamService async = new RecordingStreamService(meterRegistry, virtualThreads);
+    async.subscribe(ALICE, List.of(INVENTORY));
+    async.subscribe(BOB, List.of(INVENTORY));
+    RecordingEmitter stuck = async.emitters().getFirst();
+    RecordingEmitter healthy = async.emitters().getLast();
+    awaitEvents(stuck, 1);
+    stuck.blockFromNowOn();
+
+    // The publishing thread returns at once although ALICE's socket is not being read.
+    assertTimeoutPreemptively(
+        Duration.ofSeconds(2), () -> async.deliver(INVENTORY, List.of("stock")));
+
+    awaitEvents(healthy, 2);
+    assertThat(healthy.eventNames()).containsExactly("subscribed", "changed");
+    assertThat(stuck.eventNames()).containsExactly("subscribed");
+
+    stuck.unblock();
+    awaitEvents(stuck, 2);
+    assertThat(stuck.eventNames()).containsExactly("subscribed", "changed");
+  }
+
+  @Test
+  @DisplayName("BE-PERF-13: frames reach one stream in the order they were published")
+  void orderPerStreamSurvivesConcurrentDelivery() throws InterruptedException {
+    meterRegistry =
+        new SimpleMeterRegistry(); // the setUp service already owns the gauges on the old one
+    RecordingStreamService async = new RecordingStreamService(meterRegistry, virtualThreads);
+    async.subscribe(ALICE, List.of(INVENTORY));
+    RecordingEmitter emitter = async.emitters().getFirst();
+
+    for (int i = 0; i < 40; i++) {
+      async.deliver(INVENTORY, List.of("s" + i));
+    }
+
+    awaitEvents(emitter, 41);
+    assertThat(emitter.eventNames().getFirst()).isEqualTo("subscribed");
+    for (int i = 0; i < 40; i++) {
+      assertThat(emitter.events().get(i + 1).data()).contains("\"s" + i + "\"");
+    }
+  }
+
+  @Test
+  @DisplayName("BE-PERF-13: a full delivery queue drops and counts instead of growing")
+  void aFullQueueDropsAndCounts() throws InterruptedException {
+    meterRegistry =
+        new SimpleMeterRegistry(); // the setUp service already owns the gauges on the old one
+    RecordingStreamService async = new RecordingStreamService(meterRegistry, virtualThreads);
+    async.subscribe(ALICE, List.of(INVENTORY));
+    RecordingEmitter stuck = async.emitters().getFirst();
+    awaitEvents(stuck, 1);
+    stuck.blockFromNowOn();
+    // One frame is taken by the drain and parks in the blocked write; the queue then fills.
+    async.deliver(INVENTORY, List.of("first"));
+    stuck.awaitBlocked();
+
+    int overflow = 6;
+    for (int i = 0; i < LiveSyncStreamService.MAX_QUEUED_FRAMES + overflow; i++) {
+      async.deliver(INVENTORY, List.of("stock"));
+    }
+
+    assertThat(
+            meterRegistry
+                .get(MetricNames.LIVESYNC_FRAMES_DROPPED)
+                .tag(MetricNames.TAG_EVENT, MetricNames.LIVESYNC_EVENT_CHANGED)
+                .counter()
+                .count())
+        .isEqualTo(overflow);
+    assertThat(meterRegistry.get(MetricNames.LIVESYNC_FRAMES_QUEUED).gauge().value())
+        .isEqualTo(LiveSyncStreamService.MAX_QUEUED_FRAMES);
+
+    stuck.unblock();
+    awaitEvents(stuck, 2 + LiveSyncStreamService.MAX_QUEUED_FRAMES);
+    assertThat(meterRegistry.get(MetricNames.LIVESYNC_FRAMES_QUEUED).gauge().value()).isZero();
+  }
+
+  /**
+   * Waits until {@code emitter} has recorded at least {@code count} events.
+   *
+   * @param emitter the recording double
+   * @param count the number of events to wait for
+   * @throws InterruptedException if interrupted while waiting
+   */
+  private static void awaitEvents(RecordingEmitter emitter, int count) throws InterruptedException {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+    while (emitter.events().size() < count && System.nanoTime() < deadline) {
+      Thread.sleep(5);
+    }
+    assertThat(emitter.events()).as("events after waiting").hasSizeGreaterThanOrEqualTo(count);
+  }
+
   private double gauge() {
     return meterRegistry.get(MetricNames.LIVESYNC_STREAMS).gauge().value();
   }
@@ -188,8 +305,8 @@ class LiveSyncStreamServiceTest {
 
     private final List<RecordingEmitter> emitters = new CopyOnWriteArrayList<>();
 
-    RecordingStreamService(MeterRegistry meterRegistry) {
-      super(meterRegistry);
+    RecordingStreamService(MeterRegistry meterRegistry, Executor deliveryExecutor) {
+      super(meterRegistry, deliveryExecutor);
     }
 
     @Override
@@ -210,9 +327,21 @@ class LiveSyncStreamServiceTest {
     private final List<Event> events = new CopyOnWriteArrayList<>();
     private volatile boolean failing;
     private volatile int failedSends;
+    private volatile CountDownLatch gate;
+    private final CountDownLatch blocked = new CountDownLatch(1);
 
     @Override
     public void send(SseEventBuilder builder) throws IOException {
+      CountDownLatch current = gate;
+      if (current != null) {
+        blocked.countDown();
+        try {
+          current.await();
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new IOException("interrupted while blocked", e);
+        }
+      }
       if (failing) {
         failedSends++;
         throw new IOException("client gone");
@@ -250,6 +379,25 @@ class LiveSyncStreamServiceTest {
 
     void failFromNowOn() {
       failing = true;
+    }
+
+    /** Makes every further write park until {@link #unblock()} — a client that stopped reading. */
+    void blockFromNowOn() {
+      gate = new CountDownLatch(1);
+    }
+
+    /** Releases the writes parked by {@link #blockFromNowOn()}. */
+    void unblock() {
+      CountDownLatch current = gate;
+      gate = null;
+      if (current != null) {
+        current.countDown();
+      }
+    }
+
+    /** Waits until a write has actually parked in {@link #send}. */
+    void awaitBlocked() throws InterruptedException {
+      assertThat(blocked.await(5, TimeUnit.SECONDS)).as("a write parked").isTrue();
     }
 
     int failedSends() {
