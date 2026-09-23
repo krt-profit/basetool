@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.logging;
+package de.greluc.krt.profit.basetool.logging;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -30,6 +30,10 @@ import ch.qos.logback.classic.spi.LoggingEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+/**
+ * Pins that the human-readable console / file layout of all three applications scrubs PII (e-mail /
+ * JWT / bearer token / session id) before a line is rendered (REQ-OBS-003/-004).
+ */
 class PiiMaskingPatternLayoutTest {
 
   private PiiMaskingPatternLayout layout;
@@ -128,7 +132,7 @@ class PiiMaskingPatternLayoutTest {
 
   private ILoggingEvent createEvent(String message) {
     return new LoggingEvent(
-        "de.greluc.krt.profit.basetool.backend.logging.PiiMaskingPatternLayoutTest",
+        "de.greluc.krt.profit.basetool.logging.PiiMaskingPatternLayoutTest",
         logger,
         Level.INFO,
         message,

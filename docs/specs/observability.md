@@ -259,12 +259,16 @@ the chain (the pre-existing value wins and is never overwritten). Levels are unc
 `WARN`, the 401 stays `DEBUG`. The `sub` UUID is the only identifier permitted here (REQ-OBS-004).
 
 **Client free text is sanitised in all three modules, not only at the gateway.** The `LogSafe` guard
-described above for the ingest gateway now exists as a module-local twin in the backend
-(`backend…logging.LogSafe`) and the frontend (`frontend…logging.LogSafe`) with a byte-identical
-contract: `text(value, maxLength)` truncates to the cap first, replaces every
+described above for the ingest gateway is one class, `de.greluc.krt.profit.basetool.logging.LogSafe`
+in the shipped `logging-support` module, which the backend, the frontend and the gateway all depend
+on (ADR-0205; until 2026-09-23 it was three hand-mirrored copies held together by a parity test).
+Its contract: `text(value, maxLength)` truncates to the cap first, replaces every
 `Character.isISOControl` character with `?`, appends the truncation marker only when the *original*
-exceeded the cap, and renders null/blank as the stable token `none`. There is no shared module
-between the three, so this is a deliberate triplicate rather than a missed extraction. The realistic
+exceeded the cap, and renders null/blank as the stable token `none`. The same module holds
+`PiiMasker`, `PiiMaskingPatternLayout` and `PiiMaskingLogstashEncoder`, so all three applications
+scrub with one implementation; each application's `ProdLogMaskingTest` loads its real
+`logback-spring.xml` with the `prod` profile and asserts that a bearer token and an e-mail address
+reach neither the JSON nor the text file. The realistic
 actor here is not an internet caller but an authenticated squadron member — or a guest holding an
 edit link — typing into a search box, a filter or a form field: a pasted newline plus a fabricated
 `ERROR ---` prefix reads as a genuine line during incident triage (CWE-117), and neither the Logback

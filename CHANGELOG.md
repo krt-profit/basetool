@@ -62,6 +62,10 @@
 
 ### Changed
 
+- **Intern: eine gemeinsame Log-Bereinigung für Backend, Webtool und Ingest.** Maskierung von
+  Tokens und E-Mail-Adressen sowie der Schutz gegen gefälschte Logzeilen liegen jetzt einmal im
+  neuen Modul `logging-support` statt dreifach kopiert (ADR-0205). Keine Funktionsänderung.
+
 - **Lager: Mehrfachfilter sind auf beiden Seiten gleich beschriftet.** Sind keine oder alle
   Einträge angehakt, steht dort „Alle", sonst der Name oder „N ausgewählt". „Mein Lager" zeigte bei
   allen angehakten Einträgen bisher „N ausgewählt".

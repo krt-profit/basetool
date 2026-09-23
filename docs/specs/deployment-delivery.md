@@ -1358,7 +1358,10 @@ asserted on every pull request, rather than being four hand-maintained lists in 
 happen to agree. **A module that is not wired fails the check until somebody decides which it is**;
 one that genuinely ships nothing is entered in the script's `NOT_SHIPPED` map with the reason.
 `test-support` is the only such entry: a test-only helper library that no image carries, whose BOM
-would list JUnit and Mockito as components of the delivered product.
+would list JUnit and Mockito as components of the delivered product. A module that ships **only
+inside** other modules' artifacts is entered in a second map, `SHIPPED_INSIDE`, with those carriers:
+it appears as a component of each carrier's BOM, and the script asserts that every carrier still
+declares it as `implementation(project(...))`. `logging-support` is the only such entry (ADR-0205).
 
 **Why an assertion and not a habit.** By v1.7.3 the set had drifted in both directions available to
 it, and neither drift failed anything:

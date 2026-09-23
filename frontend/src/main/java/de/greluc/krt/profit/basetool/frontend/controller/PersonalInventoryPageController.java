@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
-import de.greluc.krt.profit.basetool.frontend.logging.LogSafe;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalInventoryItemCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalInventoryItemDto;
@@ -30,6 +29,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalInventoryItemUpd
 import de.greluc.krt.profit.basetool.frontend.model.dto.UexLocationDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.PersonalInventoryForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.logging.LogSafe;
 import jakarta.validation.Valid;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;

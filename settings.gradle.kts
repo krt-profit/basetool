@@ -18,3 +18,8 @@ include("keycloak-spi")
 // (#1804). Not a Spring Boot app and not shipped: nothing depends on it at runtime.
 // See test-support/build.gradle.kts.
 include("test-support")
+
+// The one implementation of the log hygiene every application ships: LogSafe and the PII maskers
+// (ADR-0205). A plain library, NOT a Spring Boot app — but unlike test-support it IS shipped: the
+// three applications depend on it at runtime. See logging-support/build.gradle.kts.
+include("logging-support")
