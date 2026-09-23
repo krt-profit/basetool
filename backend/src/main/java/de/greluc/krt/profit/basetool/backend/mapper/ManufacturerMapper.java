@@ -28,7 +28,4 @@ import org.mapstruct.Mapper;
 public interface ManufacturerMapper {
   /** Maps a {@link Manufacturer} entity to its outbound DTO. */
   ManufacturerDto toDto(Manufacturer entity);
-
-  /** Builds a new {@link Manufacturer} entity from the inbound DTO. */
-  Manufacturer toEntity(ManufacturerDto dto);
 }

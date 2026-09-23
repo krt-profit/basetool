@@ -41,10 +41,12 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.service.UserReconciliationService.ReconciledUser;
 import de.greluc.krt.profit.basetool.backend.support.AuthoritiesCacheProperties;
+import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
@@ -75,6 +77,9 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   @Mock private OrgUnitCascadeService orgUnitCascadeService;
   @Mock private Jwt jwt;
 
+  /** The gateway allowlist a test may extend; the properties record reads it by reference. */
+  private final List<String> gatewayClientIds = new ArrayList<>();
+
   /**
    * A real instance, not a mock: the default empty allowlist is the state most of these tests need
    * — no caller is a gateway, so the machine-identity carve-out never fires and each case exercises
@@ -84,17 +89,18 @@ class CustomJwtGrantedAuthoritiesConverterTest {
    * drive the other branch.
    */
   @Spy
-  private final IngestGatewayProperties ingestGatewayProperties = new IngestGatewayProperties();
+  private final IngestGatewayProperties ingestGatewayProperties =
+      new IngestGatewayProperties(gatewayClientIds);
 
   /**
-   * A real instance, not a mock: the converter reads {@link AuthoritiesCacheProperties#getTtl()} in
+   * A real instance, not a mock: the converter reads {@link AuthoritiesCacheProperties#ttl()} in
    * its constructor to size the memoisation window, so a mock would hand it {@code null} and the
    * Caffeine builder would fail before any test ran. The default five minutes (ADR-0174) is the
    * production value, so every case below exercises the shipped configuration.
    */
   @Spy
   private final AuthoritiesCacheProperties authoritiesCacheProperties =
-      new AuthoritiesCacheProperties();
+      BoundProperties.defaults(AuthoritiesCacheProperties.class);
 
   @InjectMocks private CustomJwtGrantedAuthoritiesConverter converter;
 
@@ -122,7 +128,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
    */
   @Test
   void grantsAConfiguredGatewayTheMachineAuthorityAndNeverRegistersIt() {
-    ingestGatewayProperties.setClientIds(List.of("test-ingest-gateway"));
+    gatewayClientIds.add("test-ingest-gateway");
     when(jwt.getClaimAsString("azp")).thenReturn("test-ingest-gateway");
 
     Collection<GrantedAuthority> authorities = converter.convert(jwt);
@@ -141,7 +147,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
    */
   @Test
   void leavesANonGatewayCallerOnTheOrdinaryMemberPath() {
-    ingestGatewayProperties.setClientIds(List.of("test-ingest-gateway"));
+    gatewayClientIds.add("test-ingest-gateway");
     when(jwt.getClaimAsString("azp")).thenReturn("basetool-frontend");
     when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(userWithNoRoles()));
 

@@ -88,7 +88,7 @@ public class ScWikiVehicleSyncService {
    */
   @Transactional
   public int syncVehicles() {
-    if (!Boolean.TRUE.equals(properties.getVehicleSyncEnabled())) {
+    if (!Boolean.TRUE.equals(properties.vehicleSyncEnabled())) {
       log.info(
           "SC Wiki vehicle sync invoked but disabled "
               + "(krt.scwiki.vehicle-sync-enabled=false) — skipping.");
@@ -98,7 +98,7 @@ public class ScWikiVehicleSyncService {
     log.info("Starting SC Wiki vehicle sync...");
     ScWikiClient.FetchResult<ScWikiVehicleDto> result =
         scWikiClient.fetchAllPagesResult(
-            properties.getVehiclesEndpoint(),
+            properties.vehiclesEndpoint(),
             new ParameterizedTypeReference<ScWikiResponseDto<ScWikiVehicleDto>>() {},
             "vehicles",
             null,
@@ -107,7 +107,7 @@ public class ScWikiVehicleSyncService {
             // smaller page than every other endpoint: at the shared 200 the first page alone is
             // 10.4 MB against the client's 16 MB codec ceiling, and crossing it stops the sync
             // silently rather than loudly.
-            properties.getVehiclesPageSize());
+            properties.vehiclesPageSize());
     if (result.notModified()) {
       // Catalogue unchanged since the last sync (ETag 304): nothing to fill, but this is a healthy
       // run — report the live Wiki-linked ship-type count so an all-304 run is not read as a

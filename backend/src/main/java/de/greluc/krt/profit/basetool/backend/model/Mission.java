@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -270,7 +271,7 @@ public class Mission extends AbstractEntity<UUID> {
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "parent_mission_id")
-  @com.fasterxml.jackson.annotation.JsonIgnore
+  @JsonIgnore
   private Mission parent;
 
   @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL)
@@ -279,7 +280,7 @@ public class Mission extends AbstractEntity<UUID> {
 
   @OneToMany(mappedBy = "mission")
   @OrderBy("startedAt DESC")
-  @com.fasterxml.jackson.annotation.JsonIgnore
+  @JsonIgnore
   @OptimisticLock(excluded = true)
   private Set<RefineryOrder> refineryOrders = new LinkedHashSet<>();
 

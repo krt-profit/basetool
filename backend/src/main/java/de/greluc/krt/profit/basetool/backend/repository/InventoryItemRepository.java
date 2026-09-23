@@ -23,6 +23,8 @@ import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemStockRow;
+import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialStockRow;
 import de.greluc.krt.profit.basetool.backend.model.projection.InventoryItemStackAggregate;
 import de.greluc.krt.profit.basetool.backend.model.projection.InventoryStackAggregate;
 import de.greluc.krt.profit.basetool.backend.model.projection.OwnedStockSlice;
@@ -150,7 +152,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("missionId") UUID missionId,
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds);
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
 
   /**
    * Loads every non-personal (shared) inventory row owned by the given user as managed entities.
@@ -207,7 +209,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("material") Material material,
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
       Pageable pageable);
 
   /**
@@ -234,7 +236,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("gameItem") GameItem gameItem,
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
       Pageable pageable);
 
   /** Derived Spring-Data query - returns entities matching {@code PersonalFalse}. */
@@ -280,7 +282,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("missionIds") List<UUID> missionIds,
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
       Pageable pageable);
 
   /**
@@ -355,7 +357,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("jobOrderIds") List<UUID> jobOrderIds,
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
       Pageable pageable);
 
   /**
@@ -402,7 +404,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("missionIds") List<UUID> missionIds,
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds);
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
 
   /**
    * Per-user group-on-read variant of {@link #findUserByFilters}: collapses the user's filtered
@@ -497,7 +499,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("jobOrderIds") List<UUID> jobOrderIds,
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds);
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
 
   /**
    * Game-item sibling of {@link #findUserStacks} (REQ-INV-029): collapses the calling user's
@@ -685,7 +687,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("owningOrgUnitId") UUID owningOrgUnitId,
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
       Pageable pageable);
 
   /**
@@ -755,7 +757,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       @Param("owningOrgUnitId") UUID owningOrgUnitId,
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
       Pageable pageable);
 
   /**
@@ -820,7 +822,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   Page<Object[]> getAggregatedInventory(
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
       Pageable pageable);
 
   /**
@@ -848,7 +850,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   Page<Object[]> getAggregatedItemInventory(
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
       Pageable pageable);
 
   /**
@@ -985,8 +987,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       FROM InventoryJobOrderAllocation a WHERE a.jobOrder.id IN :jobOrderIds
       AND a.inventoryItem.material IS NOT NULL
       """)
-  List<de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialStockRow>
-      findMaterialStockRowsByJobOrderIds(@Param("jobOrderIds") Collection<UUID> jobOrderIds);
+  List<JobOrderMaterialStockRow> findMaterialStockRowsByJobOrderIds(
+      @Param("jobOrderIds") Collection<UUID> jobOrderIds);
 
   /**
    * The game-item sibling of {@link #findMaterialStockRowsByJobOrderIds}: every job-order-linked
@@ -1010,8 +1012,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       FROM InventoryJobOrderAllocation a WHERE a.jobOrder.id IN :jobOrderIds
       AND a.inventoryItem.gameItem IS NOT NULL
       """)
-  List<de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemStockRow>
-      findGameItemStockRowsByJobOrderIds(@Param("jobOrderIds") Collection<UUID> jobOrderIds);
+  List<JobOrderGameItemStockRow> findGameItemStockRowsByJobOrderIds(
+      @Param("jobOrderIds") Collection<UUID> jobOrderIds);
 
   /**
    * Drops every job-order allocation of the given order (Variante C, REQ-INV-027) so an order
@@ -1219,7 +1221,7 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   int deleteAllNonPersonal(
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds);
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
 
   /**
    * Deletes every warehouse row held by the given user — personal and shared alike — as part of the

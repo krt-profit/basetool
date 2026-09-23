@@ -55,24 +55,6 @@ class AnnouncementMapperTest {
   }
 
   @Test
-  void toEntity_shouldMapAllFields() {
-    // Given
-    UUID id = UUID.randomUUID();
-    Instant updatedAt = Instant.parse("2026-04-01T00:00:00Z");
-    AnnouncementDto dto = new AnnouncementDto(id, "Welcome", updatedAt, 1L);
-
-    // When
-    Announcement entity = mapper.toEntity(dto);
-
-    // Then
-    assertNotNull(entity);
-    assertEquals(id, entity.getId());
-    assertEquals("Welcome", entity.getContent());
-    assertEquals(updatedAt, entity.getUpdatedAt());
-    assertEquals(1L, entity.getVersion());
-  }
-
-  @Test
   void toDto_withNullFields_shouldPassThroughNulls() {
     // Given
     Announcement entity = new Announcement();
@@ -92,6 +74,5 @@ class AnnouncementMapperTest {
   @Test
   void nullSafety_shouldReturnNull_whenSourceNull() {
     assertNull(mapper.toDto(null));
-    assertNull(mapper.toEntity(null));
   }
 }

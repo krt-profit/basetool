@@ -19,11 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
-import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
+import de.greluc.krt.profit.basetool.backend.model.RefineryGood;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
-import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryGoodDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderListDto;
@@ -37,7 +36,13 @@ import org.mapstruct.Mapping;
 /** MapStruct mapper between Refinery Order entities and DTOs. */
 @Mapper(
     config = CentralMapperConfig.class,
-    uses = {UserMapper.class, MaterialMapper.class, SquadronMapper.class})
+    uses = {
+      UserMapper.class,
+      MaterialMapper.class,
+      SquadronMapper.class,
+      LocationMapper.class,
+      RefiningMethodMapper.class
+    })
 public interface RefineryOrderMapper {
   /**
    * Maps a {@link RefineryOrder} entity to its full DTO; the {@code profit} field is derived from
@@ -55,7 +60,19 @@ public interface RefineryOrderMapper {
    */
   @Mapping(target = "profit", expression = "java(computeProfit(entity))")
   @Mapping(target = "owningSquadron", source = "owningOrgUnit")
+  // owningOrgUnitId is the create/update picker INPUT; the read side publishes owningSquadron.
+  @Mapping(target = "owningOrgUnitId", ignore = true)
   RefineryOrderDto toDto(RefineryOrder entity);
+
+  /**
+   * Maps one good of an order. {@code yieldBonusPercent} is a UEX enrichment the entity does not
+   * carry; {@link #toDto(RefineryOrder, Map)} fills it afterwards, so it is {@code null} here.
+   *
+   * @param good the good to project; {@code null} returns {@code null}.
+   * @return the good's DTO without its yield bonus.
+   */
+  @Mapping(target = "yieldBonusPercent", ignore = true)
+  RefineryGoodDto toDto(RefineryGood good);
 
   /**
    * Same as {@link #toDto(RefineryOrder)} but additionally fills {@code yieldBonusPercent} on every
@@ -114,7 +131,24 @@ public interface RefineryOrderMapper {
    * service (resolved from the JWT) and stripped here.
    */
   @Mapping(target = "owner", ignore = true)
+  // The owning org unit is resolved by the service from owningOrgUnitId (REQ-ORG-016).
+  @Mapping(target = "owningOrgUnit", ignore = true)
+  @Mapping(target = "createdAt", ignore = true)
+  @Mapping(target = "updatedAt", ignore = true)
   RefineryOrder toEntity(RefineryOrderDto dto);
+
+  /**
+   * Maps one inbound good. The back-reference to its order is wired by {@code RefineryOrderService}
+   * when it attaches the goods; version and timestamps belong to the persistence provider.
+   *
+   * @param dto the inbound good; {@code null} returns {@code null}.
+   * @return a transient good without its order.
+   */
+  @Mapping(target = "refineryOrder", ignore = true)
+  @Mapping(target = "version", ignore = true)
+  @Mapping(target = "createdAt", ignore = true)
+  @Mapping(target = "updatedAt", ignore = true)
+  RefineryGood toEntity(RefineryGoodDto dto);
 
   /**
    * Computes profit/loss = oreSales - expenses - otherExpenses for the order. Null values are
@@ -154,15 +188,13 @@ public interface RefineryOrderMapper {
         bonus);
   }
 
-  /** Nested mapping for the order's {@link Location}. */
-  LocationDto locationToDto(Location location);
-
   /**
-   * MapStruct default that resolves an incoming {@link MissionDto} to a JPA stub Mission carrying
-   * only the id - the persistence provider then materialises the managed instance on persist.
+   * MapStruct default that resolves an incoming {@link MissionReferenceDto} to a JPA stub Mission
+   * carrying only the id — {@code RefineryOrderService} reads nothing else and re-resolves the
+   * managed mission by that id.
    */
   @Nullable
-  default Mission missionDtoToMission(MissionDto dto) {
+  default Mission missionReferenceToMission(MissionReferenceDto dto) {
     if (dto == null) {
       return null;
     }

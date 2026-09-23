@@ -59,49 +59,7 @@ class ManufacturerMapperTest {
   }
 
   @Test
-  void toEntity_shouldMapAllFields() {
-    // Given
-    UUID id = UUID.randomUUID();
-    ManufacturerDto dto = new ManufacturerDto(id, "Anvil", "ANVL", null, null, null, false);
-
-    // When
-    Manufacturer entity = mapper.toEntity(dto);
-
-    // Then
-    assertNotNull(entity);
-    assertEquals(id, entity.getId());
-    assertEquals("Anvil", entity.getName());
-    assertEquals("ANVL", entity.getAbbreviation());
-    assertNull(entity.getNickname());
-    assertNull(entity.getWiki());
-    assertNull(entity.getDescription());
-    assertFalse(entity.isHidden());
-  }
-
-  @Test
-  void roundtrip_shouldPreserveAllFields() {
-    // Given
-    ManufacturerDto dto =
-        new ManufacturerDto(
-            UUID.randomUUID(),
-            "Aegis Dynamics",
-            "AEGS",
-            "Aegis",
-            "https://example.org/aegis",
-            "Military focus",
-            true);
-
-    // When
-    Manufacturer entity = mapper.toEntity(dto);
-    ManufacturerDto roundtrip = mapper.toDto(entity);
-
-    // Then
-    assertEquals(dto, roundtrip);
-  }
-
-  @Test
   void nullSafety_shouldReturnNull_whenSourceNull() {
     assertNull(mapper.toDto(null));
-    assertNull(mapper.toEntity(null));
   }
 }

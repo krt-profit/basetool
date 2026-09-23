@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.*;
 import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -89,13 +90,17 @@ class UserDeletionServiceTest {
 
   @Mock private OrgUnitBankResponsibilityService orgUnitBankResponsibilityService;
 
+  /** The gateway allowlist a test may extend; the properties record reads it by reference. */
+  private final List<String> gatewayClientIds = new ArrayList<>();
+
   /**
    * A real instance, not a mock: its default is the empty allowlist, which is the state every
    * pre-existing case here needs — no row is a gateway service account, so the machine-identity
    * exemption never fires and each case exercises the member path it was written for (ADR-0129).
    */
   @Spy
-  private final IngestGatewayProperties ingestGatewayProperties = new IngestGatewayProperties();
+  private final IngestGatewayProperties ingestGatewayProperties =
+      new IngestGatewayProperties(gatewayClientIds);
 
   @InjectMocks private UserDeletionService userDeletionService;
 
@@ -274,7 +279,7 @@ class UserDeletionServiceTest {
     // by id and finds it. Production is in exactly this state - the gateway's first call ran the
     // registration flow on itself before the machine-identity carve-out existed (ADR-0129) - and
     // without this exemption the row can never be deleted through the admin UI.
-    ingestGatewayProperties.setClientIds(List.of("basetool-ingest-gateway"));
+    gatewayClientIds.add("basetool-ingest-gateway");
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(userRepository.findAllAdmins()).thenReturn(List.of(admin));
     when(keycloakService.userExists(userId)).thenReturn(true);
@@ -293,7 +298,7 @@ class UserDeletionServiceTest {
     // `service-account-foo` can be created when no client `foo` exists (201), so the prefix alone
     // proves nothing; the name of an EXISTING service account is refused (409), so the exact name
     // of a configured client cannot be held by a hand-made account.
-    ingestGatewayProperties.setClientIds(List.of("basetool-ingest-gateway"));
+    gatewayClientIds.add("basetool-ingest-gateway");
     // The LOCAL mirror says service-account-…; Keycloak, asked by id, says otherwise. The name is
     // read from Keycloak precisely so a stale or edited local value cannot stand in for it.
     user.setUsername("service-account-basetool-ingest-gateway");
@@ -312,7 +317,7 @@ class UserDeletionServiceTest {
     // answered 403 (the backend's admin client manages users, it does not inspect clients), and
     // that exception escaped as an unexpected 500 on the deletion. A check that cannot establish
     // its answer must refuse, not explode.
-    ingestGatewayProperties.setClientIds(List.of("basetool-ingest-gateway"));
+    gatewayClientIds.add("basetool-ingest-gateway");
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(keycloakService.userExists(userId)).thenReturn(true);
     when(keycloakService.usernameOf(userId))

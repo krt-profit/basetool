@@ -45,6 +45,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -492,7 +493,7 @@ public class OrgUnitMembershipQueryService {
    */
   @NotNull
   public Optional<UUID> findExecutingStaffelForOrder(
-      @NotNull UUID userId, @org.jetbrains.annotations.Nullable UUID orderOrgUnitId) {
+      @NotNull UUID userId, @Nullable UUID orderOrgUnitId) {
     List<UUID> staffelIds = findStaffelMembershipOrgUnitIds(userId);
     if (orderOrgUnitId != null && staffelIds.contains(orderOrgUnitId)) {
       return Optional.of(orderOrgUnitId);

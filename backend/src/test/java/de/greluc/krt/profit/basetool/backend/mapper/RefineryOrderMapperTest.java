@@ -29,10 +29,10 @@ import de.greluc.krt.profit.basetool.backend.model.RefineryGood;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
-import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
-import de.greluc.krt.profit.basetool.backend.model.dto.MissionDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryGoodDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderDto;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -40,7 +40,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
-import org.springframework.test.util.ReflectionTestUtils;
 
 class RefineryOrderMapperTest {
 
@@ -48,12 +47,15 @@ class RefineryOrderMapperTest {
 
   @BeforeEach
   void setUp() {
-    // RefineryOrderMapperImpl @Autowires both UserMapper and MaterialMapper —
-    // wire them manually outside of a Spring context.
-    mapper = Mappers.getMapper(RefineryOrderMapper.class);
-    ReflectionTestUtils.setField(mapper, "userMapper", Mappers.getMapper(UserMapper.class));
-    ReflectionTestUtils.setField(mapper, "materialMapper", Mappers.getMapper(MaterialMapper.class));
-    ReflectionTestUtils.setField(mapper, "squadronMapper", Mappers.getMapper(SquadronMapper.class));
+    // RefineryOrderMapperImpl receives every mapper it uses through its constructor
+    // (CentralMapperConfig: injectionStrategy = CONSTRUCTOR).
+    mapper =
+        new RefineryOrderMapperImpl(
+            Mappers.getMapper(UserMapper.class),
+            new MaterialMapperImpl(new MaterialCategoryMapperImpl()),
+            Mappers.getMapper(SquadronMapper.class),
+            new LocationMapperImpl(),
+            new RefiningMethodMapperImpl());
   }
 
   @Test
@@ -214,52 +216,14 @@ class RefineryOrderMapperTest {
   }
 
   @Test
-  void missionDtoToMission_shouldOnlyCopyId() {
-    // Given a MissionDto where only the id is relevant for the conversion
+  void missionReferenceToMission_shouldOnlyCopyId() {
+    // Given a mission reference where only the id is relevant for the conversion
     UUID missionId = UUID.randomUUID();
-    MissionDto dto =
-        new MissionDto(
-            missionId,
-            "Op Sunfire",
-            "desc",
-            null,
-            "PLANNED",
-            null,
-            null,
-            null,
-            null,
-            null, // 5 Instants + 1 status set above
-            null,
-            null,
-            null,
-            null, // isInternal, participants, units, frequencies, subMissions, inventoryEntries,
-            // refineryOrders
-            null,
-            null,
-            null, // operation, owner, managers
-            null,
-            null,
-            null, // canEdit, canManageManagers
-            null, // version
-            null,
-            null,
-            null, // coreVersion, scheduleVersion, flagsVersion
-            null,
-            null, // checkedInParticipants, registeredParticipants
-            null, // owningSquadron
-            null, // partyLeadUser
-            null, // partyLeadGuestName
-            0L, // partyLeadVersion
-            null, // steps
-            null, // stepsVersion
-            null, // objectives
-            null, // objectivesVersion
-            null // meetingPoint
-            ,
-            null);
+    MissionReferenceDto dto =
+        new MissionReferenceDto(missionId, "Op Sunfire", "PLANNED", Instant.now());
 
     // When
-    Mission mission = mapper.missionDtoToMission(dto);
+    Mission mission = mapper.missionReferenceToMission(dto);
 
     // Then
     assertNotNull(mission);
@@ -269,34 +233,45 @@ class RefineryOrderMapperTest {
   }
 
   @Test
-  void missionDtoToMission_nullDto_shouldReturnNull() {
-    assertNull(mapper.missionDtoToMission(null));
+  void toEntity_linksTheMissionAsAnIdOnlyStub() {
+    // BE-MOD-05b: RefineryOrderDto.mission is a MissionReferenceDto; the id-stub default used to
+    // accept the full MissionDto and was never applied — MapStruct generated a field copy instead.
+    UUID missionId = UUID.randomUUID();
+    RefineryOrderDto dto =
+        new RefineryOrderDto(
+            null,
+            null,
+            null,
+            new MissionReferenceDto(missionId, "Op Sunfire", "PLANNED", Instant.now()),
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            java.util.List.of(),
+            null,
+            null,
+            null);
+
+    RefineryOrder entity = mapper.toEntity(dto);
+
+    assertEquals(missionId, entity.getMission().getId());
+    assertNull(entity.getMission().getName());
   }
 
   @Test
-  void locationToDto_shouldExposeFullSurface() {
-    // Given
-    Location loc = new Location();
-    loc.setId(UUID.randomUUID());
-    loc.setName("CRU-L4");
-    loc.setHidden(false);
-    loc.setVersion(1L);
-
-    // When
-    LocationDto dto = mapper.locationToDto(loc);
-
-    // Then
-    assertNotNull(dto);
-    assertEquals(loc.getId(), dto.id());
-    assertEquals("CRU-L4", dto.name());
+  void missionReferenceToMission_nullDto_shouldReturnNull() {
+    assertNull(mapper.missionReferenceToMission(null));
   }
 
   @Test
   void nullSafety_shouldReturnNull_whenSourceNull() {
-    assertNull(mapper.toDto(null));
+    assertNull(mapper.toDto((RefineryOrder) null));
     assertNull(mapper.toListDto(null));
-    assertNull(mapper.toEntity(null));
-    assertNull(mapper.locationToDto(null));
+    assertNull(mapper.toEntity((RefineryOrderDto) null));
   }
 
   @Test

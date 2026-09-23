@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.SetHomeLocationResponseDt
 import de.greluc.krt.profit.basetool.backend.model.dto.ShipDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronShipOverviewDto;
+import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.HangarImportService;
 import de.greluc.krt.profit.basetool.backend.service.HangarService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
@@ -48,8 +49,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
@@ -96,6 +95,7 @@ public class HangarController {
   private final UserService userService;
   private final ShipMapper shipMapper;
   private final UserMapper userMapper;
+  private final AuthHelperService authHelperService;
 
   /**
    * One server-side page of the calling user's own ships (REQ-HANGAR-002). The page is ordered by
@@ -157,7 +157,6 @@ public class HangarController {
    * @param size page size
    * @param sort sort parameter ({@code shipType.name} only)
    * @param search optional ship-type/manufacturer name filter; blank means no filter
-   * @param authentication caller's authentication, used for the role-driven response shaping
    * @return paged overview DTOs
    */
   @GetMapping("/squadron-overview")
@@ -166,16 +165,11 @@ public class HangarController {
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort,
-      @RequestParam(required = false) String search,
-      Authentication authentication) {
+      @RequestParam(required = false) String search) {
     // Role-based shaping of the response is decided HERE, at the HTTP boundary, so
     // the service stays pure business logic and does not need to read
     // SecurityContextHolder itself (architecture rule enforced by ArchitectureTest).
-    boolean includeOwnerDetails =
-        authentication != null
-            && authentication.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .anyMatch(role -> "ROLE_ADMIN".equals(role) || "ROLE_OFFICER".equals(role));
+    boolean includeOwnerDetails = authHelperService.isAdminOrOfficer();
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("shipType.name"), "shipType.name");

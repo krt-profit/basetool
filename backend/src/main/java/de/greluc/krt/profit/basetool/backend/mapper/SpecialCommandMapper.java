@@ -68,5 +68,6 @@ public interface SpecialCommandMapper {
   @Mapping(target = "promotionEnabled", ignore = true)
   @Mapping(target = "profitEligible", ignore = true)
   @Mapping(target = "parent", ignore = true)
+  @Mapping(target = "department", ignore = true)
   SpecialCommand toEntity(SpecialCommandDto dto);
 }

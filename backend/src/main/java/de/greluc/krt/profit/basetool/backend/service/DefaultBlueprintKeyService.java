@@ -59,16 +59,6 @@ public class DefaultBlueprintKeyService {
     return productKey != null && current().contains(productKey);
   }
 
-  /**
-   * Returns the cached default product-key set. Callers must treat it as read-only.
-   *
-   * @return the default product keys; never {@code null}
-   */
-  @NotNull
-  public Set<String> defaultProductKeys() {
-    return current();
-  }
-
   /** Reloads the cached default product-key set from the database. */
   public void refresh() {
     cache.set(load());

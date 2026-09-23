@@ -36,6 +36,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.AppenderBase;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
 import de.greluc.krt.profit.basetool.backend.support.RefusedSubjectWindow;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -80,7 +81,7 @@ class PendingApprovalAccessFilterTest {
     filter =
         new PendingApprovalAccessFilter(
             messageSource,
-            new ProblemResponseFactory(new AppProblemProperties()),
+            new ProblemResponseFactory(BoundProperties.defaults(AppProblemProperties.class)),
             JsonMapper.builder().build(),
             meterRegistry,
             noRoleRefusedSubjects);

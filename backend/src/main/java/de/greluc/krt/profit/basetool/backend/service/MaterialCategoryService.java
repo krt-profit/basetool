@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.MaterialCategory;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialCategoryRepository;
@@ -68,9 +69,7 @@ public class MaterialCategoryService {
    */
   @Cacheable(cacheNames = CacheConfig.MATERIAL_CATEGORIES_CACHE)
   public MaterialCategory findById(UUID id) {
-    return repository
-        .findById(id)
-        .orElseThrow(() -> new NotFoundException("MaterialCategory not found"));
+    return Entities.require(repository.findById(id), "MaterialCategory not found");
   }
 
   /**

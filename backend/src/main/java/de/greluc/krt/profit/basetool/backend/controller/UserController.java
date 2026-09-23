@@ -23,12 +23,14 @@ import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
+import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.ConsolidateAccountRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserSyncResultDto;
 import de.greluc.krt.profit.basetool.backend.service.AccountConsolidationService;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
@@ -37,14 +39,19 @@ import de.greluc.krt.profit.basetool.backend.service.UserDeletionService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.service.UserSyncService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
+import de.greluc.krt.profit.basetool.backend.support.UserDtoRedaction;
 import de.greluc.krt.profit.basetool.backend.web.CurrentUserId;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -149,7 +156,7 @@ public class UserController {
       @RequestParam(required = false) String sort) {
     Pageable pageable =
         PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "username");
-    Page<de.greluc.krt.profit.basetool.backend.model.User> p = userService.findAll(pageable);
+    Page<User> p = userService.findAll(pageable);
     userMapper.primeStaffelMemberships(p.getContent());
     return PageResponse.of(p.map(userMapper::toDto).map(this::redactForPeerIfNeeded));
   }
@@ -175,7 +182,7 @@ public class UserController {
           + Roles.BANK_EMPLOYEE
           + "')")
   @Transactional(readOnly = true)
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto> lookupUsers() {
+  public List<UserReferenceDto> lookupUsers() {
     return userService.findAllReference();
   }
 
@@ -252,12 +259,11 @@ public class UserController {
   @PreAuthorize(
       "hasAnyRole('" + Roles.ADMIN + "', '" + Roles.OFFICER + "', '" + Roles.KRT_MEMBER + "')")
   @Transactional(readOnly = true)
-  public PageResponse<de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto>
-      searchUserReferences(
-          @RequestParam(required = false) String query,
-          @RequestParam(required = false) Integer page,
-          @RequestParam(required = false) Integer size,
-          @RequestParam(required = false) String sort) {
+  public PageResponse<UserReferenceDto> searchUserReferences(
+      @RequestParam(required = false) String query,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      @RequestParam(required = false) String sort) {
     return runReferenceSearch(query, page, size, sort);
   }
 
@@ -286,12 +292,11 @@ public class UserController {
           + Roles.BANK_EMPLOYEE
           + "')")
   @Transactional(readOnly = true)
-  public PageResponse<de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto>
-      searchUserReferencesForBank(
-          @RequestParam(required = false) String query,
-          @RequestParam(required = false) Integer page,
-          @RequestParam(required = false) Integer size,
-          @RequestParam(required = false) String sort) {
+  public PageResponse<UserReferenceDto> searchUserReferencesForBank(
+      @RequestParam(required = false) String query,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size,
+      @RequestParam(required = false) String sort) {
     return runReferenceSearch(query, page, size, sort);
   }
 
@@ -306,8 +311,8 @@ public class UserController {
    * @param sort requested sort expression, or {@code null}
    * @return one page of matching user references
    */
-  private PageResponse<de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto>
-      runReferenceSearch(String query, Integer page, Integer size, String sort) {
+  private PageResponse<UserReferenceDto> runReferenceSearch(
+      String query, Integer page, Integer size, String sort) {
     Pageable pageable =
         PaginationUtil.createPageRequest(page, size, sort, REFERENCE_SORT, "username");
     return PageResponse.of(
@@ -336,8 +341,7 @@ public class UserController {
   private PageResponse<UserDto> runSearch(String query, Integer page, Integer size, String sort) {
     Pageable pageable =
         PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "username");
-    Page<de.greluc.krt.profit.basetool.backend.model.User> p =
-        userService.searchByUsername(query == null ? "" : query, pageable);
+    Page<User> p = userService.searchByUsername(query == null ? "" : query, pageable);
     userMapper.primeStaffelMemberships(p.getContent());
     return PageResponse.of(p.map(userMapper::toDto).map(this::redactForPeerIfNeeded));
   }
@@ -359,7 +363,7 @@ public class UserController {
       "hasAnyRole('" + Roles.ADMIN + "', '" + Roles.OFFICER + "', '" + Roles.KRT_MEMBER + "')")
   @Transactional(readOnly = true)
   public UserDto getUserById(@PathVariable @NotNull UUID id) {
-    de.greluc.krt.profit.basetool.backend.model.User user = userService.findById(id);
+    User user = userService.findById(id);
     UserDto dto = userMapper.toDto(user);
     if (isCrossSquadronNonAdmin(user)) {
       return redactToPeerShape(dto);
@@ -428,14 +432,13 @@ public class UserController {
    * @param user target user resolved by id; never {@code null}
    * @return {@code true} if the caller is a non-admin and shares none of the user's squadrons
    */
-  private boolean isCrossSquadronNonAdmin(
-      @NotNull de.greluc.krt.profit.basetool.backend.model.User user) {
+  private boolean isCrossSquadronNonAdmin(@NotNull User user) {
     if (authHelperService.isAdmin()) {
       return false;
     }
     // Post-R9 D3 (V101): the user's home Staffel(n) are sourced from org_unit_membership — the
     // legacy User.squadron column was dropped.
-    java.util.List<UUID> targetSquadronIds =
+    List<UUID> targetSquadronIds =
         orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(user.getId());
     if (targetSquadronIds.isEmpty()) {
       return true;
@@ -459,8 +462,7 @@ public class UserController {
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public UserDto getCurrentUser(@AuthenticationPrincipal Jwt jwt) {
-    de.greluc.krt.profit.basetool.backend.model.User me =
-        userService.findById(userService.getUserIdFromJwt(jwt));
+    User me = userService.findById(userService.getUserIdFromJwt(jwt));
     return withSelfEmail(userMapper.toDto(me), me);
   }
 
@@ -558,8 +560,8 @@ public class UserController {
   @PreAuthorize("isAuthenticated()")
   public UserDto updateMyDescription(
       @AuthenticationPrincipal Jwt jwt,
-      @NotNull @RequestBody @jakarta.validation.Valid UserDescriptionRequest request) {
-    de.greluc.krt.profit.basetool.backend.model.User me =
+      @NotNull @RequestBody @Valid UserDescriptionRequest request) {
+    User me =
         userService.updateUserDescription(
             userService.getUserIdFromJwt(jwt),
             request.getDescription(),
@@ -584,8 +586,7 @@ public class UserController {
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public MyPayoutPreferenceResponse getMyPayoutPreference(@AuthenticationPrincipal Jwt jwt) {
-    de.greluc.krt.profit.basetool.backend.model.User me =
-        userService.findById(userService.getUserIdFromJwt(jwt));
+    User me = userService.findById(userService.getUserIdFromJwt(jwt));
     return new MyPayoutPreferenceResponse(me.getDefaultPayoutPreference(), me.getVersion());
   }
 
@@ -604,8 +605,8 @@ public class UserController {
   @PreAuthorize("isAuthenticated()")
   public MyPayoutPreferenceResponse updateMyPayoutPreference(
       @AuthenticationPrincipal Jwt jwt,
-      @NotNull @RequestBody @jakarta.validation.Valid MyPayoutPreferenceRequest request) {
-    de.greluc.krt.profit.basetool.backend.model.User me =
+      @NotNull @RequestBody @Valid MyPayoutPreferenceRequest request) {
+    User me =
         userService.updateUserDefaultPayoutPreference(
             userService.getUserIdFromJwt(jwt), request.preference(), request.version());
     return new MyPayoutPreferenceResponse(me.getDefaultPayoutPreference(), me.getVersion());
@@ -624,8 +625,7 @@ public class UserController {
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public MyBlueprintSharingResponse getMyBlueprintSharing(@AuthenticationPrincipal Jwt jwt) {
-    de.greluc.krt.profit.basetool.backend.model.User me =
-        userService.findById(userService.getUserIdFromJwt(jwt));
+    User me = userService.findById(userService.getUserIdFromJwt(jwt));
     return new MyBlueprintSharingResponse(me.isShareBlueprintsGlobally(), me.getVersion());
   }
 
@@ -646,8 +646,8 @@ public class UserController {
   @PreAuthorize("isAuthenticated()")
   public MyBlueprintSharingResponse updateMyBlueprintSharing(
       @AuthenticationPrincipal Jwt jwt,
-      @NotNull @RequestBody @jakarta.validation.Valid MyBlueprintSharingRequest request) {
-    de.greluc.krt.profit.basetool.backend.model.User me =
+      @NotNull @RequestBody @Valid MyBlueprintSharingRequest request) {
+    User me =
         userService.updateUserShareBlueprintsGlobally(
             userService.getUserIdFromJwt(jwt),
             request.shareBlueprintsGlobally(),
@@ -666,8 +666,7 @@ public class UserController {
   @PreAuthorize("isAuthenticated()")
   public UserDto updateReadAnnouncement(
       @AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID announcementId) {
-    de.greluc.krt.profit.basetool.backend.model.User me =
-        userService.updateReadAnnouncement(userService.getUserIdFromJwt(jwt), announcementId);
+    User me = userService.updateReadAnnouncement(userService.getUserIdFromJwt(jwt), announcementId);
     return withSelfEmail(userMapper.toDto(me), me);
   }
 
@@ -683,8 +682,7 @@ public class UserController {
   @PutMapping("/{id}/attributes")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public UserDto updateUserAttributes(
-      @PathVariable @NotNull UUID id,
-      @NotNull @RequestBody @jakarta.validation.Valid UserAttributesRequest request) {
+      @PathVariable @NotNull UUID id, @NotNull @RequestBody @Valid UserAttributesRequest request) {
     return userMapper.toDto(
         userService.updateUserAttributes(
             id,
@@ -717,8 +715,7 @@ public class UserController {
   @PatchMapping("/{id}/memberships")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public MembershipDeltaResponse patchMemberships(
-      @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid MembershipDeltaRequest request) {
+      @PathVariable @NotNull UUID id, @RequestBody @Valid MembershipDeltaRequest request) {
     userService.applyMembershipDelta(id, request);
     return new MembershipDeltaResponse(
         orgUnitMembershipQueryService.findAllMembershipDtosForUser(id));
@@ -784,41 +781,41 @@ public class UserController {
   public UserDto consolidateAccount(
       @PathVariable @NotNull UUID id,
       @CurrentUserId UUID adminUserId,
-      @NotNull @RequestBody @jakarta.validation.Valid ConsolidateAccountRequest body) {
+      @NotNull @RequestBody @Valid ConsolidateAccountRequest body) {
     return userMapper.toDto(
         accountConsolidationService.consolidate(
             id, body.targetUserId(), body.version(), adminUserId));
   }
 
   /** Body for {@link #updateUserAttributes}. */
-  @lombok.Data
+  @Data
   public static class UserAttributesRequest {
     @jakarta.validation.constraints.NotNull private Integer rank;
 
     // Bound the free-text fields (security audit L1): description is a TEXT column with no DB
     // backstop, so without @Size an authenticated caller could store a multi-MB blob per write.
-    @jakarta.validation.constraints.Size(max = 10_000)
+    @Size(max = 10_000)
     private String description;
 
-    @jakarta.validation.constraints.Size(max = 255)
+    @Size(max = 255)
     private String displayName;
 
     @jakarta.validation.constraints.NotNull private Long version;
-    @org.jetbrains.annotations.Nullable private LocalDate joinDate;
+    @Nullable private LocalDate joinDate;
   }
 
   /** Body for {@link #updateMyDescription}. */
-  @lombok.Data
+  @Data
   public static class UserDescriptionRequest {
     // Bound the free-text self-service fields (security audit L1): description maps to a TEXT
     // column
     // with no DB length backstop. @Size only rejects over-length input; the fields stay nullable
     // (a null description means "no change", a blank displayName clears it) so partial-update
     // semantics are unchanged — do NOT add @NotBlank.
-    @jakarta.validation.constraints.Size(max = 10_000)
+    @Size(max = 10_000)
     private String description;
 
-    @jakarta.validation.constraints.Size(max = 255)
+    @Size(max = 255)
     private String displayName;
 
     @jakarta.validation.constraints.NotNull private Long version;
@@ -833,7 +830,7 @@ public class UserController {
    * @param version the user row's current {@code @Version}.
    */
   public record MyPayoutPreferenceResponse(
-      @org.jetbrains.annotations.Nullable PayoutPreference defaultPayoutPreference, Long version) {}
+      @Nullable PayoutPreference defaultPayoutPreference, Long version) {}
 
   /**
    * Body for {@link #updateMyPayoutPreference}: the new default payout preference and the expected
@@ -910,7 +907,7 @@ public class UserController {
     // must apply the same shape, and while it lived here as a private helper only this controller
     // did - so the same caller got the slim record from GET /users/{id} and the full one from any
     // aggregate that embedded it.
-    return de.greluc.krt.profit.basetool.backend.support.UserDtoRedaction.toPeerShape(dto);
+    return UserDtoRedaction.toPeerShape(dto);
   }
 
   /**
@@ -925,8 +922,7 @@ public class UserController {
    * @return a copy of {@code dto} with {@code email} populated from {@code user}
    */
   @NotNull
-  private UserDto withSelfEmail(
-      @NotNull UserDto dto, @NotNull de.greluc.krt.profit.basetool.backend.model.User user) {
+  private UserDto withSelfEmail(@NotNull UserDto dto, @NotNull User user) {
     return new UserDto(
         dto.id(),
         dto.username(),

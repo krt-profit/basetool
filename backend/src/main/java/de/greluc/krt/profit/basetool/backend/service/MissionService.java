@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static de.greluc.krt.profit.basetool.backend.support.MissionSectionVersions.bumpSectionVersion;
 import static de.greluc.krt.profit.basetool.backend.support.MissionSectionVersions.enforceSectionVersion;
 
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
@@ -34,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.model.projection.MissionParticipantCount;
@@ -65,6 +67,8 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -147,8 +151,7 @@ public class MissionService {
    *
    * @return lightweight reference projection of the picker-visible missions for the caller
    */
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto>
-      findAllActiveReference() {
+  public List<MissionReferenceDto> findAllActiveReference() {
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
     Instant terminalCutoff = OffsetDateTime.now(ZoneOffset.UTC).minusMonths(3).toInstant();
     return missionRepository.findAllActiveReference(
@@ -229,9 +232,7 @@ public class MissionService {
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no match
    */
   public Mission getMissionById(@NotNull UUID id) {
-    return missionRepository
-        .findById(id)
-        .orElseThrow(() -> new NotFoundException("Mission not found"));
+    return Entities.require(missionRepository.findById(id), "Mission not found");
   }
 
   /**
@@ -429,9 +430,8 @@ public class MissionService {
 
     if (request.operationId() != null) {
       Operation op =
-          operationRepository
-              .findById(request.operationId())
-              .orElseThrow(() -> new NotFoundException("Operation not found"));
+          Entities.require(
+              operationRepository.findById(request.operationId()), "Operation not found");
       mission.setOperation(op);
     } else {
       mission.setOperation(null);
@@ -464,13 +464,10 @@ public class MissionService {
     // legacy whole-mission path's "two concurrent overwrites 409 against each other" guarantee. The
     // client-echo check below additionally rejects a form that was already stale at load time.
     Mission mission =
-        missionRepository
-            .findByIdForFullReplace(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+        Entities.require(missionRepository.findByIdForFullReplace(missionId), "Mission not found");
 
     if (!mission.getVersion().equals(request.version())) {
-      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
-          Mission.class, missionId);
+      throw new ObjectOptimisticLockingFailureException(Mission.class, missionId);
     }
 
     // Decide the effective actualStartTime UP FRONT, before mutating any setter on the managed
@@ -496,9 +493,8 @@ public class MissionService {
 
     if (request.operationId() != null) {
       Operation op =
-          operationRepository
-              .findById(request.operationId())
-              .orElseThrow(() -> new NotFoundException("Operation not found"));
+          Entities.require(
+              operationRepository.findById(request.operationId()), "Operation not found");
       mission.setOperation(op);
     } else {
       mission.setOperation(null);
@@ -563,10 +559,7 @@ public class MissionService {
       UUID operationId,
       String meetingPoint,
       @NotNull Long expectedCoreVersion) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
     enforceSectionVersion(
         missionRepository, mission, MissionSection.CORE, expectedCoreVersion, missionId);
 
@@ -589,9 +582,7 @@ public class MissionService {
 
     if (operationId != null) {
       Operation op =
-          operationRepository
-              .findById(operationId)
-              .orElseThrow(() -> new NotFoundException("Operation not found"));
+          Entities.require(operationRepository.findById(operationId), "Operation not found");
       mission.setOperation(op);
     } else {
       mission.setOperation(null);
@@ -632,10 +623,7 @@ public class MissionService {
       Instant actualStartTime,
       Instant actualEndTime,
       @NotNull Long expectedScheduleVersion) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
     enforceSectionVersion(
         missionRepository, mission, MissionSection.SCHEDULE, expectedScheduleVersion, missionId);
     mission.setMeetingTime(meetingTime);
@@ -679,10 +667,7 @@ public class MissionService {
   @Transactional
   public Mission updateFlagsSection(
       @NotNull UUID missionId, @NotNull Boolean isInternal, @NotNull Long expectedFlagsVersion) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
     enforceSectionVersion(
         missionRepository, mission, MissionSection.FLAGS, expectedFlagsVersion, missionId);
     mission.setIsInternal(isInternal);
@@ -729,10 +714,7 @@ public class MissionService {
    */
   @Transactional
   public void deleteMission(@NotNull UUID missionId) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
 
     // Snapshot the label/id BEFORE the delete so the audit row survives the removed aggregate.
     final UUID deletedMissionId = mission.getId();
@@ -824,7 +806,7 @@ public class MissionService {
       String guestName,
       UUID desiredJobTypeId,
       String comment,
-      java.util.List<UUID> orgUnitIds,
+      List<UUID> orgUnitIds,
       PayoutPreference payoutPreference) {
     return missionParticipantService.addParticipant(
         missionId, userId, guestName, desiredJobTypeId, comment, orgUnitIds, payoutPreference);
@@ -888,11 +870,11 @@ public class MissionService {
       String comment,
       Instant startTime,
       Instant endTime,
-      java.util.List<UUID> orgUnitIds,
+      List<UUID> orgUnitIds,
       PayoutPreference payoutPreference,
       String guestName,
       Long version,
-      org.springframework.security.core.Authentication authentication) {
+      Authentication authentication) {
     return missionParticipantService.updateParticipantAttributes(
         missionId,
         participantId,
@@ -1242,9 +1224,7 @@ public class MissionService {
   @Transactional
   public Mission addSubMission(@NotNull UUID parentMissionId, CreateMissionRequest request) {
     Mission parent =
-        missionRepository
-            .findById(parentMissionId)
-            .orElseThrow(() -> new NotFoundException("Parent mission not found"));
+        Entities.require(missionRepository.findById(parentMissionId), "Parent mission not found");
 
     Mission subMission = new Mission();
     applyCreatePayload(subMission, request);
@@ -1289,10 +1269,7 @@ public class MissionService {
   @Transactional
   public Mission addOrUpdateMissionFrequency(
       @NotNull UUID missionId, @NotNull UUID frequencyTypeId, @NotNull BigDecimal value) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
     String missionName = mission.getName();
 
     if (!frequencyTypeRepository.existsById(frequencyTypeId)) {
@@ -1309,9 +1286,7 @@ public class MissionService {
         AuditDetails.of("frequencyType", frequencyTypeId));
     // The native upsert bypassed the persistence context (clearAutomatically), so re-load a fresh
     // managed mission whose frequencies collection includes the upserted row for the response.
-    return missionRepository
-        .findById(missionId)
-        .orElseThrow(() -> new NotFoundException("Mission not found"));
+    return Entities.require(missionRepository.findById(missionId), "Mission not found");
   }
 
   /**
@@ -1333,10 +1308,7 @@ public class MissionService {
   @Transactional
   public Mission addCustomMissionFrequency(
       @NotNull UUID missionId, @NotNull String name, @NotNull BigDecimal value) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
 
     MissionFrequency freq = new MissionFrequency();
     freq.setMission(mission);
@@ -1380,16 +1352,14 @@ public class MissionService {
       @NotNull String name,
       @NotNull BigDecimal value,
       @NotNull Long expectedVersion) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
 
     MissionFrequency freq =
-        mission.getFrequencies().stream()
-            .filter(f -> f.getId() != null && f.getId().equals(frequencyId))
-            .findFirst()
-            .orElseThrow(() -> new NotFoundException("Frequency not found in this mission"));
+        Entities.require(
+            mission.getFrequencies().stream()
+                .filter(f -> f.getId() != null && f.getId().equals(frequencyId))
+                .findFirst(),
+            "Frequency not found in this mission");
 
     if (freq.getFrequencyType() != null) {
       throw new IllegalArgumentException(
@@ -1398,8 +1368,7 @@ public class MissionService {
 
     long current = freq.getVersion() == null ? 0L : freq.getVersion();
     if (!expectedVersion.equals(current)) {
-      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
-          MissionFrequency.class, frequencyId);
+      throw new ObjectOptimisticLockingFailureException(MissionFrequency.class, frequencyId);
     }
 
     freq.setName(name.trim());
@@ -1418,10 +1387,7 @@ public class MissionService {
   /** Removes a frequency entry from a mission. */
   @Transactional
   public Mission removeMissionFrequency(@NotNull UUID missionId, @NotNull UUID frequencyId) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
 
     boolean removed =
         mission.getFrequencies().removeIf(f -> f.getId() != null && f.getId().equals(frequencyId));
@@ -1460,14 +1426,8 @@ public class MissionService {
   @Transactional
   public Mission updateMissionOwner(
       @NotNull UUID missionId, @NotNull UUID userId, @NotNull Long expectedOwnershipVersion) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-    User user =
-        userRepository
-            .findPlainById(userId)
-            .orElseThrow(() -> new NotFoundException("User not found"));
+    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
+    User user = Entities.require(userRepository.findPlainById(userId), "User not found");
     // Before mission.setOwner: a first change materialises the companion row with the owner it is
     // replacing, which is read off the mission.
     long ownershipVersion = upsertMissionOwnership(mission, user, expectedOwnershipVersion);
@@ -1513,7 +1473,7 @@ public class MissionService {
     long currentVersion =
         existing.map(MissionOwnership::getVersion).map(v -> v == null ? 0L : v).orElse(0L);
     if (expectedVersion != currentVersion) {
-      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
+      throw new ObjectOptimisticLockingFailureException(
           MissionOwnership.class, existing.map(MissionOwnership::getId).orElse(mission.getId()));
     }
     MissionOwnership ownership =
@@ -1560,10 +1520,7 @@ public class MissionService {
   @Transactional
   public Mission updateOwningOrgUnit(
       @NotNull UUID missionId, UUID targetOrgUnitId, @NotNull Long expectedOwningOrgUnitVersion) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
     enforceSectionVersion(
         missionRepository,
         mission,

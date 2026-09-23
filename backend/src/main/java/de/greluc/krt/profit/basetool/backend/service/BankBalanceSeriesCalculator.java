@@ -115,7 +115,7 @@ public final class BankBalanceSeriesCalculator {
       out.add(full.get(i));
     }
     BankBalancePointDto last = full.get(size - 1);
-    if (out.isEmpty() || !out.get(out.size() - 1).equals(last)) {
+    if (out.isEmpty() || !out.getLast().equals(last)) {
       out.add(last);
     }
     return out;

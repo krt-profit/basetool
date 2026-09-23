@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -520,9 +521,8 @@ public class MaterialExchangeBoardService {
    * @throws NotFoundException if no such offer exists.
    */
   private MaterialExchangeOffer loadWithDetail(UUID offerId) {
-    return offerRepository
-        .findWithDetailById(offerId)
-        .orElseThrow(() -> new NotFoundException("Offer not found: " + offerId));
+    return Entities.require(
+        offerRepository.findWithDetailById(offerId), () -> "Offer not found: " + offerId);
   }
 
   /**

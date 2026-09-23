@@ -75,7 +75,7 @@ public class ForwardedHeaderConfig {
     // primitive and which key supplies the allowlist is a wiring detail that belongs here. The
     // deployed key stays app.rate-limit.trusted-proxies for continuity (REQ-SEC-011).
     FilterRegistrationBean<ClientIpContextFilter> registration =
-        new FilterRegistrationBean<>(new ClientIpContextFilter(properties.getTrustedProxies()));
+        new FilterRegistrationBean<>(new ClientIpContextFilter(properties.trustedProxies()));
     registration.setDispatcherTypes(
         DispatcherType.REQUEST, DispatcherType.ASYNC, DispatcherType.ERROR);
     registration.addUrlPatterns("/*");

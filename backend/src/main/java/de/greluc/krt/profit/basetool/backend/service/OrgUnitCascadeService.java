@@ -23,19 +23,17 @@ import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
-import jakarta.servlet.http.HttpServletRequest;
+import de.greluc.krt.profit.basetool.backend.support.RequestMemo;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.context.request.RequestAttributes;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
  * Computes the cascading-scope expansion of the org hierarchy (epic #692, REQ-ORG-015) in one
@@ -76,8 +74,8 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  * <p><b>Per-request memoisation.</b> Within a single HTTP request both consumers run for the same
  * authenticated principal — the converter computes the reach at authentication time and {@link
  * OwnerScopeService} re-derives it at query time — so {@link #cascadedOfficerReach(Collection)}
- * caches its result on the bound {@link HttpServletRequest}, keyed by the membership-id set it was
- * computed from. This collapses the two otherwise-identical hierarchy reads ({@code
+ * caches its result in a {@link RequestMemo} on the bound request, keyed by the membership-id set
+ * it was computed from. This collapses the two otherwise-identical hierarchy reads ({@code
  * findAllOrgUnitIds()} for an OL member, {@code findChildOrgUnitIds(...)} per Bereich seat) into
  * one per request. The cache is transparent: it never changes the result (same inputs ⇒ same set),
  * it hands out defensive copies so a caller cannot corrupt it, and when no request is bound (unit
@@ -93,12 +91,14 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 public class OrgUnitCascadeService {
 
   /**
-   * Request-attribute key under which {@link #cascadedOfficerReach(Collection)} memoises its result
-   * for the duration of one request (see the class-level <i>Per-request memoisation</i> note). The
-   * fully-qualified class name avoids any clash with attributes set elsewhere on the request.
+   * Request memo under which {@link #cascadedOfficerReach(Collection)} keeps its results for the
+   * duration of one request (see the class-level <i>Per-request memoisation</i> note), keyed by the
+   * {@linkplain #membershipKey(Collection) membership-id set} each reach was computed from — so the
+   * cache can never serve one principal's reach to another.
    */
-  private static final String CACHE_KEY_CASCADED_REACH =
-      OrgUnitCascadeService.class.getName() + ".cascadedOfficerReach";
+  private static final RequestMemo.Key<Map<Set<OrgUnitMembershipId>, Set<UUID>>>
+      CACHE_KEY_CASCADED_REACH =
+          RequestMemo.Key.of(OrgUnitCascadeService.class, "cascadedOfficerReach");
 
   private final OrgUnitRepository orgUnitRepository;
 
@@ -156,21 +156,18 @@ public class OrgUnitCascadeService {
       // No memberships → empty reach with no DB read; nothing worth caching.
       return new LinkedHashSet<>();
     }
-    HttpServletRequest request = currentRequest();
-    if (request == null) {
+    Map<Set<OrgUnitMembershipId>, Set<UUID>> memo =
+        RequestMemo.getIfBound(CACHE_KEY_CASCADED_REACH, HashMap::new);
+    if (memo == null) {
       // No HTTP request bound (unit tests, scheduled jobs): compute directly — identical result.
       return computeCascadedOfficerReach(memberships);
     }
-    Set<OrgUnitMembershipId> inputKey = membershipKey(memberships);
-    Object cached = request.getAttribute(CACHE_KEY_CASCADED_REACH);
-    if (cached instanceof CachedReach hit && hit.inputs().equals(inputKey)) {
-      // Same principal within the same request → reuse the materialised reach, skipping the
-      // findAllOrgUnitIds() / findChildOrgUnitIds() round-trips the converter already paid. A
-      // defensive copy is returned so a caller can never corrupt the cached set.
-      return new LinkedHashSet<>(hit.reach());
-    }
-    Set<UUID> reach = computeCascadedOfficerReach(memberships);
-    request.setAttribute(CACHE_KEY_CASCADED_REACH, new CachedReach(inputKey, reach));
+    // Same principal within the same request → reuse the materialised reach, skipping the
+    // findAllOrgUnitIds() / findChildOrgUnitIds() round-trips the converter already paid. A
+    // defensive copy is returned so a caller can never corrupt the cached set.
+    Set<UUID> reach =
+        memo.computeIfAbsent(
+            membershipKey(memberships), key -> computeCascadedOfficerReach(memberships));
     return new LinkedHashSet<>(reach);
   }
 
@@ -206,23 +203,6 @@ public class OrgUnitCascadeService {
   }
 
   /**
-   * The {@link HttpServletRequest} bound to the current thread, or {@code null} when none is bound
-   * (e.g. a unit test or a scheduled job runs outside a servlet request). Read via {@link
-   * RequestContextHolder} rather than an injected request proxy so the bean stays usable — and the
-   * memoisation simply degrades to direct computation — when there is no request context.
-   *
-   * @return the current request, or {@code null} if the call is not running inside one.
-   */
-  @Nullable
-  private static HttpServletRequest currentRequest() {
-    RequestAttributes attrs = RequestContextHolder.getRequestAttributes();
-    if (attrs instanceof ServletRequestAttributes servletAttrs) {
-      return servletAttrs.getRequest();
-    }
-    return null;
-  }
-
-  /**
    * Builds the memoisation key for {@code memberships}: the set of their composite ids. Within a
    * request both consumers pass the authenticated principal's full membership list, so identical
    * rows yield an equal key (cache hit) while a different principal's rows yield a different key
@@ -247,14 +227,4 @@ public class OrgUnitCascadeService {
     }
     return key;
   }
-
-  /**
-   * Request-scoped cache entry pairing a computed {@linkplain #cascadedOfficerReach(Collection)
-   * reach} with the membership-id set it was computed from, so a stale entry is detected (and
-   * recomputed) if the same request ever asks for a different principal's reach.
-   *
-   * @param inputs the membership-id set the reach was computed from; never {@code null}.
-   * @param reach the materialised cascaded reach for that input; never {@code null}.
-   */
-  private record CachedReach(Set<OrgUnitMembershipId> inputs, Set<UUID> reach) {}
 }

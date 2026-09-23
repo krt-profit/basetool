@@ -74,7 +74,7 @@ class DiscordAccountExistenceControllerTest {
 
   @Test
   void disabled_whenSecretNotConfigured_returns503_andDoesNotQuery() {
-    when(properties.getSharedSecret()).thenReturn("");
+    when(properties.sharedSecret()).thenReturn("");
 
     ResponseEntity<DiscordAccountExistenceResponse> response =
         controller.checkAccountExistence("anything", REQUEST);
@@ -86,7 +86,7 @@ class DiscordAccountExistenceControllerTest {
 
   @Test
   void rejects_whenSecretHeaderMissing_returns401() {
-    when(properties.getSharedSecret()).thenReturn("real-secret");
+    when(properties.sharedSecret()).thenReturn("real-secret");
 
     ResponseEntity<DiscordAccountExistenceResponse> response =
         controller.checkAccountExistence(null, REQUEST);
@@ -98,7 +98,7 @@ class DiscordAccountExistenceControllerTest {
 
   @Test
   void rejects_whenSecretWrong_returns401() {
-    when(properties.getSharedSecret()).thenReturn("real-secret");
+    when(properties.sharedSecret()).thenReturn("real-secret");
 
     ResponseEntity<DiscordAccountExistenceResponse> response =
         controller.checkAccountExistence("wrong-secret", REQUEST);
@@ -109,7 +109,7 @@ class DiscordAccountExistenceControllerTest {
 
   @Test
   void returnsExistsTrue_whenSecretValidAndAccountExists() {
-    when(properties.getSharedSecret()).thenReturn("real-secret");
+    when(properties.sharedSecret()).thenReturn("real-secret");
     when(accountExistenceService.accountExistsForDiscordIdentity(any(), any(), any()))
         .thenReturn(true);
 
@@ -124,7 +124,7 @@ class DiscordAccountExistenceControllerTest {
 
   @Test
   void returnsExistsFalse_whenSecretValidAndNoAccount() {
-    when(properties.getSharedSecret()).thenReturn("real-secret");
+    when(properties.sharedSecret()).thenReturn("real-secret");
     when(accountExistenceService.accountExistsForDiscordIdentity(any(), any(), any()))
         .thenReturn(false);
 

@@ -151,7 +151,7 @@ public class ScWikiClient {
   void initClient() {
     this.client =
         restClientBuilder
-            .baseUrl(properties.getApiUrl())
+            .baseUrl(properties.apiUrl())
             .requestInterceptor(new ResponseSizeLimitInterceptor(MAX_RESPONSE_BYTES))
             .build();
   }
@@ -586,7 +586,7 @@ public class ScWikiClient {
     if (pageSizeOverride != null && pageSizeOverride > 0) {
       return pageSizeOverride;
     }
-    Integer configured = properties.getPageSize();
+    Integer configured = properties.pageSize();
     return configured != null && configured > 0 ? configured : 200;
   }
 
@@ -792,8 +792,8 @@ public class ScWikiClient {
         }
       }
     }
-    if (properties.getGameVersion() != null && !properties.getGameVersion().isBlank()) {
-      sb.append("&version=").append(properties.getGameVersion());
+    if (properties.gameVersion() != null && !properties.gameVersion().isBlank()) {
+      sb.append("&version=").append(properties.gameVersion());
     }
     return sb.toString();
   }
@@ -810,7 +810,7 @@ public class ScWikiClient {
    * scheduler thread can exit promptly instead of being parked inside a long sleep.
    */
   public void paceForRateLimit() {
-    int rps = properties.getRequestsPerSecond() == null ? 5 : properties.getRequestsPerSecond();
+    int rps = properties.requestsPerSecond() == null ? 5 : properties.requestsPerSecond();
     long sleepMillis = Math.max(1L, 1000L / Math.max(1, rps));
     try {
       Thread.sleep(sleepMillis);

@@ -26,6 +26,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Data transfer record carrying Create Job Order Material payload.
@@ -38,7 +39,7 @@ import java.util.UUID;
 @ValidQuantityAmount
 public record CreateJobOrderMaterialDto(
     @NotNull UUID materialId,
-    @org.jetbrains.annotations.Nullable
+    @Nullable
         @Min(650)
         @Max(650)
         @Schema(

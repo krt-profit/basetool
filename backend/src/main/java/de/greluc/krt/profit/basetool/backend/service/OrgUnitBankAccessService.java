@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountApprovalLimit;
@@ -793,9 +794,8 @@ public class OrgUnitBankAccessService {
   @Transactional
   public BankBookingRequestDto createBookingRequest(@NotNull CreateBankBookingRequest request) {
     BankAccount account =
-        bankAccountRepository
-            .findById(request.sourceAccountId())
-            .orElseThrow(() -> new NotFoundException("Bank account not found"));
+        Entities.require(
+            bankAccountRepository.findById(request.sourceAccountId()), "Bank account not found");
 
     if (request.type() == BankBookingRequestType.DEPOSIT) {
       // REQ-BANK-042: a deposit is requestable by ANY authenticated caller against ANY active
@@ -944,9 +944,7 @@ public class OrgUnitBankAccessService {
       @Nullable String justification,
       @Nullable UUID targetAccountId) {
     BankAccount account =
-        bankAccountRepository
-            .findById(accountId)
-            .orElseThrow(() -> new NotFoundException("Bank account not found"));
+        Entities.require(bankAccountRepository.findById(accountId), "Bank account not found");
     // REQ-BANK-041 (owner decision): an acting bank employee who is also the account's responsible
     // holder (an OL member on the KRT account) is exempt, so the filed request carries no approver
     // rather than routing back to themselves. The direct-booking ceiling that sent the attempt here
@@ -1028,9 +1026,8 @@ public class OrgUnitBankAccessService {
   public BankBookingRequestDto updateOwnBookingRequest(
       @NotNull UUID requestId, @NotNull UpdateBankBookingRequest request) {
     BankBookingRequest existing =
-        bankBookingRequestRepository
-            .findById(requestId)
-            .orElseThrow(() -> new NotFoundException("Booking request not found"));
+        Entities.require(
+            bankBookingRequestRepository.findById(requestId), "Booking request not found");
     UUID caller = authHelperService.currentUserId().orElse(null);
     if (caller == null || !caller.equals(existing.getRequestedBy())) {
       throw new NotFoundException("Booking request not found");
@@ -1215,9 +1212,8 @@ public class OrgUnitBankAccessService {
   @NotNull
   private BankBookingRequestDto applyOwnerApproval(@NotNull UUID requestId, boolean granted) {
     BankBookingRequest request =
-        bankBookingRequestRepository
-            .findByIdForUpdate(requestId)
-            .orElseThrow(() -> new NotFoundException("Booking request not found"));
+        Entities.require(
+            bankBookingRequestRepository.findByIdForUpdate(requestId), "Booking request not found");
     if (!canApprove(request)) {
       throw new AccessDeniedException("The caller may not approve this request");
     }
@@ -1841,9 +1837,7 @@ public class OrgUnitBankAccessService {
    */
   @NotNull
   private BankAccount requireAccount(@NotNull UUID accountId) {
-    return bankAccountRepository
-        .findById(accountId)
-        .orElseThrow(() -> new NotFoundException("Bank account not found"));
+    return Entities.require(bankAccountRepository.findById(accountId), "Bank account not found");
   }
 
   /**

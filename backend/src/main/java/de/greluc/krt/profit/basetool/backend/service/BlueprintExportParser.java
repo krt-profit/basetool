@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintExportEntryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintExportFileDto;
+import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
@@ -165,7 +166,7 @@ public final class BlueprintExportParser {
         continue;
       }
       String name = entry.productName().trim();
-      String tag = entry.tag() == null || entry.tag().isBlank() ? null : entry.tag().trim();
+      String tag = StringNormalization.trimToNull(entry.tag());
       Instant acquiredAt = acquiredAtOf(entry);
       String dedupKey = tag != null ? "t:" + tag.toLowerCase(Locale.ROOT) : "n:" + name;
       if (!earliestByKey.containsKey(dedupKey)) {

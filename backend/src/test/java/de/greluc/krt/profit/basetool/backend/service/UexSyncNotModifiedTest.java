@@ -35,7 +35,9 @@ import de.greluc.krt.profit.basetool.backend.config.UexProperties;
 import de.greluc.krt.profit.basetool.backend.integration.UexClient;
 import de.greluc.krt.profit.basetool.backend.model.UexCategory;
 import de.greluc.krt.profit.basetool.backend.repository.UexCategoryRepository;
+import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -165,8 +167,8 @@ class UexSyncNotModifiedTest {
   void itemPrices_unchangedFeed_logsInfoAndSkipsTheStaleSweep() {
     // Real properties rather than a mock, matching UexItemPriceSyncServiceTest: the flag is a
     // Lombok getter on a plain config bean, and the sync is gated off unless it is on.
-    UexProperties properties = new UexProperties();
-    properties.setItemPriceSyncEnabled(true);
+    UexProperties properties =
+        BoundProperties.bind(UexProperties.class, Map.of("item-price-sync-enabled", true));
     when(uexClient.getItemPrices()).thenReturn(unchanged());
     UexItemPriceSyncService service =
         new UexItemPriceSyncService(uexClient, properties, null, null, null, writer);

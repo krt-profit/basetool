@@ -49,11 +49,9 @@ class JobOrderMapperTest {
 
   @BeforeEach
   void setUp() {
-    // JobOrderMapperImpl @Autowires UserMapper, MaterialMapper and
-    // JobOrderHandoverMapper — wire all three manually since we are not
-    // running inside a Spring context.
-    mapper = Mappers.getMapper(JobOrderMapper.class);
-
+    // JobOrderMapperImpl receives UserMapper, MaterialMapper, JobOrderHandoverMapper and
+    // SquadronMapper through its constructor (CentralMapperConfig: injectionStrategy =
+    // CONSTRUCTOR); the test builds the graph bottom-up.
     var userMapper = Mappers.getMapper(UserMapper.class);
     // Post-R9 D3 (V101): UserMapper derives squadron + flags from org_unit_membership — wire the
     // membership repository plus the StaffelMembershipResolver collaborator (both mocked / empty
@@ -72,22 +70,15 @@ class JobOrderMapperTest {
                 de.greluc.krt.profit.basetool.backend.repository.SquadronRepository.class),
             org.mockito.Mockito.mock(
                 de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository.class)));
-    var materialMapper = Mappers.getMapper(MaterialMapper.class);
-    var handoverMapper = Mappers.getMapper(JobOrderHandoverMapper.class);
-    ReflectionTestUtils.setField(handoverMapper, "materialMapper", materialMapper);
+    var materialMapper = new MaterialMapperImpl(new MaterialCategoryMapperImpl());
+    var squadronMapper = Mappers.getMapper(SquadronMapper.class);
     // Post-fix #13: handover audit fields project user + squadron through their reference mappers
-    // (see JobOrderHandoverMapper.uses). MapStruct injects them at runtime; wire them manually
-    // here so the standalone mapper test does not NPE on the audit projection.
-    ReflectionTestUtils.setField(handoverMapper, "userMapper", userMapper);
-    ReflectionTestUtils.setField(
-        handoverMapper, "squadronMapper", Mappers.getMapper(SquadronMapper.class));
+    // (see JobOrderHandoverMapper.uses).
+    var handoverMapper = new JobOrderHandoverMapperImpl(materialMapper, userMapper, squadronMapper);
 
-    ReflectionTestUtils.setField(mapper, "userMapper", userMapper);
+    mapper = new JobOrderMapperImpl(userMapper, materialMapper, handoverMapper, squadronMapper);
     // The Bearbeiter-list primer (REQ-DATA-003) seeds the same UserMapper's request memo.
     ReflectionTestUtils.setField(mapper, "assigneeUserMapper", userMapper);
-    ReflectionTestUtils.setField(mapper, "materialMapper", materialMapper);
-    ReflectionTestUtils.setField(mapper, "jobOrderHandoverMapper", handoverMapper);
-    ReflectionTestUtils.setField(mapper, "squadronMapper", Mappers.getMapper(SquadronMapper.class));
     // The caller-aware seam behind canEdit (REQ-SEC-047). Answering true keeps these tests about
     // the field mapping; the role-and-scope rule itself is covered where it lives.
     ReflectionTestUtils.setField(

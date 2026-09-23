@@ -31,10 +31,13 @@ import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiBlueprintDto;
 import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiCommodityDto;
 import de.greluc.krt.profit.basetool.backend.dto.scwiki.ScWikiResponseDto;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import okhttp3.mockwebserver.MockResponse;
@@ -74,6 +77,10 @@ class ScWikiClientTest {
 
   private MockWebServer server;
   private ScWikiProperties properties;
+
+  /** The configured keys, relative to the record's prefix; {@link #rebuild()} binds them. */
+  private final Map<String, Object> config = new HashMap<>();
+
   private ScWikiClient client;
   private SimpleMeterRegistry meterRegistry;
 
@@ -81,11 +88,19 @@ class ScWikiClientTest {
   void setUp() throws Exception {
     server = new MockWebServer();
     server.start();
-    properties = new ScWikiProperties();
-    properties.setApiUrl(server.url("/").toString());
-    properties.setPageSize(200);
-    properties.setRequestsPerSecond(1000);
+    config.putAll(
+        Map.of(
+            "api-url", server.url("/").toString(), "page-size", 200, "requests-per-second", 1000));
     meterRegistry = new SimpleMeterRegistry();
+    rebuild();
+  }
+
+  /**
+   * Binds the properties record from {@link #config} and builds the object under test over it. The
+   * record is immutable (BE-MOD-04), so a test that changes a key rebuilds.
+   */
+  private void rebuild() {
+    properties = BoundProperties.bind(ScWikiProperties.class, config);
     client =
         new ScWikiClient(
             new RestClientConfig().restClientBuilder(ObservationRegistry.NOOP),
@@ -174,7 +189,8 @@ class ScWikiClientTest {
     // therefore asks for a smaller page, and the override has to reach BOTH the wire and the
     // "was page 1 full?" contract check, which is what decides whether a missing meta.last_page is
     // a healthy single page or an un-walked remainder.
-    properties.setPageSize(200);
+    config.put("page-size", 200);
+    rebuild();
     server.enqueue(jsonOk(pageBodyWithoutMeta(rows(2))));
 
     ScWikiClient.FetchResult<ScWikiCommodityDto> result =
@@ -196,7 +212,8 @@ class ScWikiClientTest {
   void nonPositivePageSizeOverride_fallsBackToTheConfiguredDefault() throws Exception {
     // A misconfigured override must degrade to the default rather than ask the upstream for zero
     // rows and let the empty answer read as an outage.
-    properties.setPageSize(200);
+    config.put("page-size", 200);
+    rebuild();
     server.enqueue(jsonOk(pageBody(1, 1, rows(1))));
 
     client.fetchAllPagesResult(
@@ -372,7 +389,8 @@ class ScWikiClientTest {
   void fullFirstPageWithoutPaginationMetadata_isIncomplete_andWarns() {
     // The upstream-rename signature: meta absent (silently decoded to null), page 1 filled to the
     // configured page size. Assuming "one page" here would drop every later page on the floor.
-    properties.setPageSize(3);
+    config.put("page-size", 3);
+    rebuild();
     server.enqueue(jsonOk(pageBodyWithoutMeta(rows(3))));
 
     ScWikiClient.FetchResult<ScWikiCommodityDto> result =
@@ -394,7 +412,8 @@ class ScWikiClientTest {
     // The healthy single-page case shares the "no last_page" shape but is NOT a contract break: the
     // page came back short, so there is demonstrably nothing after it. It must not warn, must not
     // count, and must stay sweepable — otherwise the guard would suppress every orphan sweep.
-    properties.setPageSize(200);
+    config.put("page-size", 200);
+    rebuild();
     server.enqueue(jsonOk(pageBodyWithoutMeta(rows(2))));
 
     ScWikiClient.FetchResult<ScWikiCommodityDto> result =
@@ -544,7 +563,8 @@ class ScWikiClientTest {
     // seen twice. Both WARNs must survive — they name different problems and an operator wants both
     // — but the counter tracks failed FETCHES, not symptoms: counting each would inflate
     // basetool_external_fetch_errors_total by the number of things that happened to be wrong.
-    properties.setPageSize(3);
+    config.put("page-size", 3);
+    rebuild();
     server.enqueue(jsonOk(pageBodyWithTotalWithoutLastPage(205, rows(3))));
 
     List<ILoggingEvent> events =

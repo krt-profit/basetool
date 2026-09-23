@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.repository;
 
 import de.greluc.krt.profit.basetool.backend.model.Location;
+import de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -45,7 +46,7 @@ public interface LocationRepository extends LookupTableRepository<Location, UUID
       SELECT new de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto(l.id,
       l.name) FROM Location l WHERE l.hidden = false ORDER BY l.name
       """)
-  List<de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto> findAllReference();
+  List<LocationReferenceDto> findAllReference();
 
   /**
    * Live-search projection for the location pickers (REQ-FE-016): non-hidden locations whose name
@@ -70,8 +71,7 @@ public interface LocationRepository extends LookupTableRepository<Location, UUID
           SELECT COUNT(l) FROM Location l WHERE l.hidden = false AND (cast(:q as string) IS NULL
           OR LOWER(l.name) LIKE LOWER(CONCAT('%', cast(:q as string), '%')))
           """)
-  Page<de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto> searchReference(
-      @Param("q") String q, Pageable pageable);
+  Page<LocationReferenceDto> searchReference(@Param("q") String q, Pageable pageable);
 
   /** Derived Spring-Data query - returns entities matching {@code Name}. */
   Optional<Location> findByName(String name);

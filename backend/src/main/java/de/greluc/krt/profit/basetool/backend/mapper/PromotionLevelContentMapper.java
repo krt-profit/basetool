@@ -51,6 +51,7 @@ public interface PromotionLevelContentMapper {
    * @param request validated payload describing the new level content
    * @return a transient entity ready to be persisted
    */
+  @Mapping(target = "id", ignore = true)
   @Mapping(target = "category", ignore = true)
   PromotionLevelContent toEntity(PromotionLevelContentWriteRequest request);
 

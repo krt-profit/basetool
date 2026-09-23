@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.model.Operation;
 import de.greluc.krt.profit.basetool.backend.model.OperationStatus;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationReferenceDto;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -89,17 +90,14 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
    *     null} when no subject resolves; gates the participant escape.
    */
   @EntityGraph(attributePaths = {"owningOrgUnit"})
-  @org.springframework.data.jpa.repository.Query(
-      "SELECT o FROM Operation o WHERE " + ScopeSpecifications.OPERATION_SCOPE_PREDICATE)
-  org.springframework.data.domain.Page<Operation> findAllScoped(
-      @org.springframework.data.repository.query.Param("isAdminAllScope") boolean isAdminAllScope,
-      @org.springframework.data.repository.query.Param("activeOrgUnitId") UUID activeOrgUnitId,
-      @org.springframework.data.repository.query.Param("memberOrgUnitIds")
-          java.util.Collection<UUID> memberOrgUnitIds,
-      @org.springframework.data.repository.query.Param("viewerIsMemberOrAbove")
-          boolean viewerIsMemberOrAbove,
-      @org.springframework.data.repository.query.Param("viewerUserId") UUID viewerUserId,
-      org.springframework.data.domain.Pageable pageable);
+  @Query("SELECT o FROM Operation o WHERE " + ScopeSpecifications.OPERATION_SCOPE_PREDICATE)
+  Page<Operation> findAllScoped(
+      @Param("isAdminAllScope") boolean isAdminAllScope,
+      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
+      @Param("viewerIsMemberOrAbove") boolean viewerIsMemberOrAbove,
+      @Param("viewerUserId") UUID viewerUserId,
+      Pageable pageable);
 
   /**
    * Slim id + name projection of every operation visible to the caller, sorted by name. Drives the
@@ -129,7 +127,7 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
    *     CANCELED} operations; {@code PLANNED} / {@code ACTIVE} operations are returned regardless.
    * @return slim reference DTOs, sorted by name ascending
    */
-  @org.springframework.data.jpa.repository.Query(
+  @Query(
       """
       SELECT new de.greluc.krt.profit.basetool.backend.model.dto.OperationReferenceDto(o.id,
       o.name) FROM Operation o WHERE (
@@ -140,14 +138,12 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
           + ScopeSpecifications.OPERATION_SCOPE_PREDICATE
           + " ORDER BY o.name ASC")
   List<OperationReferenceDto> findAllReferenceScoped(
-      @org.springframework.data.repository.query.Param("isAdminAllScope") boolean isAdminAllScope,
-      @org.springframework.data.repository.query.Param("activeOrgUnitId") UUID activeOrgUnitId,
-      @org.springframework.data.repository.query.Param("memberOrgUnitIds")
-          java.util.Collection<UUID> memberOrgUnitIds,
-      @org.springframework.data.repository.query.Param("viewerIsMemberOrAbove")
-          boolean viewerIsMemberOrAbove,
-      @org.springframework.data.repository.query.Param("viewerUserId") UUID viewerUserId,
-      @org.springframework.data.repository.query.Param("cutoff") Instant cutoff);
+      @Param("isAdminAllScope") boolean isAdminAllScope,
+      @Param("activeOrgUnitId") UUID activeOrgUnitId,
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
+      @Param("viewerIsMemberOrAbove") boolean viewerIsMemberOrAbove,
+      @Param("viewerUserId") UUID viewerUserId,
+      @Param("cutoff") Instant cutoff);
 
   /**
    * Free-text + status + time-range + scope search across operations. Mirrors the contract of
@@ -212,7 +208,7 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
       @Param("status") List<String> status,
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
       @Param("viewerIsMemberOrAbove") boolean viewerIsMemberOrAbove,
       @Param("viewerUserId") UUID viewerUserId,
       Pageable pageable);

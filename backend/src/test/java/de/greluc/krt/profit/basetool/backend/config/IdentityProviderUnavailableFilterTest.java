@@ -30,6 +30,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.FilterChain;
@@ -72,7 +73,7 @@ class IdentityProviderUnavailableFilterTest {
     filter =
         new IdentityProviderUnavailableFilter(
             messageSource,
-            new ProblemResponseFactory(new AppProblemProperties()),
+            new ProblemResponseFactory(BoundProperties.defaults(AppProblemProperties.class)),
             JsonMapper.builder().build(),
             meterRegistry);
   }

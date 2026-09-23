@@ -37,6 +37,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 
 /** Mission Unit JPA entity. */
 @Entity
@@ -63,7 +65,7 @@ public class MissionUnit extends AbstractEntity<UUID> {
 
   @ManyToOne
   @JoinColumn(name = "ship_id", nullable = true)
-  @org.hibernate.annotations.OnDelete(action = org.hibernate.annotations.OnDeleteAction.SET_NULL)
+  @OnDelete(action = OnDeleteAction.SET_NULL)
   private Ship ship;
 
   @Column private Double frequency;
@@ -81,7 +83,7 @@ public class MissionUnit extends AbstractEntity<UUID> {
    */
   @ManyToOne
   @JoinColumn(name = "responsible_user_id", nullable = true)
-  @org.hibernate.annotations.OnDelete(action = org.hibernate.annotations.OnDeleteAction.SET_NULL)
+  @OnDelete(action = OnDeleteAction.SET_NULL)
   private User responsibleUser;
 
   /** Free-text planning note for the unit (e.g. "Eskorte, Gruppe 1"). Nullable. */

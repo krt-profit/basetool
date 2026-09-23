@@ -51,8 +51,13 @@ therefore frozen against in-place shape change even though they live under `/api
 Never expose JPA entities at controller boundaries (also ArchUnit-enforced — see
 [`security-and-access.md`](security-and-access.md) REQ-SEC-003). DTOs are records; write DTOs
 carry Jakarta validation (`@NotBlank`, `@NotNull`, `@Min`, `@Max`, …). Use a MapStruct
-mapper (`@Mapper(componentModel = "spring")`) for Entity↔DTO; break circular refs with
-`@Mapping(ignore = true)`.
+mapper (`@Mapper(config = CentralMapperConfig.class)`) for Entity↔DTO; break circular refs with
+`@Mapping(ignore = true)`. `CentralMapperConfig` injects used mappers through the constructor and
+sets **`unmappedTargetPolicy = ERROR`** (BE-MOD-05/05b, 2026-09-23): a target property no source
+feeds fails the build, so a DTO field added later can no longer ship silently `null`. Every
+intended gap is an explicit `@Mapping(target = "…", ignore = true)`; the one method-level exemption
+is `MaterialMapper.toEntity`, whose DTO is the admin-edit subset of a catalogue row. The switch found
+one real gap — the job type a mission embeds never carried `isMissionLead`.
 
 ### REQ-API-003 — Validation on writes
 
@@ -133,7 +138,11 @@ Service-layer repository lookups raise their 404 through the fetch-or-throw help
 `find*(id).orElseThrow(() -> new NotFoundException(…))`. The not-found `detail` stays
 **caller-supplied, never auto-derived from the type** — `GlobalExceptionHandler.resolveDetail`
 treats the message as a translation key (sentinel-guarded), so an auto-derived message would change
-the wire `detail` and break the future i18n-key migration seam.
+the wire `detail` and break the future i18n-key migration seam. A constant message uses the
+`String` overload; a message that interpolates a value uses the `Supplier<String>` overload, so it
+is still only built on a miss. **Enforced by `EntitiesRequireRatchetTest`**, a source scan of
+`backend/src/main/java` whose ceiling on hand-written sites is **zero** since the 287 remaining ones
+were migrated message by message (BE-SIMP-01, 2026-09-23); `Entities` itself is the only exemption.
 
 **Domain exceptions carry their own error-code contract (S4, #910).** `BadRequestException`,
 `NotFoundException`, `BusinessConflictException`, `DuplicateEntityException`,

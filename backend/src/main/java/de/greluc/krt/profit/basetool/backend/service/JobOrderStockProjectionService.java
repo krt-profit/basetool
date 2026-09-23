@@ -24,9 +24,13 @@ import de.greluc.krt.profit.basetool.backend.mapper.JobOrderMapper;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.model.QualityRequirement;
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedMaterialDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemHandoverDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialStockRow;
 import de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository;
 import java.util.Collection;
@@ -124,7 +128,7 @@ public class JobOrderStockProjectionService {
     // claims + open-remaining; private (squadron) orders carry none (claims empty, openAmount
     // null),
     // so the detail UI renders no claim columns for them.
-    Map<String, de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto> claimByBucket =
+    Map<String, ClaimBucketDto> claimByBucket =
         isSpecialCommandResponsible(jobOrder)
             ? claimResolver.claimsFor(jobOrder).stream()
                 .collect(
@@ -132,7 +136,7 @@ public class JobOrderStockProjectionService {
                         b -> bucketKey(b.material().id(), b.qualityRequirement().name()), b -> b))
             : Map.of();
 
-    List<de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto> updatedMaterials =
+    List<JobOrderMaterialDto> updatedMaterials =
         baseDto.materials().stream()
             .map(
                 matDto -> {
@@ -152,13 +156,11 @@ public class JobOrderStockProjectionService {
                   // "Keine" (null minQuality) is NONE.
                   String qualityName =
                       matDto.minQuality() != null
-                          ? de.greluc.krt.profit.basetool.backend.model.QualityRequirement.GOOD
-                              .name()
-                          : de.greluc.krt.profit.basetool.backend.model.QualityRequirement.NONE
-                              .name();
-                  de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto bucket =
+                          ? QualityRequirement.GOOD.name()
+                          : QualityRequirement.NONE.name();
+                  ClaimBucketDto bucket =
                       claimByBucket.get(bucketKey(matDto.material().id(), qualityName));
-                  return new de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto(
+                  return new JobOrderMaterialDto(
                       matDto.id(),
                       matDto.material(),
                       matDto.minQuality(),
@@ -174,7 +176,7 @@ public class JobOrderStockProjectionService {
     List<JobOrderItemDto> items = isItem ? jobOrderItemService.toItemDtos(jobOrder) : List.of();
     List<AggregatedMaterialDto> aggregatedMaterials =
         isItem ? enrichAggregatedWithClaims(jobOrder, claimByBucket, stockResolver) : List.of();
-    List<de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemHandoverDto> itemHandovers =
+    List<JobOrderItemHandoverDto> itemHandovers =
         isItem
             ? jobOrder.getItemHandovers().stream().map(jobOrderItemHandoverMapper::toDto).toList()
             : List.of();
@@ -218,7 +220,7 @@ public class JobOrderStockProjectionService {
     List<JobOrder> orders = page.getContent();
     OrderLinkedStockIndex stockIndex =
         loadOrderLinkedStockIndex(orders.stream().map(JobOrder::getId).toList());
-    Map<UUID, List<de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto>> claimsByOrder =
+    Map<UUID, List<ClaimBucketDto>> claimsByOrder =
         materialClaimService.getClaimBucketsForOrders(
             orders.stream()
                 .filter(JobOrderStockProjectionService::isSpecialCommandResponsible)
@@ -256,11 +258,8 @@ public class JobOrderStockProjectionService {
    * @return the minimum quality to sum at, or {@code null} for no floor.
    */
   @Nullable
-  public static Integer qualityFloorFor(
-      de.greluc.krt.profit.basetool.backend.model.QualityRequirement qualityRequirement) {
-    return qualityRequirement == de.greluc.krt.profit.basetool.backend.model.QualityRequirement.GOOD
-        ? GOOD_QUALITY_FLOOR
-        : null;
+  public static Integer qualityFloorFor(QualityRequirement qualityRequirement) {
+    return qualityRequirement == QualityRequirement.GOOD ? GOOD_QUALITY_FLOOR : null;
   }
 
   /**
@@ -317,16 +316,14 @@ public class JobOrderStockProjectionService {
    * @return the aggregated rows, stock- and claim-enriched.
    */
   private List<AggregatedMaterialDto> enrichAggregatedWithClaims(
-      JobOrder jobOrder,
-      Map<String, de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto> claimByBucket,
-      StockResolver stockResolver) {
+      JobOrder jobOrder, Map<String, ClaimBucketDto> claimByBucket, StockResolver stockResolver) {
     return jobOrderItemService.aggregateMaterials(jobOrder).stream()
         .map(
             agg -> {
               Integer minQuality = qualityFloorFor(agg.qualityRequirement());
               double stock =
                   stockResolver.stockFor(jobOrder.getId(), agg.material().id(), minQuality);
-              de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto bucket =
+              ClaimBucketDto bucket =
                   claimByBucket.get(
                       bucketKey(agg.material().id(), agg.qualityRequirement().name()));
               return new AggregatedMaterialDto(
@@ -376,7 +373,7 @@ public class JobOrderStockProjectionService {
      * @param order the SK order whose claim buckets to return.
      * @return the claim buckets, never {@code null}.
      */
-    List<de.greluc.krt.profit.basetool.backend.model.dto.ClaimBucketDto> claimsFor(JobOrder order);
+    List<ClaimBucketDto> claimsFor(JobOrder order);
   }
 
   /**

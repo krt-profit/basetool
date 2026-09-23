@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static de.greluc.krt.profit.basetool.backend.support.MissionSectionVersions.enforceSectionVersion;
 
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
@@ -32,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionStepRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.MissionSectionVersions.MissionSection;
+import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -42,7 +44,6 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -97,16 +98,13 @@ public class MissionTimelineService {
   @Transactional
   public Mission addStep(
       @NotNull UUID missionId, String title, String meta, @NotNull Long expectedStepsVersion) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
     enforceSectionVersion(
         missionRepository, mission, MissionSection.STEPS, expectedStepsVersion, missionId);
 
     MissionStep step = new MissionStep();
     step.setTitle(title == null ? null : title.trim());
-    step.setMeta(normalizeStepMeta(meta));
+    step.setMeta(StringNormalization.trimToNull(meta));
     step.setDone(false);
     step.setOrderIndex(nextStepOrderIndex(mission));
     mission.addStep(step);
@@ -139,7 +137,7 @@ public class MissionTimelineService {
   public void addStepAtCreate(@NotNull Mission mission, String title, String meta, int orderIndex) {
     MissionStep step = new MissionStep();
     step.setTitle(title == null ? null : title.trim());
-    step.setMeta(normalizeStepMeta(meta));
+    step.setMeta(StringNormalization.trimToNull(meta));
     step.setDone(false);
     step.setOrderIndex(orderIndex);
     mission.addStep(step);
@@ -166,16 +164,13 @@ public class MissionTimelineService {
       String title,
       String meta,
       @NotNull Long expectedStepsVersion) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
     enforceSectionVersion(
         missionRepository, mission, MissionSection.STEPS, expectedStepsVersion, missionId);
 
     MissionStep step = findStep(mission, stepId);
     step.setTitle(title == null ? null : title.trim());
-    step.setMeta(normalizeStepMeta(meta));
+    step.setMeta(StringNormalization.trimToNull(meta));
 
     missionRepository.save(mission);
     auditService.record(
@@ -197,10 +192,7 @@ public class MissionTimelineService {
   @Transactional
   public Mission deleteStep(
       @NotNull UUID missionId, @NotNull UUID stepId, @NotNull Long expectedStepsVersion) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
     enforceSectionVersion(
         missionRepository, mission, MissionSection.STEPS, expectedStepsVersion, missionId);
 
@@ -240,10 +232,7 @@ public class MissionTimelineService {
       @NotNull UUID missionId,
       @NotNull List<UUID> orderedStepIds,
       @NotNull Long expectedStepsVersion) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
     enforceSectionVersion(
         missionRepository, mission, MissionSection.STEPS, expectedStepsVersion, missionId);
 
@@ -284,10 +273,7 @@ public class MissionTimelineService {
       @NotNull UUID stepId,
       boolean done,
       @NotNull Long expectedStepsVersion) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
     enforceSectionVersion(
         missionRepository, mission, MissionSection.STEPS, expectedStepsVersion, missionId);
 
@@ -311,19 +297,11 @@ public class MissionTimelineService {
    *     a child of the mission
    */
   private static MissionStep findStep(@NotNull Mission mission, @NotNull UUID stepId) {
-    return mission.getSteps().stream()
-        .filter(s -> s.getId() != null && s.getId().equals(stepId))
-        .findFirst()
-        .orElseThrow(() -> new NotFoundException("MissionStep not found in this mission"));
-  }
-
-  /**
-   * Normalises a step's optional time/place hint: trims surrounding whitespace and collapses blank
-   * input to {@code null}.
-   */
-  @Nullable
-  private static String normalizeStepMeta(String meta) {
-    return meta == null || meta.isBlank() ? null : meta.trim();
+    return Entities.require(
+        mission.getSteps().stream()
+            .filter(s -> s.getId() != null && s.getId().equals(stepId))
+            .findFirst(),
+        "MissionStep not found in this mission");
   }
 
   /** Returns the {@code orderIndex} to assign a newly appended step (max existing + 1, or 0). */
@@ -368,10 +346,7 @@ public class MissionTimelineService {
       String title,
       @NotNull MissionObjectiveKind kind,
       @NotNull Long expectedObjectivesVersion) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
     enforceSectionVersion(
         missionRepository,
         mission,
@@ -440,10 +415,7 @@ public class MissionTimelineService {
       String title,
       @NotNull MissionObjectiveKind kind,
       @NotNull Long expectedObjectivesVersion) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
     enforceSectionVersion(
         missionRepository,
         mission,
@@ -475,10 +447,7 @@ public class MissionTimelineService {
   @Transactional
   public Mission deleteObjective(
       @NotNull UUID missionId, @NotNull UUID objectiveId, @NotNull Long expectedObjectivesVersion) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
     enforceSectionVersion(
         missionRepository,
         mission,
@@ -522,10 +491,7 @@ public class MissionTimelineService {
       @NotNull UUID missionId,
       @NotNull List<UUID> orderedObjectiveIds,
       @NotNull Long expectedObjectivesVersion) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
     enforceSectionVersion(
         missionRepository,
         mission,
@@ -564,10 +530,11 @@ public class MissionTimelineService {
    */
   private static MissionObjective findObjective(
       @NotNull Mission mission, @NotNull UUID objectiveId) {
-    return mission.getObjectives().stream()
-        .filter(o -> o.getId() != null && o.getId().equals(objectiveId))
-        .findFirst()
-        .orElseThrow(() -> new NotFoundException("MissionObjective not found in this mission"));
+    return Entities.require(
+        mission.getObjectives().stream()
+            .filter(o -> o.getId() != null && o.getId().equals(objectiveId))
+            .findFirst(),
+        "MissionObjective not found in this mission");
   }
 
   /** Returns the {@code orderIndex} to assign a newly appended goal (max existing + 1, or 0). */

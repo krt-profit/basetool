@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.mapper.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronDto;
+import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.SquadronService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
@@ -33,6 +34,7 @@ import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -65,6 +67,7 @@ public class SquadronController {
 
   private final SquadronService squadronService;
   private final SquadronMapper squadronMapper;
+  private final AuthHelperService authHelperService;
 
   /**
    * Paged list with {@code includeInactive} for the admin view. The {@code includeInactive=true}
@@ -80,14 +83,9 @@ public class SquadronController {
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort,
-      @RequestParam(required = false, defaultValue = "false") boolean includeInactive,
-      org.springframework.security.core.Authentication authentication) {
-    if (includeInactive
-        && (authentication == null
-            || authentication.getAuthorities().stream()
-                .noneMatch(a -> "ROLE_ADMIN".equals(a.getAuthority())))) {
-      throw new org.springframework.security.access.AccessDeniedException(
-          "includeInactive=true requires ROLE_ADMIN");
+      @RequestParam(required = false, defaultValue = "false") boolean includeInactive) {
+    if (includeInactive && !authHelperService.isAdmin()) {
+      throw new AccessDeniedException("includeInactive=true requires ROLE_ADMIN");
     }
     Pageable pageable = PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "name");
     Page<Squadron> p = squadronService.getAllSquadrons(pageable, includeInactive);

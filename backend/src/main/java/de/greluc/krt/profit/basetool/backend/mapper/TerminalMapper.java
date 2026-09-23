@@ -28,7 +28,4 @@ import org.mapstruct.Mapper;
 public interface TerminalMapper {
   /** Maps a {@link Terminal} entity to its outbound DTO. */
   TerminalDto toDto(Terminal entity);
-
-  /** Builds a new {@link Terminal} entity from the inbound DTO. */
-  Terminal toEntity(TerminalDto dto);
 }

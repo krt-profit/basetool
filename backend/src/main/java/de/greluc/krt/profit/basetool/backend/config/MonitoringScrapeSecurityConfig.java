@@ -101,8 +101,8 @@ public class MonitoringScrapeSecurityConfig {
     if (properties.isConfigured()) {
       PasswordEncoder encoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
       UserDetails scrapeUser =
-          User.withUsername(properties.getUsername())
-              .password(encoder.encode(properties.getPassword()))
+          User.withUsername(properties.username())
+              .password(encoder.encode(properties.password()))
               .roles(MONITORING_ROLE)
               .build();
       http.userDetailsService(new InMemoryUserDetailsManager(scrapeUser))

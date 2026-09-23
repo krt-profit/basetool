@@ -21,11 +21,8 @@ package de.greluc.krt.profit.basetool.backend.config;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.scheduling.annotation.EnableAsync;
-import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
@@ -39,83 +36,69 @@ import org.springframework.validation.annotation.Validated;
  * <p>{@code schedulerEnabled} toggles the periodic background sync; {@code schedulerDelay} is the
  * fixed-delay between successive sync runs in milliseconds. Defaults to once a day (24 h) — UEX
  * commodity prices and the catalogue move slowly enough that a daily refresh keeps the data fresh
- * without hammering the upstream API. Carries {@code @EnableScheduling} and {@code @EnableAsync}
- * because it is the single owner of the sync timing — putting these in a standalone configuration
- * class would have led to two unrelated {@code @Configuration} classes sharing the same purpose.
+ * without hammering the upstream API.
+ *
+ * <p>An immutable record bound by {@code @ConfigurationPropertiesScan} (BE-MOD-04). It used to be a
+ * {@code @Configuration} that also carried {@code @EnableScheduling} and {@code @EnableAsync}; a
+ * record cannot be a configuration class, so {@code @EnableAsync} moved to {@link AsyncConfig} and
+ * {@code @EnableScheduling} is the one {@code BackendApplication} already declares.
+ *
+ * @param apiUrl the UEX API base URL every endpoint path below is appended to
+ * @param commoditiesEndpoint the commodity catalogue path
+ * @param commoditiesPricesEndpoint the all-terminals commodity price path
+ * @param starSystemsEndpoint the star-system reference path
+ * @param companiesEndpoint the company (manufacturer) reference path
+ * @param vehiclesEndpoint the vehicle catalogue path
+ * @param citiesEndpoint the city reference path
+ * @param factionsEndpoint the faction reference path
+ * @param jurisdictionsEndpoint the jurisdiction reference path
+ * @param moonsEndpoint the moon reference path
+ * @param orbitsEndpoint the orbit reference path
+ * @param outpostsEndpoint the outpost reference path
+ * @param planetsEndpoint the planet reference path
+ * @param poiEndpoint the point-of-interest reference path
+ * @param spaceStationsEndpoint the space-station reference path
+ * @param terminalsEndpoint the terminal reference path
+ * @param refineriesMethodsEndpoint the refining-method reference path
+ * @param refineriesYieldsEndpoint the per-refinery yield-bonus path
+ * @param itemsEndpoint the R2 item-catalogue path, called filtered as {@code
+ *     /items?id_category=<n>} by {@code UexItemSyncService}; walking every category takes 98+
+ *     round-trips, paced at the same cadence as the rest of the UEX sync
+ * @param itemsPricesEndpoint the R7 item-price path (~1 MB+ payload, shaped like {@code
+ *     /commodities_prices_all}), used only while {@code itemPriceSyncEnabled} is on
+ * @param categoriesEndpoint the R2 category reference path that drives the item walk through {@code
+ *     UexCategoryRefService}; its 98 (or more) {@code (id, type, section, name)} tuples map each
+ *     item and vehicle to its grouping
+ * @param itemPriceSyncEnabled the master switch for {@code UexItemPriceSyncService}; {@code false}
+ *     by default, so an accidental flip on a build without it is a no-op
+ * @param schedulerEnabled whether the periodic UEX sync runs at all
+ * @param schedulerDelay the fixed delay between two sync runs, in milliseconds as a string (read by
+ *     {@code @Scheduled(fixedDelayString = …)}); {@code 86400000}, one day, by default
  */
-@Data
 @Validated
-@Configuration
-@EnableScheduling
-@EnableAsync
 @ConfigurationProperties(prefix = "krt.uex")
-public class UexProperties {
-
-  @NotBlank private String apiUrl = "https://api.uexcorp.space/2.0";
-
-  @NotBlank private String commoditiesEndpoint = "/commodities";
-
-  @NotBlank private String commoditiesPricesEndpoint = "/commodities_prices_all";
-
-  @NotBlank private String starSystemsEndpoint = "/star_systems";
-
-  @NotBlank private String companiesEndpoint = "/companies";
-
-  @NotBlank private String vehiclesEndpoint = "/vehicles";
-
-  @NotBlank private String citiesEndpoint = "/cities";
-
-  @NotBlank private String factionsEndpoint = "/factions";
-
-  @NotBlank private String jurisdictionsEndpoint = "/jurisdictions";
-
-  @NotBlank private String moonsEndpoint = "/moons";
-
-  @NotBlank private String orbitsEndpoint = "/orbits";
-
-  @NotBlank private String outpostsEndpoint = "/outposts";
-
-  @NotBlank private String planetsEndpoint = "/planets";
-
-  @NotBlank private String poiEndpoint = "/poi";
-
-  @NotBlank private String spaceStationsEndpoint = "/space_stations";
-
-  @NotBlank private String terminalsEndpoint = "/terminals";
-
-  @NotBlank private String refineriesMethodsEndpoint = "/refineries_methods";
-
-  @NotBlank private String refineriesYieldsEndpoint = "/refineries_yields";
-
-  /**
-   * R2 item-catalogue endpoint. Filtered call-site: {@code /items?id_category=<n>} — see {@code
-   * UexItemSyncService}. Walking every category requires 98+ round-trips, which is paced at the
-   * same default cadence as the rest of the UEX sync.
-   */
-  @NotBlank private String itemsEndpoint = "/items";
-
-  /**
-   * R7 item-price endpoint (~1 MB+ payload, similar shape to {@code /commodities_prices_all}).
-   * Feature-flagged via {@code krt.uex.item-price-sync-enabled}; R2 ships only the property +
-   * client method, not the sync service.
-   */
-  @NotBlank private String itemsPricesEndpoint = "/items_prices_all";
-
-  /**
-   * R2 category reference endpoint. Drives the UEX item walk through {@code UexCategoryRefService};
-   * the response shape carries the 98 (or more) {@code (id, type, section, name)} tuples that map
-   * each item / vehicle to its grouping.
-   */
-  @NotBlank private String categoriesEndpoint = "/categories";
-
-  /**
-   * Master switch for the R7 {@code UexItemPriceSyncService}. R2 ships the property only; the sync
-   * service lands in R7. Defaults to {@code false} so an accidental flip on a non-R7 build is a
-   * no-op.
-   */
-  @NotNull private Boolean itemPriceSyncEnabled = false;
-
-  @NotNull private Boolean schedulerEnabled = true;
-
-  @NotBlank private String schedulerDelay = "86400000";
-}
+public record UexProperties(
+    @DefaultValue("https://api.uexcorp.space/2.0") @NotBlank String apiUrl,
+    @DefaultValue("/commodities") @NotBlank String commoditiesEndpoint,
+    @DefaultValue("/commodities_prices_all") @NotBlank String commoditiesPricesEndpoint,
+    @DefaultValue("/star_systems") @NotBlank String starSystemsEndpoint,
+    @DefaultValue("/companies") @NotBlank String companiesEndpoint,
+    @DefaultValue("/vehicles") @NotBlank String vehiclesEndpoint,
+    @DefaultValue("/cities") @NotBlank String citiesEndpoint,
+    @DefaultValue("/factions") @NotBlank String factionsEndpoint,
+    @DefaultValue("/jurisdictions") @NotBlank String jurisdictionsEndpoint,
+    @DefaultValue("/moons") @NotBlank String moonsEndpoint,
+    @DefaultValue("/orbits") @NotBlank String orbitsEndpoint,
+    @DefaultValue("/outposts") @NotBlank String outpostsEndpoint,
+    @DefaultValue("/planets") @NotBlank String planetsEndpoint,
+    @DefaultValue("/poi") @NotBlank String poiEndpoint,
+    @DefaultValue("/space_stations") @NotBlank String spaceStationsEndpoint,
+    @DefaultValue("/terminals") @NotBlank String terminalsEndpoint,
+    @DefaultValue("/refineries_methods") @NotBlank String refineriesMethodsEndpoint,
+    @DefaultValue("/refineries_yields") @NotBlank String refineriesYieldsEndpoint,
+    @DefaultValue("/items") @NotBlank String itemsEndpoint,
+    @DefaultValue("/items_prices_all") @NotBlank String itemsPricesEndpoint,
+    @DefaultValue("/categories") @NotBlank String categoriesEndpoint,
+    @DefaultValue("false") @NotNull Boolean itemPriceSyncEnabled,
+    @DefaultValue("true") @NotNull Boolean schedulerEnabled,
+    @DefaultValue("86400000") @NotBlank String schedulerDelay) {}

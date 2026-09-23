@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
@@ -125,7 +126,7 @@ public class MaterialExternalAliasController {
   public ResponseEntity<MaterialExternalAliasDto> createAlias(
       @RequestBody @Valid @NotNull MaterialExternalAliasWriteRequest request) {
     MaterialExternalAliasDto dto = mapper.toDto(service.create(request));
-    return ResponseEntity.status(org.springframework.http.HttpStatus.CREATED).body(dto);
+    return ResponseEntity.status(HttpStatus.CREATED).body(dto);
   }
 
   /**
