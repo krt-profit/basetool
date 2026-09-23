@@ -154,7 +154,7 @@ const ORG_CHART_UNITS_SECTION = 'units';
             return;
         }
         setBackgroundInert(false);
-        modal.style.display = 'none';
+        window.krtModal.close(modal);
         // Return focus to the control that opened the dialog (captured on open).
         if (lastTrigger && typeof lastTrigger.focus === 'function') {
             lastTrigger.focus();
@@ -252,7 +252,7 @@ const ORG_CHART_UNITS_SECTION = 'units';
             submitBtn.textContent = needsName ? OC_I18N.save : OC_I18N.submit;
         }
 
-        modal.style.display = 'flex';
+        window.krtModal.open(modal);
         let focusEl;
         if (needsStaffType) {
             focusEl = document.getElementById('oc-stafftype');

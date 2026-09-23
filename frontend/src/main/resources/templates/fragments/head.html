@@ -222,6 +222,12 @@
     <script th:src="@{/js/event-delegation.js}" defer th:attr="nonce=${cspNonce}"></script>
     <script th:src="@{/js/common-handlers.js}" defer th:attr="nonce=${cspNonce}"></script>
     <!--/*
+      window.krtModal (FE-SIMP-04, ADR-0177): the one open/close contract of every
+      `.krt-modal-overlay` <dialog> — showModal(), Escape, focus in and back. Ahead of every page
+      module in document order, so a page may open a dialog at load.
+    */-->
+    <script th:src="@{/js/krt-modal.js}" defer th:attr="nonce=${cspNonce}"></script>
+    <!--/*
       Shared AJAX/CSRF foundation (epic #571, spec REQ-FE-*): `window.krtFetch` / `window.krtCsrf`.
       Deferred like everything else, and ahead of every page module in document order, so a page
       helper (missions.js, operations.js, …) can call `krtFetch.swap(...)` at load.

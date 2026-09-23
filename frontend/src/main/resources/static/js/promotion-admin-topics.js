@@ -44,17 +44,13 @@ function toastError(msg) {
 // The dialogs moved from the legacy `.modal-overlay`/`.modal-box` shape (opened
 // by an `active` class) onto the canonical `.krt-modal-overlay` shell, whose
 // hidden default lives in styles.css. Visibility therefore rides the shared
-// krtm-modal-open / krtm-hidden pair (inline-migration.css, loaded last) that
-// the rest of the app already uses -- `active` styles nothing any more.
+// krtm-modal-open / krtm-hidden pair, which window.krtModal drives (FE-SIMP-04) --
+// `active` styles nothing any more.
 function closeModal(id) {
-    const el = document.getElementById(id);
-    el.classList.remove('krtm-modal-open');
-    el.classList.add('krtm-hidden');
+    window.krtModal.close(id);
 }
 function openModal(id) {
-    const el = document.getElementById(id);
-    el.classList.add('krtm-modal-open');
-    el.classList.remove('krtm-hidden');
+    window.krtModal.open(id);
 }
 
 // Re-renders the topics list in place after any structural change (create /

@@ -220,12 +220,12 @@ function closeStoreModal() {
         window.resetUnsavedChanges();
     }
     const modal = document.getElementById('storeModal');
-    if (modal) modal.style.display = 'none';
+    if (modal) window.krtModal.close(modal);
 }
 
 function openStoreModal() {
     const modal = document.getElementById('storeModal');
-    if (modal) modal.style.display = 'flex';
+    if (modal) window.krtModal.open(modal);
 }
 
 function duplicateStoreItem(btn) {

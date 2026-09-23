@@ -29,7 +29,21 @@
  *
  * The Thymeleaf-interpolated toast/confirm labels (window.krtToastI18n) stay inline in the fragment
  * bootstrap this module reads.
+ *
+ * Toasts and the confirm are appended to window.krtModal.layerRoot(), not blindly to the body: while
+ * a dialog is open with showModal() (FE-SIMP-04b) everything outside it is inert and painted below
+ * the top layer, so a toast in the body would be invisible and a confirm unclickable. krtModal.close
+ * moves a toast left inside a closing dialog back to the body, so it outlives the dialog.
  */
+
+/**
+ * Where a transient overlay must go to be seen and usable.
+ *
+ * @returns {HTMLElement} the open modal dialog, else the body
+ */
+function toastLayer() {
+    return window.krtModal ? window.krtModal.layerRoot() : document.body;
+}
 
 function initToasts() {
     const toasts = document.querySelectorAll('.notification-toast:not(.initialized)');
@@ -62,7 +76,7 @@ window.showFrontendErrorToast = function (message) {
 
     toast.appendChild(title);
     toast.appendChild(p);
-    document.body.appendChild(toast);
+    toastLayer().appendChild(toast);
 
     initToasts();
 };
@@ -80,7 +94,7 @@ window.showFrontendSuccessToast = function (message) {
 
     toast.appendChild(title);
     toast.appendChild(p);
-    document.body.appendChild(toast);
+    toastLayer().appendChild(toast);
 
     initToasts();
 };
@@ -126,13 +140,18 @@ window.showKrtConfirm = function (title, message, confirmLabel, cancelLabel) {
         btnOk.textContent = confirmLabel || window.krtToastI18n.confirm;
 
         function close(result) {
-            document.removeEventListener('keydown', onKey);
+            document.removeEventListener('keydown', onKey, true);
             overlay.remove();
             resolve(result);
         }
         function onKey(e) {
-            if (e.key === 'Escape') close(false);
-            else if (e.key === 'Enter') close(true);
+            if (e.key === 'Escape') {
+                // Cancelled here, so an open modal dialog underneath does not also take the Escape
+                // as its own `cancel` and close.
+                e.preventDefault();
+                e.stopPropagation();
+                close(false);
+            } else if (e.key === 'Enter') close(true);
         }
 
         btnCancel.addEventListener('click', () => close(false));
@@ -140,7 +159,7 @@ window.showKrtConfirm = function (title, message, confirmLabel, cancelLabel) {
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) close(false);
         });
-        document.addEventListener('keydown', onKey);
+        document.addEventListener('keydown', onKey, true);
 
         actions.appendChild(btnCancel);
         actions.appendChild(btnOk);
@@ -148,7 +167,7 @@ window.showKrtConfirm = function (title, message, confirmLabel, cancelLabel) {
         dialog.appendChild(p);
         dialog.appendChild(actions);
         overlay.appendChild(dialog);
-        document.body.appendChild(overlay);
+        toastLayer().appendChild(overlay);
 
         setTimeout(() => btnOk.focus(), 50);
     });

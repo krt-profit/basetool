@@ -219,7 +219,7 @@ function _handoverRowIsPiece(row) {
 }
 
 async function openHandoverModal() {
-    document.getElementById('handover-modal').style.display = 'flex';
+    window.krtModal.open(document.getElementById('handover-modal'));
     if (!isInventoryCached) {
         try {
             const materials = document.querySelectorAll('.material-row[data-material-id]');
@@ -566,7 +566,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const editVer = document.querySelector('#edit-modal input[name="version"]');
                     if (editVer && order && order.version != null) editVer.value = order.version;
                     const modal = document.getElementById('handover-modal');
-                    if (modal) modal.style.display = 'none';
+                    if (modal) window.krtModal.close(modal);
                     // The handover spent stock → the cached inventory + the modal's rows are
                     // stale; drop them so a reopen re-fetches and starts clean.
                     isInventoryCached = false;
@@ -614,7 +614,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const editVer = document.querySelector('#edit-modal input[name="version"]');
                     if (editVer && order && order.version != null) editVer.value = order.version;
                     const modal = document.getElementById('item-handover-modal');
-                    if (modal) modal.style.display = 'none';
+                    if (modal) window.krtModal.close(modal);
                     showFrontendSuccessToast(MSG_HANDOVER_SUCCESS);
                     // Re-render the ordered-items table (delivered/outstanding), the history (new
                     // row + button-gating), the modal's outstanding-line rows (fresh max=) and the
@@ -785,7 +785,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (removeBtn) {
                 const row = removeBtn.closest('.material-row');
                 if (materialsContainer.querySelectorAll('.material-row').length > 1) {
-                    document.getElementById('material-delete-confirm-modal').style.display = 'flex';
+                    window.krtModal.open(document.getElementById('material-delete-confirm-modal'));
                     window.materialRowToDelete = row;
                 } else {
                     showFrontendErrorToast(ORDER_HANDOVER_I18N.keepOneMaterial);
@@ -799,7 +799,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 reindexMaterials();
                 window.materialRowToDelete = null;
             }
-            document.getElementById('material-delete-confirm-modal').style.display = 'none';
+            window.krtModal.close(document.getElementById('material-delete-confirm-modal'));
         };
 
         function reindexMaterials() {
@@ -948,7 +948,7 @@ function _serializeEditForm() {
                 const editVer = document.querySelector('#edit-modal input[name="version"]');
                 if (editVer && dto && dto.version != null) editVer.value = dto.version;
                 const modal = document.getElementById('edit-modal');
-                if (modal) modal.style.display = 'none';
+                if (modal) window.krtModal.close(modal);
                 showFrontendSuccessToast(MSG_UPDATE_SUCCESS);
                 // Re-render the header (handle / status / priority) and the material requirement
                 // section in place and broadcast both to peers viewing this order (REQ-FE-015).
@@ -1070,7 +1070,7 @@ function _openClaimModal(opts) {
     }
     const claimScuHint = document.getElementById('claim-scu-hint');
     if (claimScuHint) claimScuHint.classList.toggle('krtm-hidden', opts.quantityType === 'PIECE');
-    document.getElementById('claim-modal').style.display = 'flex';
+    window.krtModal.open(document.getElementById('claim-modal'));
 }
 
 function openClaimCreate(el) {
@@ -1129,7 +1129,7 @@ function submitClaim() {
         toast: false,
         errorMessage: MSG_CLAIM_ERROR,
         onSuccess() {
-            document.getElementById('claim-modal').style.display = 'none';
+            window.krtModal.close(document.getElementById('claim-modal'));
             showFrontendSuccessToast(MSG_CLAIM_SUCCESS);
             _refreshMaterialsSection();
         },
@@ -1148,7 +1148,7 @@ function withdrawClaimAction() {
         toast: false,
         errorMessage: MSG_CLAIM_ERROR,
         onSuccess() {
-            document.getElementById('claim-modal').style.display = 'none';
+            window.krtModal.close(document.getElementById('claim-modal'));
             showFrontendSuccessToast(MSG_CLAIM_WITHDRAW_SUCCESS);
             _refreshMaterialsSection();
         },
@@ -1174,14 +1174,14 @@ function updateStatus(selectElement) {
     if (newStatus === 'COMPLETED' || newStatus === 'REJECTED') {
         _pendingStatus = newStatus;
         _previousStatus = _knownStatus(selectElement);
-        document.getElementById('status-warning-modal').style.display = 'flex';
+        window.krtModal.open(document.getElementById('status-warning-modal'));
     } else {
         _doStatusUpdate(selectElement.dataset.orderId, newStatus, selectElement);
     }
 }
 
 function cancelStatusChange() {
-    document.getElementById('status-warning-modal').style.display = 'none';
+    window.krtModal.close(document.getElementById('status-warning-modal'));
     const sel = document.getElementById('status-select');
     if (sel && _previousStatus) {
         sel.value = _previousStatus;
@@ -1191,7 +1191,7 @@ function cancelStatusChange() {
 }
 
 function confirmStatusChange() {
-    document.getElementById('status-warning-modal').style.display = 'none';
+    window.krtModal.close(document.getElementById('status-warning-modal'));
     const sel = document.getElementById('status-select');
     if (!sel || !_pendingStatus) return;
     _doStatusUpdate(sel.dataset.orderId, _pendingStatus, sel);
@@ -1362,7 +1362,8 @@ async function downloadHandoverReport(btn) {
         a.href = url;
         a.target = '_blank';
         a.download = filename;
-        document.body.appendChild(a);
+        // Inside an open modal <dialog> the body is inert; append where a click still lands.
+        window.krtModal.layerRoot().appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
@@ -1425,7 +1426,8 @@ async function downloadItemHandoverReport(btn) {
         a.href = url;
         a.target = '_blank';
         a.download = filename;
-        document.body.appendChild(a);
+        // Inside an open modal <dialog> the body is inert; append where a click still lands.
+        window.krtModal.layerRoot().appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
@@ -1559,7 +1561,8 @@ async function previewHandoverReport(btn) {
             previewDate,
             previewTime,
         ]);
-        document.body.appendChild(a);
+        // Inside an open modal <dialog> the body is inert; append where a click still lands.
+        window.krtModal.layerRoot().appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
@@ -1899,12 +1902,7 @@ function openProductionModal(button) {
 
     _prodResetBookIn();
 
-    const modal = document.getElementById('production-modal');
-    if (modal) {
-        modal.classList.add('krtm-modal-open');
-        modal.classList.remove('krtm-hidden');
-        modal.style.removeProperty('display');
-    }
+    window.krtModal.open('production-modal');
 
     const row = button.closest('tr');
     const demandLis = row ? row.querySelectorAll('.od-production-demand li') : [];
@@ -2342,11 +2340,7 @@ function bookProduction() {
         toast: false,
         errorMessage: PRODUCTION_I18N.allocError,
         onSuccess() {
-            const modal = document.getElementById('production-modal');
-            if (modal) {
-                modal.classList.remove('krtm-modal-open');
-                modal.classList.add('krtm-hidden');
-            }
+            window.krtModal.close('production-modal');
             showFrontendSuccessToast(PRODUCTION_I18N.booked);
             if (window.krtRefreshOrderSection) {
                 // The book-in auto-earmarks the produced units to this order by default; that stock
@@ -2372,9 +2366,9 @@ function bookProduction() {
 }
 
 // CSP-safe delegated bindings (replaces the 18 inline on*= handlers in this template).
-// Modal open/close on style.display still uses the global open-modal-display /
-// close-modal-display common-handlers; the rest call into page-local functions defined
-// in this script and the inline script higher up.
+// Modal open/close goes through window.krtModal (directly, or via the global
+// open-modal-display / close-modal-display triggers); the rest call into page-local functions
+// defined in this script and the inline script higher up.
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('change', 'od-update-status', function (el) {
         updateStatus(el);
@@ -2586,7 +2580,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
             userName,
         );
         oaUpdateCounter();
-        document.getElementById('assignee-note-modal').style.display = 'flex';
+        window.krtModal.open(document.getElementById('assignee-note-modal'));
         ta.focus();
     }
 
@@ -2601,7 +2595,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
             json: payload,
             successMsg: I18N_NOTE_SAVED,
         }).then((ok) => {
-            if (ok) document.getElementById('assignee-note-modal').style.display = 'none';
+            if (ok) window.krtModal.close(document.getElementById('assignee-note-modal'));
         });
     }
 

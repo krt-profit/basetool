@@ -966,7 +966,7 @@
     </div>
 </main>
 
-<div th:if="${isLogistician or requesterView}" id="edit-modal" class="krt-modal-overlay">
+<dialog th:if="${isLogistician or requesterView}" id="edit-modal" class="krt-modal-overlay">
     <div class="krt-modal krt-modal--xwide" role="dialog" aria-modal="true" th:aria-label="#{orders.detail.edit}">
         <div class="krt-modal-head">
             <h2 th:text="#{orders.detail.edit}">Auftrag bearbeiten</h2>
@@ -1101,9 +1101,9 @@
         </div>
         </form>
     </div>
-</div>
+</dialog>
 
-<div id="status-warning-modal" class="krt-modal-overlay krtm-display-none-z-index-1060-9a40">
+<dialog id="status-warning-modal" class="krt-modal-overlay krtm-display-none-z-index-1060-9a40">
     <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{orders.status.warning.title}">
         <div class="krt-modal-head">
             <h2 th:text="#{orders.status.warning.title}">STATUSWECHSEL BESTÄTIGEN</h2>
@@ -1118,9 +1118,9 @@
             <button type="button" class="btn btn--cta krtm-min-height-44px-min-width-120px-c0f4" data-trigger="od-confirm-status" th:text="#{orders.status.warning.confirm}">Bestätigen</button>
         </div>
     </div>
-</div>
+</dialog>
 
-<div id="material-delete-confirm-modal" class="krt-modal-overlay krtm-display-none-z-index-1050-1075">
+<dialog id="material-delete-confirm-modal" class="krt-modal-overlay krtm-display-none-z-index-1050-1075">
     <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{orders.detail.material.removeConfirmTitle}">
         <div class="krt-modal-head">
             <h2 th:text="#{orders.detail.material.removeConfirmTitle}">Material entfernen</h2>
@@ -1135,11 +1135,11 @@
             <button type="button" class="btn btn-outline-danger" data-trigger="od-confirm-remove-material" th:text="#{orders.detail.material.removeConfirmBtn}">Ja, entfernen</button>
         </div>
     </div>
-</div>
+</dialog>
 
 <!--/* Claim ("Eintragung") create/edit modal (Phase 6, #346) — only rendered for logisticians+; the
      backend still enforces the per-squadron / responsible-SK / admin matrix on the relayed call. */-->
-<div sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" id="claim-modal" class="krt-modal-overlay krtm-display-none-z-index-1060-9a40">
+<dialog sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" id="claim-modal" class="krt-modal-overlay krtm-display-none-z-index-1060-9a40">
     <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{orders.claim.modal.title.add}">
         <div class="krt-modal-head">
             <h2 id="claim-modal-title" th:text="#{orders.claim.modal.title.add}">Eintragung</h2>
@@ -1177,12 +1177,12 @@
             <button type="button" id="claim-submit-btn" class="btn btn--cta krtm-min-height-44px-1df5" data-trigger="claim-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{orders.claim.submit}">Speichern</span></button>
         </div>
     </div>
-</div>
+</dialog>
 
 <!--/* Assignee-note create/edit modal. Lives outside #assignees-section so it survives the fragment
      swap. Opened by the per-row pencil; saves via AJAX PUT and re-renders the Bearbeiter section.
      The backend enforces the self-or-logistician rule and the per-edge optimistic lock. */-->
-<div id="assignee-note-modal" class="krt-modal-overlay krtm-display-none-z-index-1060-9a40">
+<dialog id="assignee-note-modal" class="krt-modal-overlay krtm-display-none-z-index-1060-9a40">
     <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{orders.detail.assignees.note.modalTitle}">
         <div class="krt-modal-head">
             <h2 th:text="#{orders.detail.assignees.note.modalTitle}">Notiz bearbeiten</h2>
@@ -1204,10 +1204,10 @@
             <button type="button" class="btn btn--cta" data-trigger="oa-save-note"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{orders.detail.save}">Speichern</span></button>
         </div>
     </div>
-</div>
+</dialog>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
-<div sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" id="handover-modal" class="krt-modal-overlay">
+<dialog sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" id="handover-modal" class="krt-modal-overlay">
     <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{orders.detail.handover}">
         <div class="krt-modal-head">
             <h2 th:text="#{orders.detail.handover}">Übergabe protokollieren</h2>
@@ -1255,12 +1255,12 @@
             </div>
         </form>
     </div>
-</div>
+</dialog>
 
 <!--/* Item-handover modal (ITEM orders). One row per still-outstanding ordered-item line; each row's
      amount input is capped at that line's outstanding quantity. Submits as a normal form POST so the
      page reloads on success and the refreshed @Version is picked up (no stale-version 409). */-->
-<div sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:if="${order.type == 'ITEM' and hasOutstandingItemLines}" id="item-handover-modal" class="krt-modal-overlay">
+<dialog sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:if="${order.type == 'ITEM' and hasOutstandingItemLines}" id="item-handover-modal" class="krt-modal-overlay">
     <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{orders.detail.itemHandover}">
         <div class="krt-modal-head">
             <h2 th:text="#{orders.detail.itemHandover}">Item-Übergabe protokollieren</h2>
@@ -1322,13 +1322,13 @@
             </div>
         </form>
     </div>
-</div>
+</dialog>
 
 <!--/* Herstellung modal (REQ-ORDERS-025): populated per item line by orders-detail.js. Class-based
      open/close (ADR-0093). The per-material reconciliation cards + inventory-entry rows are built by
      the JS (openProductionModal) from the row's data + a per-material inventory fetch; "buchen" is
      enabled only when every material's demand is exactly covered. */-->
-<div sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:if="${order.type == 'ITEM' and isLogistician}" id="production-modal" class="krt-modal-overlay">
+<dialog sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:if="${order.type == 'ITEM' and isLogistician}" id="production-modal" class="krt-modal-overlay">
     <div class="krt-modal krt-modal--xwide" role="dialog" aria-modal="true" th:aria-label="#{orders.detail.production.record}">
         <div class="krt-modal-head">
             <h2 id="production-modal-title" th:text="#{orders.detail.production.record}">Herstellung erfassen</h2>
@@ -1391,7 +1391,7 @@
                 <button type="button" class="btn btn--cta krtm-min-height-44px-1df5" id="production-book-btn" data-trigger="od-book-production"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{orders.detail.production.book}">Herstellung buchen</span></button>
         </div>
     </div>
-</div>
+</dialog>
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     // #924 Part 2: localized strings + per-request server values consumed by the static

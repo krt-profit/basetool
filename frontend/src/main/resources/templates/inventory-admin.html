@@ -390,7 +390,7 @@
     </div>
 </main>
 
-<div id="bookOutModal" class="krt-modal-overlay" th:classappend="${showBookOutModal != null} ? 'krtm-modal-open' : 'krtm-hidden'">
+<dialog id="bookOutModal" class="krt-modal-overlay" th:classappend="${showBookOutModal != null} ? 'krtm-modal-open' : 'krtm-hidden'">
     <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{inventory.bookout.title}">
         <div class="krt-modal-head">
             <h2 th:text="#{inventory.bookout.title}">Eintrag ausbuchen</h2>
@@ -474,12 +474,12 @@
             </div>
         </form>
     </div>
-</div>
+</dialog>
 
 <!--/* Umbuchen (rebooking) modal — the transfer (Ort/Nutzer) mode relocated out of the Ausbuchen
      dialog so the two share the Lager's Umbuchen concept. The squadron-wide /all view rebooks only
      between Ort/Nutzer/OrgUnit; the personal<->shared toggle lives on the owner-scoped /my view. */-->
-<div id="umbuchenModal" class="krt-modal-overlay">
+<dialog id="umbuchenModal" class="krt-modal-overlay">
     <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{inventory.rebook.title}">
         <div class="krt-modal-head">
             <h2 th:text="#{inventory.rebook.title}">Umbuchen</h2>
@@ -558,9 +558,9 @@
             </div>
         </form>
     </div>
-</div>
+</dialog>
 
-<div id="noteModal" class="krt-modal-overlay">
+<dialog id="noteModal" class="krt-modal-overlay">
     <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{inventory.note.label}">
         <div class="krt-modal-head">
             <h2 th:text="#{inventory.note.label}">Notiz</h2>
@@ -583,9 +583,9 @@
             <button type="button" class="btn btn-ghost krtm-min-height-44px-margin-left-auto-85bf" data-trigger="inv-admin-close-note" th:text="#{inventory.note.cancel}">Abbrechen</button>
         </div>
     </div>
-</div>
+</dialog>
 
-<div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" id="delete-all-global-inventory-modal" class="krt-modal-overlay krtm-display-none-z-index-3300-c2c8">
+<dialog sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" id="delete-all-global-inventory-modal" class="krt-modal-overlay krtm-display-none-z-index-3300-c2c8">
     <div class="krt-modal krt-modal--wide krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{inventory.deleteAll.modal.title}">
         <div class="krt-modal-head">
             <h2 th:text="#{inventory.deleteAll.modal.title}">Globales Lager leeren</h2>
@@ -600,7 +600,7 @@
             <button type="button" id="delete-all-global-inventory-confirm-btn" class="btn btn-danger" th:text="#{inventory.deleteAll.modal.confirm}">Ja, alle löschen</button>
         </div>
     </div>
-</div>
+</dialog>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">

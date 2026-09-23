@@ -267,78 +267,28 @@
     });
 
     /**
-     * Set a target element's visibility from {@code data-display} via classes instead of an inline
-     * {@code style.display} (CSP migration). {@code none} hides it ({@code krtm-hidden}); {@code
-     * flex} shows it as a flex modal ({@code krtm-modal-open}); any other/empty value clears both so
-     * the element falls back to its own CSS display. Legacy trigger predating the {@code .active}
-     * modal convention.
-     */
-    on('click', 'set-display', function (el, event) {
-        const id = el.getAttribute('data-target');
-        if (!id) return;
-        const target = document.getElementById(id);
-        if (!target) return;
-        event.preventDefault();
-        const dv = el.getAttribute('data-display') || '';
-        if (dv === 'none') {
-            target.classList.add('krtm-hidden');
-            target.classList.remove('krtm-modal-open');
-        } else if (dv === 'flex') {
-            target.classList.add('krtm-modal-open');
-            target.classList.remove('krtm-hidden');
-        } else {
-            target.classList.remove('krtm-hidden');
-            target.classList.remove('krtm-modal-open');
-        }
-    });
-
-    /**
-     * "Open this modal" for the display-based modal pattern, migrated to classes (CSP): adds {@code
-     * krtm-modal-open} ({@code display:flex}) and clears {@code krtm-hidden}. Works for both modal
-     * families because inline-migration.css is loaded last — {@code krtm-modal-open} wins the
-     * default-none {@code .krt-modal-overlay} and clearing {@code krtm-hidden} un-hides the
-     * default-flex {@code .modal}. {@code data-modal-id} carries the modal's id.
-     *
-     * <p>Also clears any stale inline {@code style.display} on the modal: an inline display
-     * declaration outranks the {@code krtm-modal-open} class rule, so a modal that some page script
-     * had closed by writing {@code modal.style.display = 'none'} (rather than via the class toggle)
-     * could otherwise never be re-opened without a full page reload. Removing the inline property lets
-     * the class win again, hardening this open path against that recurring footgun regardless of how
-     * the modal was last closed.
+     * "Open this modal": {@code data-modal-id} names a {@code .krt-modal-overlay} dialog, and
+     * {@code window.krtModal.open} does the rest — the class state ({@code krtm-modal-open} over the
+     * default-none overlay), {@code showModal()} on the native {@code <dialog>}, focus into it, and
+     * clearing any stale inline {@code style.display} a page script once wrote (an inline
+     * declaration outranks the class rule, so such a dialog could otherwise never reopen). One
+     * contract for every dialog since FE-SIMP-04; the copies each page carried are gone.
      */
     on('click', 'open-modal-display', function (el, event) {
         const id = el.getAttribute('data-modal-id');
-        if (!id) return;
-        const modal = document.getElementById(id);
-        if (!modal) return;
+        if (!id || !document.getElementById(id)) return;
         event.preventDefault();
-        modal.style.removeProperty('display');
-        modal.classList.add('krtm-modal-open');
-        modal.classList.remove('krtm-hidden');
+        window.krtModal.open(id);
     });
 
     /**
-     * "Close this modal" for the display-based modal pattern, migrated to classes (CSP): removes
-     * {@code krtm-modal-open} and adds {@code krtm-hidden} ({@code display:none}). Adding
-     * {@code krtm-hidden} is required to hide the default-flex {@code .modal} family and is a
-     * harmless no-op over the default-none {@code .krt-modal-overlay} family.
-     *
-     * <p>Symmetric with {@code open-modal-display}, it first clears any inline {@code style.display}
-     * on the modal. A modal that a page script had OPENED by writing {@code
-     * modal.style.display = 'flex'} (rather than via the class) carries an inline {@code display} that
-     * outranks the {@code krtm-hidden} class rule — so without this the class-only close would leave
-     * the modal on screen (the {@code delete-operation-modal} Cancel button did exactly that: it
-     * opens via an inline flex in the page script yet closes only through this trigger). Removing the
-     * inline property lets {@code krtm-hidden} take effect regardless of how the modal was opened.
+     * "Close this modal": the symmetric half, through {@code window.krtModal.close} — class state,
+     * {@code dialog.close()}, and focus back to the control that opened it.
      */
     on('click', 'close-modal-display', function (el, event) {
         const id = el.getAttribute('data-modal-id');
-        if (!id) return;
-        const modal = document.getElementById(id);
-        if (!modal) return;
+        if (!id || !document.getElementById(id)) return;
         event.preventDefault();
-        modal.style.removeProperty('display');
-        modal.classList.remove('krtm-modal-open');
-        modal.classList.add('krtm-hidden');
+        window.krtModal.close(id);
     });
 })();

@@ -203,6 +203,38 @@ enabled in `frontend/eslint.config.mjs` (checked 2026-09-22) — see Open questi
 > reappears, if an overlay does not carry exactly one frame, or if a footer's submit button sits
 > outside the form it submits.
 
+> [!important] One open/close contract, and every overlay is a native `<dialog>` (2026-09-23)
+> **FE-SIMP-04.** `window.krtModal` (`krt-modal.js`, loaded globally) is the only way a dialog
+> opens and closes: `krtModal.open(el | id, {focus?})` and `krtModal.close(el | id)`, plus
+> `isOpen`, `topmost` and `layerRoot`. Ninety dialogs had carried their own copy of that code and
+> 107 call sites wrote `overlay.style.display` directly; every one now calls the contract, and so do
+> the shared `open-modal-display` / `close-modal-display` triggers and the mission page's
+> `krtModalOpen` / `krtModalClose` (kept as aliases). What the contract guarantees for every dialog:
+> the class state below; focus moves in on open (`[autofocus]`, else the first visible field, else
+> the frame — never a button, so Enter can not hit „Löschen") and returns to the opening control on
+> close; **Escape closes the topmost dialog** by clicking its own close control, so whatever the page
+> does on close still runs (a dialog may opt out with `data-modal-static`).
+>
+> **FE-SIMP-04b.** Every `.krt-modal-overlay` is a `<dialog>` element, and `krtModal.open` shows it
+> with `showModal()`: it goes to the top layer and the page behind it becomes inert — the focus trap
+> and background lock that before existed only on the mission page and the org chart. The class
+> stays on the element (live sync's "is a dialog open?" probe, the layout guard and the E2E suite key
+> on it), `styles.css` undoes the user-agent dialog box so it is the same full-viewport scrim, and a
+> dialog shown by its class alone (a server-rendered open dialog, the layout guard revealing every
+> dialog) is still shown — and upgraded to a modal one by the contract's observer, which also closes
+> the modal state of any dialog hidden without the contract, so no code path can leave an invisible
+> dialog holding the page inert. Because the page behind an open dialog is inert, a toast, the KRT
+> confirm and a programmatic download link are appended to `krtModal.layerRoot()` — the open dialog —
+> and a toast is handed back to the body when its dialog closes.
+>
+> The paragraph below about inline `display` versus classes describes the defect the contract ended;
+> the contract clears any inline `display` on both open and close.
+>
+> **Not done:** moving the ninety hand-written dialog shells onto `fragments/modal-wrapper.html`.
+> Their behaviour is now shared; what remains duplicated is the head markup, and each move changes a
+> dialog's rendered head (`h2` → `h3`, an icon close → ✕) and ids that scripts and tests address. An
+> owner decision.
+
 The KRT HUD modal — `.krt-modal-overlay` scrim > `.krt-modal` frame (orange top edge + corner
 brackets) > `.krt-modal-head` (title + close-X) — is extracted as the reusable Thymeleaf fragment
 `fragments/modal-wrapper.html :: modal(modalId, titleKey, variant, body)`. New `.krt-modal-overlay`
@@ -231,6 +263,17 @@ alone, or the inline `display:flex` outranks `krtm-hidden` and the modal stays o
 `delete-operation-modal` Cancel button). As a defensive backstop **both** shared handlers clear any
 inline `display` on the modal — `open-modal-display` before showing it, `close-modal-display` before
 hiding it — so the class always wins regardless of how the other side toggled visibility.
+
+**Acceptance (FE-SIMP-04 / 04b, 2026-09-23)**
+
+- [x] Every `.krt-modal-overlay` in the templates is a `<dialog>`.
+- [x] No script shows or hides a dialog through `style.display` or its own class toggle; all go
+  through `window.krtModal`.
+- [x] An opened dialog is modal (`:modal`), takes focus, makes the page behind it unfocusable, keeps
+  Tab inside it, closes on Escape, returns focus to its opener and opens again.
+
+**Enforced by:** `SingleModalShapeTest` (`everyOverlayIsANativeDialog`), `DialogA11yE2eTest`,
+`OrgChartKeyboardA11yE2eTest`, `TouchClassLayoutE2eTest`
 
 **Three sanctioned widths, and no fourth.** `.krt-modal` is 440 px (confirms and single-field
 prompts), `.krt-modal--wide` is 600 px (form-heavy: 3+ stacked fields) and `.krt-modal--xwide` is

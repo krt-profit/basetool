@@ -373,12 +373,12 @@
             );
             deleteMessage.textContent = name ? base + ' (' + name + ')' : base;
         }
-        deleteModal.style.display = 'flex';
+        window.krtModal.open(deleteModal);
     }
 
     function closeDeleteModal() {
         if (deleteModal) {
-            deleteModal.style.display = 'none';
+            window.krtModal.close(deleteModal);
         }
     }
 

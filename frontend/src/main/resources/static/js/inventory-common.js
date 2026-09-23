@@ -875,7 +875,7 @@
             loadSellTerminals(materialId, terminalSelect, sellRadio, sellNotPossibleReason);
 
             // Inline `flex` (not `block`) so `.modal`'s flex centring is preserved (#1328).
-            modal.style.display = 'flex';
+            window.krtModal.open(modal);
             // Variante C (REQ-INV-027): build the "Herkunft" (deduct-from) picker from this
             // entry's chips now that the modal is shown, so its initial validity gates the submit.
             if (window.krtHerkunft && id) {
@@ -892,7 +892,7 @@
                 window.krtHerkunft.reset('bookout');
             }
             const modal = document.getElementById('bookOutModal');
-            if (modal) modal.style.display = 'none';
+            if (modal) window.krtModal.close(modal);
         }
 
         /**
@@ -986,7 +986,7 @@
                 window.krtHerkunft.reset('umbuchen');
             }
             const modal = document.getElementById('umbuchenModal');
-            if (modal) modal.style.display = 'none';
+            if (modal) window.krtModal.close(modal);
         }
 
         /**
@@ -1557,7 +1557,7 @@
             window.onclick = function (event) {
                 const modal = document.getElementById('bookOutModal');
                 if (modal && event.target === modal) {
-                    modal.style.display = 'none';
+                    window.krtModal.close(modal);
                 }
             };
         }

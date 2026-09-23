@@ -127,7 +127,7 @@
     </div>
 
     <!--/* Create Modal */-->
-    <div id="create-operation-modal" class="krt-modal-overlay">
+    <dialog id="create-operation-modal" class="krt-modal-overlay">
         <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{operation.create}">
             <div class="krt-modal-head">
                 <h2 th:text="#{operation.create}">Create Operation</h2>
@@ -162,10 +162,10 @@
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 
     <!--/* Delete Modal */-->
-    <div id="delete-operation-modal" class="krt-modal-overlay">
+    <dialog id="delete-operation-modal" class="krt-modal-overlay">
         <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{general.confirm}">
             <div class="krt-modal-head">
                 <h2 th:text="#{general.confirm}">Confirm Delete</h2>
@@ -182,7 +182,7 @@
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 </main>
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     /*<![CDATA[*/

@@ -176,7 +176,7 @@
         updateCharCount();
 
         lastFocused = document.activeElement;
-        modal.style.display = 'flex';
+        window.krtModal.open(modal);
         const first = isEdit
             ? q('[data-mg-qty]')
             : state.kind === 'ITEM'
@@ -220,7 +220,7 @@
     }
 
     function hide() {
-        modal.style.display = 'none';
+        window.krtModal.close(modal);
         if (lastFocused && typeof lastFocused.focus === 'function') {
             lastFocused.focus();
         }

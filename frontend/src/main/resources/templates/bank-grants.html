@@ -153,7 +153,7 @@
     </div>
 
     <!--/* Create grant */-->
-    <div class="krt-modal-overlay" id="bank-grant-create-modal">
+    <dialog class="krt-modal-overlay" id="bank-grant-create-modal">
         <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.grant.title}">
             <div class="krt-modal-head">
                 <h3 th:text="#{bank.modal.grant.title}">Berechtigung erteilen</h3>
@@ -214,10 +214,10 @@
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 
     <!--/* Revoke grant */-->
-    <div class="krt-modal-overlay" id="bank-grant-revoke-modal">
+    <dialog class="krt-modal-overlay" id="bank-grant-revoke-modal">
         <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.revoke.title}">
             <div class="krt-modal-head">
                 <h3 th:text="#{bank.modal.revoke.title}">Berechtigung entziehen</h3>
@@ -244,7 +244,7 @@
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 </main>
 
 <th:block th:replace="~{fragments/toast :: toast}" />

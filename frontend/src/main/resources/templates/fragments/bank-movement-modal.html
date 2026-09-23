@@ -30,7 +30,7 @@
                              Ignored when accountSelectable (bank.js derives it per chosen account).
     - canDeposit / canWithdraw / canTransfer: which movement types the type selector offers.
 */-->
-<div th:fragment="movementModal(modalId, refreshTarget, accountId, accountSelectable, justificationRequired, canDeposit, canWithdraw, canTransfer)"
+<dialog th:fragment="movementModal(modalId, refreshTarget, accountId, accountSelectable, justificationRequired, canDeposit, canWithdraw, canTransfer)"
      class="krt-modal-overlay" th:id="${modalId}">
     <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.movement.title}">
         <div class="krt-modal-head">
@@ -287,6 +287,6 @@
             </div>
         </form>
     </div>
-</div>
+</dialog>
 </body>
 </html>

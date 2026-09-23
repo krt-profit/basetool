@@ -254,7 +254,7 @@
                      `version` correct after every fragment swap, and needs no new JS. The type is
                      fixed per row, so each modal renders exactly the fields that request kind
                      carries - no client-side gating either. */-->
-                <div th:each="r : ${ownRequests}"
+                <dialog th:each="r : ${ownRequests}"
                      th:if="${r.status() == 'PENDING' and !r.ownerApprovalGranted()}"
                      class="krt-modal-overlay" th:id="'ou-req-edit-' + ${r.id()}">
                     <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.request.edit.title}">
@@ -357,7 +357,7 @@
                             </div>
                         </form>
                     </div>
-                </div>
+                </dialog>
             </div>
 
             <!--/* FREMDE ANTRÄGE: every request raised against the accounts the caller is responsible
@@ -480,7 +480,7 @@
          (deposits may target any of them, REQ-BANK-042); the JS narrows it to the caller's
          request-capable accounts when a withdrawal/transfer is chosen. Shown whenever any active
          account exists (canRequestAny). */-->
-    <div class="krt-modal-overlay" id="org-unit-request-modal" th:if="${canRequestAny}">
+    <dialog class="krt-modal-overlay" id="org-unit-request-modal" th:if="${canRequestAny}">
         <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.request.modal.title}">
             <div class="krt-modal-head">
                 <h3 th:text="#{bank.request.modal.title}">Ein-/Auszahlung beantragen</h3>
@@ -605,7 +605,7 @@
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 </main>
 
 <th:block th:replace="~{fragments/toast :: toast}" />

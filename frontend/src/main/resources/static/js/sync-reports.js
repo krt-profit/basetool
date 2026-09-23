@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const template = messageEl ? messageEl.getAttribute('data-template') || '' : '';
 
     function closeModal() {
-        modal.style.display = 'none';
+        window.krtModal.close(modal);
     }
 
     trigger.addEventListener('click', function () {
@@ -67,7 +67,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (messageEl && template) {
             messageEl.textContent = template.replace('{0}', daysInput.value);
         }
-        modal.style.display = 'flex';
+        window.krtModal.open(modal);
     });
 
     if (cancelBtn) {

@@ -149,11 +149,7 @@
                     // only because `open-modal-display` clears the inline style first -- a
                     // dependency on the order of two unrelated pieces of code, which is the shape
                     // of a latent defect rather than a working design.
-                    const overlay = document.getElementById('profile-deletion-modal');
-                    if (overlay) {
-                        overlay.classList.remove('krtm-modal-open');
-                        overlay.classList.add('krtm-hidden');
-                    }
+                    window.krtModal.close('profile-deletion-modal');
                     if (eraseHistory) {
                         eraseHistory.checked = false;
                     }

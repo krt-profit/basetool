@@ -139,7 +139,7 @@
 <!--/* Modals */-->
 <div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
     <!--/* Reset Fitted Confirmation Modal */-->
-    <div id="reset-fitted-confirm-modal" class="krt-modal-overlay">
+    <dialog id="reset-fitted-confirm-modal" class="krt-modal-overlay">
         <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{hangar.ship.reset_fitted.confirm.title}">
             <div class="krt-modal-head">
                 <h2 th:text="#{hangar.ship.reset_fitted.confirm.title}">Zurücksetzen bestätigen</h2>
@@ -154,7 +154,7 @@
                 <button type="button" class="btn btn-danger" data-trigger="shipdata-reset" th:text="#{hangar.ship.reset_fitted.button}">Zurücksetzen</button>
             </div>
         </div>
-    </div>
+    </dialog>
 </div>
 
 <script th:src="@{/js/autocomplete.js}" defer th:attr="nonce=${cspNonce}"></script>

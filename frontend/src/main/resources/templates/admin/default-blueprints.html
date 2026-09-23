@@ -105,7 +105,7 @@
 </main>
 
 <!--/* Remove confirmation modal */-->
-<div id="krt-dbp-delete-modal" class="krt-modal-overlay">
+<dialog id="krt-dbp-delete-modal" class="krt-modal-overlay">
     <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{admin.defaultBlueprints.modal.remove.title}">
         <div class="krt-modal-head">
             <h2 th:text="#{admin.defaultBlueprints.modal.remove.title}">Standard-Blueprint entfernen</h2>
@@ -119,7 +119,7 @@
             <button type="button" id="krt-dbp-delete-confirm" class="btn krt-danger" th:text="#{admin.defaultBlueprints.action.remove}">Entfernen</button>
         </div>
     </div>
-</div>
+</dialog>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">

@@ -137,7 +137,7 @@
              only (ADR-0140) and the action guards on PENDING in the service too. Same
              server-searched account picker as the queue's dialogs -- they differ in what moves, not
              in how the account is chosen. */-->
-        <div id="consolidate-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
+        <dialog id="consolidate-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
             <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{members.consolidate.modal.title}">
                 <div class="krt-modal-head">
                     <h2 th:text="#{members.consolidate.modal.title}">Konten zusammenführen</h2>
@@ -157,7 +157,7 @@
                     <button type="button" class="btn btn--cta" id="consolidate-confirm" th:text="#{members.consolidate}">Zusammenführen</button>
                 </div>
             </div>
-        </div>
+        </dialog>
 
         <div th:replace="~{fragments/pagination :: pagination(pageResponse=${usersPage}, baseUrl='/members')}"></div>
         

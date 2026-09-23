@@ -233,7 +233,7 @@
 </main>
 
 <!--/* Create Topic Modal */-->
-<div id="modal-create-topic" class="krt-modal-overlay" role="dialog" aria-modal="true">
+<dialog id="modal-create-topic" class="krt-modal-overlay" role="dialog" aria-modal="true">
     <div class="krt-modal krt-modal--wide">
         <div class="krt-modal-head">
             <h2 th:text="#{promotion.admin.topics.modal.create.title}">Neuen Themenbereich anlegen</h2>
@@ -260,10 +260,10 @@
             <button class="btn btn--cta" data-trigger="pa-create-topic" th:text="#{promotion.admin.topics.new}">Anlegen</button>
         </div>
     </div>
-</div>
+</dialog>
 
 <!--/* Edit Topic Modal */-->
-<div id="modal-edit-topic" class="krt-modal-overlay" role="dialog" aria-modal="true">
+<dialog id="modal-edit-topic" class="krt-modal-overlay" role="dialog" aria-modal="true">
     <div class="krt-modal krt-modal--wide">
         <div class="krt-modal-head">
             <h2 th:text="#{promotion.admin.topics.modal.edit.title}">Themenbereich bearbeiten</h2>
@@ -291,10 +291,10 @@
             <button class="btn btn--cta" data-trigger="pa-update-topic"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{promotion.admin.topics.edit}">Speichern</span></button>
         </div>
     </div>
-</div>
+</dialog>
 
 <!--/* Create Category Modal */-->
-<div id="modal-create-category" class="krt-modal-overlay" role="dialog" aria-modal="true">
+<dialog id="modal-create-category" class="krt-modal-overlay" role="dialog" aria-modal="true">
     <div class="krt-modal krt-modal--wide">
         <div class="krt-modal-head">
             <h2 th:text="#{promotion.admin.category.modal.create.title}">Neue Kategorie anlegen</h2>
@@ -321,10 +321,10 @@
             <button class="btn btn--cta" data-trigger="pa-create-category" th:text="#{promotion.admin.topics.category.new}">Anlegen</button>
         </div>
     </div>
-</div>
+</dialog>
 
 <!--/* Edit Category Modal */-->
-<div id="modal-edit-category" class="krt-modal-overlay" role="dialog" aria-modal="true">
+<dialog id="modal-edit-category" class="krt-modal-overlay" role="dialog" aria-modal="true">
     <div class="krt-modal krt-modal--wide">
         <div class="krt-modal-head">
             <h2 th:text="#{promotion.admin.category.modal.edit.title}">Kategorie bearbeiten</h2>
@@ -353,7 +353,7 @@
             <button class="btn btn--cta" data-trigger="pa-update-category"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{promotion.admin.topics.edit}">Speichern</span></button>
         </div>
     </div>
-</div>
+</dialog>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 
