@@ -50,8 +50,20 @@ unlike "is the tag there yet?", does not depend on how fast ``release-publish.ym
 Everything unclear rebuilds all three: an unknown base, a base that is not an ancestor, an
 unreadable Dockerfile, a git error. The default is the behaviour this path optimises, never a guess.
 
+Two more questions the workflow asks before that decision (amendments of 2026-09-23):
+
+* ``--skip-check``: is this main-push run SUPERSEDED -- its commit no longer the tip of ``main``
+  when ``plan`` starts -- so that the whole run may skip? Never for a release commit, a tag push or
+  ``workflow_dispatch``. See :func:`skip_decision`.
+* ``--candidates``: which main commits may serve as the reuse base, newest first, bounded? The
+  workflow takes the first whose three images exist, so a skipped or failed predecessor run does not
+  force a full rebuild. See :func:`base_candidates`.
+
 Usage:
     image_reuse_plan.py --base <sha> --head <sha>     # one decision, JSON on stdout
+    image_reuse_plan.py --skip-check --event push --pushed-ref refs/heads/main \\
+        --head <sha> --before <sha> --tip <sha>       # {"skip": bool, "reason": ...}
+    image_reuse_plan.py --candidates --before <sha> --head <sha> [--limit 20]
     image_reuse_plan.py --dry-run 30 [--ref origin/main]
     image_reuse_plan.py --selftest
 
@@ -332,6 +344,115 @@ def dry_run(count: int, ref: str) -> int:
     return 0
 
 
+SHA_RE = re.compile(r"[0-9a-f]{40}")
+
+# How far back the main path looks for a reuse base whose images exist (see base_candidates).
+BASE_SEARCH_LIMIT = 20
+
+
+def skip_decision(event: str, pushed_ref: str, head: str, tip: str, head_behind_tip: bool,
+                  release_in_range: bool) -> dict:
+    """Decide whether a main-push run is superseded and may skip everything (ADR-0137 amendment).
+
+    Every push to ``main`` queues its own run -- the concurrency group is per COMMIT, so a release
+    commit and its tag never run in parallel -- and on a busy day the queue outgrows the runners
+    (2026-09-23: 29 runs queued behind ~35 merges, starving PR CI). A run whose commit is no longer
+    the tip of ``main`` when its ``plan`` job starts produces images nobody will deploy: the tip's
+    own run builds or re-tags the newer state, and ``:edge`` must not move BACK to it anyway. So it
+    skips, except where skipping could lose something:
+
+    * only a ``push`` to ``refs/heads/main`` is ever skipped -- never ``workflow_dispatch`` (the
+      manual rebuild) and never a tag push;
+    * only when the pushed commit is a STRICT ancestor of the current tip -- a newer commit on main
+      exists and has its own run; a tip that is unknown, equal, or not a descendant (a force push)
+      means "build";
+    * never when the pushed range contains a release commit: the tag run re-tags
+      ``:sha-<release commit>``, which only this run produces.
+
+    :param event: ``github.event_name``.
+    :param pushed_ref: ``github.ref``.
+    :param head: the pushed commit.
+    :param tip: ``origin/main`` as fetched at plan time, or empty when it could not be read.
+    :param head_behind_tip: whether ``head`` is an ancestor of ``tip`` (and not equal to it).
+    :param release_in_range: whether ``github.event.before..head`` introduces a dated CHANGELOG
+        section.
+    :return: ``{"skip": bool, "reason": str}``.
+    """
+    def result(skip: bool, reason: str) -> dict:
+        return {"skip": skip, "reason": reason}
+
+    if event != "push" or pushed_ref != "refs/heads/main":
+        return result(False, f"not a main push (event={event}, ref={pushed_ref})")
+    if not SHA_RE.fullmatch(tip or ""):
+        return result(False, "the current tip of main could not be read")
+    if tip == head:
+        return result(False, "this commit is the tip of main")
+    if not head_behind_tip:
+        return result(False, f"this commit is not an ancestor of main's tip {tip[:12]} (force push?)")
+    if release_in_range:
+        return result(False, f"superseded by {tip[:12]}, but the range contains a release commit, "
+                             "whose images the tag run re-tags")
+    return result(True, f"superseded: main's tip is already {tip[:12]}, whose own run publishes the "
+                        f"newer state; building {head[:12]} would only move :edge back")
+
+
+def skip_from_git(event: str, pushed_ref: str, head: str, before: str, tip: str) -> dict:
+    """Gather the git facts for :func:`skip_decision`.
+
+    :param event: ``github.event_name``.
+    :param pushed_ref: ``github.ref``.
+    :param head: the pushed commit.
+    :param before: ``github.event.before``.
+    :param tip: ``origin/main`` as fetched at plan time.
+    :return: the decision, plus ``head`` and ``tip``.
+    """
+    behind = (bool(SHA_RE.fullmatch(tip or "")) and tip != head
+              and git("merge-base", "--is-ancestor", head, tip).returncode == 0)
+    # A base the range cannot be computed from counts as "may contain a release": no skip.
+    release = True
+    if SHA_RE.fullmatch(before or "") and before != ZERO_SHA:
+        release = is_release_commit(show(head, "CHANGELOG.md") or "", show(before, "CHANGELOG.md") or "")
+    decision = skip_decision(event, pushed_ref, head, tip, behind, release)
+    decision.update({"head": head, "tip": tip})
+    return decision
+
+
+def base_candidates(chain: list[str], before_is_ancestor: bool, limit: int = BASE_SEARCH_LIMIT) -> list[str]:
+    """Order the commits the main path may take its reuse base from.
+
+    The natural base is ``github.event.before``, the previous tip. Its run may never have
+    published images -- skipped as superseded (above), cancelled, or failed -- and then every gate
+    fails and the whole push rebuilds. So the workflow walks this list, newest first, and takes the
+    first commit whose three images exist; the per-module decision is then computed against THAT
+    commit, so nothing changed since it can be missed. Bounded, because a base far back makes the
+    diff (and every rebuild it implies) larger for no benefit, and the seven-day age gate would
+    refuse most of it anyway.
+
+    :param chain: ``git rev-list --first-parent before``, newest first.
+    :param before_is_ancestor: whether ``before`` is an ancestor of the pushed commit.
+    :param limit: how many commits to offer at most.
+    :return: the candidates, newest first; empty when ``before`` is unusable.
+    """
+    if not before_is_ancestor or not chain:
+        return []
+    return [c for c in chain if SHA_RE.fullmatch(c)][:limit]
+
+
+def candidates_from_git(before: str, head: str, limit: int = BASE_SEARCH_LIMIT) -> list[str]:
+    """Gather :func:`base_candidates` from git.
+
+    :param before: ``github.event.before``.
+    :param head: the pushed commit.
+    :param limit: how many commits to offer at most.
+    :return: candidate commits, newest first.
+    """
+    if not SHA_RE.fullmatch(before or "") or before == ZERO_SHA:
+        return []
+    ancestor = git("merge-base", "--is-ancestor", before, head).returncode == 0
+    chain = git("rev-list", "--first-parent", f"--max-count={limit}", before).stdout.split()
+    return base_candidates(chain, ancestor, limit)
+
+
 def selftest() -> int:
     """Assert the input split and every decision branch on synthetic data.
 
@@ -404,6 +525,28 @@ def selftest() -> int:
     r = decide(base, head, dockerfile, ["backend/Dockerfile"], old, old, True, LEGACY_OWN, LEGACY_SHARED)
     check("dry run: a legacy per-module Dockerfile rebuilds its module", r["rebuild"] == ["backend"])
 
+    # Superseded-run skip (ADR-0137 amendment 2026-09-23).
+    tip, h = "c" * 40, "b" * 40
+    main = ("push", "refs/heads/main")
+    check("skip: a superseded main push skips", skip_decision(*main, h, tip, True, False)["skip"])
+    check("skip: the tip of main builds", not skip_decision(*main, h, h, False, False)["skip"])
+    check("skip: a superseded release commit builds", not skip_decision(*main, h, tip, True, True)["skip"])
+    check("skip: workflow_dispatch never skips",
+          not skip_decision("workflow_dispatch", "refs/heads/main", h, tip, True, False)["skip"])
+    check("skip: a tag push never skips",
+          not skip_decision("push", "refs/tags/v1.9.0", h, tip, True, False)["skip"])
+    check("skip: an unreadable tip builds", not skip_decision(*main, h, "", True, False)["skip"])
+    check("skip: a commit that is not behind the tip (force push) builds",
+          not skip_decision(*main, h, tip, False, False)["skip"])
+
+    # Reuse-base search.
+    chain = [c * 40 for c in "abcdef"]
+    check("base: candidates are the before chain, newest first", base_candidates(chain, True, 20) == chain)
+    check("base: the search is bounded", base_candidates(chain, True, 3) == chain[:3])
+    check("base: a before that is not an ancestor offers nothing", base_candidates(chain, False, 20) == [])
+    check("base: an empty chain offers nothing", base_candidates([], True, 20) == [])
+    check("base: a non-sha line is dropped", base_candidates(["x", chain[0]], True, 20) == [chain[0]])
+
     real = show("HEAD", APP_DOCKERFILE) or (REPO / APP_DOCKERFILE).read_text(encoding="utf-8")
     real_own, real_shared = input_sets(real)
     # Anti-vacuity: the split must still see the real Dockerfile's COPYs. A parser that found none
@@ -431,6 +574,16 @@ def main() -> int:
     parser.add_argument("--dry-run", type=int, metavar="N")
     parser.add_argument("--ref", default="origin/main")
     parser.add_argument("--selftest", action="store_true")
+    parser.add_argument("--skip-check", action="store_true",
+                        help="decide whether a superseded main-push run skips (needs --event, --pushed-ref, "
+                             "--head, --before, --tip)")
+    parser.add_argument("--event", default="")
+    parser.add_argument("--pushed-ref", default="")
+    parser.add_argument("--before", default="")
+    parser.add_argument("--tip", default="")
+    parser.add_argument("--candidates", action="store_true",
+                        help="print the reuse-base candidates for --before/--head, newest first")
+    parser.add_argument("--limit", type=int, default=BASE_SEARCH_LIMIT)
     args = parser.parse_args()
     if args.selftest:
         return selftest()
@@ -438,6 +591,12 @@ def main() -> int:
         return dry_run(args.dry_run, args.ref)
     if not args.head:
         parser.error("--head is required")
+    if args.skip_check:
+        print(json.dumps(skip_from_git(args.event, args.pushed_ref, args.head, args.before, args.tip)))
+        return 0
+    if args.candidates:
+        print("\n".join(candidates_from_git(args.before, args.head, args.limit)))
+        return 0
     print(json.dumps(decide_from_git(args.base or "", args.head)))
     return 0
 

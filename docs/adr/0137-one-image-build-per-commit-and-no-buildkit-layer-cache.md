@@ -1,6 +1,6 @@
 # ADR-0137 — One image build per commit, and no BuildKit layer cache
 
-- **Status:** Accepted — amended by [ADR-0210](0210-a-main-push-that-changes-no-image-input-re-tags-the-previous-build.md) (2026-09-23: a `main` push that changes no image input re-tags the previous `main` build instead of building)
+- **Status:** Accepted — amended by [ADR-0210](0210-a-main-push-that-changes-no-image-input-re-tags-the-previous-build.md) (2026-09-23: a `main` push that changes no image input re-tags the previous `main` build instead of building); amended 2026-09-23 (a superseded `main`-push run skips, see below)
 - **Date:** 2026-08-19
 - **Deciders:** Repository owner (@greluc)
 - **Related:** spec REQ-OPS-021 ([`deployment-delivery.md`](../specs/deployment-delivery.md)) · REQ-OPS-002 (promotion gates) · REQ-OPS-015 (host-side signature verification) · ADR-0049 (config as a promotable OCI artifact) · ADR-0055 (keycloak-spi bundle)
@@ -141,3 +141,31 @@ change, so it costs nothing per run — not a layer cache re-exported on every b
 - **Reusing on `workflow_dispatch` too.** "Run workflow" is the documented manual kick for a release
   whose images are missing or suspect (see `release-publish.yml`); an operator reaching for it wants
   a rebuild, and a re-tag would silently deny them one.
+
+## Amendment (2026-09-23) — a superseded `main`-push run skips
+
+**Owner-approved 2026-09-23.** The concurrency group stays **per commit**: a release commit on `main`
+and its `v*` tag must never run in parallel (v1.5.36, above). But per-commit grouping means every push
+to `main` queues a run of its own, and on 2026-09-23 about 35 merges queued 29 "Release Images" runs.
+Runner capacity was the bottleneck; PR CI and E2E starved behind builds of commits that were already
+out of date, and 28 of them were cancelled by hand.
+
+**Decision.** In `plan`, a `push` to `main` whose commit is no longer the tip of `main` when `plan`
+starts (a strict ancestor of the freshly fetched `origin/main`) **skips the whole run**: `plan` sets
+`skip=true`, writes a "skipped — superseded" summary and a `::notice`, and every later job —
+`build`, `scan`, `merge`, `build-config`, `keycloak-spi-jar` and through it `build-keycloak-spi` — is
+skipped; the run ends green. The tip's own run publishes the newer state; building the superseded
+commit would only have moved `:edge` back, which the queue's arbitrary start order could do before.
+
+**Never skipped:** a range containing a **release commit** (a new dated CHANGELOG section — the
+recognition the reuse decision already uses), because the tag run re-tags `:sha-<release commit>` and
+only that commit's run produces it; a tag push; `workflow_dispatch`; a commit that is the tip, is not
+an ancestor of the tip (a force push), or whose tip could not be read. The decision is
+`.github/scripts/image_reuse_plan.py --skip-check`, with self-test cases for each branch.
+
+**Consequences.** `build-config` and `keycloak-spi-jar` now wait for `plan` (about a minute) instead of
+starting beside it; they still run when `plan` fails, since they never depended on its decision. A
+skipped run leaves no `:sha-<short>` for its commit — so a promotion or rollback cannot name that
+commit's short tag; every tip that a later push supersedes was also never going to be deployed from
+`:edge`. If the tip's own run then fails or is cancelled, no run publishes until the next push. The
+next push's reuse base skips over the missing images (ADR-0210 Amendment 2).

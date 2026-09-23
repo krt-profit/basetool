@@ -250,7 +250,9 @@ Dockerfile, `.dockerignore`, the release workflow and its BuildKit and version i
 each other image from the previous `main` build after verifying its signature, both architectures and
 an age of at most seven days (ADR-0210, REQ-OPS-021). Release commits rebuild all three. The images of
 one `main` tag can therefore come from different builds; `promote.yml` orders environments by the
-config bundle's revision for that reason.
+config bundle's revision for that reason. A `main`-push run whose commit is no longer the tip when
+it starts skips entirely — except a release commit's — and the next run reuses from the newest
+ancestor that has images (ADR-0137/ADR-0210 amendments, 2026-09-23).
 
 `deploy.sh` and the host's own `iri-*` units are **not** part of the config bundle: a bundle cannot
 rewrite the thing that applies bundles, so they arrive with the Ansible role. The Quadlet units do
