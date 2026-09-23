@@ -165,10 +165,11 @@ not happened.
 - **Two realms agree only while someone runs the provisioner.** `scripts/provision-keycloak-realm.py`
   (ADR-0202) encodes production's realm shape, but nothing runs it on a schedule and nothing compares
   the realms automatically: a hand edit on either side drifts until the next
-  `keycloak-config-snapshot.sql` diff. It also encodes production **as it is**, so the three
-  `PROD-AS-IS` oddities it reproduces (the extractor's unused code flow, the ingest scopes on the app
-  and the gateway, the compose-internal frontend origin) are carried into every realm it shapes
-  until production decides them.
+  `keycloak-config-snapshot.sql` diff. It also encodes production **as it is**, so what it marks
+  `PROD-AS-IS` travels into every realm it shapes. Three such entries were decided on 2026-09-22 and
+  now converge away (the extractor's unused code flow, the ingest scopes on the app, the
+  compose-internal frontend origin — ADR-0202 amendment 1), but **production keeps them until the
+  provisioner is applied there**, which is an owner-gated write.
 
 ## 11.8 Smaller, known, and deliberately left
 
