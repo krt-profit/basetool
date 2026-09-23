@@ -54,5 +54,13 @@ jobs:
           java-version: '25'
 
       # Same pin as every other gradle/actions use in this repository.
+      #
+      # `--dependency-verification lenient` (ADR-0208): this job builds nothing that ships, it only
+      # reports the graph, and the action injects its own dependency-graph plugin through an init
+      # script, a classpath gradle/verification-metadata.xml does not describe and would otherwise
+      # refuse. Lenient still verifies and reports every mismatch in the log; it does not stop the
+      # submission, which is what Dependabot's alerts depend on.
       - name: Submit the resolved dependencies
         uses: gradle/actions/dependency-submission@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          additional-arguments: --dependency-verification lenient
