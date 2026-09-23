@@ -664,6 +664,45 @@ the same request (REQ-SEC-050) — the member keeps the login.
 touched either way: the mode governs reading only. `off` restores the pre-list validator exactly, for
 the case where the reporting itself misbehaves.
 
+### Internal JWKS for the backend
+
+The backend can fetch the keys that sign access tokens from the **internal** Keycloak
+(`https://keycloak:18443`, over `net-backend-keycloak` and the pinned `keycloak-trust` bundle)
+instead of through the public edge (REQ-SEC-024, ADR-0073). `iss` is still checked against the
+public issuer, so tokens do not change. Until 2026-09-23 `application-prod.yml` read the variable but
+nothing passed it to the container, so this could not be switched on in production; the release
+carrying the wiring passes it **empty**, which keeps today's issuer-location decoder exactly.
+
+**What changes when it is set:** the key fetch no longer hairpins through the edge, so an edge or
+public-DNS blip can no longer fail token validation, and the accepted signature algorithms widen
+from what the live JWKS advertises to the full asymmetric set. Members notice nothing. Only the
+backend: the ingest gateway reads the same property but is on no network that reaches Keycloak.
+
+**Precondition** (read-only): Keycloak's certificate names `keycloak` — it must already, because
+the user sync verifies it (REQ-SEC-014); a failing daily sync would say so.
+
+**Apply** (as root, from `/`; a production write, so it waits for the owner's yes):
+
+```bash
+cd /
+cp -p /var/iri/code/.env /var/iri/code/.env.backup-$(date +%Y%m%d-%H%M%S)
+printf 'IRI_BACKEND_KEYCLOAK_JWK_SET_URI=https://keycloak:18443/auth/realms/iri/protocol/openid-connect/certs\n' \
+  >> /var/iri/code/.env
+grep -c '^IRI_BACKEND_KEYCLOAK_JWK_SET_URI=' /var/iri/code/.env                        # 1
+sudo -u deploy /var/iri/code/scripts/render-env-d.py \
+  --env /var/iri/code/.env --templates /var/iri/code/quadlet/env.d --out /var/iri/code/env.d
+grep '^KEYCLOAK_JWK_SET_URI=' /var/iri/code/env.d/backend.env    # ...=https://keycloak:18443/auth/realms/iri/protocol/openid-connect/certs
+${UCTL} restart backend.service                                   # blocks until healthy
+```
+
+**Verify:** sign in on the web app and load a page that calls the API (the mission list); the app
+works and the backend log shows no `401` burst and no `JWKS` / `PKIX` / `No subject alternative`
+line (`${UPOD} logs --since 10m backend 2>&1 | grep -iE 'jwk|PKIX|subject alternative'`).
+`basetool_http_error_total{code="SERVICE_UNAVAILABLE"}` stays flat.
+
+**Rollback:** delete the line from `.env`, render `env.d/` again with the same command, restart the
+backend. The variable then arrives empty and the issuer-location decoder is back.
+
 ### Network changes are installed, not applied
 
 A changed `.network` unit reaches the host like any other and is **not** applied by it: Quadlet
@@ -818,6 +857,49 @@ client ──► haproxy :80/:443 (host, v4+v6) ──send-proxy-v2──► edg
   list was missing and only HTML left the edge compressed; `check-edge-nginx.sh` now asserts it.
 - **The API vhost's allow-list** is `docker/edge/include/api-allowlist.conf`, the source of truth
   (ADR-0135). `edge-deny-probe.yml` probes the public deny rules from outside every day.
+
+### The edge verifies Grafana
+
+Every upstream the edge re-encrypts to is verified against the internal CA
+(`include/upstream-tls.conf`), except Grafana: it serves its own self-signed certificate
+(`/var/iri/monitoring/certs/grafana.crt`, minted once per host, [`monitoring/README.md`](../monitoring/README.md)
+step 3). Since 2026-09-23 the edge can verify that hop too, pinning that very certificate as the
+Grafana upstream's only anchor and checking the name `grafana` (`include/upstream-grafana-tls.conf`,
+REQ-OBS-008). It is behind **`EDGE_GRAFANA_UPSTREAM_VERIFY`**, `off` by default, so the release that
+carries it changes nothing but one read-only mount: the edge now mounts `grafana.crt`, the same file
+Grafana itself needs to start, and `deploy.sh` refuses a release whose edge unit names a missing
+one.
+
+**Precondition** (read-only): the certificate names `grafana`.
+
+```bash
+openssl x509 -in /var/iri/monitoring/certs/grafana.crt -noout -subject -enddate -ext subjectAltName
+# subjectAltName must list DNS:grafana; enddate in the future
+```
+
+If it does not, re-mint it first (monitoring/README.md step 3) and restart Grafana.
+
+**Apply** (as root, from `/`; a production write, so it waits for the owner's yes):
+
+```bash
+cd /
+cp -p /var/iri/code/.env /var/iri/code/.env.backup-$(date +%Y%m%d-%H%M%S)
+printf 'EDGE_GRAFANA_UPSTREAM_VERIFY=on\n' >> /var/iri/code/.env
+grep -c '^EDGE_GRAFANA_UPSTREAM_VERIFY=' /var/iri/code/.env              # 1
+sudo -u deploy /var/iri/code/scripts/render-env-d.py \
+  --env /var/iri/code/.env --templates /var/iri/code/quadlet/env.d --out /var/iri/code/env.d
+${UCTL} restart edge.service                                            # blocks until healthy
+${UPOD} logs --since 2m edge 2>&1 | grep "Grafana's upstream"           # ... is verified (pinned)
+curl -sS -o /dev/null -w '%{http_code}\n' "https://$(sed -n 's/^EDGE_HOST_GRAFANA=//p' /var/iri/code/.env)/api/health"   # 200
+```
+
+A verification failure shows as the maintenance page / `503` on the Grafana host and an
+`upstream SSL certificate verify error` line in the edge log. **Rollback:** delete the line, render
+`env.d/` again, restart the edge.
+
+**From then on, a re-minted `grafana.crt` needs the edge restarted as well as Grafana:** the edge
+mounts the file (a single-file mount pins the inode) and pins its contents. Until the restart the
+edge refuses the new certificate and Grafana answers `503`.
 
 ### Maintenance page
 

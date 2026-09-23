@@ -522,11 +522,12 @@ class SessionTypeAllowListTest {
     // Object slot, written as ["java.lang.Long", 3].
     flash.put("deletedCount", 3L);
     flash.startExpirationPeriod(180);
-    // A flash map carrying a form's BindingResult is unreadable under EVERY validator today:
+    // A flash map carrying a form's BindingResult is unreadable under EVERY validator:
     // BeanPropertyBindingResult has no creator Jackson can use (InvalidDefinitionException), so
-    // the whole flash list is dropped on the redirect's GET. That is older than the allow-list and
-    // is not its business; it stays in the sample so that whoever makes it readable finds the
-    // parity check already covering it, and the validation package already on the list.
+    // the whole flash list is dropped on the redirect's GET. Since 2026-09-23 no controller flashes
+    // one (FlashAttributeTypesTest; the admin personal-inventory form was the last and re-renders
+    // inline now). It stays in the sample because it is still what the session would hold if that
+    // rule broke, and the parity check must keep treating it identically under every mode.
     FlashMap flashWithErrors = new FlashMap();
     flashWithErrors.setTargetRequestPath("/inventory");
     flashWithErrors.put("inventoryForm", form);
