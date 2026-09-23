@@ -49,7 +49,9 @@ components in `krt-components.css`.
 - [x] Categorical palettes are tokens too. The price matrix's planet tints (header fill + body-cell
   stripe for the canonical planets and the twelve `PlanetColorResolver` hash buckets) are the
   `--krt-planet-<p>` / `--krt-planet-<p>-stripe` tokens on `:root` in `styles.css` (2026-09-23,
-  unchanged colours); `materials-overview.css` holds no hex value at all.
+  unchanged colours); `materials-overview.css` holds no hex value at all. The design system
+  declares the same 48 tokens in `colors_and_type.css` (krt-profit/design-system#4, submodule at
+  `06e47e5`); all 48 values were compared and are identical, case aside.
 
 **Enforced by:** design review, plus one lint rule: `declaration-property-value-disallowed-list`
 in `frontend/.stylelintrc.json` and `.stylelintrc.templates.json` fails `:frontend:lintCss` /
