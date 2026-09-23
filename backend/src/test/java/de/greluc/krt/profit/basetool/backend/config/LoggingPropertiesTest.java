@@ -20,12 +20,11 @@
 package de.greluc.krt.profit.basetool.backend.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.context.PropertyPlaceholderAutoConfiguration;
-import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Configuration;
@@ -44,8 +43,10 @@ class LoggingPropertiesTest {
           .withUserConfiguration(Config.class);
 
   @Configuration
+  // Registers LoggingProperties alone. A @ConfigurationPropertiesScan here would also bind every
+  // other properties record of the package — KeycloakSyncProperties among them, whose required
+  // credentials this context does not configure.
   @EnableConfigurationProperties(LoggingProperties.class)
-  @ConfigurationPropertiesScan
   static class Config {}
 
   @Test
@@ -56,11 +57,11 @@ class LoggingPropertiesTest {
 
           // Given/When: defaults loaded
           // Then: match the %X{correlationId}/%X{userId} placeholders in logback-spring.xml
-          assertThat(props.getCorrelationIdHeader()).isEqualTo("X-Correlation-Id");
-          assertThat(props.getCorrelationIdMdcKey()).isEqualTo("correlationId");
-          assertThat(props.getUserIdMdcKey()).isEqualTo("userId");
-          assertThat(props.getSlowRequestThresholdMs()).isEqualTo(2000L);
-          assertThat(props.isStructuredEnabled()).isFalse();
+          assertThat(props.correlationIdHeader()).isEqualTo("X-Correlation-Id");
+          assertThat(props.correlationIdMdcKey()).isEqualTo("correlationId");
+          assertThat(props.userIdMdcKey()).isEqualTo("userId");
+          assertThat(props.slowRequestThresholdMs()).isEqualTo(2000L);
+          assertThat(props.structuredEnabled()).isFalse();
         });
   }
 
@@ -88,15 +89,15 @@ class LoggingPropertiesTest {
         .run(
             context -> {
               LoggingProperties p = context.getBean(LoggingProperties.class);
-              assertThat(p.getCorrelationIdHeader()).isEqualTo("X-Trace-Id");
-              assertThat(p.getSlowRequestThresholdMs()).isEqualTo(5000L);
-              assertThat(p.isStructuredEnabled()).isTrue();
+              assertThat(p.correlationIdHeader()).isEqualTo("X-Trace-Id");
+              assertThat(p.slowRequestThresholdMs()).isEqualTo(5000L);
+              assertThat(p.structuredEnabled()).isTrue();
             });
   }
 
   @Test
   void toString_ShouldNotLeakSensitiveInformation() {
-    LoggingProperties p = new LoggingProperties();
+    LoggingProperties p = BoundProperties.defaults(LoggingProperties.class);
     // Given/When
     String s = p.toString();
     // Then: deterministic content, no password/token-like fields
@@ -104,18 +105,18 @@ class LoggingPropertiesTest {
     assertThat(s).doesNotContain("password", "token", "secret");
   }
 
-  /** Guard against accidental removal of the setter API used by Spring binding. */
+  /**
+   * BE-MOD-04: the properties are an immutable record bound through its canonical constructor, and
+   * a key left unset keeps its {@code @DefaultValue}.
+   */
   @Test
-  void setters_ShouldBeCallableByBinder() {
-    LoggingProperties p = new LoggingProperties();
-    assertThatThrownBy(
-            () -> {
-              p.setSlowRequestThresholdMs(-5L);
-              // no-op: value invalidity is enforced by @Validated at context level, not here
-              if (p.getSlowRequestThresholdMs() < 0) {
-                throw new IllegalStateException("validator would reject");
-              }
-            })
-        .isInstanceOf(IllegalStateException.class);
+  void binding_ShouldGoThroughTheRecordConstructor() {
+    LoggingProperties p =
+        BoundProperties.bind(LoggingProperties.class, "slow-request-threshold-ms", 500);
+
+    assertThat(LoggingProperties.class.isRecord()).isTrue();
+    assertThat(p.slowRequestThresholdMs()).isEqualTo(500L);
+    assertThat(p.correlationIdHeader()).isEqualTo("X-Correlation-Id");
+    assertThat(p.orgUnitIdMdcKey()).isEqualTo("orgUnitId");
   }
 }

@@ -32,6 +32,8 @@ import de.greluc.krt.profit.basetool.backend.model.GameItemSourceSystem;
 import de.greluc.krt.profit.basetool.backend.model.ShipType;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.service.SyncReportService;
+import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -52,21 +54,34 @@ class ScWikiVehicleSyncServiceTest {
   @Mock private SyncReportService syncReportService;
 
   private ScWikiProperties properties;
+
+  /** The configured keys, relative to the record's prefix; {@link #rebuild()} binds them. */
+  private final Map<String, Object> config = new HashMap<>();
+
   private ScWikiVehicleSyncService service;
 
   @BeforeEach
   void setUp() {
-    properties = new ScWikiProperties();
-    properties.setVehicleSyncEnabled(true);
+    config.putAll(Map.of("vehicle-sync-enabled", true));
+    rebuild();
+    lenient().when(syncReportService.beginRun()).thenReturn(UUID.randomUUID());
+  }
+
+  /**
+   * Binds the properties record from {@link #config} and builds the object under test over it. The
+   * record is immutable (BE-MOD-04), so a test that changes a key rebuilds.
+   */
+  private void rebuild() {
+    properties = BoundProperties.bind(ScWikiProperties.class, config);
     service =
         new ScWikiVehicleSyncService(
             scWikiClient, properties, shipTypeRepository, syncReportService);
-    lenient().when(syncReportService.beginRun()).thenReturn(UUID.randomUUID());
   }
 
   @Test
   void syncVehicles_isNoOp_whenFeatureFlagOff() {
-    properties.setVehicleSyncEnabled(false);
+    config.put("vehicle-sync-enabled", false);
+    rebuild();
 
     service.syncVehicles();
 
@@ -79,7 +94,8 @@ class ScWikiVehicleSyncServiceTest {
     // page 1 alone is 10.4 MB against the client's 16 MB codec ceiling - and an overrun is not a
     // truncation but a decode failure that this client swallows into an empty list, stopping the
     // sync silently. The walk must therefore ask for the vehicle-specific page size.
-    properties.setVehiclesPageSize(50);
+    config.put("vehicles-page-size", 50);
+    rebuild();
     when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
         .thenReturn(ScWikiClient.FetchResult.of(List.of()));
 

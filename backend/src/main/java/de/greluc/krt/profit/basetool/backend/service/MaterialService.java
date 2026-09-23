@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.config.EvictAllMaterialCaches;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialCategory;
@@ -32,6 +33,8 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialMatrixItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialPriceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialPriceOverviewDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialSellingTerminalDto;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialCategoryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialPriceRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
@@ -129,8 +132,7 @@ public class MaterialService {
    *
    * @return all visible materials as reference DTOs
    */
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto>
-      findAllReference() {
+  public List<MaterialReferenceDto> findAllReference() {
     return materialRepository.findAllReference();
   }
 
@@ -167,12 +169,7 @@ public class MaterialService {
    */
   @Cacheable(cacheNames = CacheConfig.MATERIAL_BY_ID_CACHE)
   public Material getMaterial(@NotNull UUID id) {
-    return materialRepository
-        .findById(id)
-        .orElseThrow(
-            () ->
-                new de.greluc.krt.profit.basetool.backend.exception.NotFoundException(
-                    "Material not found"));
+    return Entities.require(materialRepository.findById(id), "Material not found");
   }
 
   /**
@@ -192,8 +189,7 @@ public class MaterialService {
    * @param id material primary key
    * @return list of selling-terminal DTOs (terminal + sell price)
    */
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.MaterialSellingTerminalDto>
-      getMaterialTerminals(@NotNull UUID id) {
+  public List<MaterialSellingTerminalDto> getMaterialTerminals(@NotNull UUID id) {
     return materialPriceRepository.findSellingTerminalsByMaterialId(id);
   }
 
@@ -305,17 +301,15 @@ public class MaterialService {
 
     if (dto.refinedMaterialId() != null) {
       Material refined =
-          materialRepository
-              .findById(dto.refinedMaterialId())
-              .orElseThrow(() -> new NotFoundException("Refined material not found"));
+          Entities.require(
+              materialRepository.findById(dto.refinedMaterialId()), "Refined material not found");
       material.setRefinedMaterial(refined);
     }
 
     if (dto.categoryId() != null) {
       MaterialCategory category =
-          materialCategoryRepository
-              .findById(dto.categoryId())
-              .orElseThrow(() -> new NotFoundException("Material category not found"));
+          Entities.require(
+              materialCategoryRepository.findById(dto.categoryId()), "Material category not found");
       material.setCategory(category);
     }
 

@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.ApiClientMetricsProperties;
+import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import de.greluc.krt.profit.basetool.backend.support.ClientAttribution;
 import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -79,7 +80,9 @@ class AuditServiceTest {
   // carry whatever the stub said and still pass while the mapping was broken.
   @Spy
   private ClientAttribution clientAttribution =
-      new ClientAttribution(new ApiClientMetricsProperties(), new IngestGatewayProperties());
+      new ClientAttribution(
+          BoundProperties.defaults(ApiClientMetricsProperties.class),
+          BoundProperties.defaults(IngestGatewayProperties.class));
 
   // A real registry (spied) so the per-domain audit counter is genuinely recorded and assertable.
   @Spy private MeterRegistry meterRegistry = new SimpleMeterRegistry();

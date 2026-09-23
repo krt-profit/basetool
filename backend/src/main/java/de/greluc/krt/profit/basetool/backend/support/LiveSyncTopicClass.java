@@ -249,7 +249,7 @@ public enum LiveSyncTopicClass {
     if (raw == null || raw.isEmpty()) {
       return List.of();
     }
-    LinkedHashSet<String> kept = new java.util.LinkedHashSet<>();
+    LinkedHashSet<String> kept = new LinkedHashSet<>();
     int examined = 0;
     for (String section : raw) {
       if (examined++ >= MAX_SECTIONS_PER_FRAME) {

@@ -50,6 +50,7 @@ public interface PromotionTopicMapper {
    * @param request validated payload describing the new topic
    * @return a transient entity ready to be persisted
    */
+  @Mapping(target = "id", ignore = true)
   @Mapping(target = "categories", ignore = true)
   @Mapping(target = "owningSquadron", ignore = true)
   PromotionTopic toEntity(PromotionTopicWriteRequest request);

@@ -497,7 +497,7 @@ public class UserDeletionService {
         username
             .filter(
                 name ->
-                    ingestGatewayProperties.getClientIds().stream()
+                    ingestGatewayProperties.clientIds().stream()
                         .anyMatch(clientId -> name.equals(SERVICE_ACCOUNT_PREFIX + clientId)))
             .isPresent();
     if (isMachine) {

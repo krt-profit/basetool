@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.exception.ProductionAllocationException;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
@@ -169,25 +170,17 @@ public class JobOrderItemProductionService {
     assertMayBookInFor(dto.bookIn());
 
     JobOrder jobOrder =
-        jobOrderRepository
-            .findById(jobOrderId)
-            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + jobOrderId));
+        Entities.require(
+            jobOrderRepository.findById(jobOrderId), () -> "JobOrder not found: " + jobOrderId);
 
     if (jobOrder.getType() != JobOrderType.ITEM) {
       throw new BadRequestException("Job order " + jobOrderId + " is not an item order");
     }
 
     JobOrderItem line =
-        jobOrder.getItems().stream()
-            .filter(i -> i.getId().equals(jobOrderItemId))
-            .findFirst()
-            .orElseThrow(
-                () ->
-                    new NotFoundException(
-                        "Item line "
-                            + jobOrderItemId
-                            + " does not belong to job order "
-                            + jobOrderId));
+        Entities.require(
+            jobOrder.getItems().stream().filter(i -> i.getId().equals(jobOrderItemId)).findFirst(),
+            () -> "Item line " + jobOrderItemId + " does not belong to job order " + jobOrderId);
 
     // Optimistic lock: a production booking must carry the line's current version (checkRequired
     // treats an unversioned line as a conflict too). GlobalExceptionHandler maps the resulting
@@ -253,10 +246,9 @@ public class JobOrderItemProductionService {
 
     for (JobOrderItemProductionConsumptionDto c : dto.consumption()) {
       InventoryItem inventoryItem =
-          inventoryItemRepository
-              .findByIdForUpdate(c.inventoryItemId())
-              .orElseThrow(
-                  () -> new NotFoundException("Inventory item not found: " + c.inventoryItemId()));
+          Entities.require(
+              inventoryItemRepository.findByIdForUpdate(c.inventoryItemId()),
+              () -> "Inventory item not found: " + c.inventoryItemId());
 
       // Optimistic lock on the entry — a concurrent stock change surfaces as a 409.
       OptimisticLock.check(
@@ -365,10 +357,11 @@ public class JobOrderItemProductionService {
     // at the API boundary), so every booking creates the produced stock.
     bookProducedStockIn(jobOrder, line, amount, dto.bookIn());
 
-    return jobOrderItemService.toItemDtos(jobOrder).stream()
-        .filter(d -> d.id().equals(jobOrderItemId))
-        .findFirst()
-        .orElseThrow(() -> new NotFoundException("Item line not found after production booking"));
+    return Entities.require(
+        jobOrderItemService.toItemDtos(jobOrder).stream()
+            .filter(d -> d.id().equals(jobOrderItemId))
+            .findFirst(),
+        "Item line not found after production booking");
   }
 
   /**
@@ -467,9 +460,7 @@ public class JobOrderItemProductionService {
 
     final User owner =
         bookIn.ownerUserId() != null
-            ? userRepository
-                .findById(bookIn.ownerUserId())
-                .orElseThrow(() -> new NotFoundException("User not found"))
+            ? Entities.require(userRepository.findById(bookIn.ownerUserId()), "User not found")
             : userService
                 .getCurrentUser()
                 .orElseThrow(
@@ -477,9 +468,7 @@ public class JobOrderItemProductionService {
                         new BadRequestException(
                             "No acting user to book the produced stock in for"));
     final Location location =
-        locationRepository
-            .findById(bookIn.locationId())
-            .orElseThrow(() -> new NotFoundException("Location not found"));
+        Entities.require(locationRepository.findById(bookIn.locationId()), "Location not found");
     final OrgUnit owningOrgUnit =
         ownerScopeService.resolveOrgUnitForPickerOutputNullable(owner, bookIn.owningOrgUnitId());
 

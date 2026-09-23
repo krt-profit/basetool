@@ -20,8 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.support;
 
 import jakarta.validation.constraints.NotBlank;
-import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
@@ -34,13 +34,13 @@ import org.springframework.validation.annotation.Validated;
  *
  * <p>Lives in the dependency-leaf {@code support} package (not {@code config}) so the {@code
  * exception} and {@code filter} layers can read it without an {@code exception}/{@code filter}
- * &rarr; {@code config} package cycle; it depends only on Lombok / Jakarta-validation / Spring-Boot
- * and is registered via {@code @ConfigurationPropertiesScan} regardless of package.
+ * &rarr; {@code config} package cycle; it depends only on Jakarta-validation / Spring-Boot and is
+ * registered via {@code @ConfigurationPropertiesScan} regardless of package. An immutable record
+ * (BE-MOD-04).
+ *
+ * @param baseUri the base URI for Problem Detail types
  */
-@Data
 @Validated
 @ConfigurationProperties(prefix = "app.problems")
-public class AppProblemProperties {
-  /** Base URI for Problem Detail types. */
-  @NotBlank private String baseUri = "https://profit-base.online/problems/";
-}
+public record AppProblemProperties(
+    @DefaultValue("https://profit-base.online/problems/") @NotBlank String baseUri) {}

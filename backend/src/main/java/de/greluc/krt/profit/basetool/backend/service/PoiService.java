@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.Poi;
 import de.greluc.krt.profit.basetool.backend.repository.PoiRepository;
@@ -68,7 +69,7 @@ public class PoiService {
    */
   @Cacheable(cacheNames = CacheConfig.POIS_CACHE)
   public Poi getPoi(UUID id) {
-    return poiRepository.findById(id).orElseThrow(() -> new NotFoundException("POI not found"));
+    return Entities.require(poiRepository.findById(id), "POI not found");
   }
 
   /**

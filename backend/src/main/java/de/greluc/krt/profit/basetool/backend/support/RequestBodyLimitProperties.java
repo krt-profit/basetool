@@ -21,8 +21,8 @@ package de.greluc.krt.profit.basetool.backend.support;
 
 import jakarta.validation.constraints.Min;
 import java.util.List;
-import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
@@ -39,29 +39,21 @@ import org.springframework.validation.annotation.Validated;
  * <p>Like {@link RateLimitProperties}, this lives in the dependency-leaf {@code support} package
  * (not {@code config}) so the {@code filter} layer can read it without a {@code filter} &rarr;
  * {@code config} package cycle; it is picked up by {@code @ConfigurationPropertiesScan} regardless
- * of package.
+ * of package. An immutable record (BE-MOD-04).
+ *
+ * @param enabled whether the request-body-size cap is active; disable only to diagnose a false
+ *     rejection
+ * @param maxBytes the inclusive maximum request-body size in bytes for the covered paths. Defaults
+ *     to 2&nbsp;MiB, the same ceiling the frontend refinery proxy already enforces ({@code
+ *     RefineryImportProxyController.MAX_EXTRACT_BYTES}); a real extract is a few KB, so anything
+ *     near this is hostile or buggy. Must be at least 1&nbsp;KiB.
+ * @param paths the request URIs (exact match) whose non-multipart body is size-capped. Defaults to
+ *     the refinery screenshot-import extract endpoint — the one non-multipart JSON import flagged
+ *     by the review; add further JSON write paths here if they ever accept large bodies.
  */
-@Data
 @Validated
 @ConfigurationProperties(prefix = "app.request-body-limit")
-public class RequestBodyLimitProperties {
-
-  /** Whether the request-body-size cap is active. Disable only to diagnose a false rejection. */
-  private boolean enabled = true;
-
-  /**
-   * Inclusive maximum request-body size in bytes for the covered paths. Defaults to 2&nbsp;MiB, the
-   * same ceiling the frontend refinery proxy already enforces ({@code
-   * RefineryImportProxyController.MAX_EXTRACT_BYTES}); a real extract is a few KB, so anything near
-   * this is hostile or buggy. Must be at least 1&nbsp;KiB.
-   */
-  @Min(1024)
-  private long maxBytes = 2L * 1024 * 1024;
-
-  /**
-   * Request URIs (exact match) whose non-multipart body is size-capped. Defaults to the refinery
-   * screenshot-import extract endpoint — the one non-multipart JSON import flagged by the review;
-   * add further JSON write paths here if they ever accept large bodies.
-   */
-  private List<String> paths = List.of("/api/v1/refinery-orders/import-extract");
-}
+public record RequestBodyLimitProperties(
+    @DefaultValue("true") boolean enabled,
+    @DefaultValue("2097152") @Min(1024) long maxBytes,
+    @DefaultValue("/api/v1/refinery-orders/import-extract") List<String> paths) {}

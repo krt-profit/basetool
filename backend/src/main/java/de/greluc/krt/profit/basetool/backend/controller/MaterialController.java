@@ -26,6 +26,8 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialMatrixItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialPriceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialPriceOverviewDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialSellingTerminalDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.MaterialService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
@@ -135,8 +137,7 @@ public class MaterialController {
    * @return all visible materials as reference DTOs
    */
   @GetMapping("/lookup")
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto>
-      lookupMaterials() {
+  public List<MaterialReferenceDto> lookupMaterials() {
     return materialService.findAllReference();
   }
 
@@ -270,8 +271,7 @@ public class MaterialController {
    * @return selling-terminal DTOs
    */
   @GetMapping("/{id}/terminals")
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.MaterialSellingTerminalDto>
-      getMaterialTerminals(@PathVariable @NotNull UUID id) {
+  public List<MaterialSellingTerminalDto> getMaterialTerminals(@PathVariable @NotNull UUID id) {
     return materialService.getMaterialTerminals(id);
   }
 

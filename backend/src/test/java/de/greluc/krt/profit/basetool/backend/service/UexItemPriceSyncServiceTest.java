@@ -43,8 +43,11 @@ import de.greluc.krt.profit.basetool.backend.model.Terminal;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemPriceRepository;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.TerminalRepository;
+import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -71,12 +74,24 @@ class UexItemPriceSyncServiceTest {
 
   private final RecordingTransactionManager tx = new RecordingTransactionManager();
   private UexProperties properties;
+
+  /** The configured keys, relative to the record's prefix; {@link #rebuild()} binds them. */
+  private final Map<String, Object> config = new HashMap<>();
+
   private UexItemPriceSyncService service;
 
   @BeforeEach
   void setUp() {
-    properties = new UexProperties();
-    properties.setItemPriceSyncEnabled(true);
+    config.putAll(Map.of("item-price-sync-enabled", true));
+    rebuild();
+  }
+
+  /**
+   * Binds the properties record from {@link #config} and builds the object under test over it. The
+   * record is immutable (BE-MOD-04), so a test that changes a key rebuilds.
+   */
+  private void rebuild() {
+    properties = BoundProperties.bind(UexProperties.class, config);
     service =
         new UexItemPriceSyncService(
             uexClient,
@@ -89,7 +104,8 @@ class UexItemPriceSyncServiceTest {
 
   @Test
   void syncItemPrices_isNoOp_whenFlagOff() {
-    properties.setItemPriceSyncEnabled(false);
+    config.put("item-price-sync-enabled", false);
+    rebuild();
 
     service.syncItemPrices();
 

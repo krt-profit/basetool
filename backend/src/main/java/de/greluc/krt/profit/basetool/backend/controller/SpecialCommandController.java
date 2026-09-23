@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.mapper.SpecialCommandMapper;
 import de.greluc.krt.profit.basetool.backend.model.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.SpecialCommandDto;
+import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.SpecialCommandService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
@@ -36,6 +37,7 @@ import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -71,6 +73,7 @@ public class SpecialCommandController {
 
   private final SpecialCommandService specialCommandService;
   private final SpecialCommandMapper specialCommandMapper;
+  private final AuthHelperService authHelperService;
 
   /**
    * Paged list of Spezialkommandos for the admin overview and the owner-picker dropdown. The {@code
@@ -81,7 +84,6 @@ public class SpecialCommandController {
    * @param size page size, defaults to the platform default.
    * @param sort sort spec; whitelisted to {@code name}, {@code shorthand}, {@code id}.
    * @param includeInactive include soft-deleted rows; ADMIN-only.
-   * @param authentication Spring Security authentication, injected for the inactive-flag gate.
    * @return paged Spezialkommando DTOs.
    * @throws org.springframework.security.access.AccessDeniedException if {@code includeInactive} is
    *     requested without ROLE_ADMIN.
@@ -105,14 +107,9 @@ public class SpecialCommandController {
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort,
-      @RequestParam(required = false, defaultValue = "false") boolean includeInactive,
-      org.springframework.security.core.Authentication authentication) {
-    if (includeInactive
-        && (authentication == null
-            || authentication.getAuthorities().stream()
-                .noneMatch(a -> "ROLE_ADMIN".equals(a.getAuthority())))) {
-      throw new org.springframework.security.access.AccessDeniedException(
-          "includeInactive=true requires ROLE_ADMIN");
+      @RequestParam(required = false, defaultValue = "false") boolean includeInactive) {
+    if (includeInactive && !authHelperService.isAdmin()) {
+      throw new AccessDeniedException("includeInactive=true requires ROLE_ADMIN");
     }
     Pageable pageable = PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "name");
     Page<SpecialCommand> p = specialCommandService.getAllSpecialCommands(pageable, includeInactive);

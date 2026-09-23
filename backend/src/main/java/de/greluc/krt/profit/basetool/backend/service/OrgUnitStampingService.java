@@ -37,6 +37,7 @@ import lombok.RequiredArgsConstructor;
 import org.hibernate.Hibernate;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -295,9 +296,8 @@ public class OrgUnitStampingService {
    *     assign to the requested target.
    * @throws BadRequestException when a non-null target id does not resolve to a known org unit.
    */
-  @org.jetbrains.annotations.Nullable
-  public OrgUnit resolveReassignTargetOrgUnit(
-      @org.jetbrains.annotations.Nullable UUID targetOrgUnitId) {
+  @Nullable
+  public OrgUnit resolveReassignTargetOrgUnit(@Nullable UUID targetOrgUnitId) {
     boolean admin = authHelper.isAdmin();
     if (targetOrgUnitId == null) {
       // Ownerless target: an admin always, otherwise only a membershipless leadership caller. The
@@ -305,7 +305,7 @@ public class OrgUnitStampingService {
       if (admin || requestScopeResolver.currentMemberOrgUnitIds().isEmpty()) {
         return null;
       }
-      throw new org.springframework.security.access.AccessDeniedException(
+      throw new AccessDeniedException(
           "Only an admin or a membershipless leadership user may make an aggregate ownerless");
     }
     // Non-null target: an admin may assign anywhere; a non-admin only to a direct membership or a
@@ -314,7 +314,7 @@ public class OrgUnitStampingService {
     if (!admin
         && !requestScopeResolver.currentMemberOrgUnitIds().contains(targetOrgUnitId)
         && !accessGateService.canEditOrgUnit(targetOrgUnitId)) {
-      throw new org.springframework.security.access.AccessDeniedException(
+      throw new AccessDeniedException(
           "Target org unit is neither a membership of the caller nor within their editable scope");
     }
     return orgUnitRepository

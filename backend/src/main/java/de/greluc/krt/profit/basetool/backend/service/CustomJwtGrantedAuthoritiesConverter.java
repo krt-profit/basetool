@@ -149,7 +149,7 @@ public class CustomJwtGrantedAuthoritiesConverter
     this.authoritiesCache =
         Caffeine.newBuilder()
             .maximumSize(AUTHORITIES_CACHE_MAX_SIZE)
-            .expireAfterWrite(authoritiesCacheProperties.getTtl())
+            .expireAfterWrite(authoritiesCacheProperties.ttl())
             .build();
   }
 

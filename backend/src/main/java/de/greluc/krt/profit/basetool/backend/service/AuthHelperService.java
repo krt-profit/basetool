@@ -144,6 +144,19 @@ public class AuthHelperService {
   }
 
   /**
+   * The programmatic twin of {@link Roles#ADMIN_OR_OFFICER}: {@code true} when the caller reaches
+   * {@code ROLE_ADMIN} or {@code ROLE_OFFICER} through the configured {@link RoleHierarchy}.
+   * Neither role is implied by any other, so today this equals "holds one of the two directly";
+   * asking the hierarchy keeps the answer right if that ever changes.
+   *
+   * @return {@code true} for an admin or an officer, {@code false} for every other caller,
+   *     including an anonymous one and a request with no authentication at all
+   */
+  public boolean isAdminOrOfficer() {
+    return isAdmin() || hasReachableRole(Roles.authority(Roles.OFFICER));
+  }
+
+  /**
    * {@code true} when the current caller is a registered organisation member or holds an elevated
    * role ({@code KRT_MEMBER}/{@code MEMBER}/{@code LOGISTICIAN}/{@code MISSION_MANAGER}/{@code
    * OFFICER}/{@code ADMIN}), evaluated through the configured {@link RoleHierarchy}.
@@ -236,8 +249,7 @@ public class AuthHelperService {
     return scope().canEditOrgUnit(orgUnitId);
   }
 
-  private de.greluc.krt.profit.basetool.backend.service.OwnerScopeService scope() {
-    return applicationContext.getBean(
-        de.greluc.krt.profit.basetool.backend.service.OwnerScopeService.class);
+  private OwnerScopeService scope() {
+    return applicationContext.getBean(OwnerScopeService.class);
   }
 }

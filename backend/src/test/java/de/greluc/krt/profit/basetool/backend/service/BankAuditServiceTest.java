@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankAuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.ApiClientMetricsProperties;
+import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import de.greluc.krt.profit.basetool.backend.support.ClientAttribution;
 import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -74,7 +75,9 @@ class BankAuditServiceTest {
   // the stub said and still pass while the mapping was broken.
   @Spy
   private ClientAttribution clientAttribution =
-      new ClientAttribution(new ApiClientMetricsProperties(), new IngestGatewayProperties());
+      new ClientAttribution(
+          BoundProperties.defaults(ApiClientMetricsProperties.class),
+          BoundProperties.defaults(IngestGatewayProperties.class));
 
   // A real registry (spied so @InjectMocks wires it) so record() genuinely increments the counter
   // and the test can read it back.

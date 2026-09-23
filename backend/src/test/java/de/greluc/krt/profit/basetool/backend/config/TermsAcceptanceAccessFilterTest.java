@@ -26,6 +26,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
 import de.greluc.krt.profit.basetool.backend.support.RefusedSubjectWindow;
 import de.greluc.krt.profit.basetool.backend.support.TermsConsentCheck;
@@ -83,7 +84,7 @@ class TermsAcceptanceAccessFilterTest {
         new TermsAcceptanceAccessFilter(
             termsConsentCheck,
             messages,
-            new ProblemResponseFactory(new AppProblemProperties()),
+            new ProblemResponseFactory(BoundProperties.defaults(AppProblemProperties.class)),
             new ObjectMapper(),
             meterRegistry,
             refusedSubjects);

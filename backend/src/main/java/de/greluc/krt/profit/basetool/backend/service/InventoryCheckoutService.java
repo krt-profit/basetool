@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.exception.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
@@ -160,9 +161,7 @@ public class InventoryCheckoutService {
   public InventoryItemDto bookOutInventoryItem(
       UUID id, InventoryItemBookOutDto dto, UUID currentUserId, boolean isAdmin) {
     InventoryItem item =
-        inventoryItemRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("Inventory item not found"));
+        Entities.require(inventoryItemRepository.findById(id), "Inventory item not found");
 
     OptimisticLock.checkOptionalClient(item.getVersion(), dto.version(), InventoryItem.class, id);
 
@@ -206,7 +205,7 @@ public class InventoryCheckoutService {
       if (dto.terminal() == null || dto.terminal().isBlank()) {
         throw new BadRequestException("Terminal is required for selling");
       }
-      if (dto.sellAmount() == null || dto.sellAmount().compareTo(java.math.BigDecimal.ZERO) < 0) {
+      if (dto.sellAmount() == null || dto.sellAmount().compareTo(BigDecimal.ZERO) < 0) {
         throw new BadRequestException("Sell amount is required and must be positive");
       }
     }
@@ -334,18 +333,15 @@ public class InventoryCheckoutService {
     User targetUser = item.getUser();
     if (dto.targetUserId() != null && !dto.targetUserId().equals(item.getUser().getId())) {
       targetUser =
-          userRepository
-              .findById(dto.targetUserId())
-              .orElseThrow(() -> new NotFoundException("Target user not found"));
+          Entities.require(userRepository.findById(dto.targetUserId()), "Target user not found");
     }
 
     Location targetLocation = item.getLocation();
     if (dto.targetLocationId() != null
         && !dto.targetLocationId().equals(item.getLocation().getId())) {
       targetLocation =
-          locationRepository
-              .findById(dto.targetLocationId())
-              .orElseThrow(() -> new NotFoundException("Target location not found"));
+          Entities.require(
+              locationRepository.findById(dto.targetLocationId()), "Target location not found");
     }
 
     if (targetUser.getId().equals(item.getUser().getId())
@@ -638,9 +634,7 @@ public class InventoryCheckoutService {
   public InventoryItemDto rebookPersonal(
       UUID id, InventoryItemPersonalRebookDto dto, UUID currentUserId, boolean isAdmin) {
     InventoryItem item =
-        inventoryItemRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("Inventory item not found"));
+        Entities.require(inventoryItemRepository.findById(id), "Inventory item not found");
 
     OptimisticLock.checkOptionalClient(item.getVersion(), dto.version(), InventoryItem.class, id);
 
@@ -1031,9 +1025,9 @@ public class InventoryCheckoutService {
 
     for (UUID itemId : request.itemIds()) {
       InventoryItem item =
-          inventoryItemRepository
-              .findByIdForUpdate(itemId)
-              .orElseThrow(() -> new NotFoundException("Inventory item not found: " + itemId));
+          Entities.require(
+              inventoryItemRepository.findByIdForUpdate(itemId),
+              () -> "Inventory item not found: " + itemId);
 
       if (!item.getUser().getId().equals(currentUserId)) {
         log.warn(
@@ -1167,9 +1161,9 @@ public class InventoryCheckoutService {
     final List<InventoryItem> rows = new ArrayList<>(orderedIds.size());
     for (UUID itemId : orderedIds) {
       InventoryItem item =
-          inventoryItemRepository
-              .findByIdForRebook(itemId)
-              .orElseThrow(() -> new NotFoundException("Inventory item not found: " + itemId));
+          Entities.require(
+              inventoryItemRepository.findByIdForRebook(itemId),
+              () -> "Inventory item not found: " + itemId);
       if (!item.getUser().getId().equals(currentUserId)) {
         log.warn(
             "User {} attempted to bulk-rebook item {} owned by {}",
@@ -1208,15 +1202,14 @@ public class InventoryCheckoutService {
     final User targetUser =
         request.targetUserId() == null
             ? null
-            : userRepository
-                .findById(request.targetUserId())
-                .orElseThrow(() -> new NotFoundException("Target user not found"));
+            : Entities.require(
+                userRepository.findById(request.targetUserId()), "Target user not found");
     final Location targetLocation =
         request.targetLocationId() == null
             ? null
-            : locationRepository
-                .findById(request.targetLocationId())
-                .orElseThrow(() -> new NotFoundException("Target location not found"));
+            : Entities.require(
+                locationRepository.findById(request.targetLocationId()),
+                "Target location not found");
 
     // Resolved once: every row has the same owner, so the destination owner — and therefore the
     // membership gate for the picked pool — is constant across the whole selection.
@@ -1410,9 +1403,8 @@ public class InventoryCheckoutService {
     // single client-echoed token for the whole split) so a stale echo still 409s and the response
     // carries the fresh version for the in-place DOM sync.
     InventoryItem item =
-        inventoryItemRepository
-            .findByIdForAllocationWrite(id)
-            .orElseThrow(() -> new NotFoundException("Inventory item not found"));
+        Entities.require(
+            inventoryItemRepository.findByIdForAllocationWrite(id), "Inventory item not found");
 
     if (!item.getUser().getId().equals(currentUserId) && !isLogistician) {
       throw new AccessDeniedException("You are not allowed to update this inventory item");
@@ -1424,15 +1416,14 @@ public class InventoryCheckoutService {
     // orders can be delivered for one and still open for another. Flip only the requested order's
     // slice; an absent slice means the order is no longer earmarked on this entry (stale UI) → 404.
     InventoryJobOrderAllocation slice =
-        item.getJobOrderAllocations().stream()
-            .filter(
-                a ->
-                    a.getJobOrder() != null && request.jobOrderId().equals(a.getJobOrder().getId()))
-            .findFirst()
-            .orElseThrow(
-                () ->
-                    new NotFoundException(
-                        "Job-order allocation not found for this inventory item"));
+        Entities.require(
+            item.getJobOrderAllocations().stream()
+                .filter(
+                    a ->
+                        a.getJobOrder() != null
+                            && request.jobOrderId().equals(a.getJobOrder().getId()))
+                .findFirst(),
+            "Job-order allocation not found for this inventory item");
     slice.setDelivered(request.delivered());
     InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
     auditService.record(

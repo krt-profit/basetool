@@ -36,19 +36,19 @@ import de.greluc.krt.profit.basetool.backend.model.dto.SpecialCommandDto;
 import de.greluc.krt.profit.basetool.backend.service.SpecialCommandService;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 /**
  * Pure-method unit tests for {@link SpecialCommandController}. Mirrors the {@link
@@ -62,7 +62,45 @@ class SpecialCommandControllerTest {
   @Mock private SpecialCommandService service;
   @Mock private SpecialCommandMapper mapper;
 
-  @InjectMocks private SpecialCommandController controller;
+  private SpecialCommandController controller;
+
+  @BeforeEach
+  void setUp() {
+    controller = new SpecialCommandController(service, mapper, RoleGateFixture.realAuthHelper());
+  }
+
+  @AfterEach
+  void clearSecurityContext() {
+    RoleGateFixture.clear();
+  }
+
+  static java.util.stream.Stream<String> callers() {
+    return RoleGateFixture.callers();
+  }
+
+  /**
+   * BE-SIMP-07: the {@code includeInactive} gate moved from a raw {@code "ROLE_ADMIN"} scan of the
+   * injected {@code Authentication} to {@code AuthHelperService.isAdmin()}. Every caller shape must
+   * still get exactly the answer the raw scan gave: an admin reaches the service, everyone else is
+   * refused before it.
+   */
+  @ParameterizedTest
+  @MethodSource("callers")
+  void getAll_includeInactive_isAdminOnlyForEveryCallerShape(String caller) {
+    boolean admitted = RoleGateFixture.rawCheckAccepted(caller, "ROLE_ADMIN");
+    RoleGateFixture.authenticateAs(caller);
+    if (admitted) {
+      when(service.getAllSpecialCommands(any(Pageable.class), eq(true)))
+          .thenReturn(new PageImpl<>(List.of()));
+      controller.getAllSpecialCommands(null, null, null, true);
+      verify(service).getAllSpecialCommands(any(Pageable.class), eq(true));
+    } else {
+      assertThrows(
+          AccessDeniedException.class,
+          () -> controller.getAllSpecialCommands(null, null, null, true));
+      verify(service, never()).getAllSpecialCommands(any(Pageable.class), any(Boolean.class));
+    }
+  }
 
   @Test
   void getAll_wrapsServicePageIntoPageResponseAndMapsContent() {
@@ -73,8 +111,7 @@ class SpecialCommandControllerTest {
     when(service.getAllSpecialCommands(any(Pageable.class), eq(false))).thenReturn(servicePage);
     when(mapper.toDto(entity)).thenReturn(dto);
 
-    PageResponse<SpecialCommandDto> resp =
-        controller.getAllSpecialCommands(0, 20, null, false, null);
+    PageResponse<SpecialCommandDto> resp = controller.getAllSpecialCommands(0, 20, null, false);
 
     assertEquals(1, resp.totalElements());
     assertEquals(1, resp.content().size());
@@ -86,24 +123,20 @@ class SpecialCommandControllerTest {
     when(service.getAllSpecialCommands(any(Pageable.class), eq(true)))
         .thenReturn(new PageImpl<>(List.of()));
 
-    Authentication adminAuth =
-        new UsernamePasswordAuthenticationToken(
-            "admin", null, java.util.List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+    RoleGateFixture.authenticateAs("ROLE_ADMIN");
 
-    controller.getAllSpecialCommands(null, null, null, true, adminAuth);
+    controller.getAllSpecialCommands(null, null, null, true);
 
     verify(service).getAllSpecialCommands(any(Pageable.class), eq(true));
   }
 
   @Test
   void getAll_includeInactive_withoutAdminAuth_throwsAccessDenied() {
-    Authentication memberAuth =
-        new UsernamePasswordAuthenticationToken(
-            "member", null, java.util.List.of(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
+    RoleGateFixture.authenticateAs("ROLE_KRT_MEMBER");
 
     assertThrows(
         AccessDeniedException.class,
-        () -> controller.getAllSpecialCommands(null, null, null, true, memberAuth));
+        () -> controller.getAllSpecialCommands(null, null, null, true));
 
     verify(service, never()).getAllSpecialCommands(any(Pageable.class), any(Boolean.class));
   }
@@ -113,7 +146,7 @@ class SpecialCommandControllerTest {
     when(service.getAllSpecialCommands(any(Pageable.class), eq(false)))
         .thenReturn(new PageImpl<>(List.of()));
 
-    controller.getAllSpecialCommands(3, 75, "name,desc", false, null);
+    controller.getAllSpecialCommands(3, 75, "name,desc", false);
 
     ArgumentCaptor<Pageable> pgCap = ArgumentCaptor.forClass(Pageable.class);
     verify(service).getAllSpecialCommands(pgCap.capture(), eq(false));

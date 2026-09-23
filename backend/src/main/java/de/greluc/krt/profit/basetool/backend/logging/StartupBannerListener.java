@@ -77,9 +77,9 @@ public class StartupBannerListener {
     log.info(" Active profiles     : {}", Arrays.toString(environment.getActiveProfiles()));
     log.info(" Datasource URL      : {}", sanitiseJdbcUrl(datasourceUrl));
     log.info(" Keycloak issuer     : {}", keycloakIssuerUri);
-    log.info(" Correlation header  : {}", loggingProperties.getCorrelationIdHeader());
-    log.info(" Slow request (ms)   : {}", loggingProperties.getSlowRequestThresholdMs());
-    log.info(" Structured logging  : {}", loggingProperties.isStructuredEnabled());
+    log.info(" Correlation header  : {}", loggingProperties.correlationIdHeader());
+    log.info(" Slow request (ms)   : {}", loggingProperties.slowRequestThresholdMs());
+    log.info(" Structured logging  : {}", loggingProperties.structuredEnabled());
     log.info("============================================================");
   }
 

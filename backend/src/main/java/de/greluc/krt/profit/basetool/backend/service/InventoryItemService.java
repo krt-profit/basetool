@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.exception.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
@@ -39,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkCheckoutRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkRebookRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkRebookResultDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryAllocationDimension;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryAllocationInput;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryAllocationWriteDto;
@@ -131,7 +133,7 @@ public class InventoryItemService {
    * @return one slice per (material, quality) the user owns, with the summed SCU; never {@code
    *     null}
    */
-  public List<OwnedStockSlice> getOwnedStockSlices(@org.jetbrains.annotations.NotNull UUID userId) {
+  public List<OwnedStockSlice> getOwnedStockSlices(@NotNull UUID userId) {
     return inventoryAggregationService.getOwnedStockSlices(userId);
   }
 
@@ -177,8 +179,7 @@ public class InventoryItemService {
    * @param userId owner id
    * @return aggregated items grouped by material
    */
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
-      getMyAggregatedInventory(UUID userId) {
+  public List<GroupedInventoryDto> getMyAggregatedInventory(UUID userId) {
     return inventoryAggregationService.getMyAggregatedInventory(userId);
   }
 
@@ -190,8 +191,8 @@ public class InventoryItemService {
    * @param missionIds optional mission filter
    * @return aggregated items
    */
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
-      getMyAggregatedInventory(UUID userId, List<UUID> jobOrderIds, List<UUID> missionIds) {
+  public List<GroupedInventoryDto> getMyAggregatedInventory(
+      UUID userId, List<UUID> jobOrderIds, List<UUID> missionIds) {
     return inventoryAggregationService.getMyAggregatedInventory(userId, jobOrderIds, missionIds);
   }
 
@@ -208,13 +209,12 @@ public class InventoryItemService {
    * @return aggregated items
    * @throws NotFoundException when the user id is unknown
    */
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
-      getMyAggregatedInventory(
-          UUID userId,
-          List<UUID> materialIds,
-          Integer minQuality,
-          List<UUID> jobOrderIds,
-          List<UUID> missionIds) {
+  public List<GroupedInventoryDto> getMyAggregatedInventory(
+      UUID userId,
+      List<UUID> materialIds,
+      Integer minQuality,
+      List<UUID> jobOrderIds,
+      List<UUID> missionIds) {
     return inventoryAggregationService.getMyAggregatedInventory(
         userId, materialIds, minQuality, jobOrderIds, missionIds);
   }
@@ -239,16 +239,15 @@ public class InventoryItemService {
    * @return aggregated items
    * @throws NotFoundException when the user id is unknown
    */
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
-      getMyAggregatedInventory(
-          UUID userId,
-          List<UUID> materialIds,
-          List<UUID> locationIds,
-          Integer minQuality,
-          List<UUID> jobOrderIds,
-          List<UUID> missionIds,
-          boolean personalOnly,
-          boolean nonPersonalOnly) {
+  public List<GroupedInventoryDto> getMyAggregatedInventory(
+      UUID userId,
+      List<UUID> materialIds,
+      List<UUID> locationIds,
+      Integer minQuality,
+      List<UUID> jobOrderIds,
+      List<UUID> missionIds,
+      boolean personalOnly,
+      boolean nonPersonalOnly) {
     return inventoryAggregationService.getMyAggregatedInventory(
         userId,
         materialIds,
@@ -307,8 +306,8 @@ public class InventoryItemService {
    * @param minQuality optional min-quality filter
    * @return aggregated squadron-wide items
    */
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
-      getAllAggregatedInventory(List<UUID> materialIds, Integer minQuality) {
+  public List<GroupedInventoryDto> getAllAggregatedInventory(
+      List<UUID> materialIds, Integer minQuality) {
     return inventoryAggregationService.getAllAggregatedInventory(materialIds, minQuality);
   }
 
@@ -323,13 +322,12 @@ public class InventoryItemService {
    * @param missionIds optional mission filter
    * @return aggregated items grouped by material
    */
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
-      getAllAggregatedInventory(
-          List<UUID> materialIds,
-          List<UUID> locationIds,
-          Integer minQuality,
-          List<UUID> jobOrderIds,
-          List<UUID> missionIds) {
+  public List<GroupedInventoryDto> getAllAggregatedInventory(
+      List<UUID> materialIds,
+      List<UUID> locationIds,
+      Integer minQuality,
+      List<UUID> jobOrderIds,
+      List<UUID> missionIds) {
     return inventoryAggregationService.getAllAggregatedInventory(
         materialIds, locationIds, minQuality, jobOrderIds, missionIds);
   }
@@ -500,26 +498,17 @@ public class InventoryItemService {
           "You are not allowed to create personal inventory items for other users");
     }
 
-    final User user =
-        userRepository
-            .findById(targetUserId)
-            .orElseThrow(() -> new NotFoundException("User not found"));
+    final User user = Entities.require(userRepository.findById(targetUserId), "User not found");
     final Material material =
         dto.materialId() != null
-            ? materialRepository
-                .findById(dto.materialId())
-                .orElseThrow(() -> new NotFoundException("Material not found"))
+            ? Entities.require(materialRepository.findById(dto.materialId()), "Material not found")
             : null;
     final GameItem gameItem =
         dto.gameItemId() != null
-            ? gameItemRepository
-                .findById(dto.gameItemId())
-                .orElseThrow(() -> new NotFoundException("GameItem not found"))
+            ? Entities.require(gameItemRepository.findById(dto.gameItemId()), "GameItem not found")
             : null;
     final Location location =
-        locationRepository
-            .findById(dto.locationId())
-            .orElseThrow(() -> new NotFoundException("Location not found"));
+        Entities.require(locationRepository.findById(dto.locationId()), "Location not found");
 
     // Service-level belts behind the DTO's @AssertTrue guards: a crafted payload that bypassed
     // bean validation must 400 here rather than surface the V220 DB CHECKs (catalog XOR,
@@ -587,9 +576,8 @@ public class InventoryItemService {
       }
       requireWholeUnits(wholeUnits, gameItem != null, allocation.amount());
       JobOrder order =
-          jobOrderRepository
-              .findById(allocation.targetId())
-              .orElseThrow(() -> new NotFoundException("JobOrder not found"));
+          Entities.require(
+              jobOrderRepository.findById(allocation.targetId()), "JobOrder not found");
       // Kind dispatch (REQ-ORDERS-018 / REQ-INV-031): a material row is gated on the order's
       // required materials, a game-item row on the ITEM order's requested game items.
       if (gameItem != null) {
@@ -607,9 +595,7 @@ public class InventoryItemService {
       }
       requireWholeUnits(wholeUnits, gameItem != null, allocation.amount());
       Mission missionTarget =
-          missionRepository
-              .findById(allocation.targetId())
-              .orElseThrow(() -> new NotFoundException("Mission not found"));
+          Entities.require(missionRepository.findById(allocation.targetId()), "Mission not found");
       InventoryAllocations.addMission(
           item, missionTarget, InventoryItem.roundToScuScale(allocation.amount()));
     }
@@ -672,9 +658,7 @@ public class InventoryItemService {
     switch (dto.field()) {
       case JOB_ORDER -> {
         JobOrder jobOrder =
-            jobOrderRepository
-                .findById(dto.targetId())
-                .orElseThrow(() -> new NotFoundException("JobOrder not found"));
+            Entities.require(jobOrderRepository.findById(dto.targetId()), "JobOrder not found");
         // Kind dispatch (REQ-ORDERS-018 / REQ-INV-031): the gate matches the row's catalog kind.
         if (item.getGameItem() != null) {
           assertGameItemRequiredByJobOrder(item.getGameItem(), jobOrder);
@@ -700,9 +684,7 @@ public class InventoryItemService {
       case MISSION -> {
         assertMissionDimensionAllowed(item);
         final Mission mission =
-            missionRepository
-                .findById(dto.targetId())
-                .orElseThrow(() -> new NotFoundException("Mission not found"));
+            Entities.require(missionRepository.findById(dto.targetId()), "Mission not found");
         if (findMissionSlice(item, dto.targetId()) != null) {
           throw new BadRequestException("error.inventory.allocation.duplicate.mission");
         }
@@ -854,9 +836,8 @@ public class InventoryItemService {
    */
   private InventoryItem loadForAllocationWrite(UUID id, InventoryAllocationWriteDto dto) {
     InventoryItem item =
-        inventoryItemRepository
-            .findByIdForAllocationWrite(id)
-            .orElseThrow(() -> new NotFoundException("Inventory item not found"));
+        Entities.require(
+            inventoryItemRepository.findByIdForAllocationWrite(id), "Inventory item not found");
     OptimisticLock.checkOptionalClient(item.getVersion(), dto.version(), InventoryItem.class, id);
     return item;
   }
@@ -1142,9 +1123,7 @@ public class InventoryItemService {
   public InventoryItemDto updateNote(
       UUID id, InventoryItemNoteUpdateRequest request, UUID currentUserId, boolean isLogistician) {
     InventoryItem item =
-        inventoryItemRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("Inventory item not found"));
+        Entities.require(inventoryItemRepository.findById(id), "Inventory item not found");
 
     boolean isOwner = item.getUser().getId().equals(currentUserId);
     if (!isOwner && !isLogistician) {

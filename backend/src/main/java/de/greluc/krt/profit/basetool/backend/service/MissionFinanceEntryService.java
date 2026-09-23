@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.MissionMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
@@ -36,6 +37,7 @@ import de.greluc.krt.profit.basetool.backend.repository.FinanceEntryAggregate;
 import de.greluc.krt.profit.basetool.backend.repository.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import java.math.BigDecimal;
 import java.util.List;
@@ -71,8 +73,7 @@ public class MissionFinanceEntryService {
   private final MissionFinanceEntryRepository financeEntryRepository;
   private final MissionParticipantRepository participantRepository;
   private final MissionRepository missionRepository;
-  private final de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository
-      refineryOrderRepository;
+  private final RefineryOrderRepository refineryOrderRepository;
   private final MissionMapper missionMapper;
   private final AuditService auditService;
 
@@ -166,13 +167,10 @@ public class MissionFinanceEntryService {
   @Transactional
   public MissionFinanceEntryDto createEntry(@NotNull MissionFinanceEntryCreateDto dto) {
     Mission mission =
-        missionRepository
-            .findById(dto.missionId())
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+        Entities.require(missionRepository.findById(dto.missionId()), "Mission not found");
     MissionParticipant participant =
-        participantRepository
-            .findById(dto.participantId())
-            .orElseThrow(() -> new NotFoundException("Assigned participant not found"));
+        Entities.require(
+            participantRepository.findById(dto.participantId()), "Assigned participant not found");
 
     if (!participant.getMission().getId().equals(mission.getId())) {
       throw new BadRequestException("Participant does not belong to this mission");
@@ -215,9 +213,7 @@ public class MissionFinanceEntryService {
   @PreAuthorize("@missionSecurityService.canEditFinanceEntry(#entryId, authentication)")
   public MissionFinanceEntryDto updateEntry(UUID entryId, MissionFinanceEntryUpdateDto dto) {
     MissionFinanceEntry entry =
-        financeEntryRepository
-            .findById(entryId)
-            .orElseThrow(() -> new NotFoundException("Finance entry not found"));
+        Entities.require(financeEntryRepository.findById(entryId), "Finance entry not found");
 
     // Optimistic Locking Check
     if (!entry.getVersion().equals(dto.version())) {
@@ -249,9 +245,7 @@ public class MissionFinanceEntryService {
   @PreAuthorize("@missionSecurityService.canEditFinanceEntry(#entryId, authentication)")
   public void deleteEntry(UUID entryId) {
     MissionFinanceEntry entry =
-        financeEntryRepository
-            .findById(entryId)
-            .orElseThrow(() -> new NotFoundException("Finance entry not found"));
+        Entities.require(financeEntryRepository.findById(entryId), "Finance entry not found");
 
     UUID auditMissionId = entry.getMission() != null ? entry.getMission().getId() : null;
     String auditMissionName = entry.getMission() != null ? entry.getMission().getName() : null;

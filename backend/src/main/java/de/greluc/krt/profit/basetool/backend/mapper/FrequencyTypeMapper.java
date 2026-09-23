@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.mapper;
 import de.greluc.krt.profit.basetool.backend.model.FrequencyType;
 import de.greluc.krt.profit.basetool.backend.model.dto.FrequencyTypeDto;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 
 /** MapStruct mapper between Frequency Type entities and DTOs. */
 @Mapper(config = CentralMapperConfig.class)
@@ -30,5 +31,7 @@ public interface FrequencyTypeMapper {
   FrequencyTypeDto toDto(FrequencyType entity);
 
   /** Builds a new {@link FrequencyType} entity from the inbound DTO. */
+  @Mapping(target = "createdAt", ignore = true)
+  @Mapping(target = "updatedAt", ignore = true)
   FrequencyType toEntity(FrequencyTypeDto dto);
 }

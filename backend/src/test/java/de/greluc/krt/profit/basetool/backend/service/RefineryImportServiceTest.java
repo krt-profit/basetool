@@ -27,7 +27,8 @@ import static org.mockito.Mockito.verify;
 import de.greluc.krt.profit.basetool.backend.config.RefineryImportProperties;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.mapper.LocationMapper;
-import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
+import de.greluc.krt.profit.basetool.backend.mapper.MaterialCategoryMapperImpl;
+import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapperImpl;
 import de.greluc.krt.profit.basetool.backend.mapper.RefiningMethodMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapperImpl;
@@ -53,6 +54,7 @@ import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipReposit
 import de.greluc.krt.profit.basetool.backend.repository.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver;
 import java.time.Instant;
 import java.util.List;
@@ -150,8 +152,8 @@ class RefineryImportServiceTest {
             userRepository,
             aliasService,
             new BlueprintFuzzyMatcher(),
-            new RefineryImportProperties(),
-            Mappers.getMapper(MaterialMapper.class),
+            BoundProperties.defaults(RefineryImportProperties.class),
+            new MaterialMapperImpl(new MaterialCategoryMapperImpl()),
             Mappers.getMapper(LocationMapper.class),
             Mappers.getMapper(RefiningMethodMapper.class),
             userMapper);

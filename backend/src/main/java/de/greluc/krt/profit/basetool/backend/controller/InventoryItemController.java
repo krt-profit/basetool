@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkCheckoutRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkRebookRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkRebookResultDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryAllocationWriteDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryCatalog;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryGameItemReferenceDto;
@@ -51,8 +52,10 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -292,18 +295,17 @@ public class InventoryItemController {
    */
   @GetMapping("/my-inventory/grouped")
   @Transactional(readOnly = true)
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
-      getMyGroupedInventory(
-          @AuthenticationPrincipal Jwt jwt,
-          @RequestParam(required = false) List<UUID> materialIds,
-          @RequestParam(required = false) List<UUID> gameItemIds,
-          @RequestParam(required = false) List<UUID> locationIds,
-          @RequestParam(required = false) Integer minQuality,
-          @RequestParam(required = false) List<UUID> jobOrderIds,
-          @RequestParam(required = false) List<UUID> missionIds,
-          @RequestParam(required = false, defaultValue = "false") boolean personalOnly,
-          @RequestParam(required = false, defaultValue = "false") boolean nonPersonalOnly,
-          @RequestParam(required = false, defaultValue = "MATERIAL") InventoryCatalog catalog) {
+  public List<GroupedInventoryDto> getMyGroupedInventory(
+      @AuthenticationPrincipal Jwt jwt,
+      @RequestParam(required = false) List<UUID> materialIds,
+      @RequestParam(required = false) List<UUID> gameItemIds,
+      @RequestParam(required = false) List<UUID> locationIds,
+      @RequestParam(required = false) Integer minQuality,
+      @RequestParam(required = false) List<UUID> jobOrderIds,
+      @RequestParam(required = false) List<UUID> missionIds,
+      @RequestParam(required = false, defaultValue = "false") boolean personalOnly,
+      @RequestParam(required = false, defaultValue = "false") boolean nonPersonalOnly,
+      @RequestParam(required = false, defaultValue = "MATERIAL") InventoryCatalog catalog) {
     if (catalog == InventoryCatalog.ITEM) {
       rejectMaterialOnlyFilters(minQuality, missionIds, materialIds);
       return inventoryAggregationService.getMyAggregatedItemInventory(
@@ -480,15 +482,14 @@ public class InventoryItemController {
    */
   @GetMapping("/all/grouped")
   @Transactional(readOnly = true)
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
-      getAllGroupedInventory(
-          @RequestParam(required = false) List<UUID> materialIds,
-          @RequestParam(required = false) List<UUID> gameItemIds,
-          @RequestParam(required = false) List<UUID> locationIds,
-          @RequestParam(required = false) Integer minQuality,
-          @RequestParam(required = false) List<UUID> jobOrderIds,
-          @RequestParam(required = false) List<UUID> missionIds,
-          @RequestParam(required = false, defaultValue = "MATERIAL") InventoryCatalog catalog) {
+  public List<GroupedInventoryDto> getAllGroupedInventory(
+      @RequestParam(required = false) List<UUID> materialIds,
+      @RequestParam(required = false) List<UUID> gameItemIds,
+      @RequestParam(required = false) List<UUID> locationIds,
+      @RequestParam(required = false) Integer minQuality,
+      @RequestParam(required = false) List<UUID> jobOrderIds,
+      @RequestParam(required = false) List<UUID> missionIds,
+      @RequestParam(required = false, defaultValue = "MATERIAL") InventoryCatalog catalog) {
     if (catalog == InventoryCatalog.ITEM) {
       rejectMaterialOnlyFilters(minQuality, missionIds, materialIds);
       return inventoryAggregationService.getAllAggregatedItemInventory(
@@ -651,7 +652,7 @@ public class InventoryItemController {
         size != null && size > 0
             ? Math.min(size, STACK_ENTRIES_MAX_SIZE)
             : STACK_ENTRIES_DEFAULT_SIZE;
-    return org.springframework.data.domain.PageRequest.of(resolvedPage, resolvedSize);
+    return PageRequest.of(resolvedPage, resolvedSize);
   }
 
   /**
@@ -760,7 +761,7 @@ public class InventoryItemController {
    */
   @PostMapping("/{id}/book-out")
   @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditInventoryItem(#id)")
-  public org.springframework.http.ResponseEntity<InventoryItemDto> bookOutInventoryItem(
+  public ResponseEntity<InventoryItemDto> bookOutInventoryItem(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
       @RequestBody @Valid InventoryItemBookOutDto dto) {
@@ -769,9 +770,9 @@ public class InventoryItemController {
         inventoryItemService.bookOutInventoryItem(
             id, dto, userService.getUserIdFromJwt(jwt), isLogistician);
     if (result == null) {
-      return org.springframework.http.ResponseEntity.noContent().build();
+      return ResponseEntity.noContent().build();
     }
-    return org.springframework.http.ResponseEntity.ok(result);
+    return ResponseEntity.ok(result);
   }
 
   /**
@@ -1018,8 +1019,8 @@ public class InventoryItemController {
   })
   @DeleteMapping("/all")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
-  public org.springframework.http.ResponseEntity<Void> deleteAllGlobalInventory() {
+  public ResponseEntity<Void> deleteAllGlobalInventory() {
     inventoryItemService.deleteAllGlobalInventory();
-    return org.springframework.http.ResponseEntity.noContent().build();
+    return ResponseEntity.noContent().build();
   }
 }

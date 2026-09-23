@@ -37,12 +37,14 @@ import de.greluc.krt.profit.basetool.backend.config.RestClientConfig;
 import de.greluc.krt.profit.basetool.backend.exception.ExternalServiceException;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
+import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.observation.DefaultMeterObservationHandler;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
 import java.security.KeyStore;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -112,7 +114,10 @@ class KeycloakServiceTest {
     assertDoesNotThrow(
         () ->
             new KeycloakService(
-                new KeycloakSyncProperties(), observedBuilder(), sslBundles, meterRegistry));
+                BoundProperties.defaults(KeycloakSyncProperties.class),
+                observedBuilder(),
+                sslBundles,
+                meterRegistry));
     verify(sslBundles).getBundle("keycloak-trust");
   }
 
@@ -125,8 +130,8 @@ class KeycloakServiceTest {
   void fetchUsers_withoutBundle_disabledSync_returnsEmpty() {
     when(sslBundles.getBundle("keycloak-trust"))
         .thenThrow(new NoSuchSslBundleException("keycloak-trust", "no such bundle"));
-    KeycloakSyncProperties properties = new KeycloakSyncProperties();
-    properties.setEnabled(false);
+    KeycloakSyncProperties properties =
+        BoundProperties.bind(KeycloakSyncProperties.class, Map.of("enabled", false));
 
     KeycloakService service =
         new KeycloakService(properties, observedBuilder(), sslBundles, meterRegistry);
@@ -148,12 +153,20 @@ class KeycloakServiceTest {
     MockWebServer server = new MockWebServer();
     server.start();
     try {
-      KeycloakSyncProperties properties = new KeycloakSyncProperties();
-      properties.setEnabled(true);
-      properties.setAdminUrl(server.url("/").toString().replaceAll("/+$", ""));
-      properties.setRealm("iri");
-      properties.setClientId("client");
-      properties.setClientSecret("secret");
+      KeycloakSyncProperties properties =
+          BoundProperties.bind(
+              KeycloakSyncProperties.class,
+              Map.of(
+                  "enabled",
+                  true,
+                  "admin-url",
+                  server.url("/").toString().replaceAll("/+$", ""),
+                  "realm",
+                  "iri",
+                  "client-id",
+                  "client",
+                  "client-secret",
+                  "secret"));
       // The client-credentials token request fails → getAccessToken throws → fetchUsers swallows.
       server.enqueue(new MockResponse().setResponseCode(500));
 
@@ -181,13 +194,22 @@ class KeycloakServiceTest {
     MockWebServer server = new MockWebServer();
     server.start();
     try {
-      KeycloakSyncProperties properties = new KeycloakSyncProperties();
-      properties.setEnabled(true);
-      properties.setAdminUrl(server.url("/").toString().replaceAll("/+$", ""));
-      properties.setRealm("iri");
-      properties.setClientId("client");
-      properties.setClientSecret("secret");
-      properties.setPageSize(2);
+      KeycloakSyncProperties properties =
+          BoundProperties.bind(
+              KeycloakSyncProperties.class,
+              Map.of(
+                  "enabled",
+                  true,
+                  "admin-url",
+                  server.url("/").toString().replaceAll("/+$", ""),
+                  "realm",
+                  "iri",
+                  "client-id",
+                  "client",
+                  "client-secret",
+                  "secret",
+                  "page-size",
+                  2));
 
       UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
       UUID userB = UUID.fromString("00000000-0000-0000-0000-0000000000b2");
@@ -247,13 +269,22 @@ class KeycloakServiceTest {
     MockWebServer server = new MockWebServer();
     server.start();
     try {
-      KeycloakSyncProperties properties = new KeycloakSyncProperties();
-      properties.setEnabled(true);
-      properties.setAdminUrl(server.url("/").toString().replaceAll("/+$", ""));
-      properties.setRealm("iri");
-      properties.setClientId("client");
-      properties.setClientSecret("secret");
-      properties.setPageSize(100);
+      KeycloakSyncProperties properties =
+          BoundProperties.bind(
+              KeycloakSyncProperties.class,
+              Map.of(
+                  "enabled",
+                  true,
+                  "admin-url",
+                  server.url("/").toString().replaceAll("/+$", ""),
+                  "realm",
+                  "iri",
+                  "client-id",
+                  "client",
+                  "client-secret",
+                  "secret",
+                  "page-size",
+                  100));
 
       UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
 
@@ -293,13 +324,22 @@ class KeycloakServiceTest {
     MockWebServer server = new MockWebServer();
     server.start();
     try {
-      KeycloakSyncProperties properties = new KeycloakSyncProperties();
-      properties.setEnabled(true);
-      properties.setAdminUrl(server.url("/").toString().replaceAll("/+$", ""));
-      properties.setRealm("iri");
-      properties.setClientId("client");
-      properties.setClientSecret("secret");
-      properties.setPageSize(100);
+      KeycloakSyncProperties properties =
+          BoundProperties.bind(
+              KeycloakSyncProperties.class,
+              Map.of(
+                  "enabled",
+                  true,
+                  "admin-url",
+                  server.url("/").toString().replaceAll("/+$", ""),
+                  "realm",
+                  "iri",
+                  "client-id",
+                  "client",
+                  "client-secret",
+                  "secret",
+                  "page-size",
+                  100));
 
       UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
 
@@ -337,13 +377,22 @@ class KeycloakServiceTest {
     MockWebServer server = new MockWebServer();
     server.start();
     try {
-      KeycloakSyncProperties properties = new KeycloakSyncProperties();
-      properties.setEnabled(true);
-      properties.setAdminUrl(server.url("/").toString().replaceAll("/+$", ""));
-      properties.setRealm("iri");
-      properties.setClientId("client");
-      properties.setClientSecret("secret");
-      properties.setPageSize(100);
+      KeycloakSyncProperties properties =
+          BoundProperties.bind(
+              KeycloakSyncProperties.class,
+              Map.of(
+                  "enabled",
+                  true,
+                  "admin-url",
+                  server.url("/").toString().replaceAll("/+$", ""),
+                  "realm",
+                  "iri",
+                  "client-id",
+                  "client",
+                  "client-secret",
+                  "secret",
+                  "page-size",
+                  100));
 
       UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
 
@@ -399,13 +448,22 @@ class KeycloakServiceTest {
     MockWebServer server = new MockWebServer();
     server.start();
     try {
-      KeycloakSyncProperties properties = new KeycloakSyncProperties();
-      properties.setEnabled(true);
-      properties.setAdminUrl(server.url("/").toString().replaceAll("/+$", ""));
-      properties.setRealm("iri");
-      properties.setClientId("client");
-      properties.setClientSecret("secret");
-      properties.setPageSize(100);
+      KeycloakSyncProperties properties =
+          BoundProperties.bind(
+              KeycloakSyncProperties.class,
+              Map.of(
+                  "enabled",
+                  true,
+                  "admin-url",
+                  server.url("/").toString().replaceAll("/+$", ""),
+                  "realm",
+                  "iri",
+                  "client-id",
+                  "client",
+                  "client-secret",
+                  "secret",
+                  "page-size",
+                  100));
 
       UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
 
@@ -462,13 +520,22 @@ class KeycloakServiceTest {
     MockWebServer server = new MockWebServer();
     server.start();
     try {
-      KeycloakSyncProperties properties = new KeycloakSyncProperties();
-      properties.setEnabled(true);
-      properties.setAdminUrl(server.url("/").toString().replaceAll("/+$", ""));
-      properties.setRealm("iri");
-      properties.setClientId("client");
-      properties.setClientSecret("secret");
-      properties.setPageSize(100);
+      KeycloakSyncProperties properties =
+          BoundProperties.bind(
+              KeycloakSyncProperties.class,
+              Map.of(
+                  "enabled",
+                  true,
+                  "admin-url",
+                  server.url("/").toString().replaceAll("/+$", ""),
+                  "realm",
+                  "iri",
+                  "client-id",
+                  "client",
+                  "client-secret",
+                  "secret",
+                  "page-size",
+                  100));
 
       UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
 
@@ -507,13 +574,22 @@ class KeycloakServiceTest {
     MockWebServer server = new MockWebServer();
     server.start();
     try {
-      KeycloakSyncProperties properties = new KeycloakSyncProperties();
-      properties.setEnabled(true);
-      properties.setAdminUrl(server.url("/").toString().replaceAll("/+$", ""));
-      properties.setRealm("iri");
-      properties.setClientId("client");
-      properties.setClientSecret("secret");
-      properties.setPageSize(100);
+      KeycloakSyncProperties properties =
+          BoundProperties.bind(
+              KeycloakSyncProperties.class,
+              Map.of(
+                  "enabled",
+                  true,
+                  "admin-url",
+                  server.url("/").toString().replaceAll("/+$", ""),
+                  "realm",
+                  "iri",
+                  "client-id",
+                  "client",
+                  "client-secret",
+                  "secret",
+                  "page-size",
+                  100));
 
       UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
 
@@ -559,13 +635,22 @@ class KeycloakServiceTest {
     MockWebServer server = new MockWebServer();
     server.start();
     try {
-      KeycloakSyncProperties properties = new KeycloakSyncProperties();
-      properties.setEnabled(true);
-      properties.setAdminUrl(server.url("/").toString().replaceAll("/+$", ""));
-      properties.setRealm("iri");
-      properties.setClientId("backend-service");
-      properties.setClientSecret("secret");
-      properties.setPageSize(100);
+      KeycloakSyncProperties properties =
+          BoundProperties.bind(
+              KeycloakSyncProperties.class,
+              Map.of(
+                  "enabled",
+                  true,
+                  "admin-url",
+                  server.url("/").toString().replaceAll("/+$", ""),
+                  "realm",
+                  "iri",
+                  "client-id",
+                  "backend-service",
+                  "client-secret",
+                  "secret",
+                  "page-size",
+                  100));
 
       UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
 
@@ -607,13 +692,22 @@ class KeycloakServiceTest {
     MockWebServer server = new MockWebServer();
     server.start();
     try {
-      KeycloakSyncProperties properties = new KeycloakSyncProperties();
-      properties.setEnabled(true);
-      properties.setAdminUrl(server.url("/").toString().replaceAll("/+$", ""));
-      properties.setRealm("iri");
-      properties.setClientId("client");
-      properties.setClientSecret("secret");
-      properties.setPageSize(100);
+      KeycloakSyncProperties properties =
+          BoundProperties.bind(
+              KeycloakSyncProperties.class,
+              Map.of(
+                  "enabled",
+                  true,
+                  "admin-url",
+                  server.url("/").toString().replaceAll("/+$", ""),
+                  "realm",
+                  "iri",
+                  "client-id",
+                  "client",
+                  "client-secret",
+                  "secret",
+                  "page-size",
+                  100));
 
       UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
 
@@ -933,12 +1027,20 @@ class KeycloakServiceTest {
    * @return the configured properties.
    */
   private static KeycloakSyncProperties writeProperties(MockWebServer server) {
-    KeycloakSyncProperties properties = new KeycloakSyncProperties();
-    properties.setEnabled(true);
-    properties.setAdminUrl(server.url("/").toString().replaceAll("/+$", ""));
-    properties.setRealm("iri");
-    properties.setClientId("client");
-    properties.setClientSecret("secret");
+    KeycloakSyncProperties properties =
+        BoundProperties.bind(
+            KeycloakSyncProperties.class,
+            Map.of(
+                "enabled",
+                true,
+                "admin-url",
+                server.url("/").toString().replaceAll("/+$", ""),
+                "realm",
+                "iri",
+                "client-id",
+                "client",
+                "client-secret",
+                "secret"));
     return properties;
   }
 
@@ -962,8 +1064,8 @@ class KeycloakServiceTest {
     MockWebServer server = new MockWebServer();
     server.start();
     try {
+      // writeProperties leaves page-size at its default of 100.
       KeycloakSyncProperties properties = writeProperties(server);
-      properties.setPageSize(100);
 
       UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
       server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
@@ -1024,13 +1126,22 @@ class KeycloakServiceTest {
     MockWebServer server = new MockWebServer();
     server.start();
     try {
-      KeycloakSyncProperties properties = new KeycloakSyncProperties();
-      properties.setEnabled(true);
-      properties.setAdminUrl(server.url("/").toString().replaceAll("/+$", ""));
-      properties.setRealm("iri");
-      properties.setClientId("client");
-      properties.setClientSecret("secret");
-      properties.setPageSize(100);
+      KeycloakSyncProperties properties =
+          BoundProperties.bind(
+              KeycloakSyncProperties.class,
+              Map.of(
+                  "enabled",
+                  true,
+                  "admin-url",
+                  server.url("/").toString().replaceAll("/+$", ""),
+                  "realm",
+                  "iri",
+                  "client-id",
+                  "client",
+                  "client-secret",
+                  "secret",
+                  "page-size",
+                  100));
 
       UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
 
@@ -1094,13 +1205,22 @@ class KeycloakServiceTest {
     MockWebServer server = new MockWebServer();
     server.start();
     try {
-      KeycloakSyncProperties properties = new KeycloakSyncProperties();
-      properties.setEnabled(true);
-      properties.setAdminUrl(server.url("/").toString().replaceAll("/+$", ""));
-      properties.setRealm("iri");
-      properties.setClientId("client");
-      properties.setClientSecret("secret");
-      properties.setPageSize(100);
+      KeycloakSyncProperties properties =
+          BoundProperties.bind(
+              KeycloakSyncProperties.class,
+              Map.of(
+                  "enabled",
+                  true,
+                  "admin-url",
+                  server.url("/").toString().replaceAll("/+$", ""),
+                  "realm",
+                  "iri",
+                  "client-id",
+                  "client",
+                  "client-secret",
+                  "secret",
+                  "page-size",
+                  100));
 
       UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
 
@@ -1145,13 +1265,22 @@ class KeycloakServiceTest {
     MockWebServer server = new MockWebServer();
     server.start();
     try {
-      KeycloakSyncProperties properties = new KeycloakSyncProperties();
-      properties.setEnabled(true);
-      properties.setAdminUrl(server.url("/").toString().replaceAll("/+$", ""));
-      properties.setRealm("iri");
-      properties.setClientId("client");
-      properties.setClientSecret("secret");
-      properties.setPageSize(10);
+      KeycloakSyncProperties properties =
+          BoundProperties.bind(
+              KeycloakSyncProperties.class,
+              Map.of(
+                  "enabled",
+                  true,
+                  "admin-url",
+                  server.url("/").toString().replaceAll("/+$", ""),
+                  "realm",
+                  "iri",
+                  "client-id",
+                  "client",
+                  "client-secret",
+                  "secret",
+                  "page-size",
+                  10));
       server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
       server.enqueue(jsonResponse("[]"));
 

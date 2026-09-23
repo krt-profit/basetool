@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderItemHandoverMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
@@ -147,9 +148,8 @@ public class JobOrderItemHandoverService {
   public JobOrderItemHandoverDto createItemHandover(
       UUID jobOrderId, JobOrderItemHandoverCreateDto dto) {
     JobOrder jobOrder =
-        jobOrderRepository
-            .findById(jobOrderId)
-            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + jobOrderId));
+        Entities.require(
+            jobOrderRepository.findById(jobOrderId), () -> "JobOrder not found: " + jobOrderId);
 
     if (jobOrder.getType() != JobOrderType.ITEM) {
       throw new BadRequestException("Job order " + jobOrderId + " is not an item order");

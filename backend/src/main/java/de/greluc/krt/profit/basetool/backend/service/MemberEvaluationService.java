@@ -231,8 +231,7 @@ public class MemberEvaluationService {
     if (authHelperService.isAdmin()) {
       return;
     }
-    java.util.List<UUID> staffelIds =
-        orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(userId);
+    List<UUID> staffelIds = orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(userId);
     if (staffelIds.stream().noneMatch(ownerScopeService::canEditSquadron)) {
       throw new AccessDeniedException(
           "Caller's squadron context does not allow evaluating this member");

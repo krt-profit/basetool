@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.JobType;
@@ -42,11 +44,15 @@ import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -122,29 +128,21 @@ public class MissionStructureService {
       Double frequency,
       UUID responsibleUserId,
       String note) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
 
     MissionUnit missionUnit = new MissionUnit();
     missionUnit.setMission(mission);
 
     if (shipTypeId != null) {
       ShipType shipType =
-          shipTypeRepository
-              .findById(shipTypeId)
-              .orElseThrow(() -> new NotFoundException("ShipType not found"));
+          Entities.require(shipTypeRepository.findById(shipTypeId), "ShipType not found");
       missionUnit.setShipType(shipType);
     } else {
       missionUnit.setShipType(null);
     }
 
     if (shipId != null) {
-      Ship ship =
-          shipRepository
-              .findById(shipId)
-              .orElseThrow(() -> new NotFoundException("Ship not found"));
+      Ship ship = Entities.require(shipRepository.findById(shipId), "Ship not found");
       if (shipTypeId != null && !ship.getShipType().getId().equals(shipTypeId)) {
         throw new IllegalArgumentException("Ship does not match the specified ShipType");
       }
@@ -224,9 +222,8 @@ public class MissionStructureService {
     if (responsibleUserId == null) {
       return null;
     }
-    return userRepository
-        .findById(responsibleUserId)
-        .orElseThrow(() -> new NotFoundException("Responsible user not found"));
+    return Entities.require(
+        userRepository.findById(responsibleUserId), "Responsible user not found");
   }
 
   /**
@@ -264,16 +261,12 @@ public class MissionStructureService {
       Double frequency,
       UUID responsibleUserId,
       String note) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
 
     MissionUnit missionUnit =
-        mission.getAssignedUnits().stream()
-            .filter(u -> u.getId().equals(unitId))
-            .findFirst()
-            .orElseThrow(() -> new NotFoundException("MissionUnit not found"));
+        Entities.require(
+            mission.getAssignedUnits().stream().filter(u -> u.getId().equals(unitId)).findFirst(),
+            "MissionUnit not found");
 
     OptimisticLock.checkOptionalClient(
         missionUnit.getVersion(), expectedVersion, MissionUnit.class, unitId);
@@ -284,19 +277,14 @@ public class MissionStructureService {
 
     if (shipTypeId != null) {
       ShipType shipType =
-          shipTypeRepository
-              .findById(shipTypeId)
-              .orElseThrow(() -> new NotFoundException("ShipType not found"));
+          Entities.require(shipTypeRepository.findById(shipTypeId), "ShipType not found");
       missionUnit.setShipType(shipType);
     } else {
       missionUnit.setShipType(null);
     }
 
     if (shipId != null) {
-      Ship ship =
-          shipRepository
-              .findById(shipId)
-              .orElseThrow(() -> new NotFoundException("Ship not found"));
+      Ship ship = Entities.require(shipRepository.findById(shipId), "Ship not found");
       if (shipTypeId != null && !ship.getShipType().getId().equals(shipTypeId)) {
         throw new IllegalArgumentException("Ship does not match the specified ShipType");
       }
@@ -382,19 +370,16 @@ public class MissionStructureService {
   @NotNull
   @Transactional(readOnly = true)
   public List<Ship> getSelectableUnitShips(@NotNull UUID missionId) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
 
-    java.util.Map<UUID, Ship> byId = new java.util.LinkedHashMap<>();
+    Map<UUID, Ship> byId = new LinkedHashMap<>();
 
     Set<UUID> participantUserIds =
         mission.getParticipants().stream()
             .map(MissionParticipant::getUser)
             .filter(Objects::nonNull)
             .map(User::getId)
-            .collect(java.util.stream.Collectors.toSet());
+            .collect(Collectors.toSet());
     if (!participantUserIds.isEmpty()) {
       shipRepository
           .findByOwnerIdIn(participantUserIds)
@@ -408,7 +393,7 @@ public class MissionStructureService {
       }
     }
 
-    return new java.util.ArrayList<>(byId.values());
+    return new ArrayList<>(byId.values());
   }
 
   /**
@@ -417,10 +402,7 @@ public class MissionStructureService {
    */
   @Transactional
   public Mission removeMissionUnit(@NotNull UUID missionId, @NotNull UUID unitId) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
 
     boolean removed = mission.getAssignedUnits().removeIf(u -> u.getId().equals(unitId));
 
@@ -447,22 +429,21 @@ public class MissionStructureService {
       @NotNull UUID missionUnitId,
       @NotNull UUID participantId,
       @NotNull Set<UUID> jobTypeIds) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
 
     MissionUnit missionShip =
-        mission.getAssignedUnits().stream()
-            .filter(ms -> ms != null && ms.getId() != null && ms.getId().equals(missionUnitId))
-            .findFirst()
-            .orElseThrow(() -> new NotFoundException("MissionUnit not found in this mission"));
+        Entities.require(
+            mission.getAssignedUnits().stream()
+                .filter(ms -> ms != null && ms.getId() != null && ms.getId().equals(missionUnitId))
+                .findFirst(),
+            "MissionUnit not found in this mission");
 
     MissionParticipant participant =
-        mission.getParticipants().stream()
-            .filter(p -> p.getId().equals(participantId))
-            .findFirst()
-            .orElseThrow(() -> new NotFoundException("Participant not found in this mission"));
+        Entities.require(
+            mission.getParticipants().stream()
+                .filter(p -> p.getId().equals(participantId))
+                .findFirst(),
+            "Participant not found in this mission");
 
     boolean isAlreadyAssigned =
         mission.getAssignedUnits().stream()
@@ -470,8 +451,7 @@ public class MissionStructureService {
             .anyMatch(c -> c.getParticipant().getId().equals(participantId));
 
     if (isAlreadyAssigned) {
-      throw new de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException(
-          "error.mission.crew.duplicate");
+      throw new DuplicateEntityException("error.mission.crew.duplicate");
     }
 
     MissionCrew crew = new MissionCrew();
@@ -516,22 +496,19 @@ public class MissionStructureService {
       @NotNull UUID crewId,
       Long expectedVersion,
       @NotNull Set<UUID> jobTypeIds) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
 
     MissionUnit missionUnit =
-        mission.getAssignedUnits().stream()
-            .filter(u -> u.getId().equals(missionUnitId))
-            .findFirst()
-            .orElseThrow(() -> new NotFoundException("MissionUnit not found"));
+        Entities.require(
+            mission.getAssignedUnits().stream()
+                .filter(u -> u.getId().equals(missionUnitId))
+                .findFirst(),
+            "MissionUnit not found");
 
     MissionCrew crew =
-        missionUnit.getCrew().stream()
-            .filter(c -> c.getId().equals(crewId))
-            .findFirst()
-            .orElseThrow(() -> new NotFoundException("Crew member not found in this unit"));
+        Entities.require(
+            missionUnit.getCrew().stream().filter(c -> c.getId().equals(crewId)).findFirst(),
+            "Crew member not found in this unit");
 
     OptimisticLock.checkOptionalClient(
         crew.getVersion(), expectedVersion, MissionCrew.class, crewId);
@@ -556,16 +533,14 @@ public class MissionStructureService {
   @Transactional
   public Mission removeCrewFromShip(
       @NotNull UUID missionId, @NotNull UUID missionUnitId, @NotNull UUID crewId) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
 
     MissionUnit missionUnit =
-        mission.getAssignedUnits().stream()
-            .filter(u -> u.getId().equals(missionUnitId))
-            .findFirst()
-            .orElseThrow(() -> new NotFoundException("MissionUnit not found"));
+        Entities.require(
+            mission.getAssignedUnits().stream()
+                .filter(u -> u.getId().equals(missionUnitId))
+                .findFirst(),
+            "MissionUnit not found");
 
     boolean removed = missionUnit.getCrew().removeIf(c -> c.getId().equals(crewId));
 
@@ -598,9 +573,7 @@ public class MissionStructureService {
     if (jobTypeIds != null && !jobTypeIds.isEmpty()) {
       for (UUID jtId : jobTypeIds) {
         JobType jt =
-            jobTypeRepository
-                .findById(jtId)
-                .orElseThrow(() -> new NotFoundException("JobType not found: " + jtId));
+            Entities.require(jobTypeRepository.findById(jtId), () -> "JobType not found: " + jtId);
 
         if (jt.getArchetype() != JobTypeArchetype.CREW) {
           throw new IllegalArgumentException(

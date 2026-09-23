@@ -20,9 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.config;
 
 import jakarta.validation.constraints.AssertTrue;
-import lombok.Data;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
@@ -40,12 +40,17 @@ import org.springframework.validation.annotation.Validated;
  * {@code 503}); the SPI treats any non-200 as unknown and fails open, so the collision precheck is
  * simply skipped. Never commit a real value — it is supplied via the {@code
  * KRT_DISCORD_SPI_SHARED_SECRET} environment variable.
+ *
+ * <p>An immutable record bound by {@code @ConfigurationPropertiesScan} (BE-MOD-04). Its {@link
+ * #toString()} redacts the secret.
+ *
+ * @param sharedSecret the shared secret the Keycloak SPI must present to call the account-existence
+ *     endpoint. Blank (the default) disables the endpoint, which fail-open-skips the precheck on
+ *     the SPI side. Not {@code @NotBlank}, so a non-Discord deployment boots without it.
  */
-@Data
-@Configuration
 @Validated
 @ConfigurationProperties(prefix = "app.discord.spi-precheck")
-public class DiscordSpiPrecheckProperties {
+public record DiscordSpiPrecheckProperties(@DefaultValue("") String sharedSecret) {
 
   /**
    * Minimum accepted length of a configured (non-blank) shared secret. The account-existence
@@ -57,14 +62,7 @@ public class DiscordSpiPrecheckProperties {
   private static final int MIN_SECRET_LENGTH = 32;
 
   /**
-   * Shared secret the Keycloak SPI must present to call the account-existence endpoint. Blank (the
-   * default) disables the endpoint, which fail-open-skips the precheck on the SPI side. Not a
-   * {@code @NotBlank} so a non-Discord deployment boots without it.
-   */
-  private String sharedSecret = "";
-
-  /**
-   * Enforces shared-secret strength at startup (via {@link Validated} on this properties class): a
+   * Enforces shared-secret strength at startup (via {@link Validated} on this properties record): a
    * configured secret must be at least {@link #MIN_SECRET_LENGTH} characters, while a blank secret
    * stays valid because it disables the endpoint. A weak operator-supplied secret therefore fails
    * the context startup instead of shipping a brute-forceable sole-credential endpoint.
@@ -79,5 +77,17 @@ public class DiscordSpiPrecheckProperties {
     return sharedSecret == null
         || sharedSecret.isBlank()
         || sharedSecret.length() >= MIN_SECRET_LENGTH;
+  }
+
+  /**
+   * Describes the record without its secret, so a logged or printed instance never carries it.
+   *
+   * @return the record name with the secret shown only as configured or blank
+   */
+  @Override
+  @NotNull
+  public String toString() {
+    boolean configured = sharedSecret != null && !sharedSecret.isBlank();
+    return "DiscordSpiPrecheckProperties[sharedSecret=" + (configured ? "<redacted>" : "") + "]";
   }
 }

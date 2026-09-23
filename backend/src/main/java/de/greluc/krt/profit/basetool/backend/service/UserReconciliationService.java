@@ -41,6 +41,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Contract;
@@ -651,7 +652,7 @@ public class UserReconciliationService {
   private Map<String, Role> roleCatalogue() {
     return roleRepository.findAllWithPermissions().stream()
         .collect(
-            java.util.stream.Collectors.toUnmodifiableMap(
+            Collectors.toUnmodifiableMap(
                 role -> role.getName().toLowerCase(Locale.ROOT), role -> role, (a, b) -> a));
   }
 

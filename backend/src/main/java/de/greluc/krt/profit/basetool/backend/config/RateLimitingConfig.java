@@ -20,13 +20,18 @@
 package de.greluc.krt.profit.basetool.backend.config;
 
 import de.greluc.krt.profit.basetool.backend.filter.RateLimitingFilter;
+import de.greluc.krt.profit.basetool.backend.filter.RequestBodySizeLimitFilter;
 import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
 import de.greluc.krt.profit.basetool.backend.support.RateLimitProperties;
+import de.greluc.krt.profit.basetool.backend.support.RequestBodyLimitProperties;
 import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.servlet.Filter;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.MessageSource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
 
 /**
  * Wires the {@link RateLimitingFilter} and registers it for all URLs at very high precedence so
@@ -69,12 +74,10 @@ public class RateLimitingConfig {
    */
   @NotNull
   @Bean
-  public org.springframework.boot.web.servlet.FilterRegistrationBean<jakarta.servlet.Filter>
-      rateLimitingFilterRegistration(RateLimitingFilter filter) {
-    org.springframework.boot.web.servlet.FilterRegistrationBean<jakarta.servlet.Filter>
-        registration = new org.springframework.boot.web.servlet.FilterRegistrationBean<>();
+  public FilterRegistrationBean<Filter> rateLimitingFilterRegistration(RateLimitingFilter filter) {
+    FilterRegistrationBean<Filter> registration = new FilterRegistrationBean<>();
     registration.setFilter(filter);
-    registration.setOrder(org.springframework.core.Ordered.HIGHEST_PRECEDENCE + 10);
+    registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 10);
     registration.addUrlPatterns("/*");
     return registration;
   }
@@ -89,13 +92,11 @@ public class RateLimitingConfig {
    */
   @NotNull
   @Bean
-  public de.greluc.krt.profit.basetool.backend.filter.RequestBodySizeLimitFilter
-      requestBodySizeLimitFilter(
-          de.greluc.krt.profit.basetool.backend.support.RequestBodyLimitProperties properties,
-          AppProblemProperties problemProperties,
-          MeterRegistry meterRegistry) {
-    return new de.greluc.krt.profit.basetool.backend.filter.RequestBodySizeLimitFilter(
-        properties, problemProperties, meterRegistry);
+  public RequestBodySizeLimitFilter requestBodySizeLimitFilter(
+      RequestBodyLimitProperties properties,
+      AppProblemProperties problemProperties,
+      MeterRegistry meterRegistry) {
+    return new RequestBodySizeLimitFilter(properties, problemProperties, meterRegistry);
   }
 
   /**
@@ -108,13 +109,11 @@ public class RateLimitingConfig {
    */
   @NotNull
   @Bean
-  public org.springframework.boot.web.servlet.FilterRegistrationBean<jakarta.servlet.Filter>
-      requestBodySizeLimitFilterRegistration(
-          de.greluc.krt.profit.basetool.backend.filter.RequestBodySizeLimitFilter filter) {
-    org.springframework.boot.web.servlet.FilterRegistrationBean<jakarta.servlet.Filter>
-        registration = new org.springframework.boot.web.servlet.FilterRegistrationBean<>();
+  public FilterRegistrationBean<Filter> requestBodySizeLimitFilterRegistration(
+      RequestBodySizeLimitFilter filter) {
+    FilterRegistrationBean<Filter> registration = new FilterRegistrationBean<>();
     registration.setFilter(filter);
-    registration.setOrder(org.springframework.core.Ordered.HIGHEST_PRECEDENCE + 15);
+    registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 15);
     registration.addUrlPatterns("/*");
     return registration;
   }

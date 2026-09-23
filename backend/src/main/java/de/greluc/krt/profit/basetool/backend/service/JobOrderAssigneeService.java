@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
@@ -78,9 +79,8 @@ public class JobOrderAssigneeService {
   @Transactional
   public JobOrderDto addAssignee(UUID jobOrderId, UUID userId) {
     JobOrder jobOrder =
-        jobOrderRepository
-            .findById(jobOrderId)
-            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + jobOrderId));
+        Entities.require(
+            jobOrderRepository.findById(jobOrderId), () -> "JobOrder not found: " + jobOrderId);
     boolean alreadyAssigned =
         jobOrder.getAssignees().stream()
             .anyMatch(a -> a.getUser() != null && a.getUser().getId().equals(userId));
@@ -88,9 +88,7 @@ public class JobOrderAssigneeService {
       return jobOrderStockProjectionService.mapToDtoWithStock(jobOrder);
     }
     User user =
-        userRepository
-            .findById(userId)
-            .orElseThrow(() -> new NotFoundException("User not found: " + userId));
+        Entities.require(userRepository.findById(userId), () -> "User not found: " + userId);
     jobOrder.addAssignee(JobOrderAssignee.builder().user(user).build());
     JobOrder saved = jobOrderRepository.saveAndFlush(jobOrder);
     auditService.record(
@@ -112,9 +110,8 @@ public class JobOrderAssigneeService {
   @Transactional
   public JobOrderDto removeAssignee(UUID jobOrderId, UUID userId) {
     JobOrder jobOrder =
-        jobOrderRepository
-            .findById(jobOrderId)
-            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + jobOrderId));
+        Entities.require(
+            jobOrderRepository.findById(jobOrderId), () -> "JobOrder not found: " + jobOrderId);
     boolean removed =
         jobOrder
             .getAssignees()
@@ -181,17 +178,14 @@ public class JobOrderAssigneeService {
    */
   private JobOrderDto setAssigneeNote(UUID jobOrderId, UUID userId, String note, Long version) {
     JobOrder jobOrder =
-        jobOrderRepository
-            .findById(jobOrderId)
-            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + jobOrderId));
+        Entities.require(
+            jobOrderRepository.findById(jobOrderId), () -> "JobOrder not found: " + jobOrderId);
     JobOrderAssignee assignee =
-        jobOrder.getAssignees().stream()
-            .filter(a -> a.getUser() != null && a.getUser().getId().equals(userId))
-            .findFirst()
-            .orElseThrow(
-                () ->
-                    new NotFoundException(
-                        "Assignee not found on job order " + jobOrderId + ": " + userId));
+        Entities.require(
+            jobOrder.getAssignees().stream()
+                .filter(a -> a.getUser() != null && a.getUser().getId().equals(userId))
+                .findFirst(),
+            () -> "Assignee not found on job order " + jobOrderId + ": " + userId);
 
     OptimisticLock.checkOptionalClient(
         assignee.getVersion(), version, JobOrderAssignee.class, assignee.getId());

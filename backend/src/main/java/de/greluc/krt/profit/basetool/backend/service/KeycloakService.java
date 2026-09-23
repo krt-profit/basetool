@@ -144,8 +144,8 @@ public class KeycloakService {
       MeterRegistry meterRegistry) {
     this.properties = properties;
     this.meterRegistry = meterRegistry;
-    if (properties.getAdminUrl() != null) {
-      restClientBuilder.baseUrl(properties.getAdminUrl());
+    if (properties.adminUrl() != null) {
+      restClientBuilder.baseUrl(properties.adminUrl());
     }
     ClientHttpRequestFactory trustedRequestFactory = buildTrustedRequestFactory(sslBundles);
     if (trustedRequestFactory != null) {
@@ -208,7 +208,7 @@ public class KeycloakService {
   @NotNull
   public List<KeycloakUserDto> fetchUsers(
       Collection<String> appRoleNames, Set<UUID> knownDiscordLinkedIds) {
-    if (!properties.isEnabled() || properties.getAdminUrl() == null) {
+    if (!properties.enabled() || properties.adminUrl() == null) {
       log.debug("Keycloak sync disabled or admin URL missing");
       return Collections.emptyList();
     }
@@ -269,7 +269,7 @@ public class KeycloakService {
               + "realm roles and reads their members, view-realm is needed beyond view-users. "
               + "Grant it in Keycloak; the run is skipped until then.",
           rcre.getStatusCode(),
-          properties.getClientId(),
+          properties.clientId(),
           e);
     } else {
       log.error("Failed to fetch users from Keycloak", e);
@@ -290,7 +290,7 @@ public class KeycloakService {
    */
   @NotNull
   private List<KeycloakUserDto> fetchAllUsers(String token) {
-    int pageSize = properties.getPageSize();
+    int pageSize = properties.pageSize();
     List<KeycloakUserDto> all = new ArrayList<>();
     int first = 0;
     while (true) {
@@ -304,7 +304,7 @@ public class KeycloakService {
                           .path("/admin/realms/{realm}/users")
                           .queryParam("first", currentFirst)
                           .queryParam("max", pageSize)
-                          .build(properties.getRealm()))
+                          .build(properties.realm()))
               .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + token)
               .retrieve()
               .body(new ParameterizedTypeReference<List<KeycloakUserDto>>() {});
@@ -452,7 +452,7 @@ public class KeycloakService {
    */
   @NotNull
   private List<String> fetchRealmRoleNames(String token) {
-    int pageSize = properties.getPageSize();
+    int pageSize = properties.pageSize();
     List<String> names = new ArrayList<>();
     int first = 0;
     while (true) {
@@ -466,7 +466,7 @@ public class KeycloakService {
                           .path("/admin/realms/{realm}/roles")
                           .queryParam("first", currentFirst)
                           .queryParam("max", pageSize)
-                          .build(properties.getRealm()))
+                          .build(properties.realm()))
               .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + token)
               .retrieve()
               .body(new ParameterizedTypeReference<List<Map<String, Object>>>() {});
@@ -500,7 +500,7 @@ public class KeycloakService {
    */
   @NotNull
   private String defaultRoleName() {
-    return "default-roles-" + properties.getRealm().toLowerCase(Locale.ROOT);
+    return "default-roles-" + properties.realm().toLowerCase(Locale.ROOT);
   }
 
   /**
@@ -531,7 +531,7 @@ public class KeycloakService {
                   uriBuilder ->
                       uriBuilder
                           .path("/admin/realms/{realm}/roles/{roleName}/composites/realm")
-                          .build(properties.getRealm(), defaultRoleName()))
+                          .build(properties.realm(), defaultRoleName()))
               .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + token)
               .retrieve()
               .body(new ParameterizedTypeReference<List<Map<String, Object>>>() {});
@@ -589,7 +589,7 @@ public class KeycloakService {
    */
   private void accumulateRoleMembers(
       String queryRoleName, String storedRoleName, String token, Map<UUID, Set<String>> byUser) {
-    accumulateRoleMembers(queryRoleName, java.util.List.of(storedRoleName), token, byUser);
+    accumulateRoleMembers(queryRoleName, List.of(storedRoleName), token, byUser);
   }
 
   /**
@@ -607,13 +607,13 @@ public class KeycloakService {
    */
   private void accumulateRoleMembers(
       String queryRoleName,
-      java.util.Collection<String> storedRoleNames,
+      Collection<String> storedRoleNames,
       String token,
       Map<UUID, Set<String>> byUser) {
     if (storedRoleNames.isEmpty()) {
       return;
     }
-    int pageSize = properties.getPageSize();
+    int pageSize = properties.pageSize();
     int first = 0;
     while (true) {
       final int currentFirst = first;
@@ -628,7 +628,7 @@ public class KeycloakService {
                             .path("/admin/realms/{realm}/roles/{roleName}/users")
                             .queryParam("first", currentFirst)
                             .queryParam("max", pageSize)
-                            .build(properties.getRealm(), queryRoleName))
+                            .build(properties.realm(), queryRoleName))
                 .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + token)
                 .retrieve()
                 .body(new ParameterizedTypeReference<List<Map<String, Object>>>() {});
@@ -758,7 +758,7 @@ public class KeycloakService {
           .post()
           .uri(
               "/admin/realms/{realm}/users/{id}/federated-identity/{provider}",
-              properties.getRealm(),
+              properties.realm(),
               keycloakUserId,
               DISCORD_IDP_ALIAS)
           .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + token)
@@ -807,7 +807,7 @@ public class KeycloakService {
           .delete()
           .uri(
               "/admin/realms/{realm}/users/{id}/federated-identity/{provider}",
-              properties.getRealm(),
+              properties.realm(),
               keycloakUserId,
               DISCORD_IDP_ALIAS)
           .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + token)
@@ -841,7 +841,7 @@ public class KeycloakService {
     try {
       adminClient
           .get()
-          .uri("/admin/realms/{realm}/users/{id}", properties.getRealm(), keycloakUserId)
+          .uri("/admin/realms/{realm}/users/{id}", properties.realm(), keycloakUserId)
           .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + getAccessToken())
           .retrieve()
           .toBodilessEntity();
@@ -882,7 +882,7 @@ public class KeycloakService {
       Map<String, Object> user =
           adminClient
               .get()
-              .uri("/admin/realms/{realm}/users/{id}", properties.getRealm(), keycloakUserId)
+              .uri("/admin/realms/{realm}/users/{id}", properties.realm(), keycloakUserId)
               .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + getAccessToken())
               .retrieve()
               .body(new ParameterizedTypeReference<Map<String, Object>>() {});
@@ -909,7 +909,7 @@ public class KeycloakService {
     try {
       adminClient
           .delete()
-          .uri("/admin/realms/{realm}/users/{id}", properties.getRealm(), keycloakUserId)
+          .uri("/admin/realms/{realm}/users/{id}", properties.realm(), keycloakUserId)
           .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + getAccessToken())
           .retrieve()
           .toBodilessEntity();
@@ -933,10 +933,7 @@ public class KeycloakService {
     List<Map<String, Object>> identities =
         adminClient
             .get()
-            .uri(
-                "/admin/realms/{realm}/users/{id}/federated-identity",
-                properties.getRealm(),
-                userId)
+            .uri("/admin/realms/{realm}/users/{id}/federated-identity", properties.realm(), userId)
             .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + token)
             .retrieve()
             .body(new ParameterizedTypeReference<List<Map<String, Object>>>() {});
@@ -977,7 +974,7 @@ public class KeycloakService {
    * @throws ExternalServiceException when the Keycloak admin URL is not configured
    */
   private void requireAdminUrl() {
-    if (properties.getAdminUrl() == null) {
+    if (properties.adminUrl() == null) {
       throw new ExternalServiceException("Keycloak admin URL is not configured");
     }
   }
@@ -994,14 +991,14 @@ public class KeycloakService {
   private String getAccessToken() {
     MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
     formData.add("grant_type", "client_credentials");
-    formData.add("client_id", properties.getClientId());
-    formData.add("client_secret", properties.getClientSecret());
+    formData.add("client_id", properties.clientId());
+    formData.add("client_secret", properties.clientSecret());
 
     try {
       Map response =
           adminClient
               .post()
-              .uri("/realms/{realm}/protocol/openid-connect/token", properties.getRealm())
+              .uri("/realms/{realm}/protocol/openid-connect/token", properties.realm())
               .contentType(MediaType.APPLICATION_FORM_URLENCODED)
               .body(formData)
               .retrieve()
@@ -1011,10 +1008,10 @@ public class KeycloakService {
         return (String) response.get("access_token");
       }
 
-      throw new de.greluc.krt.profit.basetool.backend.exception.ExternalServiceException(
+      throw new ExternalServiceException(
           "Could not retrieve access token from Keycloak. Response: " + response);
     } catch (RestClientResponseException e) {
-      throw new de.greluc.krt.profit.basetool.backend.exception.ExternalServiceException(
+      throw new ExternalServiceException(
           "Keycloak returned error: " + e.getStatusCode() + " - " + e.getResponseBodyAsString(), e);
     }
   }

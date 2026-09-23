@@ -78,61 +78,7 @@ class TerminalMapperTest {
   }
 
   @Test
-  void toEntity_shouldMapDtoFields_andLeaveUnmappedFieldsAtDefaults() {
-    // Given
-    UUID id = UUID.randomUUID();
-    java.time.Instant syncedAt = java.time.Instant.parse("2026-05-16T12:34:56Z");
-    TerminalDto dto =
-        new TerminalDto(
-            id,
-            "Lorville TDD",
-            "TDD LV",
-            "Stanton",
-            "Hurston",
-            "Lorville",
-            null,
-            true,
-            false,
-            true,
-            false,
-            false,
-            true,
-            syncedAt,
-            false);
-
-    // When
-    Terminal entity = mapper.toEntity(dto);
-
-    // Then
-    assertNotNull(entity);
-    assertEquals(id, entity.getId());
-    assertEquals("Lorville TDD", entity.getName());
-    assertEquals("TDD LV", entity.getNickname());
-    assertEquals("Stanton", entity.getStarSystemName());
-    assertEquals("Hurston", entity.getPlanetName());
-    assertEquals("Lorville", entity.getCityName());
-    assertNull(entity.getSpaceStationName());
-    assertTrue(entity.getHasLoadingDock());
-    assertFalse(entity.getIsAutoLoad());
-    assertTrue(entity.getHasLoadingDockOverridden());
-    assertFalse(entity.getIsAutoLoadOverridden());
-    assertFalse(entity.getUexHasLoadingDock());
-    assertTrue(entity.getUexIsAutoLoad());
-    assertEquals(syncedAt, entity.getUexSyncedAt());
-    assertFalse(entity.getHidden());
-    // Fields not present in DTO must stay at entity defaults
-    assertNull(entity.getIdTerminal());
-    assertNull(entity.getCode());
-    assertNull(entity.getOrbitName());
-    assertNull(entity.getMoonName());
-    assertNull(entity.getOutpostName());
-    assertNull(entity.getFactionName());
-    assertNull(entity.getCompanyName());
-  }
-
-  @Test
   void nullSafety_shouldReturnNull_whenSourceNull() {
     assertNull(mapper.toDto(null));
-    assertNull(mapper.toEntity(null));
   }
 }

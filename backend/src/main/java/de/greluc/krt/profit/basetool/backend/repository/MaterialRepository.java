@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.repository;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialType;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialPriceOverviewDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -54,7 +55,7 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
       SELECT new de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto(m.id,
       m.name, m.quantityType) FROM Material m WHERE m.isVisible = true ORDER BY m.name
       """)
-  List<de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto> findAllReference();
+  List<MaterialReferenceDto> findAllReference();
 
   /**
    * Live-search query for the material pickers (REQ-FE-016): visible materials whose name contains
@@ -217,8 +218,7 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
       SELECT m FROM Material m WHERE m.isVisible = true
       AND (m.type = :rawType OR m.isManualRawMaterial = true) ORDER BY m.name
       """)
-  List<Material> findRefineryInputCandidates(
-      @Param("rawType") de.greluc.krt.profit.basetool.backend.model.MaterialType rawType);
+  List<Material> findRefineryInputCandidates(@Param("rawType") MaterialType rawType);
 
   /**
    * Returns only the materials that actually have at least one price row at a non-hidden terminal -

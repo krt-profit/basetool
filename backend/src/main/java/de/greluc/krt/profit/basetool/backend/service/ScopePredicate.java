@@ -76,17 +76,6 @@ public record ScopePredicate(
     boolean adminAllScope, @Nullable UUID activeOrgUnitId, @NotNull Set<UUID> memberOrgUnitIds) {
 
   /**
-   * Convenience accessor for the JPQL guard against an empty {@link #memberOrgUnitIds()}. Some
-   * repository predicates short-circuit on this flag to avoid issuing an {@code IN ()} clause even
-   * on Hibernate versions that may not optimise it cleanly.
-   *
-   * @return {@code true} iff {@link #memberOrgUnitIds()} is empty.
-   */
-  public boolean memberOrgUnitIdsEmpty() {
-    return memberOrgUnitIds.isEmpty();
-  }
-
-  /**
    * In-memory mirror of the JPQL scope clause documented above, for the per-row {@code canSee*} /
    * {@code canEdit*} detail and write gates. A single org-unit id is permitted iff a row owned by
    * it would appear in this caller's scoped <em>list</em> view: admin-all-scope sees everything, a

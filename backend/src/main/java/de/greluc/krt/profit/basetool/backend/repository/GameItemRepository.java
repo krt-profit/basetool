@@ -86,7 +86,7 @@ public interface GameItemRepository extends JpaRepository<GameItem, UUID> {
    * @return every item whose {@code class_name} equals {@code className} ignoring case (possibly
    *     empty)
    */
-  java.util.List<GameItem> findByClassNameIgnoreCase(String className);
+  List<GameItem> findByClassNameIgnoreCase(String className);
 
   /**
    * Case-insensitive {@code name} lookup driving the P4K import's tertiary resolution step (when
@@ -97,7 +97,7 @@ public interface GameItemRepository extends JpaRepository<GameItem, UUID> {
    * @param name the display name to match ignoring case
    * @return every item whose {@code name} equals {@code name} ignoring case (possibly empty)
    */
-  java.util.List<GameItem> findByNameIgnoreCase(String name);
+  List<GameItem> findByNameIgnoreCase(String name);
 
   /**
    * Returns every non-null {@code external_uuid} in the table. Drives the R4 closure-mode Wiki item
@@ -108,7 +108,7 @@ public interface GameItemRepository extends JpaRepository<GameItem, UUID> {
    * @return all distinct non-null external UUIDs
    */
   @Query("SELECT DISTINCT g.externalUuid FROM GameItem g WHERE g.externalUuid IS NOT NULL")
-  java.util.List<java.util.UUID> findAllExternalUuids();
+  List<UUID> findAllExternalUuids();
 
   /**
    * Loads every row that still lacks an {@code external_uuid} and is owned by the given source
@@ -123,8 +123,7 @@ public interface GameItemRepository extends JpaRepository<GameItem, UUID> {
    *     GameItemSourceSystem#UEX_ONLY} at the only call site)
    * @return the uuid-less rows owned solely by {@code sourceSystems}
    */
-  java.util.List<GameItem> findByExternalUuidIsNullAndSourceSystems(
-      GameItemSourceSystem sourceSystems);
+  List<GameItem> findByExternalUuidIsNullAndSourceSystems(GameItemSourceSystem sourceSystems);
 
   /**
    * Soft-deletes UEX-side ownership of every row whose {@code uex_item_id} is set, NOT included in

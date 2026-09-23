@@ -36,12 +36,14 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -166,7 +168,7 @@ public class MemberEvaluationController {
    */
   @GetMapping("/members")
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
-  @org.springframework.transaction.annotation.Transactional(readOnly = true)
+  @Transactional(readOnly = true)
   @Operation(
       summary =
           "List squadron members eligible for evaluation (ADMIN/OFFICER, squadron-scoped, admins"
@@ -181,11 +183,7 @@ public class MemberEvaluationController {
       @RequestParam(required = false) String sort) {
     Pageable pageable =
         PaginationUtil.createPageRequest(
-            page,
-            size,
-            sort,
-            java.util.Set.of("id", "username", "displayName", "userRank"),
-            "username");
+            page, size, sort, Set.of("id", "username", "displayName", "userRank"), "username");
     var result = userService.findEvaluatableMembers(pageable);
     userMapper.primeStaffelMemberships(result.getContent());
     return PageResponse.of(result.map(userMapper::toDto));

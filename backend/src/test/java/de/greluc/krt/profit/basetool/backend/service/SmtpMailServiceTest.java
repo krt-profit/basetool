@@ -69,10 +69,8 @@ class SmtpMailServiceTest {
   }
 
   private static MailProperties props(boolean enabled) {
-    MailProperties p = new MailProperties();
-    p.setEnabled(enabled);
-    p.setFrom("no-reply@example.test");
-    p.setFromName("Profit Basetool");
+    MailProperties p =
+        new MailProperties(enabled, "no-reply@example.test", "Profit Basetool", "de");
     return p;
   }
 

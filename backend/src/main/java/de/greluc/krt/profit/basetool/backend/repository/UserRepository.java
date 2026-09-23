@@ -31,8 +31,10 @@ import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -133,8 +135,7 @@ public interface UserRepository
       IN :scopeSquadronIds) ORDER BY u.displayName
       """)
   List<UserReferenceDto> findAllReferenceScoped(
-      @org.springframework.data.repository.query.Param("scopeSquadronIds")
-          java.util.Collection<UUID> scopeSquadronIds);
+      @Param("scopeSquadronIds") Collection<UUID> scopeSquadronIds);
 
   /**
    * Unscoped variant used internally by JWT sync flows where access is always implicit. Kept for
@@ -158,8 +159,7 @@ public interface UserRepository
    * @return the matching user ids; never {@code null}, possibly empty
    */
   @Query("SELECT u.id FROM User u JOIN u.roles r WHERE r.code = :roleCode")
-  Set<UUID> findUserIdsByRoleCode(
-      @org.springframework.data.repository.query.Param("roleCode") String roleCode);
+  Set<UUID> findUserIdsByRoleCode(@Param("roleCode") String roleCode);
 
   /**
    * Returns the ids of every user who has opted into sharing their blueprints globally ({@link
@@ -190,8 +190,7 @@ public interface UserRepository
       :orgUnitId)
       """)
   Set<UUID> findUserIdsByRoleCodeAndOrgUnitMembership(
-      @org.springframework.data.repository.query.Param("roleCode") String roleCode,
-      @org.springframework.data.repository.query.Param("orgUnitId") UUID orgUnitId);
+      @Param("roleCode") String roleCode, @Param("orgUnitId") UUID orgUnitId);
 
   /**
    * Squadron-scoped paged listing. Filters by the user's SQUADRON-kind membership(s) in {@code
@@ -213,9 +212,7 @@ public interface UserRepository
       IN :scopeSquadronIds)
       """)
   Page<User> findAllScoped(
-      @org.springframework.data.repository.query.Param("scopeSquadronIds")
-          java.util.Collection<UUID> scopeSquadronIds,
-      Pageable pageable);
+      @Param("scopeSquadronIds") Collection<UUID> scopeSquadronIds, Pageable pageable);
 
   /**
    * Unpaged squadron-scoped listing. Same predicate as {@link #findAllScoped(java.util.Collection,
@@ -233,9 +230,7 @@ public interface UserRepository
       IN :scopeSquadronIds)
       """)
   List<User> findAllScopedList(
-      @org.springframework.data.repository.query.Param("scopeSquadronIds")
-          java.util.Collection<UUID> scopeSquadronIds,
-      org.springframework.data.domain.Sort sort);
+      @Param("scopeSquadronIds") Collection<UUID> scopeSquadronIds, Sort sort);
 
   /**
    * Paged squadron-scoped listing of the ordinary members a squadron may evaluate in the promotion
@@ -269,9 +264,7 @@ public interface UserRepository
       EXISTS (SELECT 1 FROM u.roles r WHERE UPPER(r.name) IN ('ADMIN', 'OFFICER'))
       """)
   Page<User> findEvaluatableMembers(
-      @org.springframework.data.repository.query.Param("scopeSquadronIds")
-          java.util.Collection<UUID> scopeSquadronIds,
-      Pageable pageable);
+      @Param("scopeSquadronIds") Collection<UUID> scopeSquadronIds, Pageable pageable);
 
   /**
    * Squadron-scoped substring search. Mirrors {@link
@@ -293,9 +286,8 @@ public interface UserRepository
       IN :scopeSquadronIds))
       """)
   Page<User> searchScoped(
-      @org.springframework.data.repository.query.Param("query") String query,
-      @org.springframework.data.repository.query.Param("scopeSquadronIds")
-          java.util.Collection<UUID> scopeSquadronIds,
+      @Param("query") String query,
+      @Param("scopeSquadronIds") Collection<UUID> scopeSquadronIds,
       Pageable pageable);
 
   /**
@@ -314,9 +306,7 @@ public interface UserRepository
       IN :scopeSquadronIds))
       """)
   List<User> searchScopedList(
-      @org.springframework.data.repository.query.Param("query") String query,
-      @org.springframework.data.repository.query.Param("scopeSquadronIds")
-          java.util.Collection<UUID> scopeSquadronIds);
+      @Param("query") String query, @Param("scopeSquadronIds") Collection<UUID> scopeSquadronIds);
 
   /**
    * Squadron-scoped substring search projected straight to {@link UserReferenceDto} (id, username,
@@ -357,9 +347,8 @@ public interface UserRepository
           IN :scopeSquadronIds))
           """)
   Page<UserReferenceDto> searchScopedReferences(
-      @org.springframework.data.repository.query.Param("query") String query,
-      @org.springframework.data.repository.query.Param("scopeSquadronIds")
-          java.util.Collection<UUID> scopeSquadronIds,
+      @Param("query") String query,
+      @Param("scopeSquadronIds") Collection<UUID> scopeSquadronIds,
       Pageable pageable);
 
   /**
@@ -450,9 +439,7 @@ public interface UserRepository
       SELECT (COUNT(u) > 0) FROM User u WHERE LOWER(u.username) IN :lowerNames OR
       LOWER(u.displayName) IN :lowerNames
       """)
-  boolean existsByLowerUsernameOrDisplayNameIn(
-      @org.springframework.data.repository.query.Param("lowerNames")
-          java.util.Collection<String> lowerNames);
+  boolean existsByLowerUsernameOrDisplayNameIn(@Param("lowerNames") Collection<String> lowerNames);
 
   /**
    * Whether any <em>other</em> account already carries this name, as its login {@code username} or
@@ -493,8 +480,7 @@ public interface UserRepository
    * @return {@code true} iff at least one user has that e-mail
    */
   @Query("SELECT (COUNT(u) > 0) FROM User u WHERE LOWER(u.email) = :lowerEmail")
-  boolean existsByLowerEmail(
-      @org.springframework.data.repository.query.Param("lowerEmail") String lowerEmail);
+  boolean existsByLowerEmail(@Param("lowerEmail") String lowerEmail);
 
   /**
    * Derived Spring-Data query - returns entities matching {@code
@@ -539,12 +525,12 @@ public interface UserRepository
    * @param absentSince the instant to record as when the absence was first observed
    * @return the number of users flagged as missing by this call (rows whose flag flipped)
    */
-  @org.springframework.data.jpa.repository.Modifying
+  @Modifying
   @Query(
       "UPDATE User u SET u.inKeycloak = false, u.keycloakAbsentSince = :absentSince"
           + " WHERE u.inKeycloak = true AND u.id NOT IN :ids")
   int markMissingUsers(
-      @Param("ids") @NotNull java.util.Collection<java.util.UUID> ids,
+      @Param("ids") @NotNull Collection<UUID> ids,
       @Param("absentSince") @NotNull Instant absentSince);
 
   /**
@@ -641,8 +627,7 @@ public interface UserRepository
    *
    * @param adminId the deciding admin being deleted; never {@code null}.
    */
-  @org.springframework.data.jpa.repository.Modifying
+  @Modifying
   @Query("UPDATE User u SET u.approvedById = null WHERE u.approvedById = :adminId")
-  void clearApprovedBy(
-      @org.springframework.data.repository.query.Param("adminId") @NotNull UUID adminId);
+  void clearApprovedBy(@Param("adminId") @NotNull UUID adminId);
 }

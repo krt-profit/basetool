@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.SystemSettingMapper;
 import de.greluc.krt.profit.basetool.backend.model.SystemSetting;
@@ -64,10 +65,9 @@ public class SystemSettingService {
    * @throws NotFoundException when the key is not present
    */
   public SystemSettingDto getSetting(String key) {
-    return systemSettingRepository
-        .findById(key)
-        .map(systemSettingMapper::toDto)
-        .orElseThrow(() -> new NotFoundException("Setting not found: " + key));
+    return Entities.require(
+        systemSettingRepository.findById(key).map(systemSettingMapper::toDto),
+        () -> "Setting not found: " + key);
   }
 
   /**
@@ -96,9 +96,7 @@ public class SystemSettingService {
   @Transactional
   public SystemSettingDto updateSetting(String key, SystemSettingUpdateDto dto) {
     SystemSetting setting =
-        systemSettingRepository
-            .findById(key)
-            .orElseThrow(() -> new NotFoundException("Setting not found: " + key));
+        Entities.require(systemSettingRepository.findById(key), () -> "Setting not found: " + key);
 
     OptimisticLock.check(setting.getVersion(), dto.version(), SystemSetting.class, key);
 

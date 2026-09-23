@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.model.Operation;
 import de.greluc.krt.profit.basetool.backend.model.OperationStatus;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OperationDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.OperationUpdateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.OperationFinanceService;
 import de.greluc.krt.profit.basetool.backend.service.OperationPayoutService;
@@ -39,10 +40,13 @@ import de.greluc.krt.profit.basetool.backend.service.OperationService;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
@@ -60,7 +64,49 @@ class OperationControllerTest {
 
   @Mock private OperationFinanceService operationFinanceService;
 
-  @InjectMocks private OperationController operationController;
+  private OperationController operationController;
+
+  @BeforeEach
+  void setUp() {
+    operationController =
+        new OperationController(
+            operationService,
+            operationPayoutService,
+            operationMapper,
+            operationFinanceService,
+            RoleGateFixture.realAuthHelper());
+  }
+
+  @AfterEach
+  void clearSecurityContext() {
+    RoleGateFixture.clear();
+  }
+
+  static java.util.stream.Stream<String> callers() {
+    return RoleGateFixture.callers();
+  }
+
+  /**
+   * BE-SIMP-07: the state-machine override flag moved from a raw {@code "ROLE_ADMIN"} scan of the
+   * injected {@code Authentication} to {@code AuthHelperService.isAdmin()}. Every caller shape must
+   * still hand the service exactly the flag the raw scan produced — only an admin bypasses the
+   * status transition rules.
+   */
+  @ParameterizedTest
+  @MethodSource("callers")
+  void updateOperation_overridesTheStateMachineExactlyForAnAdmin(String caller) {
+    boolean expected = RoleGateFixture.rawCheckAccepted(caller, "ROLE_ADMIN");
+    RoleGateFixture.authenticateAs(caller);
+    UUID id = UUID.randomUUID();
+    OperationUpdateDto update = new OperationUpdateDto("Op", null, OperationStatus.ACTIVE, 1L);
+    Operation updated = new Operation();
+    when(operationService.updateOperation(id, update, expected)).thenReturn(updated);
+
+    operationController.updateOperation(id, update);
+
+    verify(operationService).updateOperation(id, update, expected);
+    verify(operationMapper).toDto(updated);
+  }
 
   @Test
   void shouldCreateOperation() {

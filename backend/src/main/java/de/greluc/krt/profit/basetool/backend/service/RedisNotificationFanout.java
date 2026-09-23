@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import io.micrometer.core.instrument.MeterRegistry;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -35,7 +34,6 @@ import org.springframework.data.redis.connection.Message;
 import org.springframework.data.redis.connection.MessageListener;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -58,11 +56,8 @@ public class RedisNotificationFanout implements NotificationFanout, MessageListe
   private static final int PAYLOAD_VERSION = 1;
 
   private final NotificationStreamService notificationStreamService;
-  private final StringRedisTemplate redisTemplate;
   private final MeterRegistry meterRegistry;
-  private final JsonMapper jsonMapper;
-  private final String channel;
-  private final String instanceId;
+  private final RedisJsonFanout transport;
 
   /**
    * Builds the Redis notification fan-out.
@@ -80,11 +75,15 @@ public class RedisNotificationFanout implements NotificationFanout, MessageListe
       @NotNull String channel,
       @NotNull String instanceId) {
     this.notificationStreamService = notificationStreamService;
-    this.redisTemplate = redisTemplate;
     this.meterRegistry = meterRegistry;
-    this.jsonMapper = JsonMapper.builder().build();
-    this.channel = channel;
-    this.instanceId = instanceId;
+    this.transport =
+        new RedisJsonFanout(
+            redisTemplate,
+            meterRegistry,
+            channel,
+            instanceId,
+            MetricNames.SSE_REDIS_ERRORS,
+            "Notification");
   }
 
   /**
@@ -94,7 +93,7 @@ public class RedisNotificationFanout implements NotificationFanout, MessageListe
    */
   @NotNull
   public String channel() {
-    return channel;
+    return transport.channel();
   }
 
   /** {@inheritDoc} */
@@ -103,32 +102,38 @@ public class RedisNotificationFanout implements NotificationFanout, MessageListe
       @NotNull Collection<UUID> recipientUserIds, @NotNull NotificationSignal signal) {
     // Deliver to this instance's emitters first — a Redis failure then only degrades peer delivery.
     notificationStreamService.publish(recipientUserIds, signal);
-    try {
-      ObjectNode root = jsonMapper.createObjectNode();
-      root.put("v", PAYLOAD_VERSION);
-      root.put("origin", instanceId);
-      ArrayNode recipients = root.putArray("recipients");
-      for (UUID sub : recipientUserIds) {
-        recipients.add(sub.toString());
-      }
-      // Optional by design, and the version stays at 1. A peer on an older build ignores the field
-      // and pushes the bare refresh it always did; this build receiving a message without one does
-      // the same. Neither direction of a rolling deploy needs the other to have landed first.
-      if (signal.describesNotification()) {
-        ObjectNode signalNode = root.putObject("signal");
-        signalNode.put("type", String.valueOf(signal.type()));
-        signalNode.put("entityType", signal.entityType());
-        signalNode.put("entityId", signal.entityId() == null ? null : signal.entityId().toString());
-        ObjectNode params = signalNode.putObject("params");
-        signal.params().forEach(params::put);
-      }
-      redisTemplate.convertAndSend(channel, jsonMapper.writeValueAsString(root));
-      meterRegistry.counter(MetricNames.SSE_REDIS_PUBLISHED).increment();
-    } catch (RuntimeException e) {
-      meterRegistry
-          .counter(MetricNames.SSE_REDIS_ERRORS, MetricNames.TAG_OP, MetricNames.OP_PUBLISH)
-          .increment();
-      log.debug("Notification Redis publish failed", e);
+    transport.publish(
+        root -> writePayload(root, recipientUserIds, signal),
+        () -> meterRegistry.counter(MetricNames.SSE_REDIS_PUBLISHED).increment());
+  }
+
+  /**
+   * Writes the wire payload {@code {v, origin, recipients[, signal]}}.
+   *
+   * @param root the empty message object
+   * @param recipientUserIds the {@code sub} of every recipient
+   * @param signal what arrived; written only when it describes a notification
+   */
+  private void writePayload(
+      @NotNull ObjectNode root,
+      @NotNull Collection<UUID> recipientUserIds,
+      @NotNull NotificationSignal signal) {
+    root.put("v", PAYLOAD_VERSION);
+    root.put("origin", transport.instanceId());
+    ArrayNode recipients = root.putArray("recipients");
+    for (UUID sub : recipientUserIds) {
+      recipients.add(sub.toString());
+    }
+    // Optional by design, and the version stays at 1. A peer on an older build ignores the field
+    // and pushes the bare refresh it always did; this build receiving a message without one does
+    // the same. Neither direction of a rolling deploy needs the other to have landed first.
+    if (signal.describesNotification()) {
+      ObjectNode signalNode = root.putObject("signal");
+      signalNode.put("type", String.valueOf(signal.type()));
+      signalNode.put("entityType", signal.entityType());
+      signalNode.put("entityId", signal.entityId() == null ? null : signal.entityId().toString());
+      ObjectNode params = signalNode.putObject("params");
+      signal.params().forEach(params::put);
     }
   }
 
@@ -185,39 +190,35 @@ public class RedisNotificationFanout implements NotificationFanout, MessageListe
    */
   @Override
   public void onMessage(@NotNull Message message, byte[] pattern) {
-    try {
-      JsonNode root = jsonMapper.readTree(new String(message.getBody(), StandardCharsets.UTF_8));
-      JsonNode originNode = root.get("origin");
-      if (originNode != null && originNode.isString() && instanceId.equals(originNode.asString())) {
-        // Our own publication looped back — the local delivery already happened. Skip.
-        return;
-      }
-      List<UUID> recipients = new ArrayList<>();
-      JsonNode recipientsNode = root.get("recipients");
-      if (recipientsNode != null && recipientsNode.isArray()) {
-        for (JsonNode element : recipientsNode) {
-          if (element != null && element.isString()) {
-            // Skip a single malformed UUID rather than letting it abort the whole batch (F7): one
-            // bad entry from a future/older or tampered peer must not drop every other recipient's
-            // push. Matches the frontend consume path's per-element defensiveness.
-            try {
-              recipients.add(UUID.fromString(element.asString()));
-            } catch (IllegalArgumentException e) {
-              log.debug("Skipping malformed recipient sub in notification fan-out message", e);
-            }
+    transport.consume(message, this::deliver);
+  }
+
+  /**
+   * Delivers a peer's parsed message to this instance's emitters.
+   *
+   * @param root the parsed payload, already known not to be this instance's own
+   */
+  private void deliver(@NotNull JsonNode root) {
+    List<UUID> recipients = new ArrayList<>();
+    JsonNode recipientsNode = root.get("recipients");
+    if (recipientsNode != null && recipientsNode.isArray()) {
+      for (JsonNode element : recipientsNode) {
+        if (element != null && element.isString()) {
+          // Skip a single malformed UUID rather than letting it abort the whole batch (F7): one
+          // bad entry from a future/older or tampered peer must not drop every other recipient's
+          // push. Matches the frontend consume path's per-element defensiveness.
+          try {
+            recipients.add(UUID.fromString(element.asString()));
+          } catch (IllegalArgumentException e) {
+            log.debug("Skipping malformed recipient sub in notification fan-out message", e);
           }
         }
       }
-      if (recipients.isEmpty()) {
-        return;
-      }
-      notificationStreamService.publish(recipients, readSignal(root));
-      meterRegistry.counter(MetricNames.SSE_REDIS_CONSUMED).increment();
-    } catch (RuntimeException e) {
-      meterRegistry
-          .counter(MetricNames.SSE_REDIS_ERRORS, MetricNames.TAG_OP, MetricNames.OP_CONSUME)
-          .increment();
-      log.debug("Notification Redis consume failed", e);
     }
+    if (recipients.isEmpty()) {
+      return;
+    }
+    notificationStreamService.publish(recipients, readSignal(root));
+    meterRegistry.counter(MetricNames.SSE_REDIS_CONSUMED).increment();
   }
 }

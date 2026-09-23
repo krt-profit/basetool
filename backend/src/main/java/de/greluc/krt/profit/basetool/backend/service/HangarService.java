@@ -20,10 +20,12 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.ShipMapper;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
+import de.greluc.krt.profit.basetool.backend.model.ShipType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronShipDetailDto;
@@ -35,7 +37,9 @@ import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import jakarta.persistence.EntityManager;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -105,10 +109,7 @@ public class HangarService {
    */
   @Transactional
   public Ship addShip(@NotNull UUID userId, @NotNull ShipRequestDto dto) {
-    User user =
-        userRepository
-            .findPlainById(userId)
-            .orElseThrow(() -> new NotFoundException("User not found"));
+    User user = Entities.require(userRepository.findPlainById(userId), "User not found");
     Ship ship = new Ship();
     ship.setName(dto.name());
     ship.setInsurance(dto.insurance());
@@ -190,7 +191,7 @@ public class HangarService {
   public Page<SquadronShipOverviewDto> getSquadronOverview(
       Pageable pageable, boolean includeOwnerDetails, String query) {
     ScopePredicate scope = ownerScopeService.currentUnitOverviewScope();
-    String normalizedQuery = query == null || query.isBlank() ? null : query.trim();
+    String normalizedQuery = StringNormalization.trimToNull(query);
     Page<Object[]> p =
         shipRepository.countShipsByType(
             scope.adminAllScope(),
@@ -199,18 +200,16 @@ public class HangarService {
             normalizedQuery,
             pageable);
 
-    List<de.greluc.krt.profit.basetool.backend.model.ShipType> types =
+    List<ShipType> types =
         includeOwnerDetails
-            ? p.getContent().stream()
-                .map(obj -> (de.greluc.krt.profit.basetool.backend.model.ShipType) obj[0])
-                .toList()
-            : java.util.Collections.emptyList();
+            ? p.getContent().stream().map(obj -> (ShipType) obj[0]).toList()
+            : Collections.emptyList();
 
     List<Ship> ships =
         includeOwnerDetails && !types.isEmpty()
             ? shipRepository.findByShipTypeInScoped(
                 types, scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds())
-            : java.util.Collections.emptyList();
+            : Collections.emptyList();
 
     // Index the ships by their type once (O(ships)) instead of re-scanning the whole list per
     // ship-type row (the former O(types × ships) filter inside the page map).
@@ -219,8 +218,7 @@ public class HangarService {
 
     return p.map(
         obj -> {
-          de.greluc.krt.profit.basetool.backend.model.ShipType type =
-              (de.greluc.krt.profit.basetool.backend.model.ShipType) obj[0];
+          ShipType type = (ShipType) obj[0];
           List<SquadronShipDetailDto> details = null;
           if (includeOwnerDetails) {
             details =
@@ -258,8 +256,7 @@ public class HangarService {
    */
   @Transactional
   public Ship updateShip(@NotNull UUID userId, @NotNull UUID shipId, @NotNull ShipRequestDto dto) {
-    Ship ship =
-        shipRepository.findById(shipId).orElseThrow(() -> new NotFoundException("Ship not found"));
+    Ship ship = Entities.require(shipRepository.findById(shipId), "Ship not found");
 
     OptimisticLock.checkOptionalClient(ship.getVersion(), dto.version(), Ship.class, shipId);
 
@@ -302,8 +299,7 @@ public class HangarService {
    */
   @Transactional
   public void deleteShip(@NotNull UUID userId, @NotNull UUID shipId) {
-    Ship ship =
-        shipRepository.findById(shipId).orElseThrow(() -> new NotFoundException("Ship not found"));
+    Ship ship = Entities.require(shipRepository.findById(shipId), "Ship not found");
 
     if (ship.getOwner() == null
         || ship.getOwner().getId() == null

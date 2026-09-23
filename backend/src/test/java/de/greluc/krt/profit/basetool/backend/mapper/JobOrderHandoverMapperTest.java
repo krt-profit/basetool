@@ -34,7 +34,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
-import org.springframework.test.util.ReflectionTestUtils;
 
 class JobOrderHandoverMapperTest {
 
@@ -42,13 +41,13 @@ class JobOrderHandoverMapperTest {
 
   @BeforeEach
   void setUp() {
-    // The generated JobOrderHandoverMapperImpl pulls MaterialMapper via @Autowired
-    // for the item -> dto nested material conversion. Wire it manually outside
-    // of a Spring context.
-    mapper = Mappers.getMapper(JobOrderHandoverMapper.class);
-    ReflectionTestUtils.setField(mapper, "materialMapper", Mappers.getMapper(MaterialMapper.class));
-    ReflectionTestUtils.setField(mapper, "userMapper", Mappers.getMapper(UserMapper.class));
-    ReflectionTestUtils.setField(mapper, "squadronMapper", Mappers.getMapper(SquadronMapper.class));
+    // The generated JobOrderHandoverMapperImpl receives the mappers it uses through its
+    // constructor (CentralMapperConfig: injectionStrategy = CONSTRUCTOR).
+    mapper =
+        new JobOrderHandoverMapperImpl(
+            new MaterialMapperImpl(new MaterialCategoryMapperImpl()),
+            Mappers.getMapper(UserMapper.class),
+            Mappers.getMapper(SquadronMapper.class));
   }
 
   @Test

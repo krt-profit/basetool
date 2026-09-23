@@ -110,7 +110,7 @@ public class RequestBodySizeLimitFilter extends OncePerRequestFilter {
     this.properties = properties;
     this.problemProperties = problemProperties;
     this.meterRegistry = meterRegistry;
-    this.cappedPaths = compilePaths(properties.getPaths());
+    this.cappedPaths = compilePaths(properties.paths());
   }
 
   /**
@@ -152,7 +152,7 @@ public class RequestBodySizeLimitFilter extends OncePerRequestFilter {
       @NotNull HttpServletResponse response,
       @NotNull FilterChain filterChain)
       throws ServletException, IOException {
-    long max = properties.getMaxBytes();
+    long max = properties.maxBytes();
     long declared = request.getContentLengthLong();
 
     if (declared > max) {
@@ -181,7 +181,7 @@ public class RequestBodySizeLimitFilter extends OncePerRequestFilter {
    */
   @Override
   protected boolean shouldNotFilter(@NotNull HttpServletRequest request) {
-    if (!properties.isEnabled() || !isCappedPath(request)) {
+    if (!properties.enabled() || !isCappedPath(request)) {
       return true;
     }
     String contentType = request.getContentType();
@@ -220,12 +220,12 @@ public class RequestBodySizeLimitFilter extends OncePerRequestFilter {
     String correlationId = UUID.randomUUID().toString();
     log.debug(
         "Request body rejected: body exceeds the {}-byte cap on {}, correlationId={}",
-        properties.getMaxBytes(),
+        properties.maxBytes(),
         request.getRequestURI(),
         correlationId);
     String body =
         "{\"type\":\""
-            + problemProperties.getBaseUri()
+            + problemProperties.baseUri()
             + "request-body-too-large\",\"title\":\"Payload Too Large\",\"status\":413,"
             + "\"detail\":\"The request body exceeds the allowed size for this endpoint.\","
             + "\"code\":\"REQUEST_BODY_TOO_LARGE\",\"instance\":\""

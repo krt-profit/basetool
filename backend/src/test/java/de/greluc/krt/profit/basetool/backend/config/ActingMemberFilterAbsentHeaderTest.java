@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.ActingMemberAuthorities;
 import de.greluc.krt.profit.basetool.backend.support.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -69,8 +70,8 @@ class ActingMemberFilterAbsentHeaderTest {
   private final MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
   private ActingMemberFilter filter() {
-    IngestGatewayProperties properties = new IngestGatewayProperties();
-    properties.setClientIds(List.of("test-ingest-gateway"));
+    IngestGatewayProperties properties =
+        new IngestGatewayProperties(List.of("test-ingest-gateway"));
     StaticMessageSource messages = new StaticMessageSource();
     messages.addMessage("problem.acting_member_refused.title", Locale.ENGLISH, "Forbidden");
     messages.addMessage("problem.acting_member_refused.detail", Locale.ENGLISH, "Refused.");
@@ -78,7 +79,7 @@ class ActingMemberFilterAbsentHeaderTest {
         properties,
         authorities,
         messages,
-        new ProblemResponseFactory(new AppProblemProperties()),
+        new ProblemResponseFactory(BoundProperties.defaults(AppProblemProperties.class)),
         new ObjectMapper(),
         meterRegistry);
   }

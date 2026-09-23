@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.repository;
 
+import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintIdNameRow;
 import de.greluc.krt.profit.basetool.backend.model.dto.BlueprintProductRow;
 import de.greluc.krt.profit.basetool.backend.model.scwiki.Blueprint;
@@ -75,7 +76,7 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
    */
   @Query(
       "SELECT DISTINCT i.wikiItemUuid FROM BlueprintIngredient i WHERE i.wikiItemUuid IS NOT NULL")
-  java.util.List<UUID> findReferencedItemUuids();
+  List<UUID> findReferencedItemUuids();
 
   /**
    * Soft-deletes every blueprint whose {@code scwiki_uuid} is NOT in {@code seenScwikiUuids} and is
@@ -153,7 +154,7 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
    */
   @Query(
       "SELECT b FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL AND b.outputItem.id = :gameItemId")
-  java.util.List<Blueprint> findByOutputItemId(@Param("gameItemId") UUID gameItemId);
+  List<Blueprint> findByOutputItemId(@Param("gameItemId") UUID gameItemId);
 
   /**
    * Returns the subset of {@code gameItemIds} that an active (non-soft-deleted) blueprint produces
@@ -173,8 +174,7 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
       SELECT DISTINCT b.outputItem.id FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL
       AND b.outputItem.id IN :gameItemIds
       """)
-  java.util.List<UUID> findCraftableOutputItemIds(
-      @Param("gameItemIds") Collection<UUID> gameItemIds);
+  List<UUID> findCraftableOutputItemIds(@Param("gameItemIds") Collection<UUID> gameItemIds);
 
   /**
    * Page of distinct game items that are orderable as item-order lines: the output item of at least
@@ -212,8 +212,7 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
           de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintIngredientKind.RESOURCE
           AND i.material IS NOT NULL) AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%'))
           """)
-  Page<de.greluc.krt.profit.basetool.backend.model.GameItem> findOrderableItems(
-      @Param("q") String q, Pageable pageable);
+  Page<GameItem> findOrderableItems(@Param("q") String q, Pageable pageable);
 
   /**
    * Page of distinct game items that are <em>bookable as Lager item stock</em>: the output item of
@@ -251,8 +250,7 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
           EXISTS (SELECT 1 FROM Blueprint b WHERE b.outputItem = gi AND b.scwikiDeletedAt IS
           NULL) AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%'))
           """)
-  Page<de.greluc.krt.profit.basetool.backend.model.GameItem> findItemsWithActiveBlueprint(
-      @Param("q") String q, Pageable pageable);
+  Page<GameItem> findItemsWithActiveBlueprint(@Param("q") String q, Pageable pageable);
 
   /**
    * Projection of active (non-soft-deleted) blueprint recipes for the user-facing product search

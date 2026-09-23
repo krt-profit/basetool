@@ -41,6 +41,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.BatchSize;
+import org.hibernate.annotations.Generated;
 
 /** Job Order JPA entity. */
 @Entity
@@ -70,7 +71,7 @@ public class JobOrder extends AbstractEntity<UUID> {
   private UUID id;
 
   @Column(name = "display_id", insertable = false, updatable = false)
-  @org.hibernate.annotations.Generated
+  @Generated
   private Integer displayId;
 
   /**

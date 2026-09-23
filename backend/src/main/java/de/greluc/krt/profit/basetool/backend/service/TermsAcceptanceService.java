@@ -31,7 +31,6 @@ import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -228,17 +227,6 @@ public class TermsAcceptanceService implements TermsConsentCheck {
             acceptedCache.put(userId, Boolean.TRUE);
           }
         });
-  }
-
-  /**
-   * Returns the user's consent history, newest first — the evidence view behind an admin lookup.
-   *
-   * @param userId the user's {@code app_user.id}
-   * @return every recorded acceptance, most recent first; empty when the user never accepted
-   */
-  @Transactional(readOnly = true)
-  public List<TermsAcceptance> findAcceptanceHistory(@NotNull UUID userId) {
-    return termsAcceptanceRepository.findByUserIdOrderByAcceptedAtDesc(userId);
   }
 
   /**

@@ -32,11 +32,13 @@ import de.greluc.krt.profit.basetool.backend.dto.uex.UexCommodityPriceDto;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexItemDto;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexStarSystemDto;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.observation.DefaultMeterObservationHandler;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -76,8 +78,8 @@ class UexClientTest {
     server = new MockWebServer();
     server.start();
 
-    properties = new UexProperties();
-    properties.setApiUrl(server.url("/").toString());
+    properties =
+        BoundProperties.bind(UexProperties.class, Map.of("api-url", server.url("/").toString()));
     // All endpoints stay at their default paths — the production defaults
     // already match the public UEX 2.0 API surface and are validated as
     // part of property-binding tests.

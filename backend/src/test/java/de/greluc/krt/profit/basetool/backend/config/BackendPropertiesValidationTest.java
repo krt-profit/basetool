@@ -250,7 +250,7 @@ class BackendPropertiesValidationTest {
         .withPropertyValues("app.security.authorities-cache.ttl=15m")
         .run(
             (context) ->
-                assertThat(context.getBean(AuthoritiesCacheProperties.class).getTtl())
+                assertThat(context.getBean(AuthoritiesCacheProperties.class).ttl())
                     .isEqualTo(AuthoritiesCacheProperties.MAX_TTL));
   }
 
@@ -263,7 +263,7 @@ class BackendPropertiesValidationTest {
   void shouldDefaultToFiveMinutes_WhenAuthoritiesCacheTtlOmitted() {
     authoritiesCacheRunner.run(
         (context) ->
-            assertThat(context.getBean(AuthoritiesCacheProperties.class).getTtl())
+            assertThat(context.getBean(AuthoritiesCacheProperties.class).ttl())
                 .isEqualTo(Duration.ofMinutes(5)));
   }
 
@@ -281,10 +281,10 @@ class BackendPropertiesValidationTest {
     rateLimitRunner.run(
         (context) -> {
           RateLimitProperties.Export export =
-              context.getBean(RateLimitProperties.class).getSubject().getExport();
-          assertThat(export.getCapacity()).isEqualTo(10);
-          assertThat(export.getRefillTokens()).isEqualTo(10);
-          assertThat(export.getRefillPeriod()).isEqualTo(Duration.ofMinutes(1));
+              context.getBean(RateLimitProperties.class).subject().export();
+          assertThat(export.capacity()).isEqualTo(10);
+          assertThat(export.refillTokens()).isEqualTo(10);
+          assertThat(export.refillPeriod()).isEqualTo(Duration.ofMinutes(1));
         });
   }
 

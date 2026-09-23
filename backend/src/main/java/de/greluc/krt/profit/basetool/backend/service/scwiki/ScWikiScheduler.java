@@ -92,7 +92,7 @@ public class ScWikiScheduler {
       fixedDelayString = "${krt.scwiki.scheduler-delay:86400000}",
       initialDelayString = "${krt.scwiki.scheduler-initial-delay:3600000}")
   public void scheduleScWikiSync() {
-    if (!Boolean.TRUE.equals(properties.getSchedulerEnabled())) {
+    if (!Boolean.TRUE.equals(properties.schedulerEnabled())) {
       log.info("ScWikiScheduler invoked but disabled (krt.scwiki.scheduler-enabled=false) — skip.");
       return;
     }
@@ -179,7 +179,7 @@ public class ScWikiScheduler {
    */
   @PostConstruct
   void publishEnabledGauge() {
-    if (Boolean.TRUE.equals(properties.getSchedulerEnabled())) {
+    if (Boolean.TRUE.equals(properties.schedulerEnabled())) {
       taskMetrics.markEnabled(ScheduledJob.SCWIKI_SYNC);
     }
   }

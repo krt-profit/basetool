@@ -20,9 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.support;
 
 import java.util.List;
-import lombok.Getter;
-import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
@@ -38,22 +37,20 @@ import org.springframework.validation.annotation.Validated;
  * fails closed and refuses, an empty list here would only collapse every caller into {@code other}
  * and make the metric useless while looking healthy. The default names the two first-party clients
  * that exist in the realm; a deployment that renames them overrides the key rather than losing the
- * attribution silently.
+ * attribution silently. An immutable record (BE-MOD-04).
+ *
+ * @param knownClientIds the client ids whose {@code azp} is safe to use as a metric label verbatim
  */
-@Getter
-@Setter
 @Validated
 @ConfigurationProperties(prefix = "app.monitoring.api-clients")
-public class ApiClientMetricsProperties {
-
-  /** Client ids whose {@code azp} is safe to use as a metric label verbatim. */
-  private List<String> knownClientIds = List.of("basetool-frontend", "basetool-android");
+public record ApiClientMetricsProperties(
+    @DefaultValue({"basetool-frontend", "basetool-android"}) List<String> knownClientIds) {
 
   /**
    * Whether {@code azp} names a client this deployment knows by name.
    *
    * <p>Deliberately does not consult {@link IngestGatewayProperties}: the caller merges the two, so
-   * this class keeps one job and the gateway list keeps its single, security-relevant meaning.
+   * this record keeps one job and the gateway list keeps its single, security-relevant meaning.
    *
    * @param azp the authorized-party claim from the caller's token, may be {@code null}
    * @return {@code true} when the claim may be used as a label value as-is
