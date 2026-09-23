@@ -441,7 +441,9 @@
             });
         }
     }
-    bindBankDetailSwaps();
+    // Bound on DOMContentLoaded, not at parse time: krt-fetch.js is deferred (FE-PERF-05), so
+    // window.krtFetch does not exist yet while this inline script runs.
+    document.addEventListener('DOMContentLoaded', bindBankDetailSwaps);
     document.addEventListener('krt:swapped', bindBankDetailSwaps);
 
     // Booking-history period filter (REQ-BANK-051): the from/to date inputs re-render only the

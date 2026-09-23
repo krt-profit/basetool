@@ -157,7 +157,7 @@
     </div>
 </div>
 
-<script th:src="@{/js/autocomplete.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/autocomplete.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     /*<![CDATA[*/
     var shipDataI18n = {
@@ -176,6 +176,6 @@
     var shipDataResetUrl = /*[[@{/ship-data/reset-fitted}]]*/ '/ship-data/reset-fitted';
     /*]]>*/
 </script>
-<script th:src="@{/js/ship-data.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/ship-data.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

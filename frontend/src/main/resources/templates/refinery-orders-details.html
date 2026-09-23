@@ -4,7 +4,7 @@
     <title th:text="#{refineryorder.detail.title} + ' - ' + ${appTitle}">Raffinerieauftrag Details - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
         <link rel="stylesheet" th:href="@{/css/pages/refinery-orders-details.css}">
-        <script th:src="@{/js/refinery-yield-badge.js}" th:attr="nonce=${cspNonce}"></script>
+        <script th:src="@{/js/refinery-yield-badge.js}" defer th:attr="nonce=${cspNonce}"></script>
     </th:block>
 </head>
 <body>
@@ -457,6 +457,6 @@
         3: /*[[#{refining.rating.speed.3}]]*/ 'Schnell'
     };
 </script>
-<script th:src="@{/js/refinery-orders-details.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/refinery-orders-details.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

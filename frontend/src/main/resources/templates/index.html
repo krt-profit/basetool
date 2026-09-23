@@ -108,6 +108,6 @@
     <th:block th:replace="~{fragments/fankit :: band}" />
 
 </main>
-<script th:src="@{/js/index.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/index.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

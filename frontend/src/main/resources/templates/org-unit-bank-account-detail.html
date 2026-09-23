@@ -542,7 +542,9 @@
             });
         }
     }
-    bindOrgUnitBankDetailSwaps();
+    // Bound on DOMContentLoaded, not at parse time: krt-fetch.js is deferred (FE-PERF-05), so
+    // window.krtFetch does not exist yet while this inline script runs.
+    document.addEventListener('DOMContentLoaded', bindOrgUnitBankDetailSwaps);
     document.addEventListener('krt:swapped', bindOrgUnitBankDetailSwaps);
 
     // Booking-history period filter (REQ-BANK-051): the from/to date inputs re-render only the
@@ -593,7 +595,9 @@
     // of bouncing the user back to Buchungshistorie. No #tab= deeplink (it would collide with the
     // pager's ?page= history); document-delegated so the handlers survive the swap. No inline on*
     // (CSP).
-    (function () {
+    // Runs on DOMContentLoaded like every inline page script (FE-PERF-05): nothing runs at
+    // parse time, before the deferred scripts (InlineScriptLoadOrderTest).
+    document.addEventListener('DOMContentLoaded', function () {
         // Per-user tab persistence (REQ-UI-017): with no URL deeplink (by design, see above) the
         // active tab is kept in localStorage — keyed per user via main[data-user-id], mirroring
         // the bank.js storage-key helper — and restored on load through the existing apply()
@@ -649,7 +653,7 @@
         });
         apply();
         document.addEventListener('krt:swapped', function () { apply(); });
-    })();
+    });
 </script>
 </body>
 </html>

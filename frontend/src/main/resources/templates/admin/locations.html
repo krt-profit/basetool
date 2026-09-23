@@ -93,7 +93,7 @@
     </div>
 </main>
 
-<script th:src="@{/js/autocomplete.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/autocomplete.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     const LOCATION_MSG = {
         success:    /*[[#{notification.success.save}]]*/ 'Gespeichert.',
@@ -107,6 +107,6 @@
         reloadQuestion:       /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?'
     };
 </script>
-<script th:src="@{/js/locations.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/locations.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

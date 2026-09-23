@@ -322,6 +322,6 @@
     var MSG_SAVED = /*[[#{notification.success.save}]]*/ 'Gespeichert.';
     var MSG_ERROR = /*[[#{error.admin.uex.flag.update}]]*/ 'Speichern fehlgeschlagen.';
 </script>
-<script th:src="@{/js/uex.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/uex.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

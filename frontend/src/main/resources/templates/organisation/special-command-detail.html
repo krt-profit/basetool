@@ -162,6 +162,6 @@
         reloadQuestion:       '[[#{frontend.ajax.conflict.question}]]'
     };
 </script>
-<script th:src="@{/js/special-command-detail.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/special-command-detail.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

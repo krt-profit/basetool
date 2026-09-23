@@ -225,7 +225,9 @@
   th:action/method=post so a script-disabled browser falls back to the redirect handler.
 */-->
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
-    (function () {
+    // Runs on DOMContentLoaded: krt-fetch.js is deferred (FE-PERF-05), so window.krtFetch and
+    // window.krtCsrf do not exist yet while this inline script is parsed.
+    document.addEventListener('DOMContentLoaded', function () {
         'use strict';
         var form = document.getElementById('member-edit-form');
         if (!form || form.getAttribute('data-member-edit') === null || !window.krtFetch || !window.krtCsrf) {
@@ -303,7 +305,7 @@
                 },
             });
         });
-    })();
+    });
 </script>
 <!--/*
   Two-Staffel slot management (REQ-ORG-017). Slot 1 is always visible; slot 2 is revealed by the
@@ -313,7 +315,7 @@
   Staffel twice client-side (the backend also rejects a duplicate defensively).
 */-->
 <script th:attr="nonce=${cspNonce}">
-    (function () {
+    document.addEventListener('DOMContentLoaded', function () {
         'use strict';
         var sel1 = document.getElementById('staffel1-select');
         var sel2 = document.getElementById('staffel2-select');
@@ -359,7 +361,7 @@
         sel1.addEventListener('change', syncDuplicateOptions);
         sel2.addEventListener('change', syncDuplicateOptions);
         syncDuplicateOptions();
-    })();
+    });
 </script>
 </body>
 </html>

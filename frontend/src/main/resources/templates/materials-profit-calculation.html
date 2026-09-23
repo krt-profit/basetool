@@ -134,6 +134,6 @@
         fetchError: /*[[#{profit.error.fetch}]]*/ 'Failed to fetch the profit calculation.'
     };
 </script>
-<script th:src="@{/js/materials-profit-calculation.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/materials-profit-calculation.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

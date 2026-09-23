@@ -235,6 +235,6 @@
         deletionError: /*[[#{profile.deletion.error}]]*/ 'The deletion request could not be processed.'
     };
 </script>
-<script th:src="@{/js/profile.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/profile.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

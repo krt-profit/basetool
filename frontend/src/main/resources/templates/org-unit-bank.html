@@ -616,7 +616,9 @@
     // click/keydown handlers are document-delegated (they survive the swap) and the active tab is
     // re-applied from #tab= on every krt:swapped — otherwise the freshly rendered fragment would show
     // its default (Konten) tab after a request create/cancel. No inline on* handlers (CSP).
-    (function () {
+    // Runs on DOMContentLoaded like every inline page script (FE-PERF-05): nothing runs at
+    // parse time, before the deferred scripts (InlineScriptLoadOrderTest).
+    document.addEventListener('DOMContentLoaded', function () {
         function panels() { return document.querySelectorAll('[data-tabpanel]'); }
         function tabs() { return document.querySelectorAll('.tab-nav .tab[data-tab]'); }
 
@@ -658,7 +660,7 @@
         }
         applyFromHash();
         document.addEventListener('krt:swapped', applyFromHash);
-    })();
+    });
 </script>
 </body>
 </html>

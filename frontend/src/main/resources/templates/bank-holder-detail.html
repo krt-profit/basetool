@@ -178,7 +178,9 @@
             });
         }
     }
-    bindBankHolderBookingsPager();
+    // Bound on DOMContentLoaded, not at parse time: krt-fetch.js is deferred (FE-PERF-05), so
+    // window.krtFetch does not exist yet while this inline script runs.
+    document.addEventListener('DOMContentLoaded', bindBankHolderBookingsPager);
     document.addEventListener('krt:swapped', bindBankHolderBookingsPager);
 </script>
 </body>

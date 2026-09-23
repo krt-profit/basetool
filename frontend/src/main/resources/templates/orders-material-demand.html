@@ -308,7 +308,7 @@
     const KRT_DEMAND_LIVESYNC_UPDATES = /*[[#{orders.demand.livesync.updates}]]*/ 'Neue Daten verfügbar';
     /*]]>*/
 </script>
-<script th:src="@{/js/orders-material-demand.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/orders-material-demand.js}" defer th:attr="nonce=${cspNonce}"></script>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 </body>

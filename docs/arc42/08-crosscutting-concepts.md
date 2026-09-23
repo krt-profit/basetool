@@ -101,6 +101,11 @@ Two binding rules shape every UI change:
   linked where its `<style>` block stood; the icon sprite stays inline by measurement (2.4 KB gzip).
   A page is 33–42 % smaller raw and about half the size gzipped (REQ-UI-023,
   `TemplateCommentHygieneTest`).
+- **Every script is deferred; an inline script runs nothing at parse time** (FE-PERF-05,
+  2026-09-23). Only `krt-client-error.js` stays synchronous and first. Page modules keep their order
+  behind the head scripts; inline page scripts run their code on `DOMContentLoaded`. A head-side
+  `krtEvents` watchdog throws into the client-error beacon when `event-delegation.js` never ran
+  (REQ-FE-023, `InlineScriptLoadOrderTest`, `ScriptLoadOrderE2eTest`).
 
 Authority: [`ui-design-system.md`](../specs/ui-design-system.md),
 [`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md) (`REQ-FE-*`),

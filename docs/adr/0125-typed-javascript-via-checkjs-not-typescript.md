@@ -134,3 +134,17 @@ and we will not convert the sources to TypeScript.**
 - **Doing nothing and relying on E2E.** The Playwright suite catches DTO drift only where a test
   walks the affected path, and reports it as a UI failure far from the cause. It remains the
   behavioural gate; it is not a substitute for a contract check.
+
+## Amendment 2026-09-23 — `defer`, and still no build step (FE-PERF-05)
+
+"No `<script>` tag changes" held for the type check; the tags did change for load order: every
+external script is now `defer`, except `krt-client-error.js` (REQ-FE-023). That is a markup
+attribute, not a build step, and the sources the checker reads are still byte for byte the files
+the browser receives.
+
+A comment-stripping minification without renaming was measured and not adopted. The eleven head
+scripts would fall from 85 KB to 28 KB gzipped, but they are content-hashed and `immutable`, so
+the saving applies to a first visit and to the first load after a deploy only. Against it: a
+stripper that misreads a string or regex literal as a comment corrupts production JavaScript
+silently, and the served file would stop being the file `typecheckJs`, ESLint and the parity tests
+read — the property this ADR rests on. An owner decision if first-visit weight ever matters more.

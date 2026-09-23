@@ -681,9 +681,9 @@
         auto: /*[[#{inventory.herkunft.auto}]]*/ 'Automatisch vorbef\u00fcllt: einzige Marke, kein Rest'
     };
 </script>
-<script th:src="@{/js/inventory-note-modal.js}" th:attr="nonce=${cspNonce}"></script>
-<script th:src="@{/js/inventory-herkunft.js}" th:attr="nonce=${cspNonce}"></script>
-<script th:src="@{/js/inventory-common.js}" th:attr="nonce=${cspNonce}"></script>
-<script th:src="@{/js/inventory-admin.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/inventory-note-modal.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/inventory-herkunft.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/inventory-common.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/inventory-admin.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

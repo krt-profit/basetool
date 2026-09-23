@@ -123,6 +123,6 @@
 </main>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
-<script th:src="@{/js/refinery-orders-index.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/refinery-orders-index.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

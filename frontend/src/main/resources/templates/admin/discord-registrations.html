@@ -244,6 +244,6 @@
         rejectedEmpty: /*[[#{admin.discordRegistrations.rejected.empty}]]*/ 'Keine abgelehnten Registrierungen.'
     };
 </script>
-<script th:src="@{/js/discord-registrations.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/discord-registrations.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

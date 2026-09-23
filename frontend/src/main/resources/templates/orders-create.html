@@ -241,7 +241,7 @@
 </script>
 <!--/* Loaded synchronously (head.html's copy is deferred): orders-create.js builds the edit-mode item
      lines at parse time and escapes through the shared escapeHtml / escapeAttr (FE-SEC-05). */-->
-<script th:src="@{/js/escape-html.js}" th:attr="nonce=${cspNonce}"></script>
-<script th:src="@{/js/orders-create.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/escape-html.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/orders-create.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

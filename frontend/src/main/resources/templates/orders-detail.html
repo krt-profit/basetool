@@ -1541,6 +1541,6 @@
     const KRT_ORDER_LIVESYNC_UPDATES = /*[[#{livesync.updates_available}]]*/ 'Aktualisierungen verf\u00fcgbar';
     const KRT_ORDER_SECTION_REFRESH_ERROR = /*[[#{orders.section.refresh.error}]]*/ 'Der Abschnitt konnte nicht aktualisiert werden. Bitte Seite neu laden.';
 </script>
-<script th:src="@{/js/orders-detail.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/orders-detail.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

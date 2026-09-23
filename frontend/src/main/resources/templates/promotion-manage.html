@@ -305,6 +305,6 @@
     var MSG_REFRESH_FAILED = /*[[#{promotion.refresh.failed}]]*/ 'Saved, but the view could not be refreshed. Please reload the page.';
     /*]]>*/
 </script>
-<script th:src="@{/js/promotion-manage.js}" th:attr="nonce=${cspNonce}" th:unless="${isAllSquadronsMode}"></script>
+<script th:src="@{/js/promotion-manage.js}" defer th:attr="nonce=${cspNonce}" th:unless="${isAllSquadronsMode}"></script>
 </body>
 </html>

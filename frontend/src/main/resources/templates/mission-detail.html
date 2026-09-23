@@ -1842,7 +1842,7 @@
     window.missionOperationId =
         /*[[${mission?.operation?.id?.toString()}]]*/ null;
 </script>
-<script th:src="@{/js/mission-detail.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/mission-detail.js}" defer th:attr="nonce=${cspNonce}"></script>
     <script th:inline="javascript" th:if="${!isNew}" th:attr="nonce=${cspNonce}">
     function openEditFinanceModal(id, note, type, amount, version) {
         document.getElementById('edit-finance-form').action = window.safeSameOriginUrl('/missions/[[${mission?.id?.toString()}]]/finance-entries/' + id + '/update', document.getElementById('edit-finance-form').action);

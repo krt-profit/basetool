@@ -268,12 +268,12 @@
         </div>
     </div>
     <div id="sidebar-overlay" class="sidebar-overlay"></div>
-    <script th:src="@{/js/sidebar.js}" th:attr="nonce=${cspNonce}"></script>
+    <script th:src="@{/js/sidebar.js}" defer th:attr="nonce=${cspNonce}"></script>
     <th:block th:replace="~{fragments/toast :: toast}" />
     <th:block th:replace="~{fragments/unsaved-modal :: unsavedModal}" />
     <th:block th:replace="~{fragments/footer :: footer}" />
     <th:block th:replace="~{fragments/icons :: sprite}" />
-    <script th:src="@{/js/unsaved-changes.js}" th:attr="nonce=${cspNonce}"></script>
+    <script th:src="@{/js/unsaved-changes.js}" defer th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

@@ -64,6 +64,17 @@ A rendered page carries no developer text and no inline page CSS (`REQ-UI-023`,
   `styles.css` and before `inline-migration.css`). No `<style>` element in a template. It is linted
   by `:frontend:lintCssInline` with the tiny template rule set, and formatted by Prettier.
 
+### Script load order (binding — it has regressed three times)
+
+Every external `<script>` is `defer` — head and page modules alike — except `krt-client-error.js`,
+which stays the head's first, synchronous script (`REQ-FE-023`). Deferred scripts run in document
+order after parsing, so a page module may use every head global at load. An **inline** script runs
+earlier, during parsing: at its top level it may only declare constants, functions and `window.*`
+dictionaries, look up elements above it and register listeners / `window.krtEvents.on(...)`;
+whatever it has to run goes into `document.addEventListener('DOMContentLoaded', …)`. A top-level
+`bindX()` or IIFE that touches `window.krtFetch` silently does nothing. `InlineScriptLoadOrderTest`
+fails the build on it, `ScriptLoadOrderE2eTest` checks it in the browser.
+
 ## Live update
 
 **Live update is a binding requirement: every part of the frontend must support live update to

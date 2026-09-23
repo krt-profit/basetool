@@ -221,6 +221,6 @@
 </main>
 <th:block th:replace="~{fragments/toast :: toast}" />
 
-<script th:src="@{/js/promotion-my-evaluations.js}" th:attr="nonce=${cspNonce}" th:unless="${isAllSquadronsMode}"></script>
+<script th:src="@{/js/promotion-my-evaluations.js}" defer th:attr="nonce=${cspNonce}" th:unless="${isAllSquadronsMode}"></script>
 </body>
 </html>

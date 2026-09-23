@@ -1930,6 +1930,57 @@ calls `refresh()` after the swap so a collapsed panel never under-reports.
 `InventoryPageControllerMvcTest` (the panel markup and the shared `filterToggle`) · **Code:**
 `krt-filter-panel.js`, `fragments/components.html` (`filterToggle`)
 
+### REQ-FE-023 — Every script is deferred, and an inline script runs nothing at parse time
+
+Every external `<script>` of the frontend — the shared ones `fragments/head.html` loads and every
+page module — carries `defer` (FE-PERF-05, 2026-09-23). Deferred scripts run in **document order**
+after the HTML is parsed and before `DOMContentLoaded`, so the dependency order is unchanged: the
+head's shared scripts before the page modules that use them, `krt-fetch.js` before
+`krt-live-sync.js`, the three remote-source registries before the combobox enhancer. Nothing blocks
+the first paint any more; before, eleven head scripts (about 268 KB unminified, 85 KB gzipped) did.
+
+Two rules make that safe, and both are about the one thing that still runs earlier — an **inline**
+script, which runs where it stands, during parsing, before any deferred file:
+
+- **`krt-client-error.js` stays synchronous and first.** It installs the `error` /
+  `unhandledrejection` handlers that observe every other script, so it must run before them.
+- **An inline page script declares and registers, it does not run.** At its top level it may define
+  constants, functions and `window.*` dictionaries, look up elements already parsed above it,
+  register listeners and `window.krtEvents.on(...)` handlers (the head stub queues those). Anything
+  it has to *run* goes into a `DOMContentLoaded` listener, which fires after every deferred script.
+  A top-level call that touches `window.krtFetch` would otherwise meet an undefined global, and the
+  `if (window.krtFetch)` guard such scripts carry turns that into a silent no-op — the shape this
+  load order regressed in three times. The inline scripts that ran code at parse time moved onto
+  `DOMContentLoaded` (the bank detail / holder / manage pagers, the org-unit bank tabs and account
+  detail, the member edit form). `fragments/head.html`'s own inline scripts are exempt: they are the
+  bootstrap stubs and dictionaries that must exist first.
+
+A second `krtEvents` watchdog sits in the head, beside the stub: if `event-delegation.js` has not
+replaced the stub five seconds after `load` it **throws**, so the client-error beacon reports a
+`script_error` and `basetool_client_error_total` counts it. The watchdog inside `event-delegation.js`
+could never fire for the case it exists for — that file failing to load.
+
+**Not done: comment-stripping minification.** Measured: the head scripts would drop from 85 KB to
+28 KB gzipped without their comments. They are content-hashed and `immutable`, so that is a
+first-visit and after-deploy cost only, and every way of stripping them adds a build step whose
+failure mode is silently corrupted production JavaScript (a string or regex literal read as a
+comment) and whose output no longer matches the source the tests and the type check read. Left as an
+owner decision.
+
+**Acceptance**
+
+- [x] Every `<script src>` in the templates is `defer` except `krt-client-error.js`, which is the
+  head's first script and synchronous.
+- [x] No inline page script makes a top-level call other than element look-ups, listener and
+  `krtEvents` registrations, and no inline page script is an immediately invoked function.
+- [x] On every core page, after load, the shared globals exist, the `krtEvents` stub is replaced, no
+  script threw and no client-error beacon was sent.
+
+**Enforced by:** `InlineScriptLoadOrderTest` (the first two), `ScriptLoadOrderE2eTest` (the third,
+over `FrontendPageRoutes.CORE_SMOKE`) · **Code:** `fragments/head.html`, `event-delegation.js`,
+`krt-client-error.js` · **Related:** REQ-FE-001, REQ-OBS-* (`basetool_client_error_total`), ADR-0069
+(page JavaScript in static modules), ADR-0125
+
 ## Out of scope
 
 - The per-area conversions themselves (one issue per area, #573–#582) — this spec is the contract

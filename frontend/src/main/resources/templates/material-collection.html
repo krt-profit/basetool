@@ -114,7 +114,7 @@
     window.orderId = /*[[${jobOrderId}]]*/ null;
     /*]]>*/
 </script>
-<script th:src="@{/js/material-collection.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/material-collection.js}" defer th:attr="nonce=${cspNonce}"></script>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 </body>
