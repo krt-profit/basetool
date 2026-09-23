@@ -410,6 +410,11 @@ Two phases, PR-based; no hand-pushed tag, no tag ever moved.
 1. **Prepare.** *Actions → Release · Prepare → Run workflow*, version without the `v` (e.g.
    `1.9.3`). It cuts `[Unreleased]` into a dated CHANGELOG section, regenerates the CycloneDX SBOMs
    (`*/docs/*-bom.{json,xml}` — release-only artefacts), and opens a `chore(release): vX.Y.Z` PR.
+   The SBOMs are always a fresh generation: both SBOM tasks are untracked in the root build and
+   the step passes `--no-build-cache`, so a restored Gradle cache cannot hand back an older
+   component list, and each module's `verifyCyclonedxBom` fails the run unless its BOM lists
+   exactly the resolved runtime classpath, project dependencies such as `logging-support` included
+   (REQ-OPS-025).
 2. **Merge that PR.** `release-publish.yml` creates the tag once, at the merge commit, publishes the
    GitHub Release with the eight SBOM files (backend, frontend, ingest, keycloak-spi — REQ-OPS-025),
    attests them (REQ-OPS-023), and the tag push fires `release-images.yml`.

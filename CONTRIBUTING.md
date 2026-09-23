@@ -384,6 +384,12 @@ The CycloneDX SBOMs are a release artefact, not a build output: they are
 regenerated and committed only by the
 [release-prepare workflow](.github/workflows/release-prepare.yml) (or on
 demand via `./gradlew :<module>:cyclonedxBom`), never by `./gradlew build`.
+Both SBOM tasks are untracked — never `UP-TO-DATE`, never `FROM-CACHE`,
+because the plugin's inputs do not see project dependencies — and every
+`cyclonedxBom` is finalized by `verifyCyclonedxBom`, which fails unless the
+BOM lists exactly the module's resolved runtime classpath (REQ-OPS-025). CI
+runs the four SBOM tasks on every PR for that check; the regenerated files
+are not committed there.
 
 CodeQL additionally runs weekly, and the OWASP
 [dependency check](.github/workflows/dependency-check.yml) runs weekly

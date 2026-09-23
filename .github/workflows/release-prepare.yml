@@ -112,10 +112,19 @@ jobs:
       # naming 126 stale component versions -- a scanner reading it would clear
       # CVEs the shipped image actually carries. `keycloak-spi` had no SBOM at
       # all while promote.yml pushes its bundle to production.
+      #
+      # `--no-build-cache`: a release SBOM is never served from a cache. The step above restores
+      # the Gradle caches, build cache included, and cyclonedx-gradle's `cyclonedxDirectBom` is
+      # cacheable with inputs that do not see project dependencies -- adding `logging-support` to
+      # the three apps left its cache key unchanged, so a restored entry would have shipped the
+      # old component list (2026-09-23). The root build already makes both SBOM tasks untracked,
+      # which alone rules out UP-TO-DATE and FROM-CACHE; the flag keeps that true here even if the
+      # build script ever regresses. Each `cyclonedxBom` is finalized by `verifyCyclonedxBom`,
+      # which fails this step unless the BOM lists exactly the resolved runtime classpath.
       - name: Regenerate CycloneDX SBOMs
         run: >-
           ./gradlew :backend:cyclonedxBom :frontend:cyclonedxBom
-          :ingest:cyclonedxBom :keycloak-spi:cyclonedxBom --stacktrace
+          :ingest:cyclonedxBom :keycloak-spi:cyclonedxBom --no-build-cache --stacktrace
 
       - name: Drop SBOM churn that is only serial-number / timestamp rotation
         run: |

@@ -761,21 +761,111 @@ subprojects {
   // `includeConfigs` is an allow-list of configuration-name regexes. For keycloak-spi that list is
   // EMPTY by design -- every Keycloak SPI is `compileOnly` because Keycloak provides it -- and the
   // empty BOM becomes a tripwire the day someone writes `implementation` there.
+  //
+  // NEVER UP-TO-DATE, NEVER FROM-CACHE (REQ-OPS-025, 2026-09-23). cyclonedx-gradle 3.4.1 marks
+  // `cyclonedxDirectBom` `@CacheableTask`, and the only input it declares for the dependency graph
+  // is `resolvedDependencies` -- the artifact FILES of the resolved components. A project
+  // dependency has no artifact file there (its component carries no hashes in the BOM), so adding
+  // or removing `implementation(project(":logging-support"))` left every input unchanged: the task
+  // reported UP-TO-DATE, or was served FROM-CACHE out of the build cache CI restores, and the SBOM
+  // silently kept the previous component list. Measured on `:ingest` both ways -- dependency
+  // removed, BOM still listed it; dependency added back, BOM still did not -- until
+  // `--rerun-tasks`. The same blind spot covers a changed dependency EDGE between unchanged jars
+  // and anything else the plugin reads at execution time. Declaring the graph as an extra input
+  // would close only the gap we know of, so both tasks are untracked instead: generation takes a
+  // few seconds and runs only when a `cyclonedx*` task is named, and a release artifact must be
+  // computed from the live graph every time, not reused. `verifyCyclonedxBom` below then proves
+  // the result, independently of how the BOM was produced.
   plugins.withId("org.cyclonedx.bom") {
     val sbomExplicitlyRequested =
       gradle.startParameter.taskNames.any { it.substringAfterLast(':').startsWith("cyclonedx") }
+    val untrackedReason =
+      "a release SBOM is always rebuilt from the live dependency graph: the plugin's inputs do " +
+        "not see project dependencies, so UP-TO-DATE / FROM-CACHE could ship a stale one"
     tasks.named<org.cyclonedx.gradle.CyclonedxDirectTask>("cyclonedxDirectBom") {
       enabled = sbomExplicitlyRequested
       includeConfigs.set(listOf("^runtimeClasspath$"))
+      doNotTrackState(untrackedReason)
     }
-    tasks.named<org.cyclonedx.gradle.BaseCyclonedxTask>("cyclonedxBom") {
+    val cyclonedxBom =
+      tasks.named<org.cyclonedx.gradle.BaseCyclonedxTask>("cyclonedxBom") {
+        enabled = sbomExplicitlyRequested
+        schemaVersion.set(org.cyclonedx.Version.VERSION_16)
+        jsonOutput.set(file("docs/${project.name}-bom.json"))
+        xmlOutput.set(file("docs/${project.name}-bom.xml"))
+        includeBomSerialNumber.set(true)
+        includeLicenseText.set(true)
+        includeBuildSystem.set(true)
+        doNotTrackState(untrackedReason)
+        finalizedBy("verifyCyclonedxBom")
+      }
+
+    // The regression guard: the components the written BOM lists must be EXACTLY the components
+    // of the resolved `runtimeClasspath` graph -- every external module at its resolved version
+    // and every project dependency (`logging-support` in the three applications) -- in both
+    // directions. A BOM missing one understates what ships; one listing a component that is no
+    // longer on the classpath was not rebuilt. Runs as a finalizer of every `cyclonedxBom`, so the
+    // release-prepare workflow and every manual regeneration check themselves, and the CI step in
+    // ci.yml runs it on every PR. keycloak-spi's empty BOM stays correct as long as its
+    // `runtimeClasspath` stays empty.
+    //
+    // Configuration-cache safe: the expected set is a provider over the resolution result's root
+    // component, and the action captures only that provider and the BOM file.
+    val expectedComponents =
+      configurations
+        .named("runtimeClasspath")
+        .flatMap { it.incoming.resolutionResult.rootComponent }
+        .map { root ->
+          val seen = mutableSetOf<ResolvedComponentResult>()
+          val queue = ArrayDeque(listOf(root))
+          while (queue.isNotEmpty()) {
+            queue.removeFirst().dependencies.filterIsInstance<ResolvedDependencyResult>().forEach {
+              if (seen.add(it.selected)) queue.addLast(it.selected)
+            }
+          }
+          seen
+            .filter { it != root }
+            .mapNotNull { it.moduleVersion }
+            .map { "${it.group}:${it.name}:${it.version}" }
+            .sorted()
+        }
+    tasks.register("verifyCyclonedxBom") {
+      group = "verification"
+      description =
+        "Fails when the CycloneDX BOM does not list exactly the resolved runtimeClasspath."
       enabled = sbomExplicitlyRequested
-      schemaVersion.set(org.cyclonedx.Version.VERSION_16)
-      jsonOutput.set(file("docs/${project.name}-bom.json"))
-      xmlOutput.set(file("docs/${project.name}-bom.xml"))
-      includeBomSerialNumber.set(true)
-      includeLicenseText.set(true)
-      includeBuildSystem.set(true)
+      val bomFile = cyclonedxBom.flatMap { it.jsonOutput }
+      val projectPath = project.path
+      inputs.file(bomFile).withPropertyName("bom").withPathSensitivity(PathSensitivity.NONE)
+      inputs.property("expectedComponents", expectedComponents)
+      doLast {
+        val bom = groovy.json.JsonSlurper().parse(bomFile.get().asFile) as Map<*, *>
+        val listed =
+          (bom["components"] as? List<*>)
+            .orEmpty()
+            .filterIsInstance<Map<*, *>>()
+            .map { "${it["group"]}:${it["name"]}:${it["version"]}" }
+            .toSet()
+        val expected = expectedComponents.get().toSet()
+        val missing = (expected - listed).sorted()
+        val extra = (listed - expected).sorted()
+        if (missing.isNotEmpty() || extra.isNotEmpty()) {
+          throw GradleException(
+            buildString {
+              append("$projectPath: the SBOM does not match the resolved runtimeClasspath.\n")
+              if (missing.isNotEmpty()) {
+                append("  On the classpath, missing from the BOM:\n")
+                missing.forEach { append("    - $it\n") }
+              }
+              if (extra.isNotEmpty()) {
+                append("  In the BOM, no longer on the classpath:\n")
+                extra.forEach { append("    - $it\n") }
+              }
+              append("A stale BOM was written; regenerate it with a fresh `cyclonedxBom` run.")
+            }
+          )
+        }
+      }
     }
   }
 

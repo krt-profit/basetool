@@ -28,6 +28,12 @@ shipped unmentioned for three releases. What a release says it contains is part
 of what it publishes, so the notes are checked against the build matrix and the
 shipped-module set rather than maintained by hand beside them.
 
+A **sixth** concern arrived on 2026-09-23: a wired module whose regenerated BOM
+is stale. The CycloneDX task's inputs do not see project dependencies, so adding
+``logging-support`` left it ``UP-TO-DATE`` / ``FROM-CACHE`` with the old list.
+Gradle now proves each BOM against the resolved classpath (``verifyCyclonedxBom``);
+this script pins the pieces that keep that proof running (``check_fresh_generation``).
+
 Exit codes:
   0  -> every shipped module is wired end to end.
   1  -> at least one gap; each is printed with the file that must change.
@@ -44,6 +50,8 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 
 SETTINGS = REPO / "settings.gradle.kts"
+ROOT_BUILD = REPO / "build.gradle.kts"
+CI = REPO / ".github" / "workflows" / "ci.yml"
 PREPARE = REPO / ".github" / "workflows" / "release-prepare.yml"
 PUBLISH = REPO / ".github" / "workflows" / "release-publish.yml"
 IMAGES = REPO / ".github" / "workflows" / "release-images.yml"
@@ -65,6 +73,9 @@ NOT_SHIPPED = {
 # of each carrier's BOM (the carriers' `runtimeClasspath` is what their BOM enumerates), and a
 # second, stand-alone BOM would describe an artifact nobody can download. The entry is only
 # honest while every carrier really depends on it at runtime, so that is asserted, not trusted.
+# That the carrier's generated BOM then really lists it is asserted by Gradle, not here: each
+# `cyclonedxBom` is finalized by `verifyCyclonedxBom` (root build.gradle.kts), which compares the
+# BOM with the resolved runtimeClasspath, project dependencies included.
 SHIPPED_INSIDE = {
     "logging-support": (
         "LogSafe and the PII maskers every application's logback configuration names (ADR-0205); "
@@ -185,6 +196,70 @@ def check_shipped_inside(module: str, carriers: tuple[str, ...]) -> list[str]:
     return problems
 
 
+def check_fresh_generation(shipped: list[str], prepare: str, ci: str) -> list[str]:
+    """Assert a released SBOM is generated fresh and verified against the resolved classpath.
+
+    cyclonedx-gradle's ``cyclonedxDirectBom`` is cacheable, and the only input it
+    declares for the dependency graph is the set of resolved artifact files. A project
+    dependency has no file there, so adding ``logging-support`` to the three
+    applications left the task ``UP-TO-DATE`` / ``FROM-CACHE`` with the old component
+    list (2026-09-23). The Gradle side of the fix -- both tasks untracked, and a
+    ``verifyCyclonedxBom`` finalizer comparing the BOM with the resolved
+    ``runtimeClasspath`` -- lives in the root build script and is proved by running it;
+    this pins the pieces whose removal would pass every other check in silence.
+
+    :param shipped: the Gradle modules that publish an SBOM, in declaration order.
+    :param prepare: full text of ``release-prepare.yml``.
+    :param ci: full text of ``ci.yml``.
+    :return: one human-readable problem per missing piece; empty when all are in place.
+    """
+    problems: list[str] = []
+    root = ROOT_BUILD.read_text(encoding="utf-8")
+    block = re.search(
+        r'plugins\.withId\("org\.cyclonedx\.bom"\) \{(.*?)\n  plugins\.withId\(', root, re.DOTALL
+    )
+    if block is None:
+        problems.append(
+            'could not find the `plugins.withId("org.cyclonedx.bom")` block in build.gradle.kts '
+            "-- this checker needs updating alongside whatever replaced it"
+        )
+    else:
+        body = block.group(1)
+        if body.count("doNotTrackState(") < 2:
+            problems.append(
+                "build.gradle.kts: cyclonedxDirectBom and cyclonedxBom must both call "
+                "`doNotTrackState(...)` -- the plugin's inputs do not see project dependencies, "
+                "so a tracked task can be UP-TO-DATE or FROM-CACHE with a stale component list"
+            )
+        finalized = 'finalizedBy("verifyCyclonedxBom")' in body
+        registered = 'register("verifyCyclonedxBom")' in body
+        if not (finalized and registered):
+            problems.append(
+                "build.gradle.kts: `cyclonedxBom` must be finalized by a registered "
+                "`verifyCyclonedxBom`, the check that the BOM lists exactly the resolved "
+                "runtimeClasspath"
+            )
+
+    step = re.search(
+        r"- name: Regenerate CycloneDX SBOMs\n(.*?)(?=\n\s*- name:)", prepare, re.DOTALL
+    )
+    if step is None or "--no-build-cache" not in step.group(1):
+        problems.append(
+            "release-prepare.yml: the `Regenerate CycloneDX SBOMs` step must pass "
+            "`--no-build-cache` -- the job restores the Gradle caches, and a release SBOM is never "
+            "served from one"
+        )
+
+    for module in shipped:
+        if f":{module}:cyclonedxBom" not in ci:
+            problems.append(
+                f"{module}: ci.yml never runs `:{module}:cyclonedxBom`, so its "
+                f"verifyCyclonedxBom check first runs at release time instead of on the PR"
+            )
+
+    return problems
+
+
 def check_release_notes(shipped: list[str], images: str) -> list[str]:
     """Assert the release-notes footer announces everything the release ships.
 
@@ -302,6 +377,7 @@ def main() -> None:
     for module in shipped:
         problems.extend(check_module(module, prepare, publish))
 
+    problems.extend(check_fresh_generation(shipped, prepare, CI.read_text(encoding="utf-8")))
     problems.extend(check_release_notes(shipped, IMAGES.read_text(encoding="utf-8")))
 
     if problems:

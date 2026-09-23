@@ -153,7 +153,7 @@ ArchUnit rules in each module's `ArchitectureTest.java` (`backend`, `frontend`, 
 ./gradlew :backend:checkstyleMain :backend:spotbugsMain     # backend lint only
 ./gradlew spotlessApply                                     # auto-format sources — run before every push
 ./gradlew :backend:cyclonedxBom :frontend:cyclonedxBom      # SBOM on demand into <module>/docs/
-./gradlew :ingest:cyclonedxBom :keycloak-spi:cyclonedxBom   # the other two shipped modules (REQ-OPS-025)
+./gradlew :ingest:cyclonedxBom :keycloak-spi:cyclonedxBom   # the other two shipped modules (REQ-OPS-025); each self-verifies
 ./gradlew :backend:licensee                                 # third-party licence gate (runs in check, ADR-0197)
 ```
 
