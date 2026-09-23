@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.PersonalInventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.model.City;
 import de.greluc.krt.profit.basetool.backend.model.PersonalInventoryItem;
@@ -36,7 +37,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.UexLocationDto;
 import de.greluc.krt.profit.basetool.backend.repository.CityRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalInventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SpaceStationRepository;
-import jakarta.persistence.EntityNotFoundException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -174,7 +174,7 @@ class PersonalInventoryItemServiceTest {
         new PersonalInventoryItemCreateRequest(
             "Ghost", null, 404, PersonalInventoryLocationType.SPACE_STATION, 1);
 
-    assertThrows(EntityNotFoundException.class, () -> service.createOwn(OWNER, req));
+    assertThrows(NotFoundException.class, () -> service.createOwn(OWNER, req));
     verify(repository, never()).save(any());
   }
 
@@ -257,7 +257,7 @@ class PersonalInventoryItemServiceTest {
     // The repository correctly returns empty when filtered by the wrong owner.
     when(repository.findByIdAndOwnerUserId(id, OTHER)).thenReturn(Optional.empty());
 
-    assertThrows(EntityNotFoundException.class, () -> service.getOwn(OTHER, id));
+    assertThrows(NotFoundException.class, () -> service.getOwn(OTHER, id));
   }
 
   @Test
@@ -269,7 +269,7 @@ class PersonalInventoryItemServiceTest {
         new PersonalInventoryItemUpdateRequest(
             "x", null, 42, PersonalInventoryLocationType.CITY, 1, 0L);
 
-    assertThrows(EntityNotFoundException.class, () -> service.updateOwn(OTHER, id, req));
+    assertThrows(NotFoundException.class, () -> service.updateOwn(OTHER, id, req));
     verify(repository, never()).save(any());
   }
 
@@ -278,7 +278,7 @@ class PersonalInventoryItemServiceTest {
     UUID id = UUID.randomUUID();
     when(repository.findByIdAndOwnerUserId(id, OTHER)).thenReturn(Optional.empty());
 
-    assertThrows(EntityNotFoundException.class, () -> service.deleteOwn(OTHER, id));
+    assertThrows(NotFoundException.class, () -> service.deleteOwn(OTHER, id));
     verify(repository, never()).delete(any());
   }
 

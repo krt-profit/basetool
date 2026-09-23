@@ -37,10 +37,12 @@ import org.junit.jupiter.api.Test;
  * its 404 through {@link Entities#require}, never through a hand-written {@code
  * optional.orElseThrow(() -> new NotFoundException(…))}.
  *
- * <p>The 287 hand-written sites were migrated on 2026-09-23, message by message, so the ceiling is
- * zero. It may only ever go down: a new hand-written site fails the build here and names its file
- * and line. {@link Entities} itself is the one place the idiom is allowed — it is the
- * implementation.
+ * <p>The 312 hand-written sites were migrated on 2026-09-23, message by message, so the ceiling is
+ * zero — 287 that threw {@code NotFoundException} and 25 that threw JPA's {@code
+ * jakarta.persistence.EntityNotFoundException}, which {@code GlobalExceptionHandler.handleNotFound}
+ * answers with the identical 404 problem. It may only ever go down: a new hand-written site fails
+ * the build here and names its file and line. {@link Entities} itself is the one place the idiom is
+ * allowed — it is the implementation.
  *
  * <p>A source scan rather than an ArchUnit rule on purpose: the compiled form of the lambda is an
  * anonymous synthetic method, which ArchUnit cannot tell apart from any other {@code
@@ -56,13 +58,14 @@ class EntitiesRequireRatchetTest {
   private static final int CEILING = 0;
 
   /**
-   * The idiom, tolerant of the line breaks google-java-format puts into a long chain and of a
-   * fully-qualified {@code NotFoundException} — 37 sites were written that way and only surfaced
-   * once their names were shortened to imports.
+   * The idiom, tolerant of the line breaks google-java-format puts into a long chain, of a
+   * fully-qualified name — 37 sites were written that way and only surfaced once their names were
+   * shortened to imports — and of JPA's {@code EntityNotFoundException}, which answers the same
+   * 404.
    */
   private static final Pattern HAND_WRITTEN =
       Pattern.compile(
-          "\\.\\s*orElseThrow\\(\\s*\\(\\)\\s*->\\s*new\\s+(?:[\\w.]+\\.)?NotFoundException\\(");
+          "\\.\\s*orElseThrow\\(\\s*\\(\\)\\s*->\\s*new\\s+(?:[\\w.]+\\.)?(?:Entity)?NotFoundException\\(");
 
   @Test
   void noServiceLookupHandWritesTheNotFoundIdiom() throws IOException {
@@ -113,8 +116,12 @@ class EntitiesRequireRatchetTest {
         .matches(Matcher::find);
     assertThat(HAND_WRITTEN.matcher("Entities.require(repo.findById(id), \"x\")"))
         .matches(m -> !m.find());
+    assertThat(
+            HAND_WRITTEN.matcher(
+                "o.orElseThrow(() -> new jakarta.persistence.EntityNotFoundException(\"x\"))"))
+        .matches(Matcher::find);
     // A different exception type is a different contract, not this idiom.
-    assertThat(HAND_WRITTEN.matcher("o.orElseThrow(() -> new EntityNotFoundException(\"x\"))"))
+    assertThat(HAND_WRITTEN.matcher("o.orElseThrow(() -> new BadRequestException(\"x\"))"))
         .matches(m -> !m.find());
   }
 

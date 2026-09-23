@@ -28,6 +28,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
+import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.DefaultBlueprintMapper;
 import de.greluc.krt.profit.basetool.backend.model.DefaultBlueprint;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
@@ -35,7 +36,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.DefaultBlueprintResponse;
 import de.greluc.krt.profit.basetool.backend.repository.DefaultBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
-import jakarta.persistence.EntityNotFoundException;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -128,7 +128,7 @@ class DefaultBlueprintServiceTest {
   void add_throwsNotFound_whenProductKeyUnresolved() {
     when(blueprintProductService.resolveByProductKey("ghost")).thenReturn(Optional.empty());
 
-    assertThrows(EntityNotFoundException.class, () -> service.add("ghost", "admin-sub"));
+    assertThrows(NotFoundException.class, () -> service.add("ghost", "admin-sub"));
     verify(repository, never()).save(any());
   }
 
@@ -150,7 +150,7 @@ class DefaultBlueprintServiceTest {
     UUID id = UUID.randomUUID();
     when(repository.findById(id)).thenReturn(Optional.empty());
 
-    assertThrows(EntityNotFoundException.class, () -> service.remove(id));
+    assertThrows(NotFoundException.class, () -> service.remove(id));
     verify(repository, never()).delete(any());
   }
 }

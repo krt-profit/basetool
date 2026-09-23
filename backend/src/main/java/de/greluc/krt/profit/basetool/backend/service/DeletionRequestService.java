@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.event.AccountDeletionRequestDeclinedEvent;
 import de.greluc.krt.profit.basetool.backend.event.AccountDeletionRequestResolvedEvent;
 import de.greluc.krt.profit.basetool.backend.event.AccountDeletionRequestedEvent;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.DeletionRequest;
@@ -33,7 +35,6 @@ import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.HandleSpellings;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import io.micrometer.core.instrument.MeterRegistry;
-import jakarta.persistence.EntityNotFoundException;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.HashMap;
@@ -239,7 +240,7 @@ public class DeletionRequestService {
    * @param requestId the request to refuse
    * @param note the admin's reasoning; must not be blank
    * @return the refused request
-   * @throws EntityNotFoundException when no such pending request exists
+   * @throws NotFoundException when no such pending request exists
    * @throws IllegalArgumentException when the note is blank
    */
   @Transactional
@@ -333,7 +334,7 @@ public class DeletionRequestService {
    * @param grantHistoryErasure whether the admin also grants the Art. 17 wish to anonymise the
    *     surviving handle snapshots; independent of what the member asked for, because the admin
    *     weighs it
-   * @throws EntityNotFoundException when no such pending request exists
+   * @throws NotFoundException when no such pending request exists
    */
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public void execute(
@@ -406,7 +407,7 @@ public class DeletionRequestService {
    * @param requestId the pending request to carry out
    * @param grantHistoryErasure whether the handle snapshots are anonymised as well
    * @return the id of the deleted account, for the caller's Keycloak half
-   * @throws EntityNotFoundException when no such pending request exists
+   * @throws NotFoundException when no such pending request exists
    */
   @Transactional
   public @NotNull UUID executeDatabaseHalf(
@@ -414,9 +415,7 @@ public class DeletionRequestService {
     DeletionRequest request = pendingOrThrow(requestId, clientVersion);
     UUID userId = request.getUserId();
     User user =
-        userRepository
-            .findById(userId)
-            .orElseThrow(() -> new EntityNotFoundException("User not found: " + userId));
+        Entities.require(userRepository.findById(userId), () -> "User not found: " + userId);
 
     if (grantHistoryErasure) {
       // Before the delete: the id-matched updates only reach rows while the FK still points at the
@@ -481,17 +480,16 @@ public class DeletionRequestService {
    *     there — the admin force-save semantics {@code OptimisticLock#checkOptionalClient} exists
    *     for
    * @return the pending request, locked for the rest of the transaction
-   * @throws EntityNotFoundException when it does not exist or is already decided
+   * @throws NotFoundException when it does not exist or is already decided
    */
   private @NotNull DeletionRequest pendingOrThrow(
       @NotNull UUID requestId, @Nullable Long clientVersion) {
     DeletionRequest request =
-        deletionRequestRepository
-            .findByIdForDecision(requestId)
-            .orElseThrow(
-                () -> new EntityNotFoundException("Deletion request not found: " + requestId));
+        Entities.require(
+            deletionRequestRepository.findByIdForDecision(requestId),
+            () -> "Deletion request not found: " + requestId);
     if (request.getStatus() != DeletionRequestStatus.PENDING) {
-      throw new EntityNotFoundException("Deletion request is no longer pending: " + requestId);
+      throw new NotFoundException("Deletion request is no longer pending: " + requestId);
     }
     OptimisticLock.checkOptionalClient(
         request.getVersion(), clientVersion, DeletionRequest.class, requestId);

@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
@@ -29,7 +31,6 @@ import de.greluc.krt.profit.basetool.backend.support.HandleScrubber;
 import de.greluc.krt.profit.basetool.backend.support.HandleSpellings;
 import de.greluc.krt.profit.basetool.backend.support.PersonSearchTargets;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.Query;
 import jakarta.persistence.Tuple;
@@ -127,14 +128,12 @@ public class DataExportService {
    *
    * @param userId the member
    * @return the assembled export
-   * @throws EntityNotFoundException when no such member exists
+   * @throws NotFoundException when no such member exists
    */
   @Transactional(readOnly = true)
   public @NotNull DataExport export(@NotNull UUID userId) {
     User subject =
-        userRepository
-            .findById(userId)
-            .orElseThrow(() -> new EntityNotFoundException("User not found: " + userId));
+        Entities.require(userRepository.findById(userId), () -> "User not found: " + userId);
 
     HandleScrubber scrubber = scrubberForOthers(userId);
 

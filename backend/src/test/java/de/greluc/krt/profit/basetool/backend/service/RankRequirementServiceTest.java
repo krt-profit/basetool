@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.RankRequirementMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.PromotionLevel;
@@ -34,7 +35,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.RankRequirementWriteReque
 import de.greluc.krt.profit.basetool.backend.repository.PromotionCategoryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionTopicRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RankRequirementRepository;
-import jakarta.persistence.EntityNotFoundException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -253,7 +253,7 @@ class RankRequirementServiceTest {
     when(repository.findById(id)).thenReturn(Optional.empty());
 
     // When / Then
-    assertThrows(EntityNotFoundException.class, () -> service.get(id));
+    assertThrows(NotFoundException.class, () -> service.get(id));
   }
 
   @Test

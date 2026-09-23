@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.PromotionTopicMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.PromotionTopic;
@@ -29,7 +31,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicWriteReques
 import de.greluc.krt.profit.basetool.backend.repository.PromotionTopicRepository;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
-import jakarta.persistence.EntityNotFoundException;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -111,7 +112,7 @@ public class PromotionTopicService {
    *
    * @param id identifier of the topic
    * @return the matching topic in response form
-   * @throws EntityNotFoundException if no topic exists for that id
+   * @throws NotFoundException if no topic exists for that id
    * @throws AccessDeniedException if the caller's squadron does not match
    */
   public PromotionTopicResponse get(@NotNull UUID id) {
@@ -177,7 +178,7 @@ public class PromotionTopicService {
    * @param request validated payload with the new field values and the previously fetched {@code
    *     version}
    * @return the updated topic in response form
-   * @throws EntityNotFoundException if no topic exists for that id
+   * @throws NotFoundException if no topic exists for that id
    * @throws AccessDeniedException if the caller's squadron does not match
    * @throws ObjectOptimisticLockingFailureException if the request's {@code version} no longer
    *     matches the persisted entity
@@ -203,7 +204,7 @@ public class PromotionTopicService {
    * categories. Restricted to ADMIN or OFFICER callers whose squadron matches the topic.
    *
    * @param id identifier of the topic to delete
-   * @throws EntityNotFoundException if no topic exists for that id
+   * @throws NotFoundException if no topic exists for that id
    * @throws AccessDeniedException if the caller's squadron does not match
    */
   @Transactional
@@ -220,9 +221,7 @@ public class PromotionTopicService {
 
   @NotNull
   private PromotionTopic load(@NotNull UUID id) {
-    return repository
-        .findById(id)
-        .orElseThrow(() -> new EntityNotFoundException("PromotionTopic not found: " + id));
+    return Entities.require(repository.findById(id), () -> "PromotionTopic not found: " + id);
   }
 
   private void assertCallerMayAccess(@NotNull PromotionTopic topic) {

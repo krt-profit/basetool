@@ -25,7 +25,6 @@ import org.jetbrains.annotations.NotNull;
 import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.ReportingPolicy;
 
 /** MapStruct mapper between Material entities and DTOs. */
 @Mapper(config = CentralMapperConfig.class, uses = MaterialCategoryMapper.class)
@@ -57,14 +56,25 @@ public interface MaterialMapper {
    * Builds a new {@link Material} entity from the DTO. Boolean flags are converted back to
    * UEX-style {@code Integer} 0/1 storage.
    *
-   * <p>The one method exempt from the central {@code unmappedTargetPolicy = ERROR}: {@link
-   * MaterialDto} is the admin-editable subset, and its only consumer ({@code
+   * <p>{@link MaterialDto} is the admin-editable subset, and its only consumer ({@code
    * MaterialService.updateMaterial}) copies exactly that subset onto the managed row. Every other
    * {@link Material} column — the UEX, SC Wiki and P4K catalogue data and the timestamps — is owned
-   * by the sync jobs and left unset here on purpose; listing its ~40 names one by one would only
-   * have to be kept in step with the catalogue.
+   * by the sync jobs, so this method maps nothing by default ({@code ignoreByDefault}) and names
+   * each field it does carry. A new {@link Material} column therefore stays unset here until
+   * someone decides it belongs to the admin edit.
    */
-  @BeanMapping(unmappedTargetPolicy = ReportingPolicy.IGNORE)
+  @BeanMapping(ignoreByDefault = true)
+  @Mapping(target = "id", source = "id")
+  @Mapping(target = "version", source = "version")
+  @Mapping(target = "name", source = "name")
+  @Mapping(target = "type", source = "type")
+  @Mapping(target = "quantityType", source = "quantityType")
+  @Mapping(target = "description", source = "description")
+  @Mapping(target = "refinedMaterial", source = "refinedMaterial")
+  @Mapping(target = "category", source = "category")
+  @Mapping(target = "isManualRawMaterial", source = "isManualRawMaterial")
+  @Mapping(target = "isJobOrder", source = "isJobOrder")
+  @Mapping(target = "isVisible", source = "isVisible")
   @Mapping(
       target = "isIllegal",
       expression = "java(dto.isIllegal() != null && dto.isIllegal() ? 1 : 0)")
