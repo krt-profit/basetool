@@ -152,7 +152,7 @@ A new entry with rotation instructions, next to `KEYCLOAK_ADMIN_CLIENT_SECRET`:
 KEYCLOAK_FRONTEND_CLIENT_SECRET=CHANGE_ME
 ```
 
-**A.4 — `frontend/src/main/resources/application-test.yml`**
+**A.4 — `frontend/src/test/resources/application-test.yml`** (in `src/main` until 2026-09-23)
 
 The `@SpringBootTest` contexts boot the OAuth2 client. Once `client-secret:
 ${KEYCLOAK_FRONTEND_CLIENT_SECRET}` has no fallback, the context fails to start without a

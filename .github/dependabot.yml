@@ -1,7 +1,7 @@
 # Dependabot covers the ecosystems that refreshVersions does NOT manage:
 # GitHub Actions workflow pins and the Docker base images referenced by
 # docker-compose. Java / Gradle dependencies are intentionally left to
-# `./gradlew refreshVersions` (see .github/workflows/refresh-versions.yml)
+# `./gradlew refreshVersions -PrefreshVersions` (see .github/workflows/refresh-versions.yml)
 # so the two systems do not generate duplicate PRs.
 version: 2
 updates:

@@ -10,7 +10,6 @@ COPY --chmod=755 gradlew .
 COPY gradle/ gradle/
 COPY build.gradle.kts .
 COPY settings.gradle.kts .
-COPY versions.properties .
 COPY gradle.properties .
 # settings.gradle.kts includes all six modules, so Gradle configuration needs every
 # module's build script present even when only :ingest is built. A module added to

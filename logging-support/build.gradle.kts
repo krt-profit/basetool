@@ -24,9 +24,9 @@ description = "logging-support"
 // JAR lands in `BOOT-INF/lib` of all three boot JARs and images and is listed as a component of
 // their SBOMs. That is exactly why it holds nothing with domain meaning: no DTO, no validation
 // rule, no Spring bean — only the framework-level scrubbing every log line passes through.
-java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
-
-repositories { mavenCentral() }
+// The toolchain, the repositories, Lombok + the JetBrains annotations on both source sets
+// (compile-only, ADR-0192) and `spotbugsMain` with FindSecBugs come from the root
+// build.gradle.kts and settings.gradle.kts (BLD-SIMP-06).
 
 // The Spring Boot BOM WITHOUT the Boot plugin, so logback is resolved at the version the three
 // applications run — a second pin here is how the library and its consumers would drift apart.
@@ -43,44 +43,9 @@ dependencies {
   api("ch.qos.logback:logback-classic")
   api(libs.logstash.logback.encoder)
 
-  // Lombok + the JetBrains annotations, compile-only on both source sets exactly as in every other
-  // module (ADR-0192) — neither reaches a runtime classpath, an image or an SBOM.
-  compileOnly("org.projectlombok:lombok")
-  annotationProcessor("org.projectlombok:lombok")
-  compileOnly(libs.jetbrains.annotations)
-  testCompileOnly("org.projectlombok:lombok")
-  testAnnotationProcessor("org.projectlombok:lombok")
-  testCompileOnly(libs.jetbrains.annotations)
-
-  // FindSecBugs, as in the three applications: this code runs on every log event of all of them.
-  spotbugsPlugins(libs.findsecbugs.plugin)
-
   // JUnit from the Boot BOM imported above (the `junit-jupiter` aggregate carries the params
   // engine the expectation tables need), as in `test-support`.
   testImplementation(libs.junit.jupiter)
   testImplementation("org.assertj:assertj-core")
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
-
-// SpotBugs for the main source set, registered exactly like the applications' task: the `-base`
-// plugin creates no task of its own. BLOCKING — a HIGH-confidence finding fails the build.
-tasks.register<com.github.spotbugs.snom.SpotBugsTask>("spotbugsMain") {
-  group = "verification"
-  description = "Runs SpotBugs analysis on the main source set."
-  sourceDirs.from(sourceSets.main.get().allSource.sourceDirectories)
-  classDirs.from(sourceSets.main.get().output.classesDirs)
-  auxClassPaths.from(sourceSets.main.get().compileClasspath)
-  pluginJarFiles.from(configurations.named("spotbugsPlugins"))
-  effort.set(com.github.spotbugs.snom.Effort.DEFAULT)
-  reportLevel.set(com.github.spotbugs.snom.Confidence.HIGH)
-  ignoreFailures = false
-  // XML reporter ONLY — the SpotBugs multi-output ordering bug writes a zero-class report when html
-  // precedes xml.
-  reports.create("xml") {
-    required.set(true)
-    outputLocation.set(layout.buildDirectory.file("reports/spotbugs/main.xml"))
-  }
-  dependsOn("classes")
-}
-
-tasks.named("check").configure { dependsOn("spotbugsMain") }

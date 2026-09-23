@@ -70,7 +70,9 @@ carries it — is in [`frontend/CLAUDE.md`](../../frontend/CLAUDE.md).
 Versioned `/api/v1` paths with `@ApiDeprecation`, DTO-only boundaries (records + MapStruct +
 Jakarta validation), `@Valid` on every write, RFC 7807 `problem+json` for every error,
 `Pageable`/`PageResponse` with whitelisted sort fields, UTC everywhere, and a committed
-`openapi.json` per REST-serving module.
+`openapi.json` per REST-serving module — generated with sorted keys by each module's
+`OpenApiGeneratorTest`, and CI fails a pull request whose committed document differs from the one
+its build generated.
 
 Authority: [`api-conventions.md`](../specs/api-conventions.md) (`REQ-API-*`).
 
@@ -179,3 +181,10 @@ credential in a test or a local stack** — dedicated test artifacts exist for e
 (`.env.test`, the committed throwaway TLS material of [ADR-0139](../adr/0139-shared-committed-tls-material-for-the-test-stack.md),
 a stripped realm export). Deliberately publishing a worthless artefact and leaking a real one are
 opposite acts; one is not licence for the other.
+
+The reverse direction holds too: **nothing test-only ships.** The `test` profile lives in each
+module's `src/test/resources` and the `jar`/`bootJar` tasks fail on a jar that carries one; the
+shared test helpers in `test-support` reach no runtime classpath. And a test runs against what
+production runs where that is cheap to arrange: the Redis integration tests start the production
+image by digest (`TestImages.REDIS`, guarded against the compose file and the Quadlet unit), and
+the backend's Testcontainers PostgreSQL is one container per test JVM (`TC_DAEMON=true`).

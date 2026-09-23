@@ -1,6 +1,5 @@
 import com.github.gradle.node.npm.task.NpxTask
 import com.github.gradle.node.task.NodeTask
-import org.cyclonedx.Version
 
 // Security override on THIS script's buildscript classpath, where the `org.openapi.generator`
 // plugin below is loaded: openapi-generator 7.25.0 pins handlebars 4.3.1, which carries
@@ -33,15 +32,11 @@ plugins {
   alias(libs.plugins.openapi.generator)
 }
 
-// Force :test-support to be evaluated before this project. With org.gradle.configureondemand=true
-// it would otherwise be configured lazily, mid-configuration of this one, and Spotless cannot
-// register its afterEvaluate hook that late.
-evaluationDependsOn(":test-support")
-
-// The same for :logging-support, which this module depends on at runtime (ADR-0205).
-evaluationDependsOn(":logging-support")
-
 description = "frontend"
+
+// Toolchain, repositories, Lombok/JetBrains on `main`/`test`, the Mockito agent,
+// `spotbugsMain` and the SBOM settings come from the root
+// build.gradle.kts (`subprojects { plugins.withId(...) }`) and settings.gradle.kts.
 
 // ---------------------------------------------------------------------------
 // Generated wire models (ADR-0161 §8.2)
@@ -145,8 +140,6 @@ sourceSets.named("test") { java.srcDir(generatedContract.map { it.dir("src/main/
 
 tasks.named<JavaCompile>("compileTestJava") { dependsOn(tasks.openApiGenerate) }
 
-java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
-
 // Resolve the version string that ends up in `META-INF/build-info.properties`
 // (consumed by `AppVersionAdvice` to render the sidebar's discreet version
 // chip). Priority chain — first non-blank wins:
@@ -162,33 +155,45 @@ java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
 //      project uses `vX.Y.Z` tags); `--always` falls back to a short SHA
 //      when no tag is reachable; `--dirty` appends a marker if the worktree
 //      has uncommitted changes so a half-committed build never claims to
-//      be the clean tag. Drains stderr to `Redirect.DISCARD` so a chatty
-//      git binary cannot block on a full pipe buffer.
+//      be the clean tag. Run through `providers.exec` (audit item
+//      BLD-PERF-04): a raw `ProcessBuilder` started at configuration time is
+//      a configuration-cache violation, while the provider makes the command's
+//      output a tracked input of the cache entry instead.
 //   3. `project.version` (currently `0.0.1-SNAPSHOT`) as the final fallback
 //      for Docker builds without an injected `-PappVersion` and for hosts
-//      without git installed.
+//      without git installed (the exec then fails, which `runCatching` turns
+//      into "no answer").
 //
 // The leading `v` from a canonical tag (e.g. `v0.2.3`) is stripped at the
 // end so the sidebar's i18n template `v{0}` does not produce `vv0.2.3`. The
 // SNAPSHOT fallback has no `v` prefix and surfaces as `v0.0.1-SNAPSHOT`,
 // SHA-only fallback surfaces as `vabc1234` — both consistent with the
 // canonical-tag rendering.
-val resolvedAppVersion: String by lazy {
-  val override = (findProperty("appVersion") as String?)?.takeIf { it.isNotBlank() }
-  val gitDescribed: String? =
-    runCatching {
-        val proc =
-          ProcessBuilder("git", "describe", "--tags", "--always", "--dirty")
-            .directory(rootDir)
-            .redirectError(ProcessBuilder.Redirect.DISCARD)
-            .start()
-        val stdout = proc.inputStream.bufferedReader().readText().trim()
-        if (proc.waitFor() == 0 && stdout.isNotBlank()) stdout else null
-      }
-      .getOrNull()
-  val raw = override ?: gitDescribed ?: project.version.toString()
-  raw.removePrefix("v")
+val projectVersion = project.version.toString()
+val gitDescribe = providers.exec {
+  commandLine("git", "describe", "--tags", "--always", "--dirty")
+  workingDir = rootDir
+  isIgnoreExitValue = true
 }
+val resolvedAppVersion: Provider<String> =
+  providers
+    .gradleProperty("appVersion")
+    .filter { it.isNotBlank() }
+    .orElse(
+      provider {
+        runCatching {
+            gitDescribe.result
+              .get()
+              .exitValue
+              .takeIf { it == 0 }
+              ?.let {
+                gitDescribe.standardOutput.asText.get().trim().takeIf { out -> out.isNotBlank() }
+              }
+          }
+          .getOrNull() ?: projectVersion
+      }
+    )
+    .map { it.removePrefix("v") }
 
 // Generate `META-INF/build-info.properties` at build time so Spring Boot's
 // `ProjectInfoAutoConfiguration` auto-wires a `BuildProperties` bean. The bean
@@ -206,6 +211,17 @@ springBoot {
     }
   }
 }
+
+// `build-info.properties` changes on every build -- a fresh `build.time`, and the version string
+// moves with every commit through `git describe` -- and it sits on the test runtime classpath. So
+// `:frontend:test` never had a stable cache key and ran in full on every CI build, even for a
+// change that touched nothing it reads (audit item BLD-PERF-07, ~1:45 min plus JaCoCo per run).
+// No test reads that file: `AppVersionAdvice`'s tests hand it a `BuildProperties` of their own. So
+// the file is ignored when the runtime classpath is normalised for up-to-date checks and the build
+// cache. The jar still contains it unchanged, and every test input that DID ride on this churn by
+// accident -- the backend DTO mirrors, the OpenAPI document, the test TLS keystore -- is
+// declared on the test task explicitly below, which is what makes the normalisation safe.
+normalization { runtimeClasspath { ignore("META-INF/build-info.properties") } }
 
 dependencies {
   implementation("org.springframework.boot:spring-boot-starter-web")
@@ -282,29 +298,12 @@ dependencies {
   // (ADR-0205). `implementation`, not `testImplementation`: it ships inside the boot JAR.
   implementation(project(":logging-support"))
 
-  compileOnly("org.projectlombok:lombok")
-  annotationProcessor("org.projectlombok:lombok")
-  compileOnly(libs.jetbrains.annotations)
-
-  // The same two toolchains on the TEST source set. The three lines above configure `main` only:
-  // Gradle's `testCompileOnly` does NOT extend `compileOnly`, and `testAnnotationProcessor` does
-  // not
-  // extend `annotationProcessor`, so until these were added the test sources could use neither
-  // Lombok nor the JetBrains annotations. That was never a decision -- it was the default
-  // source-set wiring -- and it stopped the "maximize Lombok" / "JetBrains annotations wherever
-  // they
-  // communicate a real contract" conventions (CLAUDE.md `Java conventions`) at the `src/main`
-  // boundary. Lombok stays off the runtime classpath here exactly as it does for `main`.
-  testCompileOnly("org.projectlombok:lombok")
-  testAnnotationProcessor("org.projectlombok:lombok")
-  testCompileOnly(libs.jetbrains.annotations)
   // Optional: metadata for IDE assistance on configuration properties
   annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
 
-  // FindSecBugs: security-focused SpotBugs detector plugin (taint analysis for
-  // SQLi / path traversal / SSRF / weak crypto / XXE on our OWN code). Loaded
-  // into spotbugsMain via `pluginJarFiles` below; complements CodeQL (CI-only).
-  spotbugsPlugins(libs.findsecbugs.plugin)
+  // Attached to every Test JVM as a Java agent by the root build (BLD-PERF-10); the
+  // Boot-managed version.
+  "mockitoAgent"("org.mockito:mockito-core")
 
   // The endpoint-enumeration engine behind AnonymousSurfaceSweep* (#1804), shared with the other
   // module's sweep so a defect in it cannot blind both guards at once. Test-scoped: nothing from
@@ -324,61 +323,13 @@ dependencies {
   testImplementation(libs.testcontainers.junit)
 }
 
-// Test, JavaCompile, BootRun and JaCoCo setup is shared with the backend module
-// via the root build.gradle.kts `subprojects { plugins.withId(...) }` blocks.
+// Test, JavaCompile, BootRun, JaCoCo, SpotBugs and SBOM setup is shared with the other modules via
+// the root build.gradle.kts `subprojects { plugins.withId(...) }` blocks.
 
-// SpotBugs task for the main source set. We use the `-base` variant of the
-// plugin which does not auto-create tasks, so we register one explicitly and
-// wire it into `check`. BLOCKING (`ignoreFailures = false`): a HIGH-confidence
-// finding (incl. the FindSecBugs security detectors) fails the build. The
-// codebase is currently clean at this level, so the gate starts green.
-tasks.register<com.github.spotbugs.snom.SpotBugsTask>("spotbugsMain") {
-  group = "verification"
-  description = "Runs SpotBugs analysis on the main source set."
-  sourceDirs.from(sourceSets.main.get().allSource.sourceDirectories)
-  classDirs.from(sourceSets.main.get().output.classesDirs)
-  auxClassPaths.from(sourceSets.main.get().compileClasspath)
-  // Wire the FindSecBugs detectors (declared in the `spotbugsPlugins`
-  // configuration) into this manually-registered task; the `-base` plugin
-  // variant does not auto-wire it.
-  pluginJarFiles.from(configurations.named("spotbugsPlugins"))
-  effort.set(com.github.spotbugs.snom.Effort.DEFAULT)
-  reportLevel.set(com.github.spotbugs.snom.Confidence.HIGH)
-  ignoreFailures = false
-  // XML reporter ONLY — do NOT also enable HTML here. SpotBugs 4.9.8 has a
-  // multi-output ordering bug: with both reporters configured the plugin
-  // passes `-html` before `-xml`, and in that order SpotBugs writes a report
-  // with ZERO analyzed classes — i.e. the gate silently scans nothing
-  // (verified: html+xml -> total_classes=0; xml-only -> total_classes=N).
-  // XML is the canonical machine-readable format (IDE import, quality tooling).
-  // Re-add an HTML report only once SpotBugs fixes the ordering.
-  reports.create("xml") {
-    required.set(true)
-    outputLocation.set(layout.buildDirectory.file("reports/spotbugs/main.xml"))
-  }
-  dependsOn("classes")
-}
-
-tasks.named("check").configure { dependsOn("spotbugsMain") }
-
-tasks.cyclonedxBom {
-  schemaVersion.set(Version.VERSION_16)
-  jsonOutput.set(file("docs/${project.name}-bom.json"))
-  xmlOutput.set(file("docs/${project.name}-bom.xml"))
-  includeBomSerialNumber = true
-  includeLicenseText = true
-  includeBuildSystem = true
-}
-
-// Restrict the SBOM to the shipped runtime classpath so the signed BOM reflects only what actually
-// ships in the bootJar/image — not build/test-scoped components (e2e Playwright/Testcontainers,
-// test, checkstyle, spotbugs, annotationProcessor, compileOnly), which otherwise inflate the BOM
-// with tooling that never runs in production and produce false-positive CVE hits for downstream
-// scanners. In cyclonedx-gradle 3.x the dependency scan runs in the `cyclonedxDirectBom` task
-// (CyclonedxDirectTask); `includeConfigs` is an allow-list of configuration-name regexes, so only
-// the resolved runtime graph is enumerated. The explicit `^e2e.*` skip is kept as belt-and-braces.
+// The SBOM is restricted to `runtimeClasspath` by the root build. The explicit `^e2e.*` skip
+// is this module's own belt-and-braces: its `e2e` source set brings Playwright and
+// Testcontainers, which must never appear in the shipped BOM.
 tasks.named<org.cyclonedx.gradle.CyclonedxDirectTask>("cyclonedxDirectBom") {
-  includeConfigs.set(listOf("^runtimeClasspath$"))
   skipConfigs.set(listOf("^e2e.*"))
 }
 
@@ -561,7 +512,9 @@ sourceSets.named("main") { resources.srcDir(generateOssLicenses) }
 // by accident, and the documented `--rerun-tasks` workaround bought nothing. Pin the timestamp with
 // one `time.set(…)` — exactly what a reproducible-build change would add — and the defect appears
 // in full: task UP-TO-DATE, BUILD SUCCESSFUL, mirror silently out of sync. Verified both ways,
-// before and after this declaration.
+// before and after this declaration. Since 2026-09-23 the file is excluded from the classpath
+// normalisation on purpose (BLD-PERF-07, `normalization {}` above), so this declaration is now the
+// only thing that re-runs the guard -- which is exactly its job.
 //
 // Declared as the directory rather than file by file, unlike `crossModuleParitySources`: that test
 // reads three fixed, named files, while this one derives its read set at RUNTIME — it lists the
@@ -642,10 +595,23 @@ tasks.named<Test>("test") {
 // L-2 from the performance audit: minify CSS files inside the built jar so the
 // shipped payload is smaller than the readable sources under
 // `src/main/resources/static/css/`. The source files stay untouched (so editing
-// and diffing remain pleasant) — `minifyStaticCss` runs after `processResources`
-// has copied them into `build/resources/main/static/css/` and overwrites those
-// copies in place. Wired as a dependency of `classes` so it always runs before
-// the jar is assembled and before `bootRun` serves the resources.
+// and diffing remain pleasant).
+//
+// `minifyStaticCss` writes its OWN directory, and `processResources` takes the
+// CSS from there instead of from the sources (audit item BLD-PERF-08). Until
+// 2026-09-23 the task overwrote the copies `processResources` had just written
+// into `build/resources/main/static/css/`, i.e. two tasks declared the same
+// output: Gradle then cannot tell whose files those are, `processResources` is
+// never UP-TO-DATE after a minify (its output was changed behind its back), and
+// the build cache stores a pre-minify `processResources` result that a later
+// FROM-CACHE restore puts back unminified if `minifyStaticCss` is itself
+// up-to-date. Now each task owns what it writes.
+//
+// Dropping the minification instead was considered and rejected on evidence:
+// the edge compresses (`gzip on` in docker/edge/nginx.conf, with the
+// upstreams' Accept-Encoding stripped) but sets no `gzip_types`, and nginx's
+// default is `text/html` alone -- so CSS leaves the edge uncompressed today, and
+// this minifier is the only size reduction it gets.
 //
 // The minifier is deliberately conservative: it strips `/* ... */` block
 // comments, drops blank lines, and trims leading/trailing whitespace per line.
@@ -659,51 +625,66 @@ tasks.named<Test>("test") {
 // (yuicompressor / closure-stylesheets) would compress more aggressively, but
 // the LOW-priority finding does not justify a new classpath entry. Revisit if
 // the CSS surface grows beyond ~200 KB.
-tasks.register("minifyStaticCss") {
-  group = "build"
-  description = "Strips comments and blank lines from CSS files in the resources output (L-2)."
-  dependsOn("processResources")
+val cssSourceDir = layout.projectDirectory.dir("src/main/resources/static/css")
+val minifiedCssDir = layout.buildDirectory.dir("generated/minified-css")
 
-  val resourcesOutputDir = layout.buildDirectory.dir("resources/main/static/css")
-  inputs.files(fileTree("src/main/resources/static/css").matching { include("**/*.css") })
-  outputs.dir(resourcesOutputDir)
+val minifyStaticCss =
+  tasks.register("minifyStaticCss") {
+    group = "build"
+    description = "Writes minified copies of the CSS sources for processResources to ship (L-2)."
 
-  doLast {
-    val cssDir = resourcesOutputDir.get().asFile
-    if (!cssDir.exists()) {
-      logger.lifecycle("minifyStaticCss: no CSS directory at ${cssDir}; skipping")
-      return@doLast
-    }
-    val blockComment = Regex("""/\*[\s\S]*?\*/""")
-    var totalBefore = 0L
-    var totalAfter = 0L
-    cssDir
-      .walkTopDown()
-      .filter { it.isFile && it.extension == "css" }
-      .forEach { file ->
-        val original = file.readText(Charsets.UTF_8)
-        val withoutComments = blockComment.replace(original, "")
-        val minified =
-          withoutComments
-            .lineSequence()
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-            .joinToString(separator = "\n")
-            .plus("\n")
-        file.writeText(minified, Charsets.UTF_8)
-        totalBefore += original.toByteArray(Charsets.UTF_8).size.toLong()
-        totalAfter += minified.toByteArray(Charsets.UTF_8).size.toLong()
+    // Locals, not the script-level vals: the action must not reference the build script object,
+    // which the configuration cache cannot serialise.
+    val sourceRoot = cssSourceDir.asFile
+    val outputDir = minifiedCssDir
+    inputs
+      .files(fileTree(cssSourceDir) { include("**/*.css") })
+      .withPropertyName("cssSources")
+      .withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.dir(outputDir)
+
+    doLast {
+      val outputRoot = outputDir.get().asFile
+      outputRoot.deleteRecursively()
+      val blockComment = Regex("""/\*[\s\S]*?\*/""")
+      var totalBefore = 0L
+      var totalAfter = 0L
+      sourceRoot
+        .walkTopDown()
+        .filter { it.isFile && it.extension == "css" }
+        .forEach { source ->
+          val original = source.readText(Charsets.UTF_8)
+          val withoutComments = blockComment.replace(original, "")
+          val minified =
+            withoutComments
+              .lineSequence()
+              .map { it.trim() }
+              .filter { it.isNotEmpty() }
+              .joinToString(separator = "\n")
+              .plus("\n")
+          val target = outputRoot.resolve(source.relativeTo(sourceRoot).path)
+          target.parentFile.mkdirs()
+          target.writeText(minified, Charsets.UTF_8)
+          totalBefore += original.toByteArray(Charsets.UTF_8).size.toLong()
+          totalAfter += minified.toByteArray(Charsets.UTF_8).size.toLong()
+        }
+      if (totalBefore > 0) {
+        val pct = 100.0 * (totalBefore - totalAfter) / totalBefore
+        logger.lifecycle(
+          "minifyStaticCss: ${totalBefore} -> ${totalAfter} bytes (-${"%.1f".format(pct)}%)"
+        )
       }
-    if (totalBefore > 0) {
-      val pct = 100.0 * (totalBefore - totalAfter) / totalBefore
-      logger.lifecycle(
-        "minifyStaticCss: ${totalBefore} -> ${totalAfter} bytes (-${"%.1f".format(pct)}%)"
-      )
     }
   }
-}
 
-tasks.named("classes").configure { dependsOn("minifyStaticCss") }
+// The readable originals are left out of the copy and the minified ones copied in their place. The
+// exclude matches on the SOURCE file's location, so it removes exactly the originals and never the
+// minified copies, which live under build/.
+tasks.named<ProcessResources>("processResources") {
+  val originalCss = cssSourceDir.asFile
+  exclude { it.file.extension == "css" && it.file.startsWith(originalCss) }
+  from(minifyStaticCss) { into("static/css") }
+}
 
 // ---------------------------------------------------------------------------
 // E2E (Playwright) source set + task — Phase 0 spike (docs/e2e-test/README.md).
@@ -865,9 +846,14 @@ tasks.register<Test>("smokeTest") {
 // toolchain nobody reviewed. `frontend/.npmrc` adds `ignore-scripts=true`, so no package's
 // install-time lifecycle script runs on a developer machine or a CI runner; none of the lint tools
 // needs one.
+//
+// `distBaseUrl = null` stops the plugin from adding its own Node.js repository to this project: the
+// repository is declared in settings.gradle.kts instead, beside every other one, because
+// `RepositoriesMode.FAIL_ON_PROJECT_REPOS` refuses a project-level declaration (BLD-SIMP-06).
 node {
   version.set(libs.versions.node.get())
   download.set(true)
+  distBaseUrl.set(null as String?)
   npmInstallCommand.set("ci")
 }
 

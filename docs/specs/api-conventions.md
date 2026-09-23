@@ -241,6 +241,21 @@ every `@AssertTrue` method on a type published under `components.schemas` must b
 committed document must contain no such property. Prefer `@Schema(hidden = true)` over `@JsonIgnore`
 here: it removes the property from the document without touching Jackson or Bean Validation.
 
+**And the committed document MUST be the one the build generates — CI enforces it** (2026-09-23,
+audit item BLD-CI-09). Until then nothing did: `OpenApiGeneratorTest` rewrote the file during
+`test` and carried no assertion that the rewrite changed nothing, so a controller change committed
+without its regenerated document passed every check, and `ExternalContractTest` and the frontend
+contract tests then compared against a stale contract. Two parts close it:
+
+- both test profiles set `springdoc.writer-with-order-by-keys: true`, so every object in the
+  document is written in key order — a byte-stable output that does not depend on reflection order
+  (the `@Schema(hidden = true)` rule above stays: it keeps derived properties out of the document at
+  all, which ordering cannot do);
+- after a green `./gradlew build`, `ci.yml` runs
+  `git diff --exit-code -- '*/src/main/resources/api/openapi.json'` and fails the job on any
+  difference. `.gitattributes` pins `*.json` to LF, so the comparison is on normalised content and a
+  generator writing CRLF on Windows cannot produce a diff by itself.
+
 ### REQ-API-008 — Shared controller boilerplate (argument resolvers & response helpers)
 
 Cross-cutting controller boilerplate is factored into `backend/.../web` rather than re-hand-rolled
@@ -742,7 +757,9 @@ move together.
   when planning a sunset — the floor stops a build from *running*, it does not remove it from
   anyone's phone, and a member who never opens the app never learns of it.
 
-**Enforced by:** `ExternalContractTest` (backend) ·
+**Enforced by:** `ExternalContractTest` (backend) · the *Fail if a committed openapi.json is stale*
+step in `ci.yml` (since 2026-09-23), which is what keeps the document `ExternalContractTest` reads
+equal to the one the controllers produce (REQ-API-007) ·
 **Related:** ADR-0136, ADR-0135, ADR-0003, REQ-API-001, REQ-API-007, REQ-SEC-027
 
 ---

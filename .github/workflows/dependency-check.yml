@@ -32,7 +32,7 @@ on:
     paths:
       - 'build.gradle.kts'
       - '**/build.gradle.kts'
-      - 'versions.properties'
+      - 'settings.gradle.kts'
       - 'gradle/libs.versions.toml'
       - 'gradle/wrapper/gradle-wrapper.properties'
       # The suppression file decides what the scan reports and whether it fails, so editing it has
@@ -45,7 +45,7 @@ on:
     paths:
       - 'build.gradle.kts'
       - '**/build.gradle.kts'
-      - 'versions.properties'
+      - 'settings.gradle.kts'
       - 'gradle/libs.versions.toml'
       - 'gradle/wrapper/gradle-wrapper.properties'
       # The suppression file decides what the scan reports and whether it fails, so editing it has

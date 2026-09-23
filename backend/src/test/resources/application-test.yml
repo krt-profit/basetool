@@ -1,11 +1,18 @@
-# Test profile.
+# Test profile. Lives in `src/test/resources` so it is on the test classpath only and never ships in
+# the production jar (audit item SEC-17; it sat in `src/main/resources` until 2026-09-23).
 #
 # Spring-Boot integration tests run against a real Postgres container started on
 # demand by Testcontainers' JDBC-URL trick: when the URL starts with `jdbc:tc:...`
 # the Testcontainers' `ContainerDatabaseDriver` boots a `postgres:18-alpine`
-# container the first time a Spring context requests the DataSource and reuses it
-# for subsequent contexts (controlled by Testcontainers' container reuse — see
-# `TC_DAEMON` / `~/.testcontainers.properties` if you want cross-build reuse).
+# container the first time a Spring context requests the DataSource.
+#
+# `TC_DAEMON=true` is what keeps it at ONE container per test JVM (audit item TST-19). Without it the
+# driver stops the container as soon as the last connection to it closes -- a pool with
+# `minimum-idle: 0` (below) retiring its idle connections, or Spring's test-context cache evicting a
+# context -- and the next context then pays for a fresh container and a full Flyway migration.
+# With it the container lives until the JVM exits (Ryuk removes it then). This is NOT Testcontainers'
+# cross-JVM "reuse" feature (`testcontainers.reuse.enable` in `~/.testcontainers.properties`), which
+# this build does not use: every `:backend:test` run still starts from a fresh, empty database.
 #
 # Why Postgres (not H2)? Production runs on Postgres, our Flyway migrations carry
 # Postgres-specific syntax (JSONB, GIN, pg_trgm, ON CONFLICT, gen_random_uuid),
@@ -22,7 +29,7 @@ server:
     key-store-password: test-keystore-password
 spring:
   datasource:
-    url: jdbc:tc:postgresql:18-alpine:///testdb
+    url: jdbc:tc:postgresql:18-alpine:///testdb?TC_DAEMON=true
     driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
     username: test
     password: test
@@ -136,3 +143,10 @@ management:
       group:
         readiness:
           include: readinessState, db, diskSpace
+
+# Alphabetical key order in the generated OpenAPI document (REQ-API-007, audit item BLD-CI-09), so
+# the committed `api/openapi.json` that OpenApiGeneratorTest writes is byte-stable and CI can fail a
+# pull request whose document is stale (`git diff --exit-code` in ci.yml). Test profile only: the
+# document is only ever generated here, and prod does not serve it at all.
+springdoc:
+  writer-with-order-by-keys: true

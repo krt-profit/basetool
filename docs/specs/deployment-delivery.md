@@ -1363,6 +1363,13 @@ inside** other modules' artifacts is entered in a second map, `SHIPPED_INSIDE`, 
 it appears as a component of each carrier's BOM, and the script asserts that every carrier still
 declares it as `implementation(project(...))`. `logging-support` is the only such entry (ADR-0205).
 
+Applying the plugin is each module's own decision; **what the BOM contains is not**. Since
+2026-09-23 (audit item BLD-SIMP-06) the output path, schema version, serial number, licence text,
+build-system reference and the `^runtimeClasspath$` restriction are set once, in the root
+`build.gradle.kts` (`subprojects { plugins.withId("org.cyclonedx.bom") }`), for every module that
+applies it — four copies of the same block had been maintained by hand until then. Verified at the
+move: the component lists of all four BOMs were identical before and after.
+
 **Why an assertion and not a habit.** By v1.7.3 the set had drifted in both directions available to
 it, and neither drift failed anything:
 

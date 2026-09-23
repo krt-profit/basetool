@@ -133,7 +133,7 @@ docker/maintenance/** text eol=lf
 # nothing covered it.
 *.tmpl text eol=lf
 
-# `gradle/libs.versions.toml` is rewritten in place by `./gradlew refreshVersions`, which appends
+# `gradle/libs.versions.toml` is rewritten in place by `./gradlew refreshVersions -PrefreshVersions`, which appends
 # `## ⬆ = "…"` markers line by line. On a CRLF working copy that turns an annotate-only run
 # into a whole-file line-ending diff. `.gitleaks.toml` is read inside a container, by the same
 # reasoning as the edge configuration above.

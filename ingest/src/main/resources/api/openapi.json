@@ -1,8 +1,8 @@
 {
   "openapi" : "3.1.0",
   "info" : {
-    "title" : "KRT Basetool Ingest Gateway API",
     "description" : "Forward-only ingest gateway for the KRT Basetool. It validates the caller's Keycloak JWT, relays the payload to the backend's import endpoints under its OWN service-account identity while naming the member it acts for in an on-behalf-of header (ADR-0129 - the caller's token stops here, because a sender-constrained token cannot survive a second hop), stages the returned draft in Redis for a single-use browser pickup, and returns the handoff the desktop extractor opens. Nothing is interpreted or persisted here.\n\n## Restricted interface — approved clients only\n\nThis document is published so that the official basetool SC extractor can be developed against a stable contract. It is NOT an open integration API. **Only client software explicitly approved by the basetool developer (@greluc) may use this interface.** Approval means a dedicated Keycloak client registration AND an entry on the gateway's client allowlist; unapproved callers are rejected with `403 CLIENT_NOT_ALLOWED`, are unsupported, and may break without notice. Building or distributing an unapproved client is not permitted — if you want to integrate, ask first.",
+    "title" : "KRT Basetool Ingest Gateway API",
     "version" : "1.0"
   },
   "servers" : [ {
@@ -13,24 +13,109 @@
     "bearer-jwt" : [ ]
   } ],
   "tags" : [ {
-    "name" : "Ingest",
-    "description" : "Forward-only ingest of extractor payloads. Both endpoints validate the caller's token — which stops here — relay the payload to the backend and answer with a single-use browser handoff.\n\n**RESTRICTED INTERFACE — APPROVED CLIENTS ONLY.** This API is published so that the official basetool SC extractor can be developed against a stable contract. It is NOT an open integration API. Only client software explicitly approved by the basetool developer (@greluc) may use it; approval means a dedicated Keycloak client registration plus an entry on the gateway's client allowlist. Any other tool is rejected with 403 CLIENT_NOT_ALLOWED, is unsupported, and may break without notice. Building or distributing an unapproved client is not permitted — if you want to integrate, ask first."
+    "description" : "Forward-only ingest of extractor payloads. Both endpoints validate the caller's token — which stops here — relay the payload to the backend and answer with a single-use browser handoff.\n\n**RESTRICTED INTERFACE — APPROVED CLIENTS ONLY.** This API is published so that the official basetool SC extractor can be developed against a stable contract. It is NOT an open integration API. Only client software explicitly approved by the basetool developer (@greluc) may use it; approval means a dedicated Keycloak client registration plus an entry on the gateway's client allowlist. Any other tool is rejected with 403 CLIENT_NOT_ALLOWED, is unsupported, and may break without notice. Building or distributing an unapproved client is not permitted — if you want to integrate, ask first.",
+    "name" : "Ingest"
   } ],
   "paths" : {
+    "/v1/blueprint-preview" : {
+      "post" : {
+        "description" : "The body is an opaque blueprint-export JSON object; the gateway only checks that it is a JSON object and relays it to the backend preview as a file upload. The backend parses and name-matches it, exactly as a manual file import would.",
+        "operationId" : "ingestBlueprintPreview",
+        "parameters" : [ {
+          "description" : "Optional correlation id, echoed on the response and propagated to the backend for cross-module tracing. Accepted only as up to 128 characters of [A-Za-z0-9._-]; any other value is ignored and a fresh id is generated.",
+          "in" : "header",
+          "name" : "X-Correlation-Id"
+        }, {
+          "description" : "Caller locale, relayed so backend problems come back localized.",
+          "in" : "header",
+          "name" : "Accept-Language",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "additionalProperties" : true
+              }
+            }
+          },
+          "description" : "The blueprint export as produced by the extractor; must be a JSON object (an array or scalar is rejected with 400).",
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/IngestResponseDto"
+                }
+              }
+            },
+            "description" : "Preview staged; handoff returned."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : { }
+            },
+            "description" : "Body is not a JSON object or backend reject."
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : { }
+            },
+            "description" : "Caller is not authenticated."
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : { }
+            },
+            "description" : "The caller's client software is not approved for this interface (code CLIENT_NOT_ALLOWED). Only clients explicitly approved by the basetool developer may call it — see the endpoint group description."
+          },
+          "413" : {
+            "content" : {
+              "application/problem+json" : { }
+            },
+            "description" : "Payload exceeds the size cap."
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : { }
+            },
+            "description" : "Per-subject or per-IP rate limit exceeded."
+          },
+          "502" : {
+            "content" : {
+              "application/problem+json" : { }
+            },
+            "description" : "Backend relay failed: backend unreachable or 5xx, or the backend refused the gateway's own identity (a server-side fault, never the caller's login)."
+          },
+          "503" : {
+            "content" : {
+              "application/problem+json" : { }
+            },
+            "description" : "A dependency was temporarily unreachable (identity provider or handoff staging); retry after the advertised delay."
+          }
+        },
+        "summary" : "Forward a blueprint export to the backend preview and stage it for one-click browser pickup.",
+        "tags" : [ "Ingest" ]
+      }
+    },
     "/v1/refinery-extract" : {
       "post" : {
-        "tags" : [ "Ingest" ],
-        "summary" : "Forward a RefineryExtract to the backend import and stage the draft for one-click browser pickup.",
         "description" : "Accepts the frozen RefineryExtract JSON contract v1 (ADR-0008). The gateway validates the envelope, forwards it to the backend refinery import as itself while naming the calling member, and stages the returned draft under the caller's subject. No screenshot and no image bytes are ever transmitted or stored.",
         "operationId" : "ingestRefineryExtract",
         "parameters" : [ {
-          "name" : "X-Correlation-Id",
+          "description" : "Optional correlation id, echoed on the response and propagated to the backend for cross-module tracing. Accepted only as up to 128 characters of [A-Za-z0-9._-]; any other value is ignored and a fresh id is generated.",
           "in" : "header",
-          "description" : "Optional correlation id, echoed on the response and propagated to the backend for cross-module tracing. Accepted only as up to 128 characters of [A-Za-z0-9._-]; any other value is ignored and a fresh id is generated."
+          "name" : "X-Correlation-Id"
         }, {
-          "name" : "Accept-Language",
-          "in" : "header",
           "description" : "Caller locale, relayed so backend problems come back localized.",
+          "in" : "header",
+          "name" : "Accept-Language",
           "required" : false,
           "schema" : {
             "type" : "string"
@@ -48,153 +133,111 @@
         },
         "responses" : {
           "200" : {
-            "description" : "Draft staged; handoff returned.",
             "content" : {
               "application/json" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/IngestResponseDto"
                 }
               }
-            }
+            },
+            "description" : "Draft staged; handoff returned."
           },
           "400" : {
-            "description" : "Payload invalid or backend envelope reject.",
             "content" : {
               "application/problem+json" : { }
-            }
+            },
+            "description" : "Payload invalid or backend envelope reject."
           },
           "401" : {
-            "description" : "Caller is not authenticated.",
             "content" : {
               "application/problem+json" : { }
-            }
+            },
+            "description" : "Caller is not authenticated."
           },
           "403" : {
-            "description" : "The caller's client software is not approved for this interface (code CLIENT_NOT_ALLOWED). Only clients explicitly approved by the basetool developer may call it — see the endpoint group description.",
             "content" : {
               "application/problem+json" : { }
-            }
+            },
+            "description" : "The caller's client software is not approved for this interface (code CLIENT_NOT_ALLOWED). Only clients explicitly approved by the basetool developer may call it — see the endpoint group description."
           },
           "413" : {
-            "description" : "Payload exceeds the size cap.",
             "content" : {
               "application/problem+json" : { }
-            }
+            },
+            "description" : "Payload exceeds the size cap."
           },
           "429" : {
-            "description" : "Per-subject or per-IP rate limit exceeded.",
             "content" : {
               "application/problem+json" : { }
-            }
+            },
+            "description" : "Per-subject or per-IP rate limit exceeded."
           },
           "502" : {
-            "description" : "Backend relay failed: backend unreachable or 5xx, or the backend refused the gateway's own identity (a server-side fault, never the caller's login).",
             "content" : {
               "application/problem+json" : { }
-            }
+            },
+            "description" : "Backend relay failed: backend unreachable or 5xx, or the backend refused the gateway's own identity (a server-side fault, never the caller's login)."
           },
           "503" : {
-            "description" : "A dependency was temporarily unreachable (identity provider or handoff staging); retry after the advertised delay.",
             "content" : {
               "application/problem+json" : { }
-            }
+            },
+            "description" : "A dependency was temporarily unreachable (identity provider or handoff staging); retry after the advertised delay."
           }
-        }
-      }
-    },
-    "/v1/blueprint-preview" : {
-      "post" : {
-        "tags" : [ "Ingest" ],
-        "summary" : "Forward a blueprint export to the backend preview and stage it for one-click browser pickup.",
-        "description" : "The body is an opaque blueprint-export JSON object; the gateway only checks that it is a JSON object and relays it to the backend preview as a file upload. The backend parses and name-matches it, exactly as a manual file import would.",
-        "operationId" : "ingestBlueprintPreview",
-        "parameters" : [ {
-          "name" : "X-Correlation-Id",
-          "in" : "header",
-          "description" : "Optional correlation id, echoed on the response and propagated to the backend for cross-module tracing. Accepted only as up to 128 characters of [A-Za-z0-9._-]; any other value is ignored and a fresh id is generated."
-        }, {
-          "name" : "Accept-Language",
-          "in" : "header",
-          "description" : "Caller locale, relayed so backend problems come back localized.",
-          "required" : false,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "requestBody" : {
-          "description" : "The blueprint export as produced by the extractor; must be a JSON object (an array or scalar is rejected with 400).",
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "type" : "object",
-                "additionalProperties" : true
-              }
-            }
-          },
-          "required" : true
         },
-        "responses" : {
-          "200" : {
-            "description" : "Preview staged; handoff returned.",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/IngestResponseDto"
-                }
-              }
-            }
-          },
-          "400" : {
-            "description" : "Body is not a JSON object or backend reject.",
-            "content" : {
-              "application/problem+json" : { }
-            }
-          },
-          "401" : {
-            "description" : "Caller is not authenticated.",
-            "content" : {
-              "application/problem+json" : { }
-            }
-          },
-          "403" : {
-            "description" : "The caller's client software is not approved for this interface (code CLIENT_NOT_ALLOWED). Only clients explicitly approved by the basetool developer may call it — see the endpoint group description.",
-            "content" : {
-              "application/problem+json" : { }
-            }
-          },
-          "413" : {
-            "description" : "Payload exceeds the size cap.",
-            "content" : {
-              "application/problem+json" : { }
-            }
-          },
-          "429" : {
-            "description" : "Per-subject or per-IP rate limit exceeded.",
-            "content" : {
-              "application/problem+json" : { }
-            }
-          },
-          "502" : {
-            "description" : "Backend relay failed: backend unreachable or 5xx, or the backend refused the gateway's own identity (a server-side fault, never the caller's login).",
-            "content" : {
-              "application/problem+json" : { }
-            }
-          },
-          "503" : {
-            "description" : "A dependency was temporarily unreachable (identity provider or handoff staging); retry after the advertised delay.",
-            "content" : {
-              "application/problem+json" : { }
-            }
-          }
-        }
+        "summary" : "Forward a RefineryExtract to the backend import and stage the draft for one-click browser pickup.",
+        "tags" : [ "Ingest" ]
       }
     }
   },
   "components" : {
     "schemas" : {
+      "IngestResponseDto" : {
+        "type" : "object",
+        "description" : "The single-use handoff the extractor opens after a successful ingest.",
+        "properties" : {
+          "frontendUrl" : {
+            "type" : "string",
+            "description" : "Absolute frontend URL to open in the browser, already carrying ?handoff=<id>.",
+            "example" : "https://app.profit-base.online/refinery-orders/create?handoff=0jUZ9uJ5"
+          },
+          "handoffId" : {
+            "type" : "string",
+            "description" : "Opaque, single-use id keying the staged draft. Treat it as a secret: it travels in the browser URL and is consumed on first read.",
+            "example" : "0jUZ9uJ5pQ3vD1kR7tXwYbNcMeFg"
+          },
+          "kind" : {
+            "type" : "string",
+            "description" : "Which draft was staged; selects the frontend pre-fill surface.",
+            "enum" : [ "REFINERY", "BLUEPRINT" ]
+          }
+        }
+      },
       "RefineryExtractDto" : {
         "type" : "object",
         "properties" : {
+          "clientLanguage" : {
+            "type" : "string",
+            "maxLength" : 16,
+            "minLength" : 0
+          },
+          "generatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "model" : {
+            "type" : "string",
+            "maxLength" : 100,
+            "minLength" : 0
+          },
+          "orders" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/RefineryExtractOrderDto"
+            },
+            "maxItems" : 5,
+            "minItems" : 0
+          },
           "schemaVersion" : {
             "type" : "integer",
             "format" : "int32"
@@ -208,28 +251,6 @@
             "type" : "string",
             "maxLength" : 50,
             "minLength" : 0
-          },
-          "model" : {
-            "type" : "string",
-            "maxLength" : 100,
-            "minLength" : 0
-          },
-          "generatedAt" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "clientLanguage" : {
-            "type" : "string",
-            "maxLength" : 16,
-            "minLength" : 0
-          },
-          "orders" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/RefineryExtractOrderDto"
-            },
-            "maxItems" : 5,
-            "minItems" : 0
           }
         },
         "required" : [ "orders", "schemaVersion" ]
@@ -237,19 +258,11 @@
       "RefineryExtractGoodDto" : {
         "type" : "object",
         "properties" : {
-          "rowIndex" : {
-            "type" : "integer",
-            "format" : "int32",
-            "minimum" : 0
-          },
-          "rawMaterialName" : {
-            "type" : "string",
-            "maxLength" : 255,
-            "minLength" : 0
-          },
-          "quality" : {
-            "type" : "integer",
-            "format" : "int32"
+          "confidence" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1.0,
+            "minimum" : 0.0
           },
           "inputQuantity" : {
             "type" : "integer",
@@ -261,14 +274,22 @@
             "format" : "int32",
             "minimum" : 0
           },
+          "quality" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "rawMaterialName" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
           "refine" : {
             "type" : "boolean"
           },
-          "confidence" : {
-            "type" : "number",
-            "format" : "double",
-            "maximum" : 1.0,
-            "minimum" : 0.0
+          "rowIndex" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 0
           },
           "sourceImage" : {
             "type" : "string",
@@ -281,6 +302,20 @@
       "RefineryExtractImageDto" : {
         "type" : "object",
         "properties" : {
+          "capturedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "cropMode" : {
+            "type" : "string",
+            "maxLength" : 32,
+            "minLength" : 0
+          },
+          "height" : {
+            "type" : "integer",
+            "format" : "int32",
+            "exclusiveMinimum" : 0
+          },
           "name" : {
             "type" : "string",
             "maxLength" : 255,
@@ -290,20 +325,6 @@
             "type" : "integer",
             "format" : "int32",
             "exclusiveMinimum" : 0
-          },
-          "height" : {
-            "type" : "integer",
-            "format" : "int32",
-            "exclusiveMinimum" : 0
-          },
-          "cropMode" : {
-            "type" : "string",
-            "maxLength" : 32,
-            "minLength" : 0
-          },
-          "capturedAt" : {
-            "type" : "string",
-            "format" : "date-time"
           }
         },
         "required" : [ "name" ]
@@ -311,6 +332,31 @@
       "RefineryExtractOrderDto" : {
         "type" : "object",
         "properties" : {
+          "durationMinutes" : {
+            "type" : "integer",
+            "format" : "int64",
+            "minimum" : 0
+          },
+          "expenses" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1.0E9,
+            "minimum" : 0
+          },
+          "goods" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/RefineryExtractGoodDto"
+            },
+            "maxItems" : 100,
+            "minItems" : 0
+          },
+          "layoutConfidence" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1.0,
+            "minimum" : 0.0
+          },
           "panelType" : {
             "type" : "string",
             "maxLength" : 32,
@@ -319,11 +365,10 @@
           "quoted" : {
             "type" : "boolean"
           },
-          "layoutConfidence" : {
-            "type" : "number",
-            "format" : "double",
-            "maximum" : 1.0,
-            "minimum" : 0.0
+          "rawInManifestTotal" : {
+            "type" : "integer",
+            "format" : "int64",
+            "minimum" : 0
           },
           "rawLocationName" : {
             "type" : "string",
@@ -335,30 +380,9 @@
             "maxLength" : 255,
             "minLength" : 0
           },
-          "rawInManifestTotal" : {
-            "type" : "integer",
-            "format" : "int64",
-            "minimum" : 0
-          },
           "rawToRefineTotal" : {
             "type" : "integer",
             "format" : "int64",
-            "minimum" : 0
-          },
-          "expenses" : {
-            "type" : "number",
-            "format" : "double",
-            "maximum" : 1.0E9,
-            "minimum" : 0
-          },
-          "durationMinutes" : {
-            "type" : "integer",
-            "format" : "int64",
-            "minimum" : 0
-          },
-          "totalYieldScu" : {
-            "type" : "number",
-            "format" : "double",
             "minimum" : 0
           },
           "sourceImages" : {
@@ -369,44 +393,20 @@
             "maxItems" : 50,
             "minItems" : 0
           },
-          "goods" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/RefineryExtractGoodDto"
-            },
-            "maxItems" : 100,
-            "minItems" : 0
+          "totalYieldScu" : {
+            "type" : "number",
+            "format" : "double",
+            "minimum" : 0
           }
         },
         "required" : [ "goods", "panelType", "sourceImages" ]
-      },
-      "IngestResponseDto" : {
-        "type" : "object",
-        "description" : "The single-use handoff the extractor opens after a successful ingest.",
-        "properties" : {
-          "handoffId" : {
-            "type" : "string",
-            "description" : "Opaque, single-use id keying the staged draft. Treat it as a secret: it travels in the browser URL and is consumed on first read.",
-            "example" : "0jUZ9uJ5pQ3vD1kR7tXwYbNcMeFg"
-          },
-          "kind" : {
-            "type" : "string",
-            "description" : "Which draft was staged; selects the frontend pre-fill surface.",
-            "enum" : [ "REFINERY", "BLUEPRINT" ]
-          },
-          "frontendUrl" : {
-            "type" : "string",
-            "description" : "Absolute frontend URL to open in the browser, already carrying ?handoff=<id>.",
-            "example" : "https://app.profit-base.online/refinery-orders/create?handoff=0jUZ9uJ5"
-          }
-        }
       }
     },
     "securitySchemes" : {
       "bearer-jwt" : {
-        "type" : "http",
+        "bearerFormat" : "JWT",
         "scheme" : "bearer",
-        "bearerFormat" : "JWT"
+        "type" : "http"
       }
     }
   }
