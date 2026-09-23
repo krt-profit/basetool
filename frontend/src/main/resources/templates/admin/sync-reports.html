@@ -113,13 +113,8 @@
     </div>
 
     <!--/* Delete Confirmation Modal */-->
-    <dialog id="purge-confirm-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
-        <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{admin.syncReports.delete.confirm.title}">
-            <div class="krt-modal-head">
-                <h2 th:text="#{admin.syncReports.delete.confirm.title}">Löschen bestätigen</h2>
-                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="purge-confirm-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='purge-confirm-modal', titleKey='admin.syncReports.delete.confirm.title', variant='krt-modal--danger', body=~{::purge-confirm-modal-body})}">
+        <th:block th:ref="purge-confirm-modal-body">
             <div class="krt-modal-body">
                 <p id="purge-confirm-message" class="m-0"
                    th:data-template="#{admin.syncReports.delete.confirm.message}">Wirklich löschen?</p>
@@ -130,8 +125,8 @@
                 <button type="button" class="btn btn-danger" id="purge-confirm"
                         th:text="#{admin.syncReports.delete.button}">Alte löschen</button>
             </div>
-        </div>
-    </dialog>
+        </th:block>
+    </th:block>
 </main>
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     const SYNC_MSG = {

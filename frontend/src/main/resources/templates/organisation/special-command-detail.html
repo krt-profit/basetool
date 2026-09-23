@@ -123,12 +123,8 @@
 </main>
 
 <!--/* Add-Member Modal */-->
-<dialog id="add-member-modal" class="krt-modal-overlay">
-    <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{admin.specialcommands.members.add}">
-        <div class="krt-modal-head">
-            <h2 th:text="#{admin.specialcommands.members.add}">Mitglied hinzufügen</h2>
-            <button type="button" class="krt-modal-close close-add-member-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-        </div>
+<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='add-member-modal', titleKey='admin.specialcommands.members.add', closeTrigger='', closeClass='close-add-member-modal', body=~{::add-member-modal-body})}">
+    <th:block th:ref="add-member-modal-body">
         <form th:action="@{/organisation/special-commands/{id}/members(id=${specialCommand.id()})}" method="post">
             <div class="krt-modal-body">
                 <div class="form-group">
@@ -144,8 +140,8 @@
                 <button type="submit" class="btn btn--cta" th:text="#{admin.specialcommands.members.add.submit}">Hinzufügen</button>
             </div>
         </form>
-    </div>
-</dialog>
+    </th:block>
+</th:block>
 
 <!--/* Add-Member modal wiring + in-place member CRUD (#582) */-->
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">

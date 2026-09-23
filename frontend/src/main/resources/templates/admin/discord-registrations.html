@@ -131,13 +131,8 @@
     </div>
 
     <!--/* Reject reason modal (no native dialogs, REQ-UI) */-->
-    <dialog id="reject-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
-        <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{admin.discordRegistrations.reject.modal.title}">
-            <div class="krt-modal-head">
-                <h2 th:text="#{admin.discordRegistrations.reject.modal.title}">Registrierung ablehnen</h2>
-                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="reject-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='reject-modal', titleKey='admin.discordRegistrations.reject.modal.title', variant='krt-modal--wide', body=~{::reject-modal-body})}">
+        <th:block th:ref="reject-modal-body">
             <div class="krt-modal-body">
                 <label for="reject-reason" th:text="#{admin.discordRegistrations.reject.modal.reasonLabel}">Begründung (optional)</label>
                 <textarea id="reject-reason" maxlength="1000"></textarea>
@@ -146,18 +141,13 @@
                 <button type="button" class="btn btn-ghost" id="reject-cancel" th:text="#{general.cancel}">Abbrechen</button>
                 <button type="button" class="btn btn-danger" id="reject-confirm" th:text="#{admin.discordRegistrations.reject}">Ablehnen</button>
             </div>
-        </div>
-    </dialog>
+        </th:block>
+    </th:block>
 
     <!--/* Reopen-confirmation modal (no native dialogs, REQ-UI). Carries an optional note that lands
          in the approval audit alongside the REOPENED decision (REQ-SEC-034). */-->
-    <dialog id="reopen-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
-        <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{admin.discordRegistrations.reopen.modal.title}">
-            <div class="krt-modal-head">
-                <h2 th:text="#{admin.discordRegistrations.reopen.modal.title}">Registrierung wiederöffnen</h2>
-                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="reopen-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='reopen-modal', titleKey='admin.discordRegistrations.reopen.modal.title', variant='krt-modal--wide', body=~{::reopen-modal-body})}">
+        <th:block th:ref="reopen-modal-body">
             <div class="krt-modal-body">
                 <p class="reg-when" th:text="#{admin.discordRegistrations.reopen.modal.hint}">Die Registrierung kehrt in die Warteschlange zurück und muss danach erneut freigegeben werden.</p>
                 <label for="reopen-reason" th:text="#{admin.discordRegistrations.reopen.modal.reasonLabel}">Notiz (optional)</label>
@@ -167,19 +157,14 @@
                 <button type="button" class="btn btn-ghost" id="reopen-cancel" th:text="#{general.cancel}">Abbrechen</button>
                 <button type="button" class="btn btn--cta" id="reopen-confirm" th:text="#{admin.discordRegistrations.reopen}">Wiederöffnen</button>
             </div>
-        </div>
-    </dialog>
+        </th:block>
+    </th:block>
 
     <!--/* Link-to-existing-account modal (no native dialogs, REQ-UI). Server-searched account picker
          (remote-users combobox) so an admin can find the existing account even when the Discord
          handle differs from the in-app name (REQ-SEC-026). */-->
-    <dialog id="link-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
-        <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{admin.discordRegistrations.link.modal.title}">
-            <div class="krt-modal-head">
-                <h2 th:text="#{admin.discordRegistrations.link.modal.title}">Mit bestehendem Account verbinden</h2>
-                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="link-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='link-modal', titleKey='admin.discordRegistrations.link.modal.title', variant='krt-modal--wide', body=~{::link-modal-body})}">
+        <th:block th:ref="link-modal-body">
             <div class="krt-modal-body">
                 <label for="link-target" th:text="#{admin.discordRegistrations.link.modal.accountLabel}">Bestehender Account</label>
                 <select id="link-target" data-krt-combobox="remote-users"
@@ -192,20 +177,15 @@
                 <button type="button" class="btn btn-ghost" id="link-cancel" th:text="#{general.cancel}">Abbrechen</button>
                 <button type="button" class="btn btn--cta" id="link-confirm" th:text="#{admin.discordRegistrations.link}">Verknüpfen</button>
             </div>
-        </div>
-    </dialog>
+        </th:block>
+    </th:block>
     <!--/* Merge-an-older-account modal (no native dialogs, REQ-UI). The remedy for the queue's
          duplicate-callsign marker: a login whose subject matches no account no longer adopts one
          found by name, so a member who ended up with two accounts needs their data moved onto the
          one they can reach (REQ-SEC-045). Same server-searched account picker as the link modal --
          the two differ in what moves, not in how the account is chosen. */-->
-    <dialog id="merge-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
-        <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{admin.discordRegistrations.merge.modal.title}">
-            <div class="krt-modal-head">
-                <h2 th:text="#{admin.discordRegistrations.merge.modal.title}">Konten zusammenführen</h2>
-                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="merge-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='merge-modal', titleKey='admin.discordRegistrations.merge.modal.title', variant='krt-modal--wide', body=~{::merge-modal-body})}">
+        <th:block th:ref="merge-modal-body">
             <div class="krt-modal-body">
                 <label for="merge-source" th:text="#{admin.discordRegistrations.merge.modal.accountLabel}">Älteres Konto</label>
                 <select id="merge-source" data-krt-combobox="remote-users"
@@ -218,8 +198,8 @@
                 <button type="button" class="btn btn-ghost" id="merge-cancel" th:text="#{general.cancel}">Abbrechen</button>
                 <button type="button" class="btn btn--cta" id="merge-confirm" th:text="#{admin.discordRegistrations.merge}">Zusammenführen</button>
             </div>
-        </div>
-    </dialog>
+        </th:block>
+    </th:block>
 </main>
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
