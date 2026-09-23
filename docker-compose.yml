@@ -1110,9 +1110,10 @@ x-frontend: &frontend-template
     # the per-service rollout that mount's source IS the shared keystore, so nothing changes.
     INTERNAL_TLS_TRUSTSTORE: ${INTERNAL_TLS_TRUSTSTORE:-file:/run/secrets/internal-truststore.p12}
     INTERNAL_TLS_TRUSTSTORE_PASSWORD: ${INTERNAL_TLS_TRUSTSTORE_PASSWORD:-${SERVER_SSL_KEY_STORE_PASSWORD:?SERVER_SSL_KEY_STORE_PASSWORD must be set in .env}}
-    # REQ-SEC-070: also check that the backend's certificate names `backend`. Off until the owner's
-    # rollout (docs/deployment.md, Internal TLS); the shared certificate already carries the name.
-    INTERNAL_TLS_VERIFY_HOSTNAME: ${INTERNAL_TLS_VERIFY_HOSTNAME:-false}
+    # REQ-SEC-070: also check that the backend's certificate names `backend`. On since the per-service
+    # certificates (docs/deployment.md, Internal TLS): the pinned CA vouches for every service, so the
+    # name is what tells the backend apart. `false` in the host .env turns it off again.
+    INTERNAL_TLS_VERIFY_HOSTNAME: ${INTERNAL_TLS_VERIFY_HOSTNAME:-true}
     # MaxRAMPercentage=50 at the 1792M limit → an 896M ceiling, comfortably above the 529M this JVM
     # measurably commits on prod. InitialRAMPercentage drops 50 -> 35 (627M): it must stay BELOW the
     # max (at an equal pair the JVM refuses to start or clamps), and sitting just above the measured
@@ -1288,9 +1289,10 @@ x-ingest: &ingest-template
     # the per-service rollout that mount's source IS the shared keystore, so nothing changes.
     INTERNAL_TLS_TRUSTSTORE: ${INTERNAL_TLS_TRUSTSTORE:-file:/run/secrets/internal-truststore.p12}
     INTERNAL_TLS_TRUSTSTORE_PASSWORD: ${INTERNAL_TLS_TRUSTSTORE_PASSWORD:-${SERVER_SSL_KEY_STORE_PASSWORD:?SERVER_SSL_KEY_STORE_PASSWORD must be set in .env}}
-    # REQ-SEC-070: also check that the backend's certificate names `backend`. Off until the owner's
-    # rollout (docs/deployment.md, Internal TLS); the shared certificate already carries the name.
-    INTERNAL_TLS_VERIFY_HOSTNAME: ${INTERNAL_TLS_VERIFY_HOSTNAME:-false}
+    # REQ-SEC-070: also check that the backend's certificate names `backend`. On since the per-service
+    # certificates (docs/deployment.md, Internal TLS): the pinned CA vouches for every service, so the
+    # name is what tells the backend apart. `false` in the host .env turns it off again.
+    INTERNAL_TLS_VERIFY_HOSTNAME: ${INTERNAL_TLS_VERIFY_HOSTNAME:-true}
     # MaxRAMPercentage=60 (was 75) — see the heap-budget rationale in the deploy.resources comment
     # above. InitialRAMPercentage stays 50 (256M): still below the 60% max (307M) — keep Initial < Max,
     # an inverted pair makes the JVM refuse to start — and it happens to match the 248M this service

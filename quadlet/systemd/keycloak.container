@@ -21,7 +21,7 @@ Network=net-monitoring-scrape.network
 Volume=/var/iri/code/keycloak-theme/krt-theme:/opt/keycloak/themes/krt-theme:ro
 Volume=/var/iri/code/keycloak/providers:/opt/keycloak/providers:ro
 Volume=/var/iri/keycloak/log:/var/log/keycloak
-Volume=/var/iri/secrets/keystore.p12:/run/secrets/keystore.p12:ro
+Volume=/var/iri/secrets/tls/keycloak.p12:/run/secrets/keystore.p12:ro
 EnvironmentFile=/var/iri/code/env.d/keycloak.env
 Exec=start --proxy-headers xforwarded --cache=local --http-enabled=false --https-port=18443 --https-key-store-file=/run/secrets/keystore.p12 --http-management-scheme=http --log=console,file --log-file=/var/log/keycloak/keycloak.log
 

@@ -4752,9 +4752,11 @@ production rollout reaches step by step:
   (`RestClientConfig`) verify the backend's hostname, which ADR-0204 §6 had switched off for the
   relay. The backend's Keycloak client, the edge, Prometheus and the blackbox exporter verified
   already. `dev` and `test` are unaffected.
-- **Safe to ship before the rollout.** Every per-service mount falls back to the shared keystore
-  and `INTERNAL_TLS_VERIFY_HOSTNAME` defaults to `false`, so a release carrying this changes nothing
-  until the owner mints the material and flips the switches (runbook below).
+- **Shipped in two releases.** The first was inert: every per-service mount fell back to the shared
+  keystore and `INTERNAL_TLS_VERIFY_HOSTNAME` defaulted to `false`. The second — rollout step 3 —
+  bakes the Quadlet units to `/var/iri/secrets/tls/<service>.p12` and the CA-only truststore and
+  defaults the switch to `true`; it may only be promoted to a host where step 2 has run (runbook
+  below). Compose stacks keep the fallbacks.
 - **The committed test material has the same shape** (ADR-0139 amendment 1).
 
 **Acceptance**
