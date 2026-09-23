@@ -20,10 +20,9 @@
 package de.greluc.krt.profit.basetool.frontend.config;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
 
@@ -44,46 +43,45 @@ import org.springframework.web.bind.annotation.ModelAttribute;
  *
  * <p>Scoped to {@link UsesLayoutModel}, so it does not run ahead of the module's REST controllers:
  * they serialise through Jackson and never read a model attribute. See that annotation for why the
- * selector is an opt-in marker rather than the {@code Controller} stereotype or a base package. It
- * is one uncached backend read ({@code /api/v1/me/capabilities}) per authenticated request.
+ * selector is an opt-in marker rather than the {@code Controller} stereotype or a base package. The
+ * flags come from the request's one {@code GET /api/v1/me/layout} read, shared with the other two
+ * layout advices through {@link LayoutContextLoader}, and are not read at all for a handler that
+ * writes its response body directly (FE-PERF-01).
  */
 @ControllerAdvice(annotations = UsesLayoutModel.class)
 @RequiredArgsConstructor
-@Slf4j
 public class CapabilityFlagsAdvice {
 
-  private final BackendApiClient backendApiClient;
+  /** Reads the request's layout context once and shares it with the other layout advices. */
+  private final LayoutContextLoader layoutContextLoader;
+
+  /** Answers whether the caller is authenticated and whether they hold {@code ADMIN}. */
   private final FrontendAuthHelperService authHelper;
 
   /**
-   * Loads the per-principal UI capability flags once per request from {@code GET
-   * /api/v1/me/capabilities} so the derived {@code canSeeBlueprintOverview} and {@code
-   * canViewJobOrders} attributes share a single backend round-trip instead of one each. Admins
-   * receive every flag without a call (system-wide access); anonymous callers receive every flag
-   * off without a call.
+   * Resolves the per-principal UI capability flags once per request so the derived {@code
+   * canSeeBlueprintOverview}, {@code canViewJobOrders} and {@code canViewOwnJobOrders} attributes
+   * share one answer. Admins receive every flag without consulting the backend (system-wide
+   * access); anonymous callers receive every flag off. Everyone else reads the {@code capabilities}
+   * part of the request's single {@code GET /api/v1/me/layout} answer via {@link
+   * LayoutContextLoader}.
    *
    * <p>Fails <em>closed</em>: any backend hiccup yields all-off rather than exposing a gated menu
    * or page the caller may not be entitled to. The backend enforces the same gates (a forbidden API
    * / empty list), so a hidden control and the API stay in lockstep.
    *
+   * @param request the current request, through which the layout context is memoised
    * @return the caller's capability flags; never {@code null}.
    */
   @ModelAttribute("meCapabilities")
-  public CapabilitiesResponse meCapabilities() {
+  public CapabilitiesResponse meCapabilities(HttpServletRequest request) {
     if (!authHelper.isAuthenticated()) {
-      return new CapabilitiesResponse(false, false, false);
+      return CapabilitiesResponse.NONE;
     }
     if (authHelper.isAdmin()) {
       return new CapabilitiesResponse(true, true, true);
     }
-    try {
-      CapabilitiesResponse resp =
-          backendApiClient.get("/api/v1/me/capabilities", CapabilitiesResponse.class);
-      return resp != null ? resp : new CapabilitiesResponse(false, false, false);
-    } catch (Exception ex) {
-      log.debug("Failed to resolve me-capabilities", ex);
-      return new CapabilitiesResponse(false, false, false);
-    }
+    return layoutContextLoader.load(request).capabilities();
   }
 
   /**
@@ -91,9 +89,10 @@ public class CapabilityFlagsAdvice {
    * overview is restricted to admins, officers (their Staffel) and Spezialkommando leads (their SK)
    * — but the frontend session flattens SK-lead into {@code ROLE_LOGISTICIAN}, so the lead bit is
    * invisible here. We therefore reuse the backend's authoritative gate, resolved once per request
-   * by {@link #meCapabilities()}.
+   * by {@link #meCapabilities(HttpServletRequest)}.
    *
-   * @param caps the per-request capability flags resolved by {@link #meCapabilities()}.
+   * @param caps the per-request capability flags resolved by {@link
+   *     #meCapabilities(HttpServletRequest)}.
    * @return {@code true} iff the caller may open the blueprint availability overview.
    */
   @ModelAttribute("canSeeBlueprintOverview")
@@ -110,9 +109,10 @@ public class CapabilityFlagsAdvice {
    * but don't track" posture the public request form used to give an anonymous visitor
    * (REQ-ORDERS-023 relaxes it for the requesting unit's own members). The backend gate ({@code
    * OwnerScopeService.canViewJobOrders}) is authoritative; this attribute only steers the UI and
-   * fails closed via {@link #meCapabilities()}.
+   * fails closed via {@link #meCapabilities(HttpServletRequest)}.
    *
-   * @param caps the per-request capability flags resolved by {@link #meCapabilities()}.
+   * @param caps the per-request capability flags resolved by {@link
+   *     #meCapabilities(HttpServletRequest)}.
    * @return {@code true} iff the caller may view job orders.
    */
   @ModelAttribute("canViewJobOrders")
@@ -127,9 +127,10 @@ public class CapabilityFlagsAdvice {
    * {@code JobOrderPageController} render their own placed orders instead of redirecting them to
    * the create form. The backend gate ({@code OwnerScopeService.canViewOwnJobOrders}) is
    * authoritative; this attribute only steers the UI and fails closed via {@link
-   * #meCapabilities()}.
+   * #meCapabilities(HttpServletRequest)}.
    *
-   * @param caps the per-request capability flags resolved by {@link #meCapabilities()}.
+   * @param caps the per-request capability flags resolved by {@link
+   *     #meCapabilities(HttpServletRequest)}.
    * @return {@code true} iff the caller may view the orders their own org unit requested.
    */
   @ModelAttribute("canViewOwnJobOrders")
@@ -197,5 +198,9 @@ public class CapabilityFlagsAdvice {
    *     requested (the "Meine Auftr&auml;ge" requester capability, REQ-ORDERS-023).
    */
   public record CapabilitiesResponse(
-      boolean canSeeBlueprintOverview, boolean canViewJobOrders, boolean canViewOwnJobOrders) {}
+      boolean canSeeBlueprintOverview, boolean canViewJobOrders, boolean canViewOwnJobOrders) {
+
+    /** Every capability off: the fail-closed answer for an anonymous or unresolved caller. */
+    public static final CapabilitiesResponse NONE = new CapabilitiesResponse(false, false, false);
+  }
 }

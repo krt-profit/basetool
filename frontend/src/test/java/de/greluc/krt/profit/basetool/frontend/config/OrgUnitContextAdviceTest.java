@@ -29,13 +29,14 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.frontend.config.OrgUnitContextAdvice.ActiveOrgUnitResponse;
 import de.greluc.krt.profit.basetool.frontend.controller.MeFrontendController;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
+import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import java.util.UUID;
@@ -43,6 +44,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockHttpServletRequest;
 
 /**
  * Unit tests for {@link OrgUnitContextAdvice}. Two groups: (1) the slow-changing catalogue reads —
@@ -61,7 +63,8 @@ class OrgUnitContextAdviceTest {
   @Mock private HttpServletRequest request;
 
   private OrgUnitContextAdvice advice() {
-    return new OrgUnitContextAdvice(backendApiClient, authHelper);
+    return new OrgUnitContextAdvice(
+        backendApiClient, new LayoutContextLoader(backendApiClient, authHelper), authHelper);
   }
 
   @Test
@@ -72,7 +75,7 @@ class OrgUnitContextAdviceTest {
     // assertion is about the routing, not the payload.
     when(authHelper.isAuthenticated()).thenReturn(true);
 
-    advice().availableSquadrons();
+    advice().availableSquadrons(new MockHttpServletRequest());
 
     verify(backendApiClient).getCached(eq(CachedCatalog.SQUADRONS), anyTypeRef());
     verify(backendApiClient, never())
@@ -87,9 +90,11 @@ class OrgUnitContextAdviceTest {
     // rule is how the Android app came to offer an admin nothing to pin at all.
     when(authHelper.isAuthenticated()).thenReturn(true);
 
-    advice().availableOrgUnits();
+    advice().availableOrgUnits(new MockHttpServletRequest());
 
-    verify(backendApiClient).get(eq("/api/v1/me/org-units"), anyTypeRef());
+    // FE-PERF-01: the answer is the orgUnits part of the one /me/layout read.
+    verify(backendApiClient).get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class);
+    verify(backendApiClient, never()).get(eq("/api/v1/me/org-units"), anyTypeRef());
     // The catalogues this class used to page-walk for admins are no longer its business.
     verify(backendApiClient, never()).getCached(eq(CachedCatalog.SQUADRONS), anyTypeRef());
     verify(backendApiClient, never()).getCached(eq(CachedCatalog.SPECIAL_COMMANDS), anyTypeRef());
@@ -99,8 +104,8 @@ class OrgUnitContextAdviceTest {
   void switcher_returnsEmptyForAnAnonymousCaller_withoutAskingTheBackend() {
     when(authHelper.isAuthenticated()).thenReturn(false);
 
-    assertTrue(advice().availableOrgUnits().isEmpty());
-    verify(backendApiClient, never()).get(eq("/api/v1/me/org-units"), anyTypeRef());
+    assertTrue(advice().availableOrgUnits(new MockHttpServletRequest()).isEmpty());
+    verifyNoInteractions(backendApiClient);
   }
 
   @Test
@@ -133,13 +138,14 @@ class OrgUnitContextAdviceTest {
   @Test
   void activeSquadronId_nonAdmin_fallsBackToBackendActiveOrgUnit() {
     // Branch 3: a non-admin without a session pin resolves the persistent home Staffel via the
-    // backend GET /api/v1/me/active-org-unit. A break here stops resolving the home staffel.
+    // activeOrgUnitId part of GET /api/v1/me/layout (formerly /me/active-org-unit). A break here
+    // stops resolving the home staffel.
     UUID home = UUID.randomUUID();
     when(authHelper.isAuthenticated()).thenReturn(true);
     when(request.getSession(false)).thenReturn(null);
     when(authHelper.isAdmin()).thenReturn(false);
-    when(backendApiClient.get("/api/v1/me/active-org-unit", ActiveOrgUnitResponse.class))
-        .thenReturn(new ActiveOrgUnitResponse(home));
+    when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.activeOrgUnit(home));
 
     assertEquals(home, advice().activeSquadronId(request));
   }
@@ -151,7 +157,7 @@ class OrgUnitContextAdviceTest {
     when(authHelper.isAuthenticated()).thenReturn(true);
     when(request.getSession(false)).thenReturn(null);
     when(authHelper.isAdmin()).thenReturn(false);
-    when(backendApiClient.get("/api/v1/me/active-org-unit", ActiveOrgUnitResponse.class))
+    when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
         .thenThrow(new RuntimeException("boom"));
 
     assertNull(advice().activeSquadronId(request));

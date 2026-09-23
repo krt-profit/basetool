@@ -91,6 +91,11 @@ Two binding rules shape every UI change:
   `Last-Modified`; everything else is `no-store`, where no ETag can be issued. So assets, pages,
   fragments and the SSE relay all leave unbuffered. A new publicly cacheable, non-hashed route
   joins `EtagConfig.ETAG_URL_PATTERNS` (ADR-0161).
+- **The layout model costs one backend read, and only where it can be rendered** (FE-PERF-01,
+  2026-09-23). The three layout advices share one `GET /api/v1/me/layout` per request through
+  `LayoutContextLoader`; a handler that writes its own body and reads no `ModelAttribute` pays
+  nothing, even inside a view controller. New JSON handlers go into a `@RestController`
+  (REQ-FE-020, ADR-0165, ratchet in `ArchitectureTest`).
 
 Authority: [`ui-design-system.md`](../specs/ui-design-system.md),
 [`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md) (`REQ-FE-*`),

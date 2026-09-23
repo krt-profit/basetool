@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
@@ -30,11 +29,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
  * JSON proxies for the catalog pickers' live search (REQ-FE-016): material and location comboboxes
@@ -52,9 +50,11 @@ import org.springframework.web.bind.annotation.ResponseBody;
  * handler here used to sit under a {@code permitAll} URL rule, and thirteen of them across this
  * package carried no gate of their own at all — protected by a matcher two folders away rather than
  * by anything next to the code. A method-level gate still wins where one is present.
+ *
+ * <p>A {@code RestController} without {@code UsesLayoutModel} since FE-PERF-01: both handlers
+ * answer JSON, so the layout advices have nothing to contribute and must not run ahead of them.
  */
-@Controller
-@UsesLayoutModel
+@RestController
 @RequestMapping("/catalog")
 @RequiredArgsConstructor
 @Slf4j
@@ -87,7 +87,6 @@ public class CatalogSearchController {
    *     extra row into the "keep typing" hint rather than showing it.
    */
   @GetMapping("/material-search")
-  @ResponseBody
   public List<MaterialDto> materialSearch(
       @RequestParam(required = false) String q,
       @RequestParam(required = false, defaultValue = "false") boolean jobOrder,
@@ -125,7 +124,6 @@ public class CatalogSearchController {
    *     name ascending; empty on failure
    */
   @GetMapping("/location-search")
-  @ResponseBody
   public List<LocationReferenceDto> locationSearch(@RequestParam(required = false) String q) {
     try {
       PageResponse<LocationReferenceDto> page =

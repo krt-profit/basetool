@@ -19,16 +19,16 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.frontend.config.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.util.List;
 import java.util.UUID;
 import org.hamcrest.Matchers;
@@ -76,13 +76,14 @@ class OrgUnitSwitcherLabelMvcTest {
   @BeforeEach
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-    when(backendApiClient.get(eq("/api/v1/me/org-units"), anyTypeRef()))
+    when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
         .thenReturn(
-            List.of(
-                new OrgUnitMembershipOptionDto(
-                    UUID.randomUUID(), "IRIDIUM", "IRI", "SQUADRON", true),
-                new OrgUnitMembershipOptionDto(
-                    UUID.randomUUID(), "VANGUARD", "VGD", "SQUADRON", true)));
+            LayoutResponses.orgUnits(
+                List.of(
+                    new OrgUnitMembershipOptionDto(
+                        UUID.randomUUID(), "IRIDIUM", "IRI", "SQUADRON", true),
+                    new OrgUnitMembershipOptionDto(
+                        UUID.randomUUID(), "VANGUARD", "VGD", "SQUADRON", true))));
   }
 
   @Test

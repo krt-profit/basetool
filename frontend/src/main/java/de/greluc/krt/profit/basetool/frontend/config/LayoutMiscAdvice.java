@@ -19,14 +19,10 @@
 
 package de.greluc.krt.profit.basetool.frontend.config;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationCountResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
-import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -43,23 +39,24 @@ import org.springframework.web.bind.annotation.ModelAttribute;
  * name — Spring's {@code ModelFactory} orders {@code @ModelAttribute} methods by dependency across
  * all advice beans, so the reference resolves regardless of the source bean.
  *
- * <p>The backend round-trip for the notification count degrades gracefully: a hiccup hides the
- * badge (count 0) rather than breaking the chrome.
+ * <p>The notification count is the {@code unreadNotifications} part of the request's single {@code
+ * GET /api/v1/me/layout} answer, shared through {@link LayoutContextLoader}; a backend hiccup hides
+ * the badge (count 0) rather than breaking the chrome.
  *
  * <p>Scoped to {@link UsesLayoutModel}, so it does not run ahead of the module's REST controllers:
  * they serialise through Jackson and never read a model attribute. See that annotation for why the
  * selector is an opt-in marker rather than the {@code Controller} stereotype or a base package. It
- * is one uncached backend read ({@code /api/v1/notifications/unread-count}) per authenticated
- * request.
+ * issues no backend read of its own (FE-PERF-01).
  */
 @ControllerAdvice(annotations = UsesLayoutModel.class)
 @RequiredArgsConstructor
-@Slf4j
 public class LayoutMiscAdvice {
 
-  private final BackendApiClient backendApiClient;
+  /** Reads the request's layout context once and shares it with the other layout advices. */
+  private final LayoutContextLoader layoutContextLoader;
+
+  /** Resolves the localised title patterns. */
   private final MessageSource messageSource;
-  private final FrontendAuthHelperService authHelper;
 
   /**
    * Composes the dynamic application title rendered in the {@code <title>} tag and the sidebar
@@ -108,26 +105,17 @@ public class LayoutMiscAdvice {
 
   /**
    * The caller's unread-notification count, fed to the always-on bell badge rendered on every page
-   * (REQ-NOTIF-006). Resolved once per request; fails soft to zero so a backend hiccup hides the
-   * badge rather than breaking the chrome, and the bell's client-side polling keeps it fresh after
-   * the initial render.
+   * (REQ-NOTIF-006). Read from the request's single layout answer ({@link LayoutContextLoader}), so
+   * it costs no call of its own; zero when unauthenticated, for a handler that writes its body
+   * directly, or on a backend error, so a hiccup hides the badge rather than breaking the chrome.
+   * The bell's client-side polling keeps it fresh after the initial render.
    *
-   * @return the unread count, or {@code 0} when unauthenticated or on a backend error.
+   * @param request the current request, through which the layout context is memoised
+   * @return the unread count, or {@code 0} when it cannot or need not be resolved
    */
   @ModelAttribute("unreadNotificationCount")
-  public long unreadNotificationCount() {
-    if (!authHelper.isAuthenticated()) {
-      return 0L;
-    }
-    try {
-      NotificationCountResponse resp =
-          backendApiClient.get(
-              "/api/v1/notifications/unread-count", NotificationCountResponse.class);
-      return resp != null && resp.count() != null ? resp.count() : 0L;
-    } catch (Exception ex) {
-      log.debug("Failed to resolve unread notification count", ex);
-      return 0L;
-    }
+  public long unreadNotificationCount(HttpServletRequest request) {
+    return layoutContextLoader.load(request).unreadNotifications();
   }
 
   /**

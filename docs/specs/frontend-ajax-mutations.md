@@ -1831,6 +1831,29 @@ reads — four uncached, plus the cached squadron page-walk — to build a model
 in-place mutation is the app's primary interaction model (REQ-FE-001…REQ-FE-010), that sat on the
 hot path.
 
+**Amended 2026-09-23 (FE-PERF-01) — per handler, and one read.** A `@ControllerAdvice` selects per
+controller *type*, so the marker alone left the ~200 `ResponseBody` handlers that live inside view
+controllers (the in-place mutation endpoints, the unread-count poll) paying for the model. Two rules
+close that:
+
+- **A handler that cannot render does not read the layout.** `LayoutContextLoader.needsLayoutModel`
+  looks at the handler the dispatcher matched: a method that writes its own body (`ResponseBody` on
+  the method or class, or an `HttpEntity` / `ResponseBodyEmitter` / `StreamingResponseBody` return
+  type) **and** declares no `ModelAttribute` parameter gets the fail-closed empty context with no
+  backend read. The second condition is load-bearing — `JobOrderWriteController`'s AJAX create
+  handlers are `ResponseBody` and read `canViewJobOrders` as a parameter. A handler that returns a
+  view, full page or XHR fragment, always gets the whole model: the list fragments of the hangar,
+  missions, refinery orders, the Lager admin and the promotion pages read `isAllSquadronsMode`, so
+  no fragment is skipped on the strength of a request header.
+- **A rendered page reads the layout once.** The three advices take their org-unit context,
+  pinnable units, capability flags and unread count from one `GET /api/v1/me/layout`
+  (REQ-API-012), memoised as a request attribute, instead of four separate reads. It fails closed
+  as a whole (ADR-0151). The squadron catalogue stays the cached `CachedCatalog.SQUADRONS` read.
+
+New JSON handlers belong in a `@RestController`; `ArchitectureTest` ratchets the number of
+body-writing handlers inside `@UsesLayoutModel` controllers (215 on 2026-09-23) so it can only
+fall.
+
 **Acceptance**
 
 - [ ] An authenticated request to a `@RestController` in the `frontend` module triggers none of
@@ -1842,11 +1865,21 @@ hot path.
   app title, unread count, CSRF metas and app version.
 - [ ] `GlobalBindingAdvice` remains unscoped, and a `String` `@RequestParam`/`@PathVariable` on a
   proxy is still trimmed and length-capped.
+- [x] The unread-count poll (`GET /notifications/unread-count`, a `ResponseBody` handler in a view
+  controller) makes exactly one backend call, its own (2026-09-23).
+- [x] A rendered page makes exactly one `/api/v1/me/layout` read and none of the four retired
+  layout reads; the three advices share it (2026-09-23).
+- [x] A `ResponseBody` handler that reads a `ModelAttribute` parameter still receives the model
+  (2026-09-23).
+- [x] The body-writing handlers inside `@UsesLayoutModel` controllers only ever decrease (ratchet,
+  2026-09-23).
 
-**Enforced by:** `LayoutModelScopeMvcTest` (no layout backend read on a `@RestController`),
-`ArchitectureTest` (both halves of the `@UsesLayoutModel` marker rule) · **Code:**
-`config/UsesLayoutModel` and the five `@ControllerAdvice(annotations = UsesLayoutModel.class)` layout
-advices · **ADR:** ADR-0165
+**Enforced by:** `LayoutModelScopeMvcTest` (no layout backend read on a `@RestController`; one call
+for the unread-count poll; one layout read per rendered page), `LayoutContextLoaderTest` (memo,
+fail-closed, the handler test), `ArchitectureTest` (both halves of the `@UsesLayoutModel` marker
+rule; the body-handler ratchet) · **Code:** `config/UsesLayoutModel`, `config/LayoutContextLoader`
+and the five `@ControllerAdvice(annotations = UsesLayoutModel.class)` layout advices · **ADR:**
+ADR-0165
 
 ### REQ-FE-021 — A list page's filters collapse behind one toggle
 

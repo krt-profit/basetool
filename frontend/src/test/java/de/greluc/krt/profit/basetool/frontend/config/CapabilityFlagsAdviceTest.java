@@ -30,17 +30,20 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.frontend.config.CapabilityFlagsAdvice.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
+import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockHttpServletRequest;
 
 /**
  * Unit tests for {@link CapabilityFlagsAdvice}. Exercises the shared {@code meCapabilities}
- * resolver (a single backend round-trip, admins short-circuited to all-on, anonymous
- * short-circuited to all-off, fail-closed on error) and the derived sidebar flags {@code
- * canSeeBlueprintOverview} (#364), {@code canViewJobOrders} (profit-eligible order visibility) and
- * {@code canViewOwnJobOrders} (the requester capability, REQ-ORDERS-023) that read from it.
+ * resolver (the capabilities part of the one {@code /me/layout} read, admins short-circuited to
+ * all-on, anonymous short-circuited to all-off, fail-closed on error) and the derived sidebar flags
+ * {@code canSeeBlueprintOverview} (#364), {@code canViewJobOrders} (profit-eligible order
+ * visibility) and {@code canViewOwnJobOrders} (the requester capability, REQ-ORDERS-023) that read
+ * from it.
  */
 @ExtendWith(MockitoExtension.class)
 class CapabilityFlagsAdviceTest {
@@ -49,14 +52,15 @@ class CapabilityFlagsAdviceTest {
   @Mock private FrontendAuthHelperService authHelper;
 
   private CapabilityFlagsAdvice advice() {
-    return new CapabilityFlagsAdvice(backendApiClient, authHelper);
+    return new CapabilityFlagsAdvice(
+        new LayoutContextLoader(backendApiClient, authHelper), authHelper);
   }
 
   @Test
   void meCapabilities_anonymous_allFalse_withoutBackendCall() {
     when(authHelper.isAuthenticated()).thenReturn(false);
 
-    CapabilitiesResponse caps = advice().meCapabilities();
+    CapabilitiesResponse caps = advice().meCapabilities(new MockHttpServletRequest());
 
     assertFalse(caps.canSeeBlueprintOverview());
     assertFalse(caps.canViewJobOrders());
@@ -68,7 +72,7 @@ class CapabilityFlagsAdviceTest {
     when(authHelper.isAuthenticated()).thenReturn(true);
     when(authHelper.isAdmin()).thenReturn(true);
 
-    CapabilitiesResponse caps = advice().meCapabilities();
+    CapabilitiesResponse caps = advice().meCapabilities(new MockHttpServletRequest());
 
     assertTrue(caps.canSeeBlueprintOverview());
     assertTrue(caps.canViewJobOrders());
@@ -79,10 +83,10 @@ class CapabilityFlagsAdviceTest {
   void meCapabilities_nonAdmin_reflectsBackend() {
     when(authHelper.isAuthenticated()).thenReturn(true);
     when(authHelper.isAdmin()).thenReturn(false);
-    when(backendApiClient.get("/api/v1/me/capabilities", CapabilitiesResponse.class))
-        .thenReturn(new CapabilitiesResponse(true, false, false));
+    when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.capabilities(true, false, false));
 
-    CapabilitiesResponse caps = advice().meCapabilities();
+    CapabilitiesResponse caps = advice().meCapabilities(new MockHttpServletRequest());
 
     assertTrue(caps.canSeeBlueprintOverview());
     assertFalse(caps.canViewJobOrders());
@@ -92,10 +96,10 @@ class CapabilityFlagsAdviceTest {
   void meCapabilities_nonAdmin_backendFails_failsClosed() {
     when(authHelper.isAuthenticated()).thenReturn(true);
     when(authHelper.isAdmin()).thenReturn(false);
-    when(backendApiClient.get("/api/v1/me/capabilities", CapabilitiesResponse.class))
+    when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
         .thenThrow(new RuntimeException("boom"));
 
-    CapabilitiesResponse caps = advice().meCapabilities();
+    CapabilitiesResponse caps = advice().meCapabilities(new MockHttpServletRequest());
 
     assertFalse(caps.canSeeBlueprintOverview());
     assertFalse(caps.canViewJobOrders());

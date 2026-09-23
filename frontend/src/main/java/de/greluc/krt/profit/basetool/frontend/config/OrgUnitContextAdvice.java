@@ -74,10 +74,11 @@ import org.springframework.web.bind.annotation.ModelAttribute;
  *
  * <p>Scoped to {@link UsesLayoutModel}, so it does not run ahead of the module's REST controllers:
  * they serialise through Jackson and never read a model attribute. See that annotation for why the
- * selector is an opt-in marker rather than the {@code Controller} stereotype or a base package.
- * Three of the five layout-model backend reads are made here — the active org unit, the cached
- * squadron page-walk and the org-unit memberships — so this is the largest single share of the cost
- * a JSON endpoint used to pay.
+ * selector is an opt-in marker rather than the {@code Controller} stereotype or a base package. The
+ * active org unit and the pinnable org units come from the request's single {@code GET
+ * /api/v1/me/layout} read, shared with the other layout advices through {@link
+ * LayoutContextLoader}; the squadron catalogue stays a cached read. A handler that writes its
+ * response body directly and reads no model attribute pays for neither (FE-PERF-01).
  */
 @ControllerAdvice(annotations = UsesLayoutModel.class)
 @RequiredArgsConstructor
@@ -88,11 +89,13 @@ public class OrgUnitContextAdvice {
   private static final ParameterizedTypeReference<PageResponse<SquadronDto>> SQUADRON_PAGE =
       new ParameterizedTypeReference<>() {};
 
-  /** Captured generic type for decoding the caller's OrgUnit-membership option rows. */
-  private static final ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>
-      ORG_UNIT_MEMBERSHIP_OPTION_LIST = new ParameterizedTypeReference<>() {};
-
+  /** The single seam to the backend, used here only for the cached squadron catalogue. */
   private final BackendApiClient backendApiClient;
+
+  /** Reads the request's layout context once and shares it with the other layout advices. */
+  private final LayoutContextLoader layoutContextLoader;
+
+  /** Answers whether the caller is authenticated and whether they hold {@code ADMIN}. */
   private final FrontendAuthHelperService authHelper;
 
   /**
@@ -103,8 +106,9 @@ public class OrgUnitContextAdvice {
    *   <li>Admin: read the switcher selection from the frontend's Redis-backed Spring Session (set
    *       by {@link MeFrontendController}). {@code null} means "all squadrons" mode.
    *   <li>Non-admin: the user's persistent home squadron from {@code app_user.squadron_id} on the
-   *       backend. The {@code GET /api/v1/me/active-org-unit} endpoint already resolves this for
-   *       the current principal; we reuse it instead of duplicating the lookup on the frontend.
+   *       backend. The {@code activeOrgUnitId} part of {@code GET /api/v1/me/layout} resolves this
+   *       for the current principal, as {@code /api/v1/me/active-org-unit} did before it; we reuse
+   *       it instead of duplicating the lookup on the frontend.
    * </ul>
    *
    * <p>Anonymous callers return {@code null}; the failure of the backend round-trip degrades
@@ -132,23 +136,8 @@ public class OrgUnitContextAdvice {
       // Admin without an active session pin → all-scopes mode, no badge.
       return null;
     }
-    try {
-      ActiveOrgUnitResponse resp =
-          backendApiClient.get("/api/v1/me/active-org-unit", ActiveOrgUnitResponse.class);
-      return resp != null ? resp.orgUnitId() : null;
-    } catch (Exception ex) {
-      log.debug("Failed to resolve home squadron for non-admin caller", ex);
-      return null;
-    }
+    return layoutContextLoader.load(request).activeOrgUnitId();
   }
-
-  /**
-   * Wire-shape mirror of the backend's {@code MeController.ActiveOrgUnitResponse} record. Kept
-   * local to avoid a frontend dependency on the backend module just for one JSON envelope.
-   *
-   * @param orgUnitId resolved OrgUnit UUID, or {@code null} when none applies.
-   */
-  public record ActiveOrgUnitResponse(UUID orgUnitId) {}
 
   /**
    * Resolves the full {@link SquadronDto} that matches {@link #activeSquadronId} so the template
@@ -180,8 +169,8 @@ public class OrgUnitContextAdvice {
    * OrgUnitMembershipOptionDto} (carries the {@code kind} discriminator) so the context chip can
    * render {@code [Staffel: IRI]} vs {@code [SK: ALPHA]} and apply a kind-specific style. Where
    * {@link #activeSquadron} can only resolve {@code SQUADRON}-kind pins (its catalogue is the
-   * Squadron-only list), this attribute reads from {@link #availableOrgUnits()} which already
-   * carries the merged Squadron + SK catalogue with the discriminator inline.
+   * Squadron-only list), this attribute reads from {@link #availableOrgUnits(HttpServletRequest)}
+   * which already carries the merged Squadron + SK catalogue with the discriminator inline.
    *
    * <p>Returns {@code null} when no pin is active (admin in all-OrgUnits mode, member with no home
    * Staffel) or the pinned id is not present in the caller's catalogue (e.g. an admin pin that
@@ -211,13 +200,17 @@ public class OrgUnitContextAdvice {
    * Loads the squadron catalogue once per request. Returned to admins for the switcher dropdown and
    * reused by {@link #activeSquadron(UUID, List)} to dereference the active id without a second
    * round-trip. Empty list for anonymous callers or when the backend call fails - the dropdown
-   * gracefully renders without options rather than 500ing the page.
+   * gracefully renders without options rather than 500ing the page. Also empty, without a read, for
+   * a handler that writes its response body directly and reads no model attribute ({@link
+   * LayoutContextLoader#needsLayoutModel(HttpServletRequest)}): nothing there can read the list,
+   * and a cache miss would otherwise still cost a page-walk.
    *
+   * @param request the current request, carrying the matched handler
    * @return list of active squadrons, ordered by name; never {@code null}.
    */
   @ModelAttribute("availableSquadrons")
-  public List<SquadronDto> availableSquadrons() {
-    if (!authHelper.isAuthenticated()) {
+  public List<SquadronDto> availableSquadrons(HttpServletRequest request) {
+    if (!authHelper.isAuthenticated() || !LayoutContextLoader.needsLayoutModel(request)) {
       return List.of();
     }
     // R5.e: kept identical to the pre-R5.e semantics — load the full Squadron catalogue for
@@ -243,43 +236,30 @@ public class OrgUnitContextAdvice {
 
   /**
    * R5.e — list of {@link OrgUnitMembershipOptionDto} that the caller can switch their active scope
-   * to. Replaces {@link #availableSquadrons()} for the post-R5.e sidebar switcher: admins see every
-   * active org unit; everyone else sees the units they belong to plus the ones a Bereich or OL seat
-   * reaches. All four kinds — a Bereich and the Organisationsleitung own aggregates in their own
-   * right, so a member seated on one and on nothing else had an empty switcher. The template hides
-   * itself when this list has fewer than two entries — no choice to offer means no UI noise (plan
-   * §7.2).
+   * to. Replaces {@link #availableSquadrons(HttpServletRequest)} for the post-R5.e sidebar
+   * switcher: admins see every active org unit; everyone else sees the units they belong to plus
+   * the ones a Bereich or OL seat reaches. All four kinds — a Bereich and the Organisationsleitung
+   * own aggregates in their own right, so a member seated on one and on nothing else had an empty
+   * switcher. The template hides itself when this list has fewer than two entries — no choice to
+   * offer means no UI noise (plan §7.2).
    *
-   * <p>Backend round-trips:
-   *
-   * <ul>
-   *   <li><strong>One call, no branch here.</strong> {@code GET /api/v1/me/org-units} answers it:
-   *       an admin gets every active org unit, everyone else their own reach. The fork used to live
-   *       in this class — page-walking {@code /squadrons} plus {@code /special-commands} for
-   *       admins, and two round-trips ({@code /users/me}, then {@code /users/{id}/memberships}) for
-   *       everyone else. The Android client had to know the same rule and did not, so an admin was
-   *       offered nothing to pin at all (ADR-0151, REQ-SEC-048). One endpoint means one place to be
-   *       right, and collapses up to four round-trips into one.
-   * </ul>
+   * <p><strong>No branch here.</strong> The backend answers it — the {@code orgUnits} part of
+   * {@code GET /api/v1/me/layout}, identical to {@code GET /api/v1/me/org-units}: an admin gets
+   * every active org unit, everyone else their own reach. The fork used to live in this class —
+   * page-walking {@code /squadrons} plus {@code /special-commands} for admins, and two round-trips
+   * ({@code /users/me}, then {@code /users/{id}/memberships}) for everyone else. The Android client
+   * had to know the same rule and did not, so an admin was offered nothing to pin at all (ADR-0151,
+   * REQ-SEC-048). One endpoint means one place to be right.
    *
    * <p>Failures degrade silently to an empty list — the switcher then hides itself rather than
    * 500'ing the sidebar render.
    *
+   * @param request the current request, through which the layout context is memoised
    * @return the OrgUnit options visible in the switcher; never {@code null}.
    */
   @ModelAttribute("availableOrgUnits")
-  public List<OrgUnitMembershipOptionDto> availableOrgUnits() {
-    if (!authHelper.isAuthenticated()) {
-      return List.of();
-    }
-    try {
-      List<OrgUnitMembershipOptionDto> options =
-          backendApiClient.get("/api/v1/me/org-units", ORG_UNIT_MEMBERSHIP_OPTION_LIST);
-      return options != null ? options : List.of();
-    } catch (Exception ex) {
-      log.debug("Failed to load pinnable org units for the switcher", ex);
-      return List.of();
-    }
+  public List<OrgUnitMembershipOptionDto> availableOrgUnits(HttpServletRequest request) {
+    return layoutContextLoader.load(request).orgUnits();
   }
 
   /**

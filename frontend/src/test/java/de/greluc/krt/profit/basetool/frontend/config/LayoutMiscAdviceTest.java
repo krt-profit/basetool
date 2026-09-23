@@ -21,11 +21,18 @@ package de.greluc.krt.profit.basetool.frontend.config;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
+import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
+import de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -33,6 +40,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
+import org.springframework.mock.web.MockHttpServletRequest;
 
 /**
  * Unit tests for {@link LayoutMiscAdvice}. Focuses on the {@code appTitle} composition
@@ -49,7 +57,8 @@ class LayoutMiscAdviceTest {
   @Mock private FrontendAuthHelperService authHelper;
 
   private LayoutMiscAdvice advice() {
-    return new LayoutMiscAdvice(backendApiClient, messageSource, authHelper);
+    return new LayoutMiscAdvice(
+        new LayoutContextLoader(backendApiClient, authHelper), messageSource);
   }
 
   @Test
@@ -99,6 +108,37 @@ class LayoutMiscAdviceTest {
     stubEchoMessages();
 
     assertEquals("app.title", advice().appTitle(null, false));
+  }
+
+  @Test
+  void unreadNotificationCount_readsTheLayoutAnswer() {
+    // FE-PERF-01: the bell count is a part of the one /me/layout read, not a call of its own.
+    when(authHelper.isAuthenticated()).thenReturn(true);
+    when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
+        .thenReturn(
+            new LayoutContextLoader.MeLayoutResponse(
+                null, List.of(), CapabilityFlagsAdvice.CapabilitiesResponse.NONE, 7L));
+
+    assertEquals(7L, advice().unreadNotificationCount(new MockHttpServletRequest()));
+    verify(backendApiClient, never())
+        .get(eq("/api/v1/notifications/unread-count"), ResponseTypeMatchers.anyClass());
+  }
+
+  @Test
+  void unreadNotificationCount_backendFails_hidesTheBadge() {
+    when(authHelper.isAuthenticated()).thenReturn(true);
+    when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
+        .thenThrow(new RuntimeException("boom"));
+
+    assertEquals(0L, advice().unreadNotificationCount(new MockHttpServletRequest()));
+  }
+
+  @Test
+  void unreadNotificationCount_anonymous_isZeroWithoutACall() {
+    when(authHelper.isAuthenticated()).thenReturn(false);
+
+    assertEquals(0L, advice().unreadNotificationCount(new MockHttpServletRequest()));
+    verifyNoInteractions(backendApiClient);
   }
 
   /**
