@@ -59,7 +59,9 @@ ToDo.md
 **/*.log.zip
 log.txt
 
-# E2E (Playwright) source set: test-only, never shipped in the image. Excluding it
-# from the build context also stops e2e-test edits from busting the backend/frontend
-# image layer cache (the Dockerfiles COPY the whole module src/ tree).
+# Test and E2E (Playwright) source sets: never compiled into the image. The app build
+# runs `:<module>:bootJar` (BLD-PERF-01), which does not touch either, and docker/app/Dockerfile
+# copies only `src/main`. Excluding them anyway keeps the build context small and makes the
+# boundary explicit: nothing test-only can reach an image, even through a future wider COPY.
+**/src/test
 **/src/e2e

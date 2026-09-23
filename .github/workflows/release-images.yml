@@ -34,7 +34,7 @@ name: Release Images
 #      `ubuntu-24.04-arm` fleet — and pushes the resulting image to GHCR
 #      **by digest** only (no tag). The previous all-in-one matrix went
 #      through qemu-aarch64 emulation for the arm64 stage and was ~3-6x
-#      slower than amd64 because every javac / Gradle / AppCDS JVM invocation
+#      slower than amd64 because every javac / Gradle / AOT-training JVM invocation
 #      ran translated. With native runners both architectures finish in
 #      roughly the same wall time.
 #   2. `merge` matrix (3 jobs, one per module): assembles a multi-arch OCI
@@ -522,14 +522,15 @@ jobs:
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
-          file: ${{ matrix.module }}/Dockerfile
+          # One Dockerfile for all three app images (IMG-SIMP-14); MODULE selects the
+          # Gradle project, the training flags and the per-module port/healthcheck stage.
+          file: docker/app/Dockerfile
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
-          # Forwarded to both module Dockerfiles. The frontend consumes it via
-          # `-PappVersion=...` to override `bootBuildInfo`'s default version;
-          # the backend just declares the ARG to silence BuildKit's "unused
-          # build arg" warning (it has no UI to render a version chip on).
+          # APP_VERSION goes to Gradle as `-PappVersion=...` for every module; only
+          # the frontend reads it (`bootBuildInfo`, the sidebar's version chip).
           build-args: |
+            MODULE=${{ matrix.module }}
             APP_VERSION=${{ steps.app-version.outputs.version }}
           # Push the per-arch image as a digest-only reference (no tag). The
           # merge job below assembles all per-arch digests into a single

@@ -73,7 +73,10 @@ before the artifact is used.
    `./gradlew --write-verification-metadata sha256 :frontend:nodeSetup`, and a Node bump in the
    catalog regenerates both committed entries — on Windows with the command above, the Linux one
    with the same command in a Linux shell or container. The Docker image builds never resolve Node:
-   every Node task is excluded there (`check_frontend_image_lint_exclusions.py`).
+   they run `:<module>:bootJar`, which no Node task feeds. *(Updated 2026-09-23, ADR-0209 / BLD-PERF-01:
+   this said every Node task was excluded by name and checked by
+   `check_frontend_image_lint_exclusions.py`; the builds stopped running `build`, and the script and
+   its exclusion list are gone.)*
 6. **`dependency-submission.yml` runs lenient.** It builds nothing that ships, and the
    `gradle/actions/dependency-submission` action injects its own dependency-graph plugin through an
    init script whose classpath this file does not describe; strict mode would refuse it and stop the
@@ -90,7 +93,7 @@ before the artifact is used.
   which Gradle resolves; its PRs are unaffected. Should a Dependabot *security update* ever open a
   Gradle PR, it fails verification until a maintainer pushes the regenerated file — the same one
   command, on that PR's branch.
-- The Docker image builds copy `gradle/` already, so they verify too.
+- The Docker image build (`docker/app/Dockerfile` since 2026-09-23) copies `gradle/`, so it verifies too.
 - The file is large and machine-written. It is reviewed for *which* coordinates change, not read.
 - Verified at introduction (2026-09-23): strict mode on an empty Gradle user home in Linux
   (`eclipse-temurin:25-jdk-alpine`) ran `help`, `assemble`, `compileTestJava`,

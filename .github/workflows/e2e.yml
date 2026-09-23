@@ -100,16 +100,17 @@ jobs:
           persist-credentials: false
 
       # The same two builds `docker compose ... up --build` ran in every cell: context `.`, the
-      # module Dockerfile, no build args (docker-compose.build.yml passes none). Retried once, for
-      # the same reason E2eStackExtension retried its `up --build`: the Gradle dependency download
-      # inside the image build is the network call that fails transiently.
+      # shared app Dockerfile, `MODULE` the only build arg (docker-compose.build.yml passes the same
+      # and nothing else). Retried once, for the same reason E2eStackExtension retried its
+      # `up --build`: the Gradle dependency download inside the image build is the network call
+      # that fails transiently.
       - name: Build the backend and frontend images
         run: |
           set -euo pipefail
           build() {
-            local dockerfile="$1" tag="$2" attempt
+            local module="$1" tag="$2" attempt
             for attempt in 1 2; do
-              if docker build --file "$dockerfile" --tag "$tag" .; then
+              if docker build --file docker/app/Dockerfile --build-arg "MODULE=${module}" --tag "$tag" .; then
                 return 0
               fi
               echo "::warning::building ${tag} failed (attempt ${attempt}/2)"
@@ -117,8 +118,8 @@ jobs:
             done
             return 1
           }
-          build backend/Dockerfile "$BACKEND_IMAGE"
-          build frontend/Dockerfile "$FRONTEND_IMAGE"
+          build backend "$BACKEND_IMAGE"
+          build frontend "$FRONTEND_IMAGE"
           docker image ls --format '{{.Repository}}:{{.Tag}} {{.Size}}' | grep ':e2e-local '
 
       # zstd ships on the runner; -T0 uses every core. Uploaded uncompressed by the artifact action

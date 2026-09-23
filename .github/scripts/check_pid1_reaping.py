@@ -32,12 +32,14 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-# Our own images carry their HEALTHCHECK in these Dockerfiles; a service using the image inherits it
-# unless the compose file overrides `healthcheck`.
+# Our own images carry their HEALTHCHECK in one shared Dockerfile, in a per-module tail stage
+# (`FROM runtime AS runtime-<module>`), because HEALTHCHECK expands no build args; a service using
+# the image inherits it unless the compose file overrides `healthcheck`.
+APP_DOCKERFILE = "docker/app/Dockerfile"
 IMAGE_DOCKERFILES = {
-    "basetool-backend": "backend/Dockerfile",
-    "basetool-frontend": "frontend/Dockerfile",
-    "basetool-ingest": "ingest/Dockerfile",
+    "basetool-backend": (APP_DOCKERFILE, "runtime-backend"),
+    "basetool-frontend": (APP_DOCKERFILE, "runtime-frontend"),
+    "basetool-ingest": (APP_DOCKERFILE, "runtime-ingest"),
 }
 
 
@@ -102,22 +104,41 @@ def flatten_probe(test) -> str | None:
     return None
 
 
+def stage_text(dockerfile: str, stage: str) -> str | None:
+    """Return the instructions of one named build stage, line continuations already joined.
+
+    Continuations are joined FIRST, then matched. Matching before joining is what once silently
+    broke this check: our HEALTHCHECK puts its flags and its CMD on separate lines, and a greedy
+    ``[^\\n]*`` swallows the trailing backslash, so the continuation never matches and the probe
+    reads as absent — every JVM service would then pass this check vacuously.
+
+    :param dockerfile: the Dockerfile's full text.
+    :param stage: the stage name after ``AS`` (case-insensitive, as Docker treats it).
+    :return: the text from that stage's ``FROM`` line up to the next ``FROM``, or ``None`` when no
+        stage carries that name.
+    """
+    joined = re.sub(r"\\\r?\n\s*", " ", dockerfile)
+    stages = re.split(r"(?m)^(?=FROM\s)", joined)
+    for chunk in stages:
+        header = re.match(r"FROM\s+\S+\s+AS\s+(\S+)", chunk, re.IGNORECASE)
+        if header and header.group(1).lower() == stage.lower():
+            return chunk
+    return None
+
+
 def dockerfile_probe(image: str) -> str | None:
     """Return the ``HEALTHCHECK`` command baked into one of this repo's own images.
 
     :param image: the compose ``image:`` value, which may carry a registry, namespace and tag.
     :return: the image's healthcheck command, or ``None`` for third-party or un-probed images.
     """
-    for marker, rel in IMAGE_DOCKERFILES.items():
+    for marker, (rel, stage) in IMAGE_DOCKERFILES.items():
         if marker not in image:
             continue
-        text = (REPO_ROOT / rel).read_text(encoding="utf-8")
-        # Join Dockerfile line continuations FIRST, then match. Matching before joining is what
-        # silently broke this: our HEALTHCHECK puts its flags and its CMD on separate lines, and a
-        # greedy `[^\n]*` swallows the trailing backslash, so the continuation never matches and the
-        # probe reads as absent — every JVM service would then pass this check vacuously.
-        joined = re.sub(r"\\\r?\n\s*", " ", text)
-        match = re.search(r"^HEALTHCHECK\b(.*)$", joined, re.MULTILINE)
+        chunk = stage_text((REPO_ROOT / rel).read_text(encoding="utf-8"), stage)
+        if chunk is None:
+            return None
+        match = re.search(r"^HEALTHCHECK\b(.*)$", chunk, re.MULTILINE)
         if not match:
             return None
         cmd = re.search(r"\bCMD\b(.*)", match.group(1), re.DOTALL)
@@ -214,13 +235,24 @@ def selftest() -> int:
     # failed to join Dockerfile line continuations and read that probe as ABSENT, which made every
     # JVM service pass without being checked at all. Assert the resolution really produces a
     # forking probe, so the check can never go quietly blind again.
+    #
+    # Since the three images share one Dockerfile, each probe must also come from ITS OWN tail
+    # stage: a resolver that read the first HEALTHCHECK in the file would hand all three the
+    # backend's probe and still pass the forking check above. The port tells them apart.
+    own_port = {"basetool-backend": "11261", "basetool-frontend": "18081", "basetool-ingest": "11262"}
     for marker in IMAGE_DOCKERFILES:
         probe = dockerfile_probe(f"ghcr.io/krt-profit/{marker}:stable")
         if not probe or not probe_forks_tls_helper(probe):
             print(f"  [FAIL] {marker}: image HEALTHCHECK did not resolve to a forking probe ({probe!r})")
             failures += 1
+        elif f"localhost:{own_port[marker]}/" not in probe:
+            print(f"  [FAIL] {marker}: resolved another stage's probe ({probe!r})")
+            failures += 1
         else:
-            print(f"  [ok ] {marker}: image HEALTHCHECK resolved -> forking probe detected")
+            print(f"  [ok ] {marker}: image HEALTHCHECK resolved from its own stage -> forking probe")
+    if stage_text("FROM a AS runtime-backend\nHEALTHCHECK CMD x\n", "runtime-frontend") is not None:
+        print("  [FAIL] stage_text returned a stage that does not exist")
+        failures += 1
 
     print("selftest: FAILED" if failures else "selftest: passed")
     return 1 if failures else 0
