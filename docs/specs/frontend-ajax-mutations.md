@@ -1960,12 +1960,11 @@ replaced the stub five seconds after `load` it **throws**, so the client-error b
 `script_error` and `basetool_client_error_total` counts it. The watchdog inside `event-delegation.js`
 could never fire for the case it exists for — that file failing to load.
 
-**Not done: comment-stripping minification.** Measured: the head scripts would drop from 85 KB to
-28 KB gzipped without their comments. They are content-hashed and `immutable`, so that is a
-first-visit and after-deploy cost only, and every way of stripping them adds a build step whose
-failure mode is silently corrupted production JavaScript (a string or regex literal read as a
-comment) and whose output no longer matches the source the tests and the type check read. Left as an
-owner decision.
+**Comment-stripping minification is declined** (owner decision 2026-09-23, recorded in ADR-0125):
+it would save about 57 KB gzip on the head scripts, on a first visit after a deploy only (the assets
+are hashed and `immutable`), at the risk of silently corrupting production JavaScript and of serving
+a file other than the one the type check and the linters read. The transfer saving comes from edge
+compression instead (`gzip_types` for JavaScript, CSS and JSON, PR #2021).
 
 **Acceptance**
 
