@@ -25,6 +25,7 @@ import static org.mockito.Mockito.*;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.PromotionCategoryMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.PromotionCategory;
@@ -34,7 +35,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PromotionCategoryResponse
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionCategoryWriteRequest;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionCategoryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionTopicRepository;
-import jakarta.persistence.EntityNotFoundException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -106,7 +106,7 @@ class PromotionCategoryServiceTest {
     when(repository.findById(id)).thenReturn(Optional.empty());
 
     // When / Then
-    assertThrows(EntityNotFoundException.class, () -> service.get(id));
+    assertThrows(NotFoundException.class, () -> service.get(id));
   }
 
   @Test
@@ -136,7 +136,7 @@ class PromotionCategoryServiceTest {
     when(topicRepository.findById(topicId)).thenReturn(Optional.empty());
 
     // When / Then
-    assertThrows(EntityNotFoundException.class, () -> service.create(request));
+    assertThrows(NotFoundException.class, () -> service.create(request));
   }
 
   @Test

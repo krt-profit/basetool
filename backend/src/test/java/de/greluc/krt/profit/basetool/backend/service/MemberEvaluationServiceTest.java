@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.MemberEvaluationMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.MemberEvaluation;
@@ -33,7 +34,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MemberEvaluationResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.MemberEvaluationUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.repository.MemberEvaluationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionCategoryRepository;
-import jakarta.persistence.EntityNotFoundException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -256,7 +256,7 @@ class MemberEvaluationServiceTest {
 
     // When / Then
     assertThrows(
-        EntityNotFoundException.class,
+        NotFoundException.class,
         () ->
             service.upsert(
                 USER_A,

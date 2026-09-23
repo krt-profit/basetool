@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.RankRequirementMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.PromotionCategory;
@@ -33,7 +35,6 @@ import de.greluc.krt.profit.basetool.backend.repository.PromotionTopicRepository
 import de.greluc.krt.profit.basetool.backend.repository.RankRequirementRepository;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
-import jakarta.persistence.EntityNotFoundException;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -110,7 +111,7 @@ public class RankRequirementService {
    *
    * @param id identifier of the rank requirement
    * @return the matching rank requirement in response form
-   * @throws EntityNotFoundException if no rank requirement exists for that id
+   * @throws NotFoundException if no rank requirement exists for that id
    * @throws AccessDeniedException if the caller's squadron context does not match the requirement's
    *     owning squadron
    */
@@ -134,7 +135,7 @@ public class RankRequirementService {
    *
    * @param request validated payload describing the new rank requirement
    * @return the persisted rank requirement in response form
-   * @throws EntityNotFoundException if a referenced topic or category does not exist
+   * @throws NotFoundException if a referenced topic or category does not exist
    * @throws BadRequestException when the caller has no active squadron context, or a referenced
    *     topic/category belongs to a different squadron
    */
@@ -192,8 +193,7 @@ public class RankRequirementService {
    * @param request validated payload with the new field values and the previously fetched {@code
    *     version}
    * @return the updated rank requirement in response form
-   * @throws EntityNotFoundException if the requirement or any referenced topic/category does not
-   *     exist
+   * @throws NotFoundException if the requirement or any referenced topic/category does not exist
    * @throws ObjectOptimisticLockingFailureException if the request's {@code version} no longer
    *     matches the persisted entity
    */
@@ -230,7 +230,7 @@ public class RankRequirementService {
    * OFFICER callers.
    *
    * @param id identifier of the rank requirement to delete
-   * @throws EntityNotFoundException if no rank requirement exists for that id
+   * @throws NotFoundException if no rank requirement exists for that id
    */
   @Transactional
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
@@ -337,9 +337,7 @@ public class RankRequirementService {
 
   @NotNull
   private RankRequirement load(@NotNull UUID id) {
-    return repository
-        .findById(id)
-        .orElseThrow(() -> new EntityNotFoundException("RankRequirement not found: " + id));
+    return Entities.require(repository.findById(id), () -> "RankRequirement not found: " + id);
   }
 
   @Contract("null -> null")
@@ -348,9 +346,8 @@ public class RankRequirementService {
     if (topicId == null) {
       return null;
     }
-    return topicRepository
-        .findById(topicId)
-        .orElseThrow(() -> new EntityNotFoundException("PromotionTopic not found: " + topicId));
+    return Entities.require(
+        topicRepository.findById(topicId), () -> "PromotionTopic not found: " + topicId);
   }
 
   @Contract("null -> null")
@@ -359,9 +356,8 @@ public class RankRequirementService {
     if (categoryId == null) {
       return null;
     }
-    return categoryRepository
-        .findById(categoryId)
-        .orElseThrow(
-            () -> new EntityNotFoundException("PromotionCategory not found: " + categoryId));
+    return Entities.require(
+        categoryRepository.findById(categoryId),
+        () -> "PromotionCategory not found: " + categoryId);
   }
 }

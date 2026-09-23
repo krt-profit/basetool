@@ -55,8 +55,9 @@ mapper (`@Mapper(config = CentralMapperConfig.class)`) for Entity↔DTO; break c
 `@Mapping(ignore = true)`. `CentralMapperConfig` injects used mappers through the constructor and
 sets **`unmappedTargetPolicy = ERROR`** (BE-MOD-05/05b, 2026-09-23): a target property no source
 feeds fails the build, so a DTO field added later can no longer ship silently `null`. Every
-intended gap is an explicit `@Mapping(target = "…", ignore = true)`; the one method-level exemption
-is `MaterialMapper.toEntity`, whose DTO is the admin-edit subset of a catalogue row. The switch found
+intended gap is an explicit `@Mapping(target = "…", ignore = true)`. There is no method-level
+exemption: `MaterialMapper.toEntity`, whose DTO is the admin-edit subset of a ~40-column catalogue
+row, uses `@BeanMapping(ignoreByDefault = true)` and names each of the fields it carries. The switch found
 one real gap — the job type a mission embeds never carried `isMissionLead`.
 
 ### REQ-API-003 — Validation on writes
@@ -141,7 +142,8 @@ treats the message as a translation key (sentinel-guarded), so an auto-derived m
 the wire `detail` and break the future i18n-key migration seam. A constant message uses the
 `String` overload; a message that interpolates a value uses the `Supplier<String>` overload, so it
 is still only built on a miss. **Enforced by `EntitiesRequireRatchetTest`**, a source scan of
-`backend/src/main/java` whose ceiling on hand-written sites is **zero** since the 287 remaining ones
+`backend/src/main/java` whose ceiling on hand-written sites is **zero** since the 312 remaining ones (25 of them threw JPA's
+`EntityNotFoundException`, which `handleNotFound` answers identically)
 were migrated message by message (BE-SIMP-01, 2026-09-23); `Entities` itself is the only exemption.
 
 **Domain exceptions carry their own error-code contract (S4, #910).** `BadRequestException`,

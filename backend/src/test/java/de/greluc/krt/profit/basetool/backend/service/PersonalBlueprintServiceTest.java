@@ -36,6 +36,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
+import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.PersonalBlueprintMapper;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
@@ -47,7 +48,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintUpdateRe
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
-import jakarta.persistence.EntityNotFoundException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -215,7 +215,7 @@ class PersonalBlueprintServiceTest {
     when(blueprintProductService.resolveByProductKey("ghost")).thenReturn(Optional.empty());
 
     assertThrows(
-        EntityNotFoundException.class,
+        NotFoundException.class,
         () -> service.add(SUB, new PersonalBlueprintCreateRequest("ghost", null, null)));
   }
 
@@ -283,7 +283,7 @@ class PersonalBlueprintServiceTest {
     when(repository.findByIdAndOwnerUserId(id, SUB)).thenReturn(Optional.empty());
 
     assertThrows(
-        EntityNotFoundException.class,
+        NotFoundException.class,
         () -> service.update(SUB, id, new PersonalBlueprintUpdateRequest(null, null, 1L)));
   }
 
@@ -303,7 +303,7 @@ class PersonalBlueprintServiceTest {
     UUID id = UUID.randomUUID();
     when(repository.findByIdAndOwnerUserId(id, SUB)).thenReturn(Optional.empty());
 
-    assertThrows(EntityNotFoundException.class, () -> service.delete(SUB, id));
+    assertThrows(NotFoundException.class, () -> service.delete(SUB, id));
   }
 
   @Test
@@ -372,7 +372,7 @@ class PersonalBlueprintServiceTest {
     UUID id = UUID.randomUUID();
     when(repository.findByIdAndOwnerUserId(id, SUB)).thenReturn(Optional.empty());
 
-    assertThrows(EntityNotFoundException.class, () -> service.recipeForOwn(SUB, id));
+    assertThrows(NotFoundException.class, () -> service.recipeForOwn(SUB, id));
   }
 
   // --------------------------------------------------------------- admin variants --
@@ -408,7 +408,7 @@ class PersonalBlueprintServiceTest {
     when(repository.findById(id)).thenReturn(Optional.empty());
 
     assertThrows(
-        EntityNotFoundException.class,
+        NotFoundException.class,
         () -> service.updateForUser(id, new PersonalBlueprintUpdateRequest(null, null, 1L)));
   }
 
@@ -428,7 +428,7 @@ class PersonalBlueprintServiceTest {
     UUID id = UUID.randomUUID();
     when(repository.findById(id)).thenReturn(Optional.empty());
 
-    assertThrows(EntityNotFoundException.class, () -> service.deleteForUser(id));
+    assertThrows(NotFoundException.class, () -> service.deleteForUser(id));
   }
 
   @Test
