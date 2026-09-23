@@ -3,56 +3,7 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{inventory.input.title} + ' - Profit Basetool'">Lagereintrag einbuchen - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-<style th:attr="nonce=${cspNonce}">
-        .form-container {
-            max-width: 600px;
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-family: 'Lato', sans-serif;
-            font-weight: 700;
-            font-size: 0.9rem;
-        }
-        /* Radios are excluded alongside checkboxes: the 0.75rem padding + surface background
-           would inflate the 1.2rem KRT radio circle (styles.css) into an oversized oval. The
-           exclusions sit in :where() so they add ZERO specificity — the rule stays at the plain
-           `.form-group input` weight (0,1,1) and keeps losing to the (0,2,0) combobox rule
-           `.krt-combobox .krt-combobox__input`, whose right padding reserves room for the
-           dropdown chevron (styles.css documents that it must outrank per-page input padding). */
-        .form-group input:where(:not([type='checkbox']):not([type='radio'])), .form-group select {
-            width: 100%;
-            padding: 0.75rem;
-            background-color: var(--color-surface-input);
-            border: 1px solid var(--color-gray-3);
-            color: var(--color-gray-1);
-            font-family: var(--font-body);
-            box-sizing: border-box;
-        }
-        /* Checkbox rows share ONE format (profile-page .check-row precedent): checkbox left,
-           label + muted .form-hint stacked right, so a long label wraps inside its own column
-           instead of reflowing around the checkbox. */
-        .form-group.check-row {
-            display: flex;
-            align-items: flex-start;
-            gap: 0.5rem;
-        }
-        .form-group.check-row input[type='checkbox'] {
-            flex: none;
-            margin: 0.15rem 0 0;
-        }
-        .form-group.check-row label {
-            margin: 0;
-            cursor: pointer;
-        }
-        /* The merge row is toggled via .krtm-hidden (inline-migration.css), which is only
-           (0,1,0) and relies on equal specificity + being loaded last. The (0,2,0) flex rule
-           above would override it, so re-assert the hide at higher specificity — without this
-           the REQ-INV-026 opt-in would be stuck visible even for PIECE materials. */
-        .form-group.check-row.krtm-hidden {
-            display: none;
-        }
-    </style>
+<link rel="stylesheet" th:href="@{/css/pages/inventory-input.css}">
     </th:block>
 </head>
 <body>
@@ -95,7 +46,7 @@
                 
                 <div class="form-group" th:if="*{isGlobal}">
                     <label for="userId" th:text="#{inventory.input.assignUser}">Nutzer zuordnen</label>
-                    <!-- #1193: server-side user search (remote-users) replaces the preloaded ${users} full list; the roster is queried on demand via /users/search. The empty option ("own entry") stays as the placeholder / self-assign choice. -->
+                    <!--/* #1193: server-side user search (remote-users) replaces the preloaded ${users} full list; the roster is queried on demand via /users/search. The empty option ("own entry") stays as the placeholder / self-assign choice. */-->
                     <select id="userId" th:field="*{userId}" data-krt-combobox="remote-users">
                         <option value="" th:text="#{inventory.input.assignUser.own}">-- Eigener Eintrag --</option>
                         <option th:if="${selectedUser != null}" th:value="${selectedUser.id}" th:text="${selectedUser.effectiveName != null ? selectedUser.effectiveName : selectedUser.username}"></option>
@@ -104,12 +55,12 @@
 
                 <th:block th:replace="~{fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=*{owningOrgUnitId}, required=false)}"></th:block>
 
-                <!-- Material <-> Item catalog-mode toggle (design §6.2, REQ-INV-029): one shared form,
+                <!--/* Material <-> Item catalog-mode toggle (design §6.2, REQ-INV-029): one shared form,
                      the toggle swaps only the catalog-specific controls below (material picker + quality
                      vs. remote item picker). inventory-input.js hides AND disables the inactive block so
                      its `required` fields never block submit and its values are omitted from the POST
                      (the client half of the materialId/gameItemId XOR). Redisplay after a classic-path
-                     validation error derives the active mode from which reference the form carries. -->
+                     validation error derives the active mode from which reference the form carries. */-->
                 <div class="form-group">
                     <label th:text="#{inventory.form.item.modeLabel}">Eintragsart</label>
                     <div class="flex-gap-sm krtm-display-flex-gap-1-5rem-7e37">
@@ -133,10 +84,10 @@
                 <div id="mode-material-fields" th:hidden="*{gameItemId != null}">
                     <div class="form-group">
                         <label for="materialId">Material</label>
-                        <!-- Server-side material search (remote-materials): the catalog is queried on demand via
+                        <!--/* Server-side material search (remote-materials): the catalog is queried on demand via
                              /catalog/material-search instead of being dumped as <option>s. Only the redisplay-selected
                              material is seeded (validation-error re-render) so the enhancer harvests its label and
-                             data-quantity-type metadata. -->
+                             data-quantity-type metadata. */-->
                         <select id="materialId" th:field="*{materialId}" required data-krt-combobox="remote-materials">
                             <option value="" data-quantity-type="">-- Bitte wählen --</option>
                             <option th:each="mat : ${materials}" th:if="${mat.id == inventoryForm.materialId}" th:value="${mat.id}" th:data-quantity-type="${mat.quantityType}" th:text="${mat.name}"></option>
@@ -149,11 +100,11 @@
                     </div>
                 </div>
 
-                <!-- Item mode: remote-searched bookable-item picker (design §6.6, REQ-FE-016). No
+                <!--/* Item mode: remote-searched bookable-item picker (design §6.6, REQ-FE-016). No
                      quality field — item rows carry none (REQ-INV-029). The seeded option keeps the
                      picked item across a classic-path validation redisplay: its label comes from the
                      gameItemName echo the page JS mirrors off the committed combobox label (there is
-                     no by-id catalog resolve), falling back to the raw id. -->
+                     no by-id catalog resolve), falling back to the raw id. */-->
                 <div id="mode-item-fields" th:hidden="*{gameItemId == null}">
                     <div class="form-group">
                         <label for="gameItemId" th:text="#{inventory.form.item.label}">Item</label>
@@ -170,8 +121,8 @@
 
                 <div class="form-group">
                     <label for="locationId">Ort</label>
-                    <!-- Server-side location search (remote-locations): queried on demand via
-                         /catalog/location-search; only the redisplay-selected location is seeded. -->
+                    <!--/* Server-side location search (remote-locations): queried on demand via
+                         /catalog/location-search; only the redisplay-selected location is seeded. */-->
                     <select id="locationId" th:field="*{locationId}" required data-krt-combobox="remote-locations">
                         <option value="">-- Bitte wählen --</option>
                         <option th:each="loc : ${locations}" th:if="${loc.id == inventoryForm.locationId}" th:value="${loc.id}" th:text="${loc.name}"></option>
@@ -183,18 +134,18 @@
                     <input type="text" inputmode="decimal" data-scu-decimal id="amount" th:field="*{amount}" step="0.001" min="0" required>
                 </div>
                 
-                <!-- Variante C (REQ-INV-027, R4): split at check-in — assign the new stock to several
+                <!--/* Variante C (REQ-INV-027, R4): split at check-in — assign the new stock to several
                      job orders / missions with their own amounts. inventory-input.js clones a row
                      from the hidden template and binds it as indexed params the FormData submit
                      carries; an empty section falls back to no assignment. With exactly ONE target
                      row the amount may stay blank — the write controller then earmarks the entry's
-                     whole amount to it (single-target shorthand); the hint states that. -->
-                <!-- REQ-INV-039: the per-order outstanding need rides in as one JSON blob keyed by
+                     whole amount to it (single-target shorthand); the hint states that. */-->
+                <!--/* REQ-INV-039: the per-order outstanding need rides in as one JSON blob keyed by
                      order id, NOT as an attribute per <option>: the rows below are cloned from the
                      <template>, so a figure copied onto every clone would have to be rewritten on
                      every clone whenever a peer's booking moves it. inventory-input.js decodes this
                      once and re-reads the identical shape from /inventory/order-needs on a live-sync
-                     frame, so there is one format rather than two. -->
+                     frame, so there is one format rather than two. */-->
                 <div class="form-group" id="jobOrderAllocGroup" th:attr="data-order-needs=${jobOrderNeedsJson}">
                     <label th:text="#{inventory.input.orders.label}">Aufträge zuordnen (optional)</label>
                     <div id="jobOrderAllocRows" data-alloc-rows="jobOrder"></div>
@@ -204,12 +155,12 @@
                         <div class="flex-gap-sm mb-1" data-alloc-row>
                             <select class="w-full" data-alloc-target>
                                 <option value="" th:text="#{inventory.order.none}">-- Kein Auftrag --</option>
-                                <!-- data-materials is the CSV of the order's required material ids, keyed on
+                                <!--/* data-materials is the CSV of the order's required material ids, keyed on
                                  the kind-agnostic requiredMaterialIds (REQ-ORDERS-018) — NOT order.materials,
                                  which is empty for ITEM orders and would hide every crafting order whose
                                  blueprint consumes the picked material (the "no/all/some orders" filter bug).
                                  data-game-items is its item-mode sibling (REQ-INV-031): the CSV of gameItems
-                                 the ITEM order's lines request, filtering by the picked gameItem the same way. -->
+                                 the ITEM order's lines request, filtering by the picked gameItem the same way. */-->
                             <option th:each="order : ${jobOrders}" th:value="${order.id}" th:data-materials="${order.requiredMaterialIds != null and !order.requiredMaterialIds.isEmpty() ? #strings.listJoin(order.requiredMaterialIds, ',') : ''}" th:data-game-items="${order.requiredGameItemIds != null and !order.requiredGameItemIds.isEmpty() ? #strings.listJoin(order.requiredGameItemIds, ',') : ''}" th:text="${'#' + order.displayId + ' - ' + @handles.display(order.handle) + ' (' + order.status + ')'}"></option>
                             </select>
                             <input type="number" class="assoc-menge-input" data-alloc-amount step="0.001" min="0" th:placeholder="#{inventory.assoc.amount}">
@@ -245,8 +196,8 @@
                     </div>
                 </div>
 
-                <!-- REQ-INV-026: per-action stock-merge opt-in. Shown by inventory-input.js only for an
-                     SCU material (a PIECE book-in always merges, so no choice is offered). -->
+                <!--/* REQ-INV-026: per-action stock-merge opt-in. Shown by inventory-input.js only for an
+                     SCU material (a PIECE book-in always merges, so no choice is offered). */-->
                 <div class="form-group check-row krtm-hidden" id="merge-stock-row">
                     <input type="checkbox" id="mergeStock" th:field="*{mergeStock}">
                     <div>

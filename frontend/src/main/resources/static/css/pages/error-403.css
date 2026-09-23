@@ -1,0 +1,56 @@
+/* Page stylesheet of templates/error/403.html, moved out of its inline style block
+ * (FE-PERF-02). Linked in the same place the block stood, so the cascade order is
+ * unchanged. */
+
+.error-container {
+    text-align: center;
+    border: 2px solid var(--color-danger);
+    box-shadow: 0 0 15px rgba(163, 0, 10, 0.3);
+    background: rgba(20, 20, 20, 0.6);
+    padding: 2.5rem 2rem;
+    max-width: 600px;
+    width: 100%;
+    margin: 0 auto;
+}
+.error-code {
+    font-family: var(--font-headline);
+    font-size: 4rem;
+    color: var(--color-danger);
+    margin-bottom: 0.5rem;
+}
+.error-title {
+    font-family: var(--font-headline);
+    font-size: 2rem;
+    color: var(--color-gray-1);
+    margin-bottom: 1.5rem;
+    text-transform: uppercase;
+}
+.error-message {
+    font-size: 1.2rem;
+    color: var(--color-gray-1);
+    margin-bottom: 2rem;
+}
+.btn-return {
+    display: inline-block;
+    padding: 0.8rem 1.5rem;
+    background-color: var(--color-danger);
+    color: #ffffff;
+    font-family: var(--font-headline);
+    text-decoration: none;
+    font-weight: bold;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+}
+.btn-return:hover {
+    background-color: #d41a25;
+    box-shadow: 0 0 10px #d41a25;
+}
+/* Make sure main takes full screen if no sidebar */
+main {
+    margin-left: 0 !important;
+    padding-top: 80px;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}

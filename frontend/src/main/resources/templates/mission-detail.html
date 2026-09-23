@@ -3,312 +3,7 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{missions.title} + ' - ' + ${appTitle}">Mission Details - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-    <style th:attr="nonce=${cspNonce}">
-        label { display: block; margin-bottom: 0.5rem; font-family: var(--font-body); font-size: 0.9rem; font-weight: bold; }
-        /* Required-field marker (the "*" the owner asked for on mandatory unit fields). */
-        .req { color: var(--color-danger-text); font-weight: var(--fw-bold); margin-left: 2px; }
-        input[type="text"], input[type="url"], select, textarea, input[type="date"], input[type="time"], input[type="datetime-local"], input[type="number"] { width: 100%; padding: 0.8rem; background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3); color: var(--color-gray-1); font-family: var(--font-body); box-sizing: border-box; }
-        input:focus, select:focus, textarea:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 5px rgba(231, 126, 35, 0.3); }
-        .form-actions { margin-top: 2rem; display: flex; gap: 1rem; }
-        .form-row { display: flex; gap: 1rem; flex-wrap: wrap; }
-        .form-row > .form-group { flex: 1; min-width: 250px; }
-
-        /* =========================================================
-           Mission-Detail Tab Layout (Variante B, DS mission-page
-           patterns): sticky head + facts bar + tab nav, four panes.
-           Mocks: das-kartell-design/proposals/mission-page-tabs-gesamt.html
-           ========================================================= */
-        html, body { margin: 0; overflow-x: hidden; }
-        .page-wrapper {
-            width: 100%;
-            /* The tab layout is column-based and dense — cap it instead of spanning
-               ultra-wide viewports edge to edge. 1.5x the regular --content-max
-               (1200px): the board and the finance grid carry side-by-side columns
-               that profit from the extra room (owner decision 2026-06-11). */
-            max-width: 1800px;
-            margin: 0 auto;
-            overflow-x: clip;
-            box-sizing: border-box;
-            /* Reserve viewport-bottom space for the fixed footer (see styles.css `main`). */
-            padding-bottom: calc(var(--krt-footer-height, 5rem) + 5rem);
-        }
-        /* The phone-class reserve for this page lives in styles.css's `width <= 768px` block,
-           with every other page's, and it has to out-specify this rule to get there: head.html
-           links styles.css at :85 and renders the per-page style block at :348, so an equal-specificity
-           `.page-wrapper` in that block loses the source-order tie and the phone class kept
-           `calc(0px + 5rem)` = 80px of dead scroll. It is written `div.page-wrapper` for exactly
-           the reason `.btn.btn-xs2` and `input.item-checkbox` are. The DESKTOP reserve stays here,
-           on the page that needs it. */
-        .mission-head-sticky {
-            position: sticky;
-            top: 0; /* corrected at runtime to the real <header> height */
-            z-index: 900;
-            background-color: var(--color-bg-black);
-        }
-        .mission-head {
-            background-color: var(--color-bg-dark-gray);
-            border-bottom: var(--border-hairline);
-            padding: 12px 16px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            flex-wrap: wrap;
-        }
-        .mission-head-title { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; min-width: 0; }
-        .mission-head-title h1 {
-            font-family: var(--font-headline);
-            font-weight: var(--fw-bold);
-            color: var(--color-primary);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            font-size: 1.05rem;
-            margin: 0;
-            display: inline;
-        }
-        .mission-head-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-        /* Final Einsatz design (#818 follow-up): the primary "Anmelden" CTA in the sticky head is a
-           full-size button (not btn-xs2) so the page's main action reads as the main action. */
-        .mission-head-actions .btn--cta { font-size: 0.92rem; padding: 0.8rem 1.5rem; min-height: 50px; }
-        /* Final Einsatz design (#818 follow-up): a higher-signal facts bar — larger type, a leading
-           orange icon per fact, and the checked-in count folded into the participants fact. Scoped to
-           the mission head so the shared .facts-bar on other detail pages is untouched. */
-        .mission-head-sticky .facts-bar { gap: 22px; padding: 12px 16px; font-size: 0.95rem; align-items: center; }
-        .mission-head-sticky .facts-bar .fact { display: inline-flex; align-items: center; gap: 8px; }
-        .mission-head-sticky .facts-bar .fact > .krt-icon { width: 17px; height: 17px; color: var(--color-primary); flex: none; }
-        .mission-head-sticky .facts-bar .fact-k { font-size: 0.7rem; margin-right: 0; }
-        .mission-head-sticky .facts-bar .fact-v { font-size: 1rem; }
-        .mission-head-sticky .facts-bar .facts-checked-in-suffix { font-size: 0.82rem; font-weight: 400; color: var(--color-gray-2-text); }
-        .tab-panes { padding: 14px 16px 18px; }
-        .tab-pane { display: none; flex-direction: column; gap: 12px; }
-        .tab-pane.on { display: flex; }
-        /* #574 wrapped the finance pane's blocks (summary strip, ledger/payout grid,
-           Wirtschaft details) in #finance-results for in-place AJAX swaps, demoting them
-           from direct flex children of .tab-pane to plain block-flow and dropping the
-           standard 12px inter-block gap (e.g. payout block -> Raffinerieauftraege).
-           Re-establish the same flex column here. */
-        #finance-results { display: flex; flex-direction: column; gap: 12px; }
-        .pane-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
-        /* Create page (isNew): the right column's panels are all edit-only (th:if="${!isNew}"),
-           so the grid carries a single Details card. Collapse to one column so that card spans
-           the full page width instead of being stranded in the left half. */
-        .pane-grid-2.pane-grid--single { grid-template-columns: 1fr; }
-        .pane-grid-fin { display: grid; grid-template-columns: 1.5fr 1fr; gap: 12px; align-items: start; }
-        .pane-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-        @media (width <= 980px) { .pane-grid-2, .pane-grid-fin { grid-template-columns: 1fr; } }
-
-        .kpanel { background-color: var(--color-bg-dark-gray); border: var(--border-hairline); min-width: 0; }
-        .kpanel-head {
-            padding: 8px 12px;
-            background-color: var(--color-surface-input);
-            border-left: 4px solid var(--color-primary);
-            border-bottom: var(--border-hairline);
-            font-family: var(--font-body);
-            font-size: 0.72rem;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            font-weight: var(--fw-bold);
-            color: var(--color-gray-1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-        .kpanel-body { padding: 12px; }
-        .kpanel-body > .table-responsive { width: 100%; overflow-x: auto; }
-        .btn-xs2 { min-height: 32px; padding: 0.25rem 0.6rem; font-size: 0.68rem; }
-
-        /* Uebersicht */
-        .desc { font-size: 0.85rem; font-weight: 300; color: var(--color-gray-1); margin: 0; line-height: 1.55; max-width: 80ch; white-space: pre-line; }
-        /* Detaillierte Beschreibung — sits on the same gray card surface as the other overview
-           panels (.kpanel) instead of bare on the flat page background (owner request 2026-06-27,
-           #818 follow-up). Collapsible with a chevron that flips when open. */
-        details.more { border: var(--border-hairline); background-color: var(--color-bg-dark-gray); margin-top: 12px; }
-        details.more > summary { list-style: none; cursor: pointer; padding: 11px 14px; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: var(--fw-bold); color: var(--color-gray-1); display: flex; align-items: center; gap: 8px; min-height: var(--touch-target); box-sizing: border-box; }
-        details.more > summary::-webkit-details-marker { display: none; }
-        details.more > summary .krt-icon { width: 14px; height: 14px; color: var(--color-primary); transition: transform 0.2s; flex: none; }
-        details.more[open] > summary .krt-icon { transform: rotate(180deg); }
-        details.more .more-body { padding: 0 14px 14px; }
-        .chiprow { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-        .navrow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-        @media (width <= 880px) { .navrow { grid-template-columns: 1fr; } }
-        .navcard { background-color: var(--color-bg-dark-gray); border: var(--border-hairline); padding: 10px 12px; cursor: pointer; transition: border-color 0.15s; display: flex; flex-direction: column; gap: 6px; text-align: left; font-family: var(--font-body); color: var(--color-gray-1); }
-        .navcard:hover, .navcard:focus-visible { border-color: var(--color-primary); outline: none; }
-        .navcard .nk { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--color-gray-2-text); font-weight: var(--fw-bold); display: flex; justify-content: space-between; gap: 6px; }
-        .navcard .nk .arrow { color: var(--color-primary); }
-        .navcard .nv { font-family: var(--font-headline); font-weight: var(--fw-bold); font-size: 1.05rem; color: var(--color-white); font-variant-numeric: tabular-nums; }
-        .navcard .nd { font-size: 0.68rem; color: var(--color-gray-1); font-weight: 300; }
-        .navcard .nd.warn { color: var(--color-warning); }
-
-        /* Crew board */
-        .sec-h { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
-        .sec-h h2 { font-family: var(--font-body); font-weight: var(--fw-bold); text-transform: uppercase; letter-spacing: 0.07em; font-size: 0.75rem; color: var(--color-gray-1); margin: 0; }
-        .sec-h .warn { color: var(--color-warning); }
-        /* gray-1 + regular weight: gray-2 at thin weight was unreadable over the dark page background. */
-        .sec-h .legend { font-size: 0.72rem; color: var(--color-gray-1); font-weight: 400; }
-        /* Pool column widened to match the 1800px page cap — the person rows carry
-           name + badges + wish/note + actions and clipped at the mock's 340px. */
-        .board { display: grid; grid-template-columns: 600px 1fr; gap: 12px; align-items: start; }
-        @media (width <= 900px) { .board { grid-template-columns: 1fr; } }
-        .board-units { display: flex; flex-direction: column; gap: 10px; }
-        .unit-panel .kpanel-head { border-left: none; border-bottom: var(--border-hairline); }
-        .pool-panel .kpanel-head { border-left: none; border-bottom: 2px solid var(--color-primary); }
-        .uname { color: var(--color-primary); font-size: 0.75rem; letter-spacing: 0.03em; }
-        .uname small { color: var(--color-gray-2-text); font-weight: 400; text-transform: none; letter-spacing: 0; }
-        .ucount { color: var(--color-gray-2-text); font-weight: var(--fw-bold); font-variant-numeric: tabular-nums; text-transform: none; }
-        .unit-head-actions { display: flex; gap: 6px; align-items: center; }
-        .row-line1 { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-        .person-name { font-weight: var(--fw-bold); color: var(--color-white); font-size: 0.8rem; }
-        .notemark { color: var(--color-primary); cursor: help; }
-        .row-actions { display: flex; gap: 4px; flex: none; }
-        .chip-xs { font-size: 0.55rem; padding: 0 6px; }
-        .crew-jobs-static { font-size: 0.64rem; color: var(--color-gray-1); text-transform: uppercase; letter-spacing: 0.05em; flex: none; max-width: 165px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .board-add-unit { align-self: flex-start; }
-
-        /* Finance tab */
-        .sumstrip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-        @media (width <= 880px) { .sumstrip { grid-template-columns: repeat(2, 1fr); } }
-        .sum { background-color: var(--color-bg-dark-gray); border: var(--border-hairline); padding: 10px 14px; }
-        .sum .sk { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--color-gray-2-text); font-weight: var(--fw-bold); }
-        .sum .sv { font-family: var(--font-headline); font-weight: var(--fw-bold); font-size: 1.15rem; color: var(--color-white); font-variant-numeric: tabular-nums; margin-top: 2px; }
-        .sum .sv.pos { color: var(--color-success); }
-        .sum .sv.neg { color: var(--color-danger-text); }
-        .sum .sd { font-size: 0.66rem; color: var(--color-gray-2-text); margin-top: 2px; }
-        td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-        td.num { color: var(--color-white); }
-        /* The payout table must fit a half-4K browser window without clipping the
-           preference dropdowns: denser cells, content-shrunk % column, ellipsised names. */
-        .payout-table th, .payout-table td { padding: 8px 10px; }
-        .payout-table th.num, .payout-table td.num { width: 1%; }
-        .payout-table td:first-child { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .payout-table select { min-width: 0; }
-        /* The Wirtschaft details sit directly on the flat page background — give them
-           the panel surface so summary titles stay readable. */
-        #pane-fin details.hud-details { background-color: var(--color-bg-dark-gray); border: var(--border-hairline); padding: 12px 14px; }
-        /* Actual start/end carry a trailing "Jetzt" button — let it wrap below the
-           inputs instead of clipping on narrow panes. */
-        .datetime-with-now { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
-        .reflink { color: var(--color-dept-profit); text-decoration: underline; }
-        .auto-marker { font-size: 0.62rem; color: var(--color-gray-2-text); text-transform: uppercase; letter-spacing: 0.05em; }
-        .fact-v.pos { color: var(--color-success); }
-        .fact-v.neg { color: var(--color-danger-text); }
-
-        /* Verwaltung */
-        .footacts { display: flex; gap: 8px; justify-content: flex-end; align-items: center; flex-wrap: wrap; border-top: var(--border-hairline); padding-top: 12px; }
-        /* The Verwaltung action row (Delete / Save / Back) stays anchored to the bottom of the
-           viewport, above the fixed footer, while the tiles scroll behind it (owner request). Scoped
-           to the active Verwaltung pane — also the sole pane on the create page. z-index clears the
-           footer (999) yet stays below the modal overlay (3000) and the sidebar drawer (2000). A
-           solid bar + top border separate it from the scrolling content; the pane's extra
-           padding-bottom keeps the last tile from hiding behind it. */
-        #pane-verw.on { padding-bottom: 4rem; }
-        #pane-verw.on .footacts {
-            position: fixed;
-            left: 0;
-            right: 0;
-            bottom: var(--krt-footer-height, 5rem);
-            z-index: 1100;
-            margin: 0;
-            padding: 12px 16px;
-            background-color: var(--color-bg-dark-gray);
-            border-top: var(--border-hairline);
-        }
-        /* Phone class: the footer is static and scrolls, so `--krt-footer-height` is 0 and the
-           fixed bar above would cover the legal links at the end of the page. Sticky pins it to the
-           viewport bottom while the pane is in view and releases at the pane's end.
-
-           AFTER the rule it overrides, not before it. A media query adds no specificity, so the two
-           selectors tie and source order decides — written first, this block lost every time and
-           the bar stayed `fixed` on the class it was written for. Same defect as org-chart.css's
-           `.oc-scrollbar`, found in the same review.
-
-           `width <= 768px`, not `max-width: 768px`: every rule in static/css uses the range form,
-           and stylelint's `media-feature-range-notation` would have said so if its glob reached
-           templates. */
-        @media (width <= 768px) {
-            #pane-verw.on .footacts { position: sticky; bottom: 0; }
-        }
-        .manager-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--color-surface-input); border: var(--border-hairline); padding: 0.2rem 0.5rem; }
-
-        /* Finance type segment control.
-
-           `min-height` is the 44px floor token, not a number. It used to be 34px, and an
-           explicit declaration beats the zero-specificity default of ADR-0176 — so these four
-           buttons ("Einnahme"/"Ausgabe" in both finance modals) were the floor's only
-           remaining escapees, and stood as findings on every touch-class run at 810x1080.
-           REQ-UI-009 grants the dense exception to repeated in-row controls; a form button in
-           a modal is not one. */
-        .seg { display: inline-flex; border: var(--border-hairline); }
-        .seg button { background: none; border: none; color: var(--color-gray-2-text); font-family: var(--font-body); font-weight: var(--fw-bold); text-transform: uppercase; font-size: 0.66rem; letter-spacing: 0.06em; padding: 8px 14px; cursor: pointer; min-height: var(--touch-target); }
-        .seg button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
-        .seg button.on-pos { background: var(--color-success); color: #fff; }
-        .seg button.on-neg { background: var(--color-danger); color: #fff; }
-
-        /* Inputs inside krt-modals / panels are denser than the global 0.8rem padding. */
-        .krt-modal-body input[type="text"], .krt-modal-body input[type="url"], .krt-modal-body input[type="number"],
-        .krt-modal-body select, .krt-modal-body textarea,
-        .krt-modal-body input[type="date"], .krt-modal-body input[type="time"] { padding: 0.5rem 0.6rem; }
-
-        /* Uebersicht — Teilnehmer attendance meter */
-        .attendance { display: flex; flex-direction: column; gap: 6px; }
-        .attendance-count { display: flex; align-items: baseline; gap: 8px; }
-        .attendance-count .att-n { font-family: var(--font-headline); font-weight: var(--fw-bold); font-size: 1.4rem; color: var(--color-white); font-variant-numeric: tabular-nums; }
-        .attendance-count .att-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-gray-2-text); font-weight: var(--fw-bold); }
-        .attendance-meter { height: 8px; background: var(--color-surface-input); border: 1px solid var(--color-gray-3); overflow: hidden; }
-        .attendance-meter i { display: block; height: 100%; background: var(--color-success); }
-        .attendance-sub { font-size: 0.72rem; color: var(--color-gray-2-text); }
-        .attendance-sub b { color: var(--color-gray-1); }
-
-        /* Uebersicht — Ablauf (procedure timeline) read-only checklist */
-        .ablauf { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
-        .ablauf .step { display: flex; align-items: flex-start; gap: 10px; }
-        .ablauf .step-num { flex: none; width: 18px; height: 18px; margin-top: 1px; border: 1px solid var(--color-gray-2); background: var(--color-bg-black); box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; }
-        .ablauf .step-num[role="button"] { cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s; }
-        .ablauf .step-num[role="button"]:hover { border-color: var(--color-success); box-shadow: 0 0 0 1px var(--color-success); }
-        .ablauf .step-num[role="button"]:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-        .ablauf .step--done .step-num { background: var(--color-success); border-color: var(--color-success); }
-        .ablauf .step--done .step-num::after { content: ''; width: 4px; height: 8px; border: solid var(--color-bg-black); border-width: 0 2px 2px 0; transform: rotate(45deg) translate(-1px, -1px); }
-        .ablauf .step--now .step-num { border-color: var(--color-primary); box-shadow: 0 0 0 1px var(--color-primary); }
-        .ablauf .step-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-        .ablauf .step-title { font-size: 0.82rem; font-weight: var(--fw-bold); color: var(--color-white); }
-        .ablauf .step--done .step-title { color: var(--color-gray-2-text); text-decoration: line-through; }
-        .ablauf .step-meta { font-size: 0.7rem; color: var(--color-gray-2-text); }
-        .ablauf .step--now .step-meta { color: var(--color-primary); }
-        .subhead { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.1em; font-weight: var(--fw-bold); color: var(--color-gray-2-text); margin: 12px 0 6px; padding-top: 10px; border-top: var(--border-hairline); }
-
-        /* Uebersicht — Ziele (mission goals) read-only grouped list (Hauptziel/Nebenziel/Nicht-Ziel) */
-        .ziele-group + .ziele-group { margin-top: 12px; }
-        .ziele-group-head { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.1em; font-weight: var(--fw-bold); color: var(--color-gray-2-text); margin: 0 0 6px; }
-        .ziele-group-head--primary { color: var(--color-primary); }
-        .ziele { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-        .ziele .ziel { display: flex; align-items: flex-start; gap: 8px; }
-        .ziele .ziel::before { content: ''; flex: none; width: 6px; height: 6px; margin-top: 7px; background: var(--color-gray-2); transform: rotate(45deg); }
-        .ziele .ziel--primary::before { background: var(--color-primary); }
-        .ziele .ziel--non_goal::before { opacity: 0.5; }
-        .ziele .ziel-title { font-size: 0.82rem; font-weight: var(--fw-bold); color: var(--color-white); }
-        .ziele .ziel--non_goal .ziel-title { color: var(--color-gray-2-text); text-decoration: line-through; }
-
-        /* Verwaltung — Ablauf editor (drag-sortable step rows) */
-        .ae-list { display: flex; flex-direction: column; gap: 8px; }
-        .ae-row { display: flex; align-items: center; gap: 9px; padding: 8px 9px; background: var(--color-surface-input); border: var(--border-hairline); }
-        .ae-row.drag-over { border-color: var(--color-primary); box-shadow: inset 0 0 0 1px var(--color-primary); }
-        .ae-grip { color: var(--color-gray-2-text); cursor: grab; flex: none; letter-spacing: -1px; }
-        .ae-num { flex: none; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--color-gray-2); background: var(--color-bg-black); color: var(--color-gray-1); font-family: var(--font-headline); font-weight: var(--fw-bold); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
-        .ae-fields { flex: 1; display: grid; grid-template-columns: 1.4fr 1fr; gap: 8px; min-width: 0; }
-        @media (width <= 620px) { .ae-fields { grid-template-columns: 1fr; } }
-        .ae-fields input { width: 100%; box-sizing: border-box; background: var(--color-bg-dark-gray); color: var(--color-white); border: var(--border-hairline); font-family: var(--font-body); font-size: 0.78rem; padding: 7px 9px; min-height: 34px; font-weight: var(--fw-bold); }
-        .ae-fields input.ae-meta { color: var(--color-gray-1); font-weight: 400; }
-        .ae-fields select.ae-kind { width: 100%; box-sizing: border-box; background: var(--color-bg-dark-gray); color: var(--color-white); border: var(--border-hairline); font-family: var(--font-body); font-size: 0.78rem; padding: 7px 9px; min-height: 34px; font-weight: var(--fw-bold); }
-        .ae-move { display: flex; flex-direction: column; gap: 2px; flex: none; }
-        .ae-move button { min-height: 18px; min-width: 26px; padding: 0; }
-        .ae-row .btn-icon { flex: none; }
-
-        /* Finance — total-card orange top accent (matches the mock's "Gesamtergebnis"). */
-        .sum.is-total { border-top: 3px solid var(--color-primary); }
-        .charhint { color: var(--color-gray-2-text); font-variant-numeric: tabular-nums; float: right; }
-        .ph-extra { color: var(--color-gray-2-text); font-weight: var(--fw-bold); text-transform: none; }
-    </style>
+    <link rel="stylesheet" th:href="@{/css/pages/mission-detail.css}">
     </th:block>
 </head>
 <body>
@@ -330,7 +25,7 @@
 
 <div class="page-wrapper">
 
-    <!-- Create page: plain greeting head, the form pane below is the only content. -->
+    <!--/* Create page: plain greeting head, the form pane below is the only content. */-->
     <main th:if="${isNew}" class="krtm-padding-bottom-0-a32f">
         <div class="greeting hud-box flex-between">
             <h1 class="m-0" th:text="#{mission.create}">New Mission</h1>
@@ -338,13 +33,13 @@
         </div>
     </main>
 
-    <!-- Detail page: sticky head (title + badge + status + CTA), facts bar, tab nav. -->
+    <!--/* Detail page: sticky head (title + badge + status + CTA), facts bar, tab nav. */-->
     <div th:unless="${isNew}" class="mission-head-sticky" id="mission-head-sticky">
         <div class="mission-head">
             <div class="mission-head-title">
                 <h1 th:text="#{mission.prefix} + ' ' + ${mission.name}">Mission Name</h1>
-                <!-- Stable slot (display:contents adds no flex gap when empty) so the owning-org-unit
-                     reassignment (REQ-ORG-018) can patch this badge in place without a reload. -->
+                <!--/* Stable slot (display:contents adds no flex gap when empty) so the owning-org-unit
+                     reassignment (REQ-ORG-018) can patch this badge in place without a reload. */-->
                 <span id="mission-head-org-badge-slot" class="krtm-display-contents-ddf5"><span th:if="${mission?.owningSquadron != null}" class="squadron-badge"
                       th:title="${mission.owningSquadron.name()}"
                       th:text="${mission.owningSquadron.shorthand()}">IRI</span></span>
@@ -373,14 +68,14 @@
     </div>
 
     <div class="tab-panes">
-        <!-- ================= Tab 1: Uebersicht (read-only landing tab) ================= -->
+        <!--/* ================= Tab 1: Uebersicht (read-only landing tab) ================= */-->
         <section th:unless="${isNew}" id="pane-ueb" class="tab-pane" role="tabpanel" aria-labelledby="tab-ueb">
-            <!-- In-place AJAX swap container (live multi-user sync, REQ-FE-010): a core / schedule /
+            <!--/* In-place AJAX swap container (live multi-user sync, REQ-FE-010): a core / schedule /
                  flags / party-lead / frequency change re-renders this fragment via
                  GET /missions/{id}?fragment=overview. The #overview-results wrapper persists (only its
                  innerHTML is replaced). #overview-head-meta carries the fresh title / status / times so
                  the krt:swapped listener can patch the sticky header (h1, status pill, facts bar), which
-                 live OUTSIDE this fragment — generalising the crew #crew-count-meta precedent. -->
+                 live OUTSIDE this fragment — generalising the crew #crew-count-meta precedent. */-->
             <div id="overview-results"><th:block th:fragment="overviewSection">
             <span id="overview-head-meta" hidden
                   th:attr="data-title=${#messages.msg('mission.prefix') + ' ' + mission.name},
@@ -392,33 +87,33 @@
                            data-leader=${!#strings.isEmpty(factLeaderName) ? factLeaderName : #messages.msg('general.none')},
                            data-owning-org-unit-shorthand=${mission.owningSquadron != null ? mission.owningSquadron.shorthand() : ''},
                            data-owning-org-unit-name=${mission.owningSquadron != null ? mission.owningSquadron.name() : ''}"></span>
-            <!-- Final Einsatz design (#818 follow-up): the overview is re-split into "Mission auf
+            <!--/* Final Einsatz design (#818 follow-up): the overview is re-split into "Mission auf
                  einen Blick" (Ziel + key facts), separate "Weitere Leads" / "Funk" panels, a
                  participant attendance meter, the read-only Ablauf checklist, a Kalender card and a
                  collapsible long description. Supersedes the 2026-06-11 consolidated kv-list
                  (REQ-MISSION-004 amended). The #overview-actual-* / #overview-party-lead / frequency
                  ids are preserved so the schedule/party-lead/frequency live-update patches keep
-                 working. -->
+                 working. */-->
             <div class="pane-grid-2">
-                <!-- LEFT: goals (Ziele), Ablauf checklist, attendance, calendar -->
+                <!--/* LEFT: goals (Ziele), Ablauf checklist, attendance, calendar */-->
                 <div class="pane-col">
-                    <!-- Ziele (REQ-MISSION-019): structured goals grouped Hauptziel -> Nebenziel ->
+                    <!--/* Ziele (REQ-MISSION-019): structured goals grouped Hauptziel -> Nebenziel ->
                          Nicht-Ziel; read-only here, authored in the Verwaltung tab. Refreshed in place
                          through the 'overview' section swap
                          (krtRefreshMissionSection(['objectives','overview'])); no version attribute
-                         because the overview box carries no mutation (the editor lives in Verwaltung). -->
-                    <!-- The whole Ziele tile is omitted when no goals are authored (owner request
+                         because the overview box carries no mutation (the editor lives in Verwaltung). */-->
+                    <!--/* The whole Ziele tile is omitted when no goals are authored (owner request
                          2026-07-01) — an empty box is noise, so the panel disappears entirely rather
                          than showing an empty-state placeholder. The tile reappears in place when the
-                         first goal is added via the overview section swap. -->
+                         first goal is added via the overview section swap. */-->
                     <div class="kpanel" th:if="${mission.objectives != null and !mission.objectives.isEmpty()}">
                         <div class="kpanel-head">
                             <span th:text="#{mission.objective.section}">Ziele</span>
                             <span class="ucount" th:text="${mission.objectives.size()}">0</span>
                         </div>
-                        <!-- Three explicit groups with string-literal kind filters (a SpEL selection
+                        <!--/* Three explicit groups with string-literal kind filters (a SpEL selection
                              ?[...] re-roots on the element, so an outer loop variable is not reachable
-                             inside it — hence no th:each over the kinds). Empty groups are omitted. -->
+                             inside it — hence no th:each over the kinds). Empty groups are omitted. */-->
                         <div class="kpanel-body"
                              th:with="primaryGoals=${mission.objectives.?[kind.name() == 'PRIMARY']},
                                       secondaryGoals=${mission.objectives.?[kind.name() == 'SECONDARY']},
@@ -443,10 +138,10 @@
                             </div>
                         </div>
                     </div>
-                    <!-- Ablauf checklist (moved from the former right column). The whole tile is
+                    <!--/* Ablauf checklist (moved from the former right column). The whole tile is
                          omitted when no steps are authored (owner request 2026-07-01) — no empty-state
                          placeholder; the tile reappears in place when the first step is added via the
-                         ['steps','overview'] section swap. -->
+                         ['steps','overview'] section swap. */-->
                     <div class="kpanel" th:if="${mission.steps != null and !mission.steps.isEmpty()}">
                         <div class="kpanel-head">
                             <span th:text="#{mission.step.section}">Ablauf</span>
@@ -472,7 +167,7 @@
                             </ol>
                         </div>
                     </div>
-                    <!-- Teilnehmer attendance meter (moved from the former right column) -->
+                    <!--/* Teilnehmer attendance meter (moved from the former right column) */-->
                     <div class="kpanel">
                         <div class="kpanel-head" th:text="#{mission.overview.attendance}">Teilnehmer</div>
                         <div class="kpanel-body">
@@ -487,7 +182,7 @@
                             </div>
                         </div>
                     </div>
-                    <!-- Kalender (moved from the former right column) -->
+                    <!--/* Kalender (moved from the former right column) */-->
                     <div class="kpanel" th:if="${!#strings.isEmpty(mission.calendarLink)}">
                         <div class="kpanel-head" th:text="#{mission.calendar_link}">Kalender</div>
                         <div class="kpanel-body">
@@ -495,7 +190,7 @@
                         </div>
                     </div>
                 </div>
-                <!-- RIGHT: at-a-glance facts, further leads, radio -->
+                <!--/* RIGHT: at-a-glance facts, further leads, radio */-->
                 <div class="pane-col">
                     <div class="kpanel">
                         <div class="kpanel-head" th:text="#{mission.overview.at_a_glance}">Mission auf einen Blick</div>
@@ -546,7 +241,7 @@
                             </dl>
                         </div>
                     </div>
-                    <!-- Funk: the dynamic frequencies (#816). Shows only entries that actually carry a
+                    <!--/* Funk: the dynamic frequencies (#816). Shows only entries that actually carry a
                          value — first the central, unit-less frequencies that have been set, then the
                          per-unit frequencies of the units that carry one. Central types without a value
                          and units without a frequency are omitted, and the whole panel collapses when
@@ -557,7 +252,7 @@
                          whose failure is swallowed (the attribute is then null), so without this guard a
                          mission that carries a central value while the type list failed to load — and has
                          no unit frequency — would paint a bare "Funk" heading over an empty list. The
-                         central rows iterate frequencyTypes, so they can only render when it is present. -->
+                         central rows iterate frequencyTypes, so they can only render when it is present. */-->
                     <th:block th:with="unitsWithFreq=${mission.assignedUnits != null ? mission.assignedUnits.?[frequency != null] : null},
                                        hasCentralTypes=${frequencyTypes != null and !frequencyTypes.isEmpty()},
                                        hasCentralFreq=${frequencyByTypeId != null and !frequencyByTypeId.isEmpty()},
@@ -566,7 +261,7 @@
                         <div class="kpanel-head" th:text="#{mission.overview.radio}">Funk</div>
                         <div class="kpanel-body">
                             <dl class="kv-list">
-                                <!-- Central, unit-less frequencies — only those with a value entered. -->
+                                <!--/* Central, unit-less frequencies — only those with a value entered. */-->
                                 <th:block th:each="freqType : ${frequencyTypes}"
                                           th:if="${frequencyByTypeId[freqType.id] != null}"
                                           th:with="f=${frequencyByTypeId[freqType.id]}">
@@ -575,14 +270,14 @@
                                         <span class="data-value data-value--mono freq-value-display" th:attr="data-freq-type-id=${freqType.id}" th:text="${#strings.replace(#numbers.formatDecimal(f.value, 3, 'NONE', 2, 'DEFAULT'), ',', '.')}">123.45</span>
                                     </dd>
                                 </th:block>
-                                <!-- Custom, mission-specific frequencies (REQ-MISSION-014) — free-text label + value. -->
+                                <!--/* Custom, mission-specific frequencies (REQ-MISSION-014) — free-text label + value. */-->
                                 <th:block th:each="cf : ${customFrequencies}">
                                     <dt th:text="${cf.name}">Funk</dt>
                                     <dd>
                                         <span class="data-value data-value--mono" th:text="${#strings.replace(#numbers.formatDecimal(cf.value, 3, 'NONE', 2, 'DEFAULT'), ',', '.')}">123.45</span>
                                     </dd>
                                 </th:block>
-                                <!-- Per-unit frequencies — only units that carry one. -->
+                                <!--/* Per-unit frequencies — only units that carry one. */-->
                                 <th:block th:each="unit : ${unitsWithFreq}">
                                     <dt><span th:text="${unit.name}">Einheit</span> <small class="kv-sub" th:text="#{mission.overview.radio.unit}">Einheit</small></dt>
                                     <dd>
@@ -595,14 +290,14 @@
                     </th:block>
                 </div>
             </div>
-            <!-- Detaillierte Beschreibung (Markdown) — collapsible gray card (.more) matching the
-                 other overview panels (#818 follow-up); member+ gate unchanged. -->
+            <!--/* Detaillierte Beschreibung (Markdown) — collapsible gray card (.more) matching the
+                 other overview panels (#818 follow-up); member+ gate unchanged. */-->
             <details class="more" open sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).KRT_MEMBER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).MISSION_MANAGER)"
                      th:if="${!#strings.isEmpty(mission.description)}">
                 <summary><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-down"/></svg> <span th:text="#{mission.overview.details_collapse}">Detaillierte Beschreibung anzeigen</span></summary>
                 <div class="more-body">
-                    <!-- th:utext is safe here: @markdown escapes raw HTML in the source and strips unsafe
-                         link protocols, so only renderer-generated markup is emitted. -->
+                    <!--/* th:utext is safe here: @markdown escapes raw HTML in the source and strips unsafe
+                         link protocols, so only renderer-generated markup is emitted. */-->
                     <div class="markdown-content"
                          th:with="descriptionHtml=${@markdown.render(mission.description)}"
                          th:utext="${descriptionHtml}">Beschreibung</div>
@@ -610,32 +305,32 @@
             </details>
             </th:block></div>
         </section>
-        <!-- Section-refresh error fragment (#574 review must-fix): returned with HTTP 200 by
+        <!--/* Section-refresh error fragment (#574 review must-fix): returned with HTTP 200 by
              GET /missions/{id}?fragment=… when the backend read fails, so an in-place swap paints
              a section-sized inline notice instead of a full-page redirect being followed into the
              small #…-results container. Held in an inert <template> so it never shows in the normal
              full-page render; the fragment selector extracts only the inner <p>, which krtFetch.swap
-             then injects. Renders from message bundles only (no model attributes). -->
+             then injects. Renders from message bundles only (no model attributes). */-->
         <template>
             <p th:fragment="fragmentError" class="desc" role="alert" th:text="#{mission.section.refresh.error}">The section could not be refreshed. Please reload the page.</p>
         </template>
-        <!-- ================= Tab 2: Teilnehmer & Einheiten (crew board) ================= -->
+        <!--/* ================= Tab 2: Teilnehmer & Einheiten (crew board) ================= */-->
         <section th:unless="${isNew}" id="pane-crew" class="tab-pane" role="tabpanel" aria-labelledby="tab-crew">
-            <!-- In-place AJAX swap container (epic #571 / #574): a crew sub-mutation re-renders this
+            <!--/* In-place AJAX swap container (epic #571 / #574): a crew sub-mutation re-renders this
                  fragment via GET /missions/{id}?fragment=crew-board. The #crew-board-results wrapper
                  persists (only its innerHTML is replaced), so the board drag-drop / button handlers
-                 are delegated on it and survive every swap. -->
+                 are delegated on it and survive every swap. */-->
             <div id="crew-board-results"><th:block th:fragment="crewBoard">
-            <!-- Carries the fresh participant counts so an in-place crew swap can patch the facts bar
+            <!--/* Carries the fresh participant counts so an in-place crew swap can patch the facts bar
                  + crew tab badge, which live in the page header OUTSIDE this fragment. Generalises the
-                 finance #finance-count-meta / refreshFinanceAndBadge precedent (#571/#574). -->
+                 finance #finance-count-meta / refreshFinanceAndBadge precedent (#571/#574). */-->
             <span id="crew-count-meta" hidden th:attr="data-registered=${mission.registeredParticipants},data-checked-in=${mission.checkedInParticipants}"></span>
             <div class="sec-h">
                 <h2><span th:text="#{mission.crew.planning}">Crew-Planung</span> &middot; <span class="warn" th:text="|${unassignedParticipants.size()} ${#messages.msg('mission.overview.without_unit')}|">0 ohne Einheit</span></h2>
                 <span class="legend" th:if="${mission.canEdit}" th:text="#{mission.crew.legend}">Ziehen oder ausw&auml;hlen und Ziel anklicken</span>
             </div>
             <div class="board">
-                <!-- Pool: participants without a unit assignment -->
+                <!--/* Pool: participants without a unit assignment */-->
                 <div class="kpanel pool-panel">
                     <div class="kpanel-head"><span th:text="#{mission.crew.pool}">Ohne Einheit</span> <span class="ucount" th:text="${unassignedParticipants.size()}">0</span></div>
                     <div class="drop-zone" id="board-pool" data-zone="pool"
@@ -643,11 +338,11 @@
                         <th:block th:each="p : ${unassignedParticipants}">
                             <div th:replace="~{:: personRow(${p}, null, null)}"></div>
                         </th:block>
-                        <!-- Two-state hint (#1936): .hint-idle names the TAP path before the drag one
+                        <!--/* Two-state hint (#1936): .hint-idle names the TAP path before the drag one
                              (native HTML5 drag is inert on touch), and .hint-armed replaces it with the
                              short call to action once a participant is selected elsewhere on the board.
                              The swap is pure CSS (:has(.person-row.is-selected)) — no JS state to keep in
-                             sync across the board's innerHTML swaps. -->
+                             sync across the board's innerHTML swaps. */-->
                         <div class="drop-hint" th:if="${mission.canEdit}">
                             <span class="hint-idle" th:text="#{mission.crew.pool.drophint}">Teilnehmer antippen, dann hierher tippen</span>
                             <span class="hint-armed" th:text="#{mission.crew.pool.taphint}">Hier tippen, um die Zuweisung zu entfernen</span>
@@ -656,7 +351,7 @@
                     </div>
                 </div>
 
-                <!-- Units: open drop zones, no fixed size -->
+                <!--/* Units: open drop zones, no fixed size */-->
                 <div class="board-units">
                     <div th:each="unit, unitStat : ${mission.assignedUnits}" class="kpanel unit-panel mission-unit-box"
                          th:classappend="'unit-color-' + ${unitStat.index % 24}"
@@ -699,16 +394,16 @@
                         </div>
                         <div class="drop-zone" data-zone="unit" th:attr="data-unit-id=${unit.id}, tabindex=${mission.canEdit ? '0' : null}, role=${mission.canEdit ? 'button' : null}, aria-label=${mission.canEdit ? unit.name + ' — ' + #messages.msg('mission.crew.unit.drophint') : null}">
                             <th:block th:each="c : ${unit.crew}" th:with="cp=${participantsById[c.participantId]}">
-                                <!-- th:if must NOT share an element with th:replace: th:replace (attribute precedence 1)
+                                <!--/* th:if must NOT share an element with th:replace: th:replace (attribute precedence 1)
                                      runs BEFORE th:if (3), so a same-element guard is dead and a crew entry whose
                                      participant is missing from participantsById would render a ghost person-row. The
                                      backend keeps crew and participants in sync (removing a participant scrubs its crew),
-                                     so cp is non-null today; gating an outer th:block keeps that defence effective. -->
+                                     so cp is non-null today; gating an outer th:block keeps that defence effective. */-->
                                 <th:block th:if="${cp != null}">
                                     <div th:replace="~{:: personRow(${cp}, ${c}, ${unit})}"></div>
                                 </th:block>
                             </th:block>
-                            <!-- Same two-state hint as the pool zone (#1936) — see the comment there. -->
+                            <!--/* Same two-state hint as the pool zone (#1936) — see the comment there. */-->
                             <div class="drop-hint" th:if="${mission.canEdit}">
                                 <span class="hint-idle" th:text="#{mission.crew.unit.drophint}">Teilnehmer antippen, dann hierher tippen</span>
                                 <span class="hint-armed" th:text="#{mission.crew.unit.taphint}">Hier tippen, um zuzuweisen</span>
@@ -722,18 +417,18 @@
             </div>
             </th:block></div>
         </section>
-        <!-- ================= Tab 3: Finanzen & Auszahlung ================= -->
+        <!--/* ================= Tab 3: Finanzen & Auszahlung ================= */-->
         <section th:unless="${isNew}" id="pane-fin" class="tab-pane" role="tabpanel" aria-labelledby="tab-fin">
-            <!-- In-place AJAX swap container (#571/#574): finance add/edit/delete re-render this
+            <!--/* In-place AJAX swap container (#571/#574): finance add/edit/delete re-render this
                  fragment via ?fragment=finance. It spans the sumstrip + ledger + payout table so the
                  totals, per-share and participant rows all refresh together. Edit/delete triggers
-                 inside are krtEvents-delegated on document and survive the innerHTML swap. -->
+                 inside are krtEvents-delegated on document and survive the innerHTML swap. */-->
             <div id="finance-results"><th:block th:fragment="financeSection">
-            <!-- Carries the current entry count so an in-place finance swap can patch the Finanzen
-                 tab badge (which lives in the tab nav, outside this fragment). -->
+            <!--/* Carries the current entry count so an in-place finance swap can patch the Finanzen
+                 tab badge (which lives in the tab nav, outside this fragment). */-->
             <span id="finance-count-meta" hidden th:text="${(financeIncomeCount ?: 0) + (financeExpenseCount ?: 0)}"></span>
 
-            <!-- Summary strip (member+ only: aggregates come from the finance ledger) -->
+            <!--/* Summary strip (member+ only: aggregates come from the finance ledger) */-->
             <div class="sumstrip" th:if="${financeSum != null}" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).KRT_MEMBER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).MISSION_MANAGER)">
                 <div class="sum is-total"><div class="sk" th:text="#{mission.finance.total}">Gesamtsumme</div><div class="sv" th:classappend="${financeSum >= 0 ? 'pos' : 'neg'}" th:text="${#numbers.formatInteger(@moneyFormat.round(financeSum), 1, 'POINT')}">0</div><div class="sd" th:text="|aUEC &middot; ${financeIncomeCount + financeExpenseCount} ${#messages.msg('mission.finance.entries')}|">aUEC</div></div>
                 <div class="sum"><div class="sk" th:text="#{mission.finance.income_sum}">Einnahmen</div><div class="sv pos" th:text="'+' + ${#numbers.formatInteger(@moneyFormat.round(financeIncomeSum), 1, 'POINT')}">0</div><div class="sd" th:text="|${financeIncomeCount} ${#messages.msg('mission.finance.entries')}|">0</div></div>
@@ -742,7 +437,7 @@
             </div>
 
             <div class="pane-grid-fin">
-                <!-- Finance ledger (member+ only, same gate as the old finance panel) -->
+                <!--/* Finance ledger (member+ only, same gate as the old finance panel) */-->
                 <div class="kpanel" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).KRT_MEMBER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).MISSION_MANAGER)">
                     <div class="kpanel-head">
                         <span th:text="#{mission.finances}">Finanzen</span>
@@ -771,13 +466,13 @@
                                     <td th:text="${entry.note}" th:title="${entry.note}">Notiz</td>
                                     <td sec:authorize="isAuthenticated()">
                                         <div class="flex-gap-xs krtm-justify-content-flex-end-177c">
-                                            <!-- Edit button. The rounded amount is bound via th:with
+                                            <!--/* Edit button. The rounded amount is bound via th:with
                                                  (an unrestricted expression context) and only the
                                                  resulting variable is read in th:data-amount: Thymeleaf
                                                  3.1 evaluates default/unknown attributes (th:data-*) in
                                                  a restricted context where @bean references like
                                                  @moneyFormat are forbidden, so calling the bean directly
-                                                 in th:data-amount throws and 500s the whole page. -->
+                                                 in th:data-amount throws and 500s the whole page. */-->
                                             <button type="button" class="btn btn-ghost btn-icon edit-finance-btn"
                                                     th:with="financeEditAmount=${@moneyFormat.round(entry.amount)}"
                                                     th:data-id="${entry.id}"
@@ -788,7 +483,7 @@
                                                     data-trigger="mission-open-edit-finance"
                                                     th:title="#{members.edit}" th:aria-label="#{members.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
 
-                                            <!-- Delete button -->
+                                            <!--/* Delete button */-->
                                             <button type="button" class="btn btn-quiet-danger btn-icon delete-finance-btn" th:attr="data-action=@{/missions/{id}/finance-entries/{entryId}/delete(id=${mission.id}, entryId=${entry.id})}" data-sub-section="finance" th:title="#{info.delete}" th:aria-label="#{info.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                                         </div>
                                     </td>
@@ -815,7 +510,7 @@
                     </div>
                 </div>
 
-                <!-- Payout (visible to every viewer; participation % authenticated only) -->
+                <!--/* Payout (visible to every viewer; participation % authenticated only) */-->
                 <div class="kpanel">
                     <div class="kpanel-head" th:text="#{mission.payout}">Auszahlung</div>
                     <div class="kpanel-body">
@@ -852,9 +547,9 @@
                 </div>
             </div>
 
-            <!-- Wirtschaft (authenticated viewers, only when data exists — same gate as before).
+            <!--/* Wirtschaft (authenticated viewers, only when data exists — same gate as before).
                  #1138: the refinery + inventory lists moved off the embedded MissionDto fields onto
-                 the finance section's dedicated ${refineryOrders} / ${inventoryEntries} reads. -->
+                 the finance section's dedicated ${refineryOrders} / ${inventoryEntries} reads. */-->
             <th:block sec:authorize="isAuthenticated()" th:if="${(refineryOrders != null and !#lists.isEmpty(refineryOrders)) or (inventoryEntries != null and !#lists.isEmpty(inventoryEntries))}">
                 <details class="hud-details" open th:if="${refineryOrders != null and !#lists.isEmpty(refineryOrders)}">
                     <summary><span th:text="#{mission.refinery_orders}">Raffinerieauftr&auml;ge</span> <span class="chip chip--data chip-xs" th:text="${#lists.size(refineryOrders)}">2</span></summary>
@@ -874,7 +569,7 @@
                                     <td th:text="${order.owner != null ? order.owner.effectiveName : '-'}">Nutzer</td>
                                     <td th:text="${order.location != null ? order.location.name : '-'}">Standort</td>
                                     <td>
-                                        <!-- Server-Rendering explizit in UTC; Browser-JS konvertiert es DST-korrekt in die lokale Zeitzone des Nutzers. -->
+                                        <!--/* Server-Rendering explizit in UTC; Browser-JS konvertiert es DST-korrekt in die lokale Zeitzone des Nutzers. */-->
                                         <span class="refinery-endsat-local"
                                               th:data-utc="${order.endsAt != null ? order.endsAt.toEpochMilli() : 'null'}"
                                               th:text="${order.endsAt != null ? #temporals.format(order.endsAt, 'dd.MM.yyyy HH:mm', 'UTC') + ' UTC' : '-'}">Ende</span>
@@ -949,7 +644,7 @@
             </th:block>
             </th:block></div>
         </section>
-        <!-- ================= Tab 4: Verwaltung (role-gated; sole pane on the create page) ================= -->
+        <!--/* ================= Tab 4: Verwaltung (role-gated; sole pane on the create page) ================= */-->
         <section id="pane-verw" class="tab-pane" role="tabpanel" aria-labelledby="tab-verw"
                  th:classappend="${isNew} ? 'on'"
                  th:if="${isNew or mission.canEdit or mission.canManageManagers}">
@@ -958,23 +653,23 @@
                     <div class="kpanel-head" th:text="#{mission.details}">Details</div>
                     <div class="kpanel-body">
 
-                    <!-- #589: the core-edit form saves IN PLACE via an X-Requested-With AJAX twin
+                    <!--/* #589: the core-edit form saves IN PLACE via an X-Requested-With AJAX twin
                          (POST /missions/{id}); the classic POST->redirect stays the no-JS fallback.
                          data-mission-edit gates the JS interceptor so only the EDIT path is in-place —
                          the CREATE path (isNew, posts to /missions) keeps its classic navigate-to-the-
                          new-mission behaviour. On a 422 the JS renders the {field:message} map into the
                          per-field .field-error[data-error-for] slots; on success it writes the four
-                         fresh versions back into the hidden inputs (no navigation). -->
+                         fresh versions back into the hidden inputs (no navigation). */-->
                     <form id="mission-form" data-testid="mission-form" th:action="${isNew} ? @{/missions} : @{/missions/{id}(id=${mission.id})}" method="post" th:object="${missionForm}"
                           th:attr="data-mission-edit=${isNew} ? null : 'true'">
                         <input type="hidden" id="mission-version" name="version" th:field="*{version}">
                         <input type="hidden" id="mission-core-version" name="coreVersion" th:field="*{coreVersion}">
                         <input type="hidden" id="mission-schedule-version" name="scheduleVersion" th:field="*{scheduleVersion}">
                         <input type="hidden" id="mission-flags-version" name="flagsVersion" th:field="*{flagsVersion}">
-                        <!-- Dirty-section flags (#1136, REQ-FE-014): the edit JS sets each to whether the user
+                        <!--/* Dirty-section flags (#1136, REQ-FE-014): the edit JS sets each to whether the user
                              touched that header section; applyMissionUpdate skips the PATCH for any section left
                              "false". They default to "true" so the no-JavaScript classic submit still saves every
-                             section. -->
+                             section. */-->
                         <input type="hidden" id="mission-dirty-core" name="dirtyCore" value="true">
                         <input type="hidden" id="mission-dirty-schedule" name="dirtySchedule" value="true">
                         <input type="hidden" id="mission-dirty-flags" name="dirtyFlags" value="true">
@@ -986,11 +681,11 @@
                 <div class="field-error" data-error-for="name" th:text="${#fields.hasErrors('name') ? #fields.errors('name')[0] : ''}"></div>
             </div>
 
-            <!-- Create-only Ziele + Ablauf editors (optional; sit ABOVE the description per owner
+            <!--/* Create-only Ziele + Ablauf editors (optional; sit ABOVE the description per owner
                  request). The mission has no id yet, so these are client-side rows (no AJAX, no
                  section version) serialized into the hidden objectivesJson / stepsJson carriers on
                  submit; the write controller parses them into the create request. Goals/steps can
-                 equally be added later via the Verwaltung section editors. -->
+                 equally be added later via the Verwaltung section editors. */-->
             <div class="form-group" th:if="${isNew}">
                 <label th:text="#{mission.objective.section}">Ziele</label>
                 <div class="kpanel">
@@ -1102,7 +797,7 @@
                 </div>
             </div>
 
-            <!-- R5.d.d owner-picker: only shown on create when the caller has >1 OrgUnit membership. -->
+            <!--/* R5.d.d owner-picker: only shown on create when the caller has >1 OrgUnit membership. */-->
             <div class="form-row" th:if="${isNew}">
                 <th:block th:replace="~{fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=*{owningOrgUnitId}, required=false)}"></th:block>
             </div>
@@ -1171,7 +866,7 @@
             </div>
             </div>
 
-            <!-- Calendar link moved to the end of the Details card (owner request). -->
+            <!--/* Calendar link moved to the end of the Details card (owner request). */-->
             <div class="form-group">
                 <label th:text="#{mission.calendar_link}">Link zum Kalendereintrag</label>
                 <div class="flex-gap-sm">
@@ -1188,12 +883,12 @@
                 </div>
 
                 <div class="pane-col" th:if="${!isNew}">
-                    <!-- Ziele editor (REQ-MISSION-019): classified, sortable goals. In-place AJAX swap
+                    <!--/* Ziele editor (REQ-MISSION-019): classified, sortable goals. In-place AJAX swap
                          container — a goal add/edit/remove/reorder re-renders this objectivesEditor
                          fragment via ?fragment=objectives-editor AND the overview Ziele box via
                          ?fragment=overview. Handlers are delegated on document so they survive swaps.
                          The dedicated mission.objectivesVersion section counter keeps the goals lock
-                         narrow (a goal edit never 409s a concurrent core/schedule/flags/Ablauf edit). -->
+                         narrow (a goal edit never 409s a concurrent core/schedule/flags/Ablauf edit). */-->
                     <div id="mission-objectives-results"><th:block th:fragment="objectivesEditor">
                     <div class="kpanel" th:if="${!isNew and mission.canEdit}"
                          th:attr="data-objectives-version=${mission.objectivesVersion}"
@@ -1233,12 +928,12 @@
                     </div>
                     </th:block></div>
 
-                    <!-- Ablauf editor (final Einsatz design): drag-sortable procedure steps. In-place
+                    <!--/* Ablauf editor (final Einsatz design): drag-sortable procedure steps. In-place
                          AJAX swap container — a step add/edit/remove/reorder re-renders this
                          stepsEditor fragment via ?fragment=steps-editor AND the overview checklist via
                          ?fragment=overview. Handlers are delegated on document so they survive swaps.
                          The dedicated mission.stepsVersion section counter keeps the Ablauf lock
-                         narrow (a step edit never 409s a concurrent core/schedule/flags edit). -->
+                         narrow (a step edit never 409s a concurrent core/schedule/flags edit). */-->
                     <div id="mission-steps-results"><th:block th:fragment="stepsEditor">
                     <div class="kpanel" th:if="${!isNew and mission.canEdit}"
                          th:attr="data-steps-version=${mission.stepsVersion}"
@@ -1275,17 +970,17 @@
                     </div>
                     </th:block></div>
 
-                    <!-- Organisation: party lead + typed frequencies + custom (mission-specific)
-                         frequencies (edit). -->
+                    <!--/* Organisation: party lead + typed frequencies + custom (mission-specific)
+                         frequencies (edit). */-->
                     <div class="kpanel" th:if="${!isNew}">
                         <div class="kpanel-head" th:text="#{mission.organisation}">Organisation</div>
                         <div class="kpanel-body">
-                            <!-- #1120: party lead + typed-frequency overview are their own
+                            <!--/* #1120: party lead + typed-frequency overview are their own
                                  broadcastable fragment (REQ-FE-015) so a peer's change re-renders
                                  the panel — refreshing their #party-lead-version — instead of
                                  leaving it stale. The custom "Weitere Frequenzen" block below stays
                                  a SIBLING swap container (#mission-frequencies-results), never
-                                 nested inside this one (the krtFetch re-nesting trap). -->
+                                 nested inside this one (the krtFetch re-nesting trap). */-->
                             <div id="mission-organisation-results"><th:block th:fragment="organisationPanel">
                             <div class="form-group">
                                 <label th:text="#{mission.party_lead}">Partyleiter</label>
@@ -1338,13 +1033,13 @@
                             </div>
                             </th:block></div>
 
-                            <!-- Weitere Frequenzen (REQ-MISSION-014): mission-specific custom channels
+                            <!--/* Weitere Frequenzen (REQ-MISSION-014): mission-specific custom channels
                                  (free-text label + value). In-place AJAX swap container — a custom
                                  add/edit/delete re-renders this frequenciesEditor fragment via
                                  ?fragment=frequencies-editor AND the overview Funk panel via
                                  ?fragment=overview. Handlers are delegated on document so they survive
                                  swaps. Persisting a frequency is @OptimisticLock(excluded) on the
-                                 mission, so it never 409s a concurrent core/schedule/flags edit. -->
+                                 mission, so it never 409s a concurrent core/schedule/flags edit. */-->
                             <div id="mission-frequencies-results"><th:block th:fragment="frequenciesEditor">
                             <div class="form-group krtm-margin-bottom-0-5043" th:if="${!isNew}">
                                 <label th:text="#{mission.frequency.custom.section}">Weitere Frequenzen</label>
@@ -1370,10 +1065,10 @@
                         </div>
                     </div>
 
-                    <!-- Owner & Manager — in-place AJAX swap container (#571/#574): an owner change
+                    <!--/* Owner & Manager — in-place AJAX swap container (#571/#574): an owner change
                          or manager add/remove re-renders this fragment via ?fragment=mgmt. The
                          triggers inside are krtEvents-delegated on document, so they survive the
-                         innerHTML swap of #mission-mgmt-results with no re-init. -->
+                         innerHTML swap of #mission-mgmt-results with no re-init. */-->
                     <div id="mission-mgmt-results"><th:block th:fragment="mgmtPanels">
                     <div class="kpanel" th:if="${!isNew and mission.canManageManagers}">
                         <div class="kpanel-head" th:text="#{mission.management_rights}">Verwaltungsrechte</div>
@@ -1384,10 +1079,10 @@
                                     <div class="data-value krtm-background-var-color-surface-input-padding-0-fd20">
                                         <span th:text="${mission.owner != null ? mission.owner.effectiveName : '-'}">Besitzer Name</span>
                                     </div>
-                                    <!-- data-ownership-version: the owner change's optimistic-lock counter (BE-SIMP-03),
-                                         echoed on the next change and rewritten in place after one. -->
+                                    <!--/* data-ownership-version: the owner change's optimistic-lock counter (BE-SIMP-03),
+                                         echoed on the next change and rewritten in place after one. */-->
                                     <div th:if="${mission.canEdit}" class="flex-gap-xs" id="owner-row" th:attr="data-ownership-version=${mission.ownershipVersion}">
-                                        <!-- Server-side searchable combobox (remote-users, #1193): roster is searched on demand, not preloaded. -->
+                                        <!--/* Server-side searchable combobox (remote-users, #1193): roster is searched on demand, not preloaded. */-->
                                         <select id="new-owner-id" class="flex-1" data-krt-combobox="remote-users" data-testid="mission-owner-picker">
                                             <option value="" th:text="#{mission.owner.select}">-- Neuen Besitzer w&auml;hlen --</option>
                                         </select>
@@ -1396,11 +1091,11 @@
                                 </div>
                             </div>
 
-                            <!-- Owning org unit (Verantwortliche Einheit) — REQ-ORG-018 reassignment control.
+                            <!--/* Owning org unit (Verantwortliche Einheit) — REQ-ORG-018 reassignment control.
                                  Re-homes the mission to a different Staffel/SK/Bereich/OL (or to ownerless).
                                  Lives in the #mission-mgmt-results swap container so a change re-renders in
                                  place (krtRefreshMissionSection('mgmt')); the data-owning-org-unit-version
-                                 attribute carries the section-scoped optimistic-lock counter. -->
+                                 attribute carries the section-scoped optimistic-lock counter. */-->
                             <div class="form-group">
                                 <label th:text="#{mission.owningOrgUnit}">Verantwortliche Einheit</label>
                                 <div class="krtm-display-flex-gap-0-5rem-flex-direction-colum-3289">
@@ -1410,8 +1105,8 @@
                                     </div>
                                     <div th:if="${mission.canEdit}" class="flex-gap-xs" id="owning-org-unit-row" th:attr="data-owning-org-unit-version=${mission.owningOrgUnitVersion}">
                                         <select id="new-owning-org-unit-id" class="flex-1">
-                                            <!-- Current assignment first: always selectable + preselected even when it
-                                                 is not part of the caller's own pickable set. -->
+                                            <!--/* Current assignment first: always selectable + preselected even when it
+                                                 is not part of the caller's own pickable set. */-->
                                             <option th:if="${mission.owningSquadron != null}" th:value="${mission.owningSquadron.id()}" th:text="${mission.owningSquadron.name()}" selected></option>
                                             <option value="" th:text="#{mission.owningOrgUnit.none}" th:selected="${mission.owningSquadron == null}">-- Keine --</option>
                                             <option th:each="o : ${ownerOptions}" th:if="${mission.owningSquadron == null or mission.owningSquadron.id() != o.orgUnitId()}" th:value="${o.orgUnitId()}" th:text="${o.orgUnitName()}"></option>
@@ -1435,7 +1130,7 @@
                                 </div>
 
                                 <div th:if="${mission.canEdit}" class="flex-gap-xs">
-                                    <!-- Server-side searchable combobox (remote-users, #1193): roster is searched on demand, not preloaded. -->
+                                    <!--/* Server-side searchable combobox (remote-users, #1193): roster is searched on demand, not preloaded. */-->
                                     <select id="new-manager-id" class="flex-1" data-krt-combobox="remote-users">
                                         <option value="" th:text="#{mission.manager.select}">-- Manager w&auml;hlen --</option>
                                     </select>
@@ -1458,9 +1153,9 @@
             </div>
         </section>
 
-    </div> <!-- End tab-panes -->
-</div> <!-- End page-wrapper -->
-    <!-- ===== person-row fragment (board rows; wrapped in th:if=false so it only renders when inserted) ===== -->
+    </div> <!--/* End tab-panes */-->
+</div> <!--/* End page-wrapper */-->
+    <!--/* ===== person-row fragment (board rows; wrapped in th:if=false so it only renders when inserted) ===== */-->
     <th:block th:if="${false}">
         <div th:fragment="personRow(p, crew, unit)" class="person-row"
              th:with="own=${authUserId != null and p?.user != null and p.user.id.toString() == authUserId},
@@ -1478,10 +1173,10 @@
                   th:title="${checkedIn} ? #{mission.crew.checked_in} : #{mission.crew.not_checked_in}"></span>
             <div class="row-main">
                 <div class="row-line1">
-                    <!-- A participant with neither a user nor a guest name is a deleted account: the
+                    <!--/* A participant with neither a user nor a guest name is a deleted account: the
                          deletion nulls user_id and a user-linked sign-up never carried a guest name,
                          so the two cases are unambiguous. Without the third branch the row rendered
-                         blank and was additionally mislabelled "Gast". -->
+                         blank and was additionally mislabelled "Gast". */-->
                     <span class="person-name"
                           th:text="${p?.user != null ? p.user.effectiveName : (p?.guestName != null ? p.guestName : #messages.msg('mission.participant.deleted'))}">Name</span>
                     <span th:if="${p?.user == null and p?.guestName != null}" class="chip chip--muted chip-xs" th:text="#{mission.participant.external}">Extern</span>
@@ -1502,7 +1197,7 @@
                     <span th:if="${!#strings.isEmpty(p?.comment)}" class="notemark" th:title="${p.comment}" th:attr="aria-label=#{mission.participant.comment} + ': ' + ${p.comment}" tabindex="0">&#x270E;</span>
                 </div>
             </div>
-            <!-- On-board function: quick chip-select for editors; static text otherwise. Only on unit rows. -->
+            <!--/* On-board function: quick chip-select for editors; static text otherwise. Only on unit rows. */-->
             <select th:if="${crew != null and mission.canEdit}" class="chip-select crew-role-select"
                     th:title="#{mission.crew.function}" th:aria-label="#{mission.crew.function}"
                     th:with="jobIds=${crew.jobTypes != null ? crew.jobTypes.![id.toString()] : {}}"
@@ -1522,12 +1217,12 @@
             <span th:if="${crew != null and !mission.canEdit and crew.jobTypes != null and !crew.jobTypes.isEmpty()}"
                   class="crew-jobs-static" th:text="${#strings.listJoin(crew.jobTypes.![name], ', ')}"
                   th:title="${#strings.listJoin(crew.jobTypes.![name], ', ')}">Pilot</span>
-            <!-- ADR-0159 / decision D4: an EXTERNAL row (no user, but a name) is the mission
+            <!--/* ADR-0159 / decision D4: an EXTERNAL row (no user, but a name) is the mission
                  leadership's to edit and remove — it carries no creator to bind a self-edit to, and
                  the roster shows its id to every member who can see the Einsatz. The arm that used
                  to let ANY viewer maintain such a row is gone; the backend refuses it either way
                  (MissionSecurityService.canAccessParticipant), and rendering a control that always
-                 fails is worse than not rendering it. -->
+                 fails is worse than not rendering it. */-->
             <div class="row-actions" th:if="${mission.canEdit or own}">
                 <form th:action="@{/missions/{id}/participants/{pId}/check-in(id=${mission.id}, pId=${p?.id})}" method="post" th:if="${p?.startTime == null and mission.actualStartTime != null and mission.actualEndTime == null}" class="participant-action-form krtm-display-inline-2f87" data-participant-action="check-in" th:data-participant-id="${p?.id}">
                     <button type="submit" class="btn btn-success btn-icon" th:title="#{mission.participant.checkin.tooltip}" th:aria-label="#{mission.participant.checkin}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-login"/></svg></button>
@@ -1562,9 +1257,9 @@
             </div>
         </div>
     </th:block>
-    <!-- ===== Modals (KRT modal frame: orange top edge + HUD corner brackets) ===== -->
+    <!--/* ===== Modals (KRT modal frame: orange top edge + HUD corner brackets) ===== */-->
 
-    <!-- Add Participant Modal -->
+    <!--/* Add Participant Modal */-->
     <div id="participant-modal" class="krt-modal-overlay" th:classappend="${openModal == 'participant-modal'} ? 'krtm-modal-open' : 'krtm-hidden'" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{mission.participant.add}">
         <div class="krt-modal krt-modal--wide">
             <div class="krt-modal-head">
@@ -1573,10 +1268,10 @@
             </div>
             <form id="add-participant-form" th:action="@{/missions/{id}/participant(id=${mission.id})}" method="post" th:object="${participantForm}">
                 <div class="krt-modal-body">
-                <!-- The anonymous variant of this field is gone with the anonymous caller
+                <!--/* The anonymous variant of this field is gone with the anonymous caller
                      (ADR-0159). What is left is the member's control, which doubles as the way to
                      record an EXTERNAL participant: type a name nobody matches and the row is
-                     created without a user (decision D4). -->
+                     created without a user (decision D4). */-->
                 <div class="form-group krtm-position-relative-a8a9">
                     <label th:text="#{mission.participant.name}">Name</label>
                     <input type="text" id="participant-search-input" name="guestName" autocomplete="off" th:value="*{guestName}" th:placeholder="#{mission.participant.external_name_placeholder}">
@@ -1604,8 +1299,8 @@
 
                 <div class="form-group">
                     <label th:text="#{mission.participant.payout_preference}">Auszahlungsart</label>
-                    <!-- Empty option = backend default chain (profile default for members,
-                         PAYOUT for guests, REQ-MISSION-002); an explicit choice wins. -->
+                    <!--/* Empty option = backend default chain (profile default for members,
+                         PAYOUT for guests, REQ-MISSION-002); an explicit choice wins. */-->
                     <select name="payoutPreference">
                         <option value="" th:text="#{mission.payout.preference.default}" th:selected="${participantForm.payoutPreference == null}">Standard</option>
                         <option value="PAYOUT" th:text="#{mission.payout.preference.payout}" th:selected="${participantForm.payoutPreference != null and participantForm.payoutPreference.name() == 'PAYOUT'}">Auszahlen</option>
@@ -1628,7 +1323,7 @@
         </div>
     </div>
 
-    <!-- Edit Participant Modal -->
+    <!--/* Edit Participant Modal */-->
     <div id="edit-participant-modal" class="krt-modal-overlay krtm-display-none-5790" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{members.edit}">
         <div class="krt-modal krt-modal--wide">
             <div class="krt-modal-head">
@@ -1663,9 +1358,9 @@
                     </select>
                     <small class="form-hint" th:text="#{mission.participant.org_units.external_hint}">Nur fuer externe Teilnehmer relevant.</small>
                 </div>
-                <!-- Registered members get their org units from their account (never selected). JS
+                <!--/* Registered members get their org units from their account (never selected). JS
                      shows this read-only list (populated from the row's data-org-unit-names) and hides
-                     the picker above for a member, or does the reverse for a guest. -->
+                     the picker above for a member, or does the reverse for a guest. */-->
                 <div class="form-group krtm-display-none-5790" id="edit-org-units-readonly-group">
                     <label th:text="#{mission.participant.org_units}">Org-Einheiten</label>
                     <div id="edit-org-units-readonly" class="chiprow"></div>
@@ -1717,7 +1412,7 @@
         </div>
     </div>
 
-    <!-- Add Unit Modal -->
+    <!--/* Add Unit Modal */-->
     <div id="add-unit-modal" class="krt-modal-overlay" th:classappend="${openModal == 'unit-modal'} ? 'krtm-modal-open' : 'krtm-hidden'" th:if="${!isNew and mission.canEdit}" role="dialog" aria-modal="true" th:aria-label="#{mission.unit.add}">
         <div class="krt-modal krt-modal--wide"
              th:data-init-shiptype="${unitForm.shipTypeId != null ? unitForm.shipTypeId : ''}"
@@ -1756,8 +1451,8 @@
                 </div>
                 <div class="form-group">
                     <label th:text="#{mission.unit.responsible}">Verantwortlich</label>
-                    <!-- Registered participants only — mirrors the board's responsible display;
-                         the empty option falls back to the assigned ship's owner. -->
+                    <!--/* Registered participants only — mirrors the board's responsible display;
+                         the empty option falls back to the assigned ship's owner. */-->
                     <select name="responsibleUserId" id="add-unit-responsible" data-krt-combobox>
                         <option value="" selected th:text="#{mission.unit.responsible.auto}">&mdash; automatisch: Schiffseigner &mdash;</option>
                         <option th:each="p : ${participants}" th:if="${p.user != null}" th:value="${p.user.id}" th:attr="data-search=${p.user.username}" th:text="${p.user.effectiveName}">User</option>
@@ -1787,7 +1482,7 @@
         </div>
     </div>
 
-    <!-- Frequency Modal -->
+    <!--/* Frequency Modal */-->
     <div id="frequency-modal" class="krt-modal-overlay krtm-display-none-5790" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{admin.mission_data.frequency_types}">
         <div class="krt-modal">
             <div class="krt-modal-head">
@@ -1810,10 +1505,10 @@
         </div>
     </div>
 
-    <!-- Custom (mission-specific) frequency modal (REQ-MISSION-014) — add & edit share it; the hidden
+    <!--/* Custom (mission-specific) frequency modal (REQ-MISSION-014) — add & edit share it; the hidden
          id/version discriminate (empty id = add). Pure-JS submit against the /frequencies/custom
          AJAX proxies; on success the "Weitere Frequenzen" editor + overview Funk panel refresh in
-         place. Lives outside every swap fragment so its .freq-input listener persists across swaps. -->
+         place. Lives outside every swap fragment so its .freq-input listener persists across swaps. */-->
     <div id="custom-frequency-modal" class="krt-modal-overlay krtm-display-none-5790" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{mission.frequency.custom.section}">
         <div class="krt-modal">
             <div class="krt-modal-head">
@@ -1842,7 +1537,7 @@
         </div>
     </div>
 
-    <!-- Edit Unit Modal -->
+    <!--/* Edit Unit Modal */-->
     <div id="edit-unit-modal" class="krt-modal-overlay" th:classappend="${openModal == 'edit-unit-modal'} ? 'krtm-modal-open' : 'krtm-hidden'" th:if="${!isNew and mission.canEdit}" role="dialog" aria-modal="true" th:aria-label="#{mission.unit.edit}">
         <div class="krt-modal krt-modal--wide"
              th:data-init-shiptype="${unitForm.shipTypeId != null ? unitForm.shipTypeId : ''}"
@@ -1910,7 +1605,7 @@
         </div>
     </div>
 
-    <!-- Edit Crew Modal (multi function selection; quick single change runs via the board chip-select) -->
+    <!--/* Edit Crew Modal (multi function selection; quick single change runs via the board chip-select) */-->
     <div id="edit-crew-modal" class="krt-modal-overlay" th:classappend="${openModal == 'edit-crew-modal'} ? 'krtm-modal-open' : 'krtm-hidden'" th:if="${!isNew and mission.canEdit}" role="dialog" aria-modal="true" th:aria-label="#{mission.unit.edit_crew}">
         <div class="krt-modal">
             <div class="krt-modal-head">
@@ -1936,7 +1631,7 @@
         </div>
     </div>
 
-    <!-- Add Finance Entry Modal -->
+    <!--/* Add Finance Entry Modal */-->
     <div id="finance-modal" class="krt-modal-overlay" th:classappend="${openModal == 'finance-entry-modal'} ? 'krtm-modal-open' : 'krtm-hidden'" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{mission.finance.add}">
         <div class="krt-modal krt-modal--wide">
             <div class="krt-modal-head">
@@ -1986,7 +1681,7 @@
         </div>
     </div>
 
-    <!-- Edit Finance Entry Modal -->
+    <!--/* Edit Finance Entry Modal */-->
     <div id="edit-finance-entry-modal" class="krt-modal-overlay" th:classappend="${openModal == 'edit-finance-entry-modal'} ? 'krtm-modal-open' : 'krtm-hidden'" sec:authorize="isAuthenticated()" th:if="${!isNew}" role="dialog" aria-modal="true" th:aria-label="#{mission.finance.edit}">
         <div class="krt-modal krt-modal--wide">
             <div class="krt-modal-head">
@@ -2024,7 +1719,7 @@
         </div>
     </div>
 
-    <!-- Delete Confirmation Modal (danger variant; the body names the consequence per sub-section) -->
+    <!--/* Delete Confirmation Modal (danger variant; the body names the consequence per sub-section) */-->
     <div id="delete-confirm-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb" role="dialog" aria-modal="true" th:aria-label="#{info.delete.confirm.title}">
         <div class="krt-modal krt-modal--danger">
             <div class="krt-modal-head">
@@ -2160,9 +1855,9 @@
         window.krtModalOpen(document.getElementById('edit-finance-entry-modal'));
     }
     </script>
-<!-- Mission sub-writes go through the local krtMissionWrite wrapper around window.krtFetch.write
-     (#574); the former window.MissionSubresource alias has been retired from krt-fetch.js. -->
-<!-- Mission detail presence/awareness client (Stufe 3). -->
+<!--/* Mission sub-writes go through the local krtMissionWrite wrapper around window.krtFetch.write
+     (#574); the former window.MissionSubresource alias has been retired from krt-fetch.js. */-->
+<!--/* Mission detail presence/awareness client (Stufe 3). */-->
 <script th:src="@{/js/mission-presence.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script th:if="${!isNew and authUserId != null}" th:attr="nonce=${cspNonce}" th:inline="javascript">
     window.MISSION_PRESENCE_I18N = {
@@ -2181,8 +1876,8 @@
         window.missionPresence = presence;
     });
 </script>
-<!-- UTC timestamps are rendered server-side; convert them to the browser's local
+<!--/* UTC timestamps are rendered server-side; convert them to the browser's local
      time zone (DST-correct) on load. Covers the facts bar / overview kv values
-     (.krt-local-dt) and the refinery end times (.refinery-endsat-local). -->
+     (.krt-local-dt) and the refinery end times (.refinery-endsat-local). */-->
 </body>
 </html>

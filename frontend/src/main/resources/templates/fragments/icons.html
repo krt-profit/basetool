@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-<!--
+<!--/*
   KRT icon sprite — single hidden SVG declaring every reusable icon as a
   <symbol>. Pages reference icons via `<svg class="krt-icon"><use href="#krt-icon-NAME"/></svg>`
   so the underlying SVG is loaded exactly once per page-load and any icon usage is
@@ -16,7 +16,7 @@
   This is intentionally a small, hand-curated set rather than a third-party
   icon library — CSP forbids external CDNs and a static font/sprite payload is
   smaller than pulling in lucide / feather wholesale for a dozen glyphs.
--->
+*/-->
 <th:block th:fragment="sprite">
     <svg xmlns="http://www.w3.org/2000/svg" class="krt-icon-sprite" aria-hidden="true" focusable="false">
         <symbol id="krt-icon-close" viewBox="0 0 24 24">
@@ -64,31 +64,31 @@
         <symbol id="krt-icon-trash" viewBox="0 0 24 24">
             <path d="M5 7h14M9 7V4h6v3M7 7l1 14h8l1-14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
         </symbol>
-        <!-- Book-out / outbound: arrow leaving an open bracket. Used as the icon-only
-             "Ausbuchen" action in the dense Lager tree table (label in aria-label/title). -->
+        <!--/* Book-out / outbound: arrow leaving an open bracket. Used as the icon-only
+             "Ausbuchen" action in the dense Lager tree table (label in aria-label/title). */-->
         <symbol id="krt-icon-bookout" viewBox="0 0 24 24">
             <path d="M11 5H6v14h5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
             <path d="M9 12h11m-4-4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
         </symbol>
-        <!-- Rebook / Umbuchung: the book-out left bracket paired with a two-way arrow (out + back).
+        <!--/* Rebook / Umbuchung: the book-out left bracket paired with a two-way arrow (out + back).
              Stock moves between pools (personal <-> shared, or to another Ort/Nutzer) without
              leaving the Lager. Deliberately rhymes with krt-icon-bookout so the two dense Lager
-             tree-table row actions read as one family; label in aria-label/title. -->
+             tree-table row actions read as one family; label in aria-label/title. */-->
         <symbol id="krt-icon-rebook" viewBox="0 0 24 24">
             <path d="M11 5H6v14h5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
             <path d="M10 9h10m-4-4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
             <path d="M20 15H10m4-4l-4 4 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
         </symbol>
-        <!-- Save: floppy-disk outline (notched body, top shutter slot, bottom label).
-             For icon-only "Speichern" actions; label in aria-label/title. -->
+        <!--/* Save: floppy-disk outline (notched body, top shutter slot, bottom label).
+             For icon-only "Speichern" actions; label in aria-label/title. */-->
         <symbol id="krt-icon-save" viewBox="0 0 24 24">
             <path d="M5 4h11l4 4v12H5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/>
             <path d="M9 4v4h5V4" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/>
             <path d="M8 20v-6h8v6" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/>
         </symbol>
-        <!-- Extended action set (design-system krt-icons.svg). Navigation, state
+        <!--/* Extended action set (design-system krt-icons.svg). Navigation, state
              transitions and import/export glyphs used as icon-only row actions or
-             icon+text buttons; meaning carried in aria-label/title where icon-only. -->
+             icon+text buttons; meaning carried in aria-label/title where icon-only. */-->
         <symbol id="krt-icon-arrow-left" viewBox="0 0 24 24">
             <path d="M19 12H5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             <path d="M12 5l-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
@@ -97,29 +97,29 @@
             <path d="M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             <path d="M12 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
         </symbol>
-        <!-- Plain check (lighter than the bold krt-icon-success tick). -->
+        <!--/* Plain check (lighter than the bold krt-icon-success tick). */-->
         <symbol id="krt-icon-check" viewBox="0 0 24 24">
             <path d="M5 12l4 4 10-10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
         </symbol>
-        <!-- Check-in / Anmelden: arrow entering a bracket. Icon-only row action. -->
+        <!--/* Check-in / Anmelden: arrow entering a bracket. Icon-only row action. */-->
         <symbol id="krt-icon-login" viewBox="0 0 24 24">
             <path d="M14 4h6v16h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
             <path d="M3 12h11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             <path d="M11 8l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
         </symbol>
-        <!-- Check-out / Abmelden: arrow leaving a bracket. Icon-only row action. -->
+        <!--/* Check-out / Abmelden: arrow leaving a bracket. Icon-only row action. */-->
         <symbol id="krt-icon-logout" viewBox="0 0 24 24">
             <path d="M10 4H4v16h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
             <path d="M21 12H10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             <path d="M17 8l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
         </symbol>
-        <!-- Add member: person with a plus. -->
+        <!--/* Add member: person with a plus. */-->
         <symbol id="krt-icon-user-plus" viewBox="0 0 24 24">
             <path d="M15 20v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
             <circle cx="8.5" cy="7" r="4" stroke="currentColor" stroke-width="2" fill="none"/>
             <path d="M19 8v6M22 11h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
         </symbol>
-        <!-- Open external resource / foreign link. -->
+        <!--/* Open external resource / foreign link. */-->
         <symbol id="krt-icon-external-link" viewBox="0 0 24 24">
             <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
             <path d="M15 3h6v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
@@ -133,110 +133,110 @@
             <path d="M19 10c0 5-7 11-7 11s-7-6-7-11a7 7 0 0 1 14 0z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/>
             <circle cx="12" cy="10" r="2.5" stroke="currentColor" stroke-width="2" fill="none"/>
         </symbol>
-        <!-- Clear/reset an active filter (filter with a strike). -->
+        <!--/* Clear/reset an active filter (filter with a strike). */-->
         <symbol id="krt-icon-filter-off" viewBox="0 0 24 24">
             <path d="M4 5h16l-6 8v6l-4-2v-4z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/>
             <path d="M3 3l18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
         </symbol>
-        <!-- View / show details. -->
+        <!--/* View / show details. */-->
         <symbol id="krt-icon-eye" viewBox="0 0 24 24">
             <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/>
             <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2" fill="none"/>
         </symbol>
-        <!-- Download (e.g. "Protokoll herunterladen"). -->
+        <!--/* Download (e.g. "Protokoll herunterladen"). */-->
         <symbol id="krt-icon-download" viewBox="0 0 24 24">
             <path d="M12 3v12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             <path d="M7 10l5 5 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
             <path d="M5 21h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
         </symbol>
-        <!-- Upload / import. -->
+        <!--/* Upload / import. */-->
         <symbol id="krt-icon-upload" viewBox="0 0 24 24">
             <path d="M12 15V3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             <path d="M7 8l5-5 5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
             <path d="M5 21h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
         </symbol>
-        <!-- Sync / apply / clipboard-confirm. -->
+        <!--/* Sync / apply / clipboard-confirm. */-->
         <symbol id="krt-icon-clipboard-check" viewBox="0 0 24 24">
             <path d="M9 4H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
             <path d="M9 3h6v3H9z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/>
             <path d="M9 13l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
         </symbol>
-        <!-- List / overview. -->
+        <!--/* List / overview. */-->
         <symbol id="krt-icon-list" viewBox="0 0 24 24">
             <path d="M8 6h13M8 12h13M8 18h13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             <path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
         </symbol>
-        <!-- Bank: deposit (arrow into a tray) — from the DS bank mockups (#i-in). -->
+        <!--/* Bank: deposit (arrow into a tray) — from the DS bank mockups (#i-in). */-->
         <symbol id="krt-icon-bank-in" viewBox="0 0 24 24">
             <path d="M12 3v12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             <path d="M7 10l5 5 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
             <path d="M5 21h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
         </symbol>
-        <!-- Bank: withdrawal (arrow out of a tray) — from the DS bank mockups (#i-out). -->
+        <!--/* Bank: withdrawal (arrow out of a tray) — from the DS bank mockups (#i-out). */-->
         <symbol id="krt-icon-bank-out" viewBox="0 0 24 24">
             <path d="M12 15V3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             <path d="M7 8l5-5 5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
             <path d="M5 21h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
         </symbol>
-        <!-- Bank: transfer / rebooking (double arrows) — from the DS bank mockups (#i-swap). -->
+        <!--/* Bank: transfer / rebooking (double arrows) — from the DS bank mockups (#i-swap). */-->
         <symbol id="krt-icon-swap" viewBox="0 0 24 24">
             <path d="M4 7h13m-4-4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
             <path d="M20 17H7m4 4l-4-4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
         </symbol>
-        <!-- PDF document — from the DS bank mockups (#i-pdf). -->
+        <!--/* PDF document — from the DS bank mockups (#i-pdf). */-->
         <symbol id="krt-icon-pdf" viewBox="0 0 24 24">
             <path d="M6 3h9l4 4v14H6z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/>
             <path d="M15 3v4h4" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/>
             <path d="M9 13h6M9 17h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
         </symbol>
-        <!-- Settings gear — from the DS bank mockups (#i-settings). -->
+        <!--/* Settings gear — from the DS bank mockups (#i-settings). */-->
         <symbol id="krt-icon-gear" viewBox="0 0 24 24">
             <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2" fill="none"/>
             <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
         </symbol>
-        <!-- Reset (counter-clockwise arrow) — from the DS bank mockups (#i-reset). -->
+        <!--/* Reset (counter-clockwise arrow) — from the DS bank mockups (#i-reset). */-->
         <symbol id="krt-icon-reset" viewBox="0 0 24 24">
             <path d="M3 12a9 9 0 1 0 3-6.7" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
             <path d="M3 4v5h5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
         </symbol>
-        <!--
+        <!--/*
           GitHub "Octocat" brand mark. Native 16x16 viewBox (kept as-is per the
           sprite header note: deviate from 24x24 only when the source asset
           requires it). Solid-fill glyph with no explicit fill so it inherits
           `fill: currentColor` from `.krt-icon`, matching the footer link colour
           and its orange hover state.
-        -->
+        */-->
         <symbol id="krt-icon-github" viewBox="0 0 16 16">
             <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/>
         </symbol>
-        <!--
+        <!--/*
           Discord brand mark (Clyde wordmark glyph). Native 24x24 viewBox. Solid-fill
           glyph with no explicit fill so it inherits `fill: currentColor` from
           `.krt-icon`, matching the sibling GitHub octocat: it takes the surrounding
           link colour and its orange hover state rather than the Discord blurple, to
           stay within the monochrome-icon convention of the design system. Used as the
           trailing mark on the anonymous-sidebar "Sign in with Discord" entry.
-        -->
+        */-->
         <symbol id="krt-icon-discord" viewBox="0 0 24 24">
             <path d="M20.317 4.3698a19.7913 19.7913 0 0 0-4.8851-1.5152.0741.0741 0 0 0-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 0 0-.0785-.037 19.7363 19.7363 0 0 0-4.8852 1.515.0699.0699 0 0 0-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 0 0 .0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 0 0 .0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 0 0-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 0 1-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 0 1 .0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 0 1 .0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 0 1-.0066.1276 12.2986 12.2986 0 0 1-1.873.8914.0766.0766 0 0 0-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 0 0 .0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 0 0 .0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 0 0-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/>
         </symbol>
-        <!-- Notification bell (epic #622). Outline bell + clapper; inherits currentColor. -->
+        <!--/* Notification bell (epic #622). Outline bell + clapper; inherits currentColor. */-->
         <symbol id="krt-icon-bell" viewBox="0 0 24 24">
             <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
             <path d="M13.7 21a2 2 0 0 1-3.4 0" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
         </symbol>
-        <!-- Headset (Teamspeak / voice). Used as a facts-bar lead icon on the mission detail page. -->
+        <!--/* Headset (Teamspeak / voice). Used as a facts-bar lead icon on the mission detail page. */-->
         <symbol id="krt-icon-headset" viewBox="0 0 24 24">
             <path d="M4 13v-1a8 8 0 0 1 16 0v1" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
             <path d="M4 14a2 2 0 0 1 2-2h1v6H6a2 2 0 0 1-2-2zM20 14a2 2 0 0 0-2-2h-1v6h1a2 2 0 0 0 2-2z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/>
             <path d="M18 18v1a3 3 0 0 1-3 3h-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
         </symbol>
-        <!-- Single person (mission lead). Facts-bar lead icon. -->
+        <!--/* Single person (mission lead). Facts-bar lead icon. */-->
         <symbol id="krt-icon-user" viewBox="0 0 24 24">
             <circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2" fill="none"/>
             <path d="M5 21v-1a7 7 0 0 1 14 0v1" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
         </symbol>
-        <!-- Two people (participants). Facts-bar lead icon. -->
+        <!--/* Two people (participants). Facts-bar lead icon. */-->
         <symbol id="krt-icon-users" viewBox="0 0 24 24">
             <circle cx="9" cy="8" r="3.5" stroke="currentColor" stroke-width="2" fill="none"/>
             <path d="M3 20v-1a6 6 0 0 1 12 0v1" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>

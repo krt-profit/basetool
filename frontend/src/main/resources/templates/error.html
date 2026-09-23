@@ -3,60 +3,7 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{error.generic.title} + ' - ' + ${appTitle}">System Error - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-<style th:attr="nonce=${cspNonce}">
-        .error-container {
-            text-align: center;
-            border: 2px solid var(--color-danger);
-            box-shadow: 0 0 15px rgba(163, 0, 10, 0.3);
-            background: rgba(20, 20, 20, 0.6);
-            padding: 2.5rem 2rem;
-            max-width: 600px;
-            width: 100%;
-            margin: 0 auto;
-        }
-        .error-code {
-            font-family: var(--font-headline);
-            font-size: 4rem;
-            color: var(--color-danger);
-            margin-bottom: 0.5rem;
-        }
-        .error-title {
-            font-family: var(--font-headline);
-            font-size: 2rem;
-            color: var(--color-gray-1);
-            margin-bottom: 1.5rem;
-            text-transform: uppercase;
-        }
-        .error-message {
-            font-size: 1.2rem;
-            color: var(--color-gray-1);
-            margin-bottom: 2rem;
-        }
-        .btn-return {
-            display: inline-block;
-            padding: 0.8rem 1.5rem;
-            background-color: var(--color-danger);
-            color: #FFFFFF;
-            font-family: var(--font-headline);
-            text-decoration: none;
-            font-weight: bold;
-            transition: all 0.3s ease;
-            text-transform: uppercase;
-        }
-        .btn-return:hover {
-            background-color: #D41A25;
-            box-shadow: 0 0 10px #D41A25;
-        }
-        /* Make sure main takes full screen if no sidebar */
-        main {
-            margin-left: 0 !important;
-            padding-top: 80px;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-    </style>
+<link rel="stylesheet" th:href="@{/css/pages/error.css}">
     </th:block>
 </head>
 <body>
@@ -71,12 +18,12 @@
 </header>
 <main>
     <div class="greeting hud-box error-container">
-        <!-- Display status code if available, otherwise 'ERROR' -->
+        <!--/* Display status code if available, otherwise 'ERROR' */-->
         <div class="error-code" th:text="${status} ?: 'ERROR'">ERROR</div>
         
         <div class="error-title" th:text="#{error.generic.title}">System Malfunction</div>
         
-        <!-- Display specific message if available, otherwise generic -->
+        <!--/* Display specific message if available, otherwise generic */-->
         <p class="error-message" th:text="${message} ?: #{error.generic.message}">
             Critical system failure detected. Technical personnel notified.
         </p>

@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="de">
 <body>
-<!--
+<!--/*
   Materialbörse Gesuche (wanted-listings) board fragments (REQ-MARKET-015…). Rendered inside
   #mb-board on the shared /materialboerse page when activeMode == 'requests'. Mirrors the offer
   master-detail (fragments in materialboerse.html) but for requests: a min-quality fact, a desired
   quantity (SCU/Stück), no stock/location, and the "Ich kann liefern" fulfilment signal. The shared
   four-tab bar comes from ~{materialboerse :: mbtabs}. Interactions live in the request branches of
   materialboerse.js; the create/edit modal is materialgesuch-modal.js.
--->
+*/-->
 <th:block th:fragment="requestBoard">
     <div class="mb-toolbar">
         <div th:replace="~{materialboerse :: mbtabs}"></div>
@@ -46,7 +46,7 @@
     <div id="mg-listwrap">
     <th:block th:fragment="requestList">
     <div class="master-detail mb-md" th:classappend="${selectedRequest != null} ? 'has-sel'">
-        <!-- master list -->
+        <!--/* master list */-->
         <div class="master-list mb-mlist">
             <div th:if="${#lists.isEmpty(requests)}" class="empty-state">
                 <div class="empty-title" th:text="#{materialgesuch.empty.title}">Keine Gesuche</div>
@@ -96,7 +96,7 @@
             </button>
         </div>
 
-        <!-- detail pane -->
+        <!--/* detail pane */-->
         <div class="detail-pane mb-detailpane" id="mg-detail">
             <div th:fragment="requestDetail" class="mb-detail-inner">
                 <div th:if="${selectedRequest == null}" class="empty-state mb-detail-empty">
@@ -148,7 +148,7 @@
                             </p>
                         </div>
                         <div class="mb-dp-side">
-                            <!-- suppliers: names only for the owner -->
+                            <!--/* suppliers: names only for the owner */-->
                             <div th:if="${request.mine()}" class="mb-int-owner">
                                 <p class="mb-dp-label" th:text="#{materialgesuch.interest.label} + ' (' + ${request.interestCount()} + ')'">Lieferanten (0)</p>
                                 <div th:if="${!#lists.isEmpty(request.interestedHandles())}" class="mb-int-names">
@@ -173,7 +173,7 @@
                                 </p>
                             </div>
 
-                            <!-- actions -->
+                            <!--/* actions */-->
                             <div class="mb-dp-actions" th:data-request-id="${request.id()}" th:data-version="${request.version()}">
                                 <th:block th:if="${request.mine()}">
                                     <button type="button" class="btn btn-ghost btn-xs" data-mg-edit

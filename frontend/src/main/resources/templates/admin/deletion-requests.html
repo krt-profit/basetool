@@ -3,15 +3,7 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{admin.deletionRequests.title} + ' - ' + ${appTitle}">L&ouml;schantr&auml;ge - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-<style th:attr="nonce=${cspNonce}">
-        .dr-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-        .dr-when { color: var(--color-gray-2-text); font-size: 0.85rem; }
-        #decline-note {
-            width: 100%; min-height: 80px; padding: 0.5rem; box-sizing: border-box;
-            background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3);
-            color: var(--color-gray-1); font-family: var(--font-body);
-        }
-    </style>
+<link rel="stylesheet" th:href="@{/css/pages/admin-deletion-requests.css}">
     </th:block>
 </head>
 <body>
@@ -41,9 +33,9 @@
         <p th:text="#{${error}}">Fehler beim Laden.</p>
     </div>
 
-    <!-- The deadline note is the reason this page exists rather than an inbox message: Art. 12(3)
+    <!--/* The deadline note is the reason this page exists rather than an inbox message: Art. 12(3)
          allows one month to respond, the queue is ordered oldest first, and DeletionRequestOverdue
-         alerts at 14 days. -->
+         alerts at 14 days. */-->
     <div class="hud-box mt-2 krtm-border-color-var-color-warning-display-flex-1b12" role="note">
         <svg class="krt-icon krtm-flex-0-0-auto-margin-top-0-1rem-f087" aria-hidden="true">
             <use href="#krt-icon-info"/></svg>
@@ -52,8 +44,8 @@
 
     <div class="hud-box mt-2">
         <div class="table-responsive" id="deletionRequestsHost">
-            <!-- The rows are a fragment so a decision refreshes the table in place instead of
-                 reloading the page (REQ-FE-001). -->
+            <!--/* The rows are a fragment so a decision refreshes the table in place instead of
+                 reloading the page (REQ-FE-001). */-->
             <th:block th:fragment="rows">
             <table id="deletionRequestsTable">
                 <thead>
@@ -100,11 +92,11 @@
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 
-<!--
+<!--/*
   Refusal dialog. The reason is mandatory in three places - here, in the proxy and in a database
   CHECK - because Art. 12(4) obliges the controller to tell the requester WHY a request was
   refused, and a reason nobody wrote down cannot be told to them.
--->
+*/-->
 <div th:replace="~{fragments/modal-wrapper :: modal(modalId='decline-modal', titleKey='admin.deletionRequests.decline.title', variant=null, body=~{::.decline-form})}">
     <div class="decline-form">
         <div class="krt-modal-body">
@@ -127,12 +119,12 @@
     </div>
 </div>
 
-<!--
+<!--/*
   Execution dialog. Two separate confirmations in one place, because they are two decisions: the
   deletion itself, and whether the member's Art. 17 wish to anonymise the surviving handle
   snapshots is granted. The checkbox starts UNTICKED even when the member asked - granting is a
   deliberate act, and pre-ticking it would turn the wish into the default.
--->
+*/-->
 <div th:replace="~{fragments/modal-wrapper :: modal(modalId='execute-modal', titleKey='admin.deletionRequests.execute.title', variant=null, body=~{::.execute-form})}">
     <div class="execute-form">
         <div class="krt-modal-body">
@@ -149,13 +141,13 @@
                     <p class="form-hint" th:text="#{admin.deletionRequests.execute.eraseHistory.hint}">Betrifft beide Audit-Protokolle, die Buchungshistorie, Buchungsantr&auml;ge und die &Uuml;bergabe-Empf&auml;nger. Die Zeilen bleiben bestehen, nur der Name verschwindet.</p>
                 </div>
             </div>
-            <!-- No note field here, unlike the refusal dialog, and that is deliberate. There is
+            <!--/* No note field here, unlike the refusal dialog, and that is deliberate. There is
                  nowhere durable to put one: the deletion_request row cascades away with the account
                  the moment this action completes, and REQ-AUDIT-001 keeps free text out of the
                  audit details payload. The dialog used to ask for one and discard it, which is
                  worse than not asking -- the admin believes they have recorded their reasoning.
                  A refusal is the case where the reasoning has to survive, and there it does
-                 (deletion_request.decision_note, enforced by a CHECK constraint). -->
+                 (deletion_request.decision_note, enforced by a CHECK constraint). */-->
             <span class="bank-field-error" data-error-for="_global"></span>
         </div>
         <div class="krt-modal-foot">

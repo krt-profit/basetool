@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.ShipTypeDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronShipOverviewDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -110,12 +111,12 @@ class HangarPageControllerMvcTest {
         .perform(get("/hangar"))
         .andExpect(status().isOk())
         .andExpect(
-            content()
-                .string(
-                    containsString(
-                        ".form-group input:where(:not([type='checkbox']):not([type='radio']))")))
+            PageStylesheets.content(
+                containsString(
+                    ".form-group input:where(:not([type='checkbox']):not([type='radio']))")))
         .andExpect(
-            content().string(org.hamcrest.Matchers.not(containsString(".form-group input[type="))));
+            PageStylesheets.content(
+                org.hamcrest.Matchers.not(containsString(".form-group input[type="))));
   }
 
   @Test

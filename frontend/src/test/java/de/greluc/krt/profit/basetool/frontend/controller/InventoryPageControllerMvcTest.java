@@ -52,6 +52,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
 import de.greluc.krt.profit.basetool.frontend.support.PickerSearch;
 import jakarta.servlet.http.Cookie;
 import java.time.Instant;
@@ -608,11 +609,10 @@ class InventoryPageControllerMvcTest {
         .perform(get("/inventory/input"))
         .andExpect(status().isOk())
         .andExpect(
-            content()
-                .string(
-                    containsString(
-                        ".form-group input:where(:not([type='checkbox']):not([type='radio']))")))
-        .andExpect(content().string(containsString(".form-group.check-row.krtm-hidden")));
+            PageStylesheets.content(
+                containsString(
+                    ".form-group input:where(:not([type='checkbox']):not([type='radio']))")))
+        .andExpect(PageStylesheets.content(containsString(".form-group.check-row.krtm-hidden")));
   }
 
   // REQ-FE-011/REQ-FE-016: the shared combobox i18n bootstrap (fragments/head.html) must carry a

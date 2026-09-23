@@ -5,30 +5,7 @@
     <th:block th:fragment="extraLinks">
         <meta name="_csrf" th:content="${_csrf.token}"/>
         <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
-        <style th:attr="nonce=${cspNonce}">
-            .data-section {
-                margin-bottom: 3rem;
-            }
-            .form-group label {
-                display: block;
-                margin-bottom: 0.5rem;
-            }
-            /* Checkboxes and radios are excluded: width:100% + the padding would stretch the
-               1.2rem KRT squares (styles.css) full-width. The exclusions sit in :where() so they
-               add ZERO specificity — the rule keeps the plain `.form-group input` weight (0,1,1)
-               and stays below the (0,2,0) combobox rule `.krt-combobox .krt-combobox__input`.
-               The include-inactive toggle sits outside .form-group today; the exclusion closes
-               the latent trap that broke admin/materials when its checkboxes were added later. */
-            .form-group input:where(:not([type='checkbox']):not([type='radio'])), .form-group select, .form-group textarea {
-                width: 100%;
-                padding: 0.5rem;
-                background-color: var(--color-surface-input);
-                border: 1px solid var(--color-gray-3);
-                color: var(--color-gray-1);
-                font-family: var(--font-body);
-                box-sizing: border-box;
-            }
-        </style>
+        <link rel="stylesheet" th:href="@{/css/pages/admin-special-commands.css}">
     </th:block>
 </head>
 <body>
@@ -57,17 +34,17 @@
         </p>
     </div>
 
-    <!-- Error alert -->
+    <!--/* Error alert */-->
     <th:block th:replace="~{fragments/components :: alert(type='danger', msgKey=${error}, extraClass='mt-2')}"></th:block>
 
-    <!-- SK List Section -->
+    <!--/* SK List Section */-->
     <div class="hud-box data-section mt-2" id="specialcommands-box">
         <div class="box-header krtm-display-flex-justify-content-space-between-a-1321">
             <h2 th:text="#{admin.specialcommands.title}" class="m-0">Spezialkommandos</h2>
             <div class="krtm-display-flex-gap-1rem-align-items-center-6529">
-                <!-- The include-inactive toggle swaps the SK list in place via the inline script
+                <!--/* The include-inactive toggle swaps the SK list in place via the inline script
                      below (krtFetch); it already required JS (the old data-trigger="submit-form-
-                     by-id" was a JS-driven reload), so the no-JS baseline is unchanged. -->
+                     by-id" was a JS-driven reload), so the no-JS baseline is unchanged. */-->
                 <form th:action="@{/admin/special-commands}" method="get" id="sc-filter-form" class="no-track m-0 flex-gap-sm">
                     <input type="checkbox" id="includeInactive" name="includeInactive" th:checked="${includeInactive}">
                     <label for="includeInactive" class="krtm-color-var-color-gray-2-font-size-0-9rem-curs-0b43" th:text="#{admin.specialcommands.show_inactive}">Inaktive anzeigen</label>
@@ -76,13 +53,13 @@
             </div>
         </div>
 
-        <!-- AJAX swap target (REQ-FE-002): the include-inactive toggle re-renders only this block
+        <!--/* AJAX swap target (REQ-FE-002): the include-inactive toggle re-renders only this block
              via krtFetch. The per-row Edit + Delete buttons are document-delegated, so swapped-in
-             rows survive with no re-init. The toggle is JS-driven (it was already JS-only). -->
+             rows survive with no re-init. The toggle is JS-driven (it was already JS-only). */-->
         <div class="box-content" id="sc-results">
             <th:block th:fragment="results">
-            <!-- Inside the swapped fragment on purpose: the include-inactive AJAX swap must
-                 re-evaluate the truncation warning (REQ-ADMIN-002). -->
+            <!--/* Inside the swapped fragment on purpose: the include-inactive AJAX swap must
+                 re-evaluate the truncation warning (REQ-ADMIN-002). */-->
             <th:block th:if="${catalogTruncated}">
                 <div th:replace="~{fragments/components :: alert('warning', 'admin.catalog.truncated', 'mb-1')}"></div>
             </th:block>
@@ -135,7 +112,7 @@
     </div>
 </main>
 
-<!-- SpecialCommand Modal (create + edit, action URL toggled by JS) -->
+<!--/* SpecialCommand Modal (create + edit, action URL toggled by JS) */-->
 <div id="specialcommand-modal" class="krt-modal-overlay" th:classappend="${openModal == 'specialcommand-modal'} ? 'krtm-modal-open' : 'krtm-hidden'">
     <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{admin.specialcommands.create}">
         <div class="krt-modal-head">
@@ -169,9 +146,9 @@
     </div>
 </div>
 
-<!-- Delete confirmation modal — the per-row trash button is a soft-delete (deactivate, reversible
+<!--/* Delete confirmation modal — the per-row trash button is a soft-delete (deactivate, reversible
      via "Aktivieren"); the form action is set to the clicked SK's delete URL by the script below.
-     No native confirm() per the design system's "no native browser dialogs" rule. -->
+     No native confirm() per the design system's "no native browser dialogs" rule. */-->
 <div id="sc-delete-modal" class="krt-modal-overlay">
     <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{info.delete.confirm.title}">
         <div class="krt-modal-head">
@@ -191,7 +168,7 @@
     </div>
 </div>
 
-<!-- Modal wiring: open create on +button, open edit prefilled from data-* on Edit button, close on x -->
+<!--/* Modal wiring: open create on +button, open edit prefilled from data-* on Edit button, close on x */-->
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     var SC_MSG = {
         saved:   '[[#{notification.success.save}]]',

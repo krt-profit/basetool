@@ -1,5 +1,4 @@
 {
-  "customSyntax": "postcss-html",
   "ignoreFiles": [
     "build/**",
     "node_modules/**"
@@ -16,5 +15,13 @@
         "message": "No hex fallback in var(): every design token is defined in styles.css, and a fallback only hides a renamed or missing token (FE-MOD-01, ui-design-system.md)."
       }
     ]
-  }
+  },
+  "overrides": [
+    {
+      "files": [
+        "**/*.html"
+      ],
+      "customSyntax": "postcss-html"
+    }
+  ]
 }

@@ -2,20 +2,20 @@
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
 <body>
 <th:block th:fragment="sidebar">
-    <!-- The sec:authorize="isAuthenticated()" guards in this fragment are NOT redundant with the
+    <!--/* The sec:authorize="isAuthenticated()" guards in this fragment are NOT redundant with the
          URL matrix, unlike the ones on the pages behind it: landing.html includes this fragment,
          and the landing page is one of the four surfaces REQ-SEC-052 serves without a session. For
          a logged-out visitor the span below is the only thing between them and the whole
          navigation, and the other two hide the notification bell and the org-unit switcher. Do not
          remove them as "always true" — HomeControllerMvcTest#anonymousLandingPageShowsNoNavigation
-         fails if you do. -->
-    <!-- The active org-unit context is surfaced solely via the application title (see
+         fails if you do. */-->
+    <!--/* The active org-unit context is surfaced solely via the application title (see
          LayoutMiscAdvice#appTitle and REQ-ORG-024) — the brand logo text in the header
          and the browser <title>. The previously-rendered top-right context chip was removed
-         as redundant; do not reintroduce a parallel always-on context badge here. -->
-    <!-- Notification bell + always-on unread badge (epic #622, REQ-NOTIF-006). Top-right on every
+         as redundant; do not reintroduce a parallel always-on context badge here. */-->
+    <!--/* Notification bell + always-on unread badge (epic #622, REQ-NOTIF-006). Top-right on every
          page; the badge shows whenever unreadNotificationCount > 0 and is kept fresh by polling
-         in notifications.js. The dropdown content is loaded lazily via AJAX on open. -->
+         in notifications.js. The dropdown content is loaded lazily via AJAX on open. */-->
     <div sec:authorize="isAuthenticated()" id="notification-bell" class="notification-bell">
         <span id="notification-i18n" hidden
               th:attr="data-loading=#{notifications.loading},data-empty=#{notifications.empty},data-mark-read=#{notifications.markRead},data-delete=#{notifications.delete},data-deleted=#{notifications.success.deleted},data-all-read=#{notifications.success.allRead},data-cleared=#{notifications.success.cleared},data-confirm-clear-title=#{notifications.confirm.clear.title},data-confirm-clear-body=#{notifications.confirm.clear.body},data-confirm-ok=#{notifications.confirm.ok},data-confirm-cancel=#{general.cancel},data-error=#{notification.error.title}"></span>
@@ -68,10 +68,10 @@
                         <a th:href="@{/refinery-orders}" data-testid="nav-refinery" th:text="#{nav.refinery}">Raffinerie</a>
                         <a th:href="@{/orders}" th:if="${canViewJobOrders}" data-testid="nav-orders" th:text="#{nav.orders}">Aufträge</a>
                         <a th:href="@{/orders}" th:if="${!canViewJobOrders and canViewOwnJobOrders}" data-testid="nav-orders-own" th:text="#{nav.orders.own}">Meine Aufträge</a>
-                        <!-- Cross-order material demand (REQ-ORDERS-034). Gated on the same
+                        <!--/* Cross-order material demand (REQ-ORDERS-034). Gated on the same
                              canViewJobOrders capability as the queue: it is a fold of exactly the
                              orders that list shows, so anyone who may not see the queue must not
-                             see its aggregate either. -->
+                             see its aggregate either. */-->
                         <a th:href="@{/orders/material-demand}" th:if="${canViewJobOrders}" data-testid="nav-orders-material-demand" th:text="#{nav.orders.materialDemand}">Materialbedarf</a>
                         <a th:href="@{/orders/create}" th:unless="${canViewJobOrders or canViewOwnJobOrders}" data-testid="nav-orders-create" th:text="#{orders.create.link}">Auftrag anlegen</a>
                         <a th:href="@{/blueprint-overview}" th:if="${canSeeBlueprintOverview}" data-testid="nav-blueprint-overview" th:text="#{nav.blueprint_overview}">Blueprint Availability</a>
@@ -107,15 +107,15 @@
                     <summary th:text="#{nav.section.organisation}">Organisation</summary>
                     <div class="sidebar-sublinks">
                         <a th:href="@{/org-chart}" data-testid="nav-org-chart" th:text="#{nav.orgChart}">Organigramm</a>
-                        <!-- Leitung: appointment surface, ADMIN/OFFICER only. Every functional leader
+                        <!--/* Leitung: appointment surface, ADMIN/OFFICER only. Every functional leader
                              (OL, Bereich, SK, Staffelleitung + in-Kommando ranks) carries the operative
                              OFFICER Keycloak role, so none is locked out; matches LeitungPageController's
-                             @PreAuthorize(Roles.ADMIN_OR_OFFICER). -->
+                             @PreAuthorize(Roles.ADMIN_OR_OFFICER). */-->
                         <a th:href="@{/organisation/leitung}" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER)" data-testid="nav-leitung" th:text="#{nav.leitung}">Leitung</a>
-                        <!-- Org-Einheits-Bank: reachable by any KRT member (the CARTEL account is visible
+                        <!--/* Org-Einheits-Bank: reachable by any KRT member (the CARTEL account is visible
                              to all, REQ-BANK-037, and a member may hold a view grant). Mirror the
                              member-or-above gate of OrgUnitBankPageController so the link is not hidden
-                             from plain members who can open the page. -->
+                             from plain members who can open the page. */-->
                         <a th:href="@{/org-unit-bank}" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).MISSION_MANAGER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).KRT_MEMBER)" data-testid="nav-org-unit-bank" th:text="#{nav.bank.myOrgUnit}">Org-Einheits-Bank</a>
                     </div>
                 </details>
@@ -161,7 +161,7 @@
                         <a th:href="@{/admin/personal-blueprints}" th:text="#{admin.personalInventory.blueprints.menu}">Pers. Blueprints (Admin)</a>
                     </div>
                 </details>
-                <!-- L-3: logout is a POST form (CSRF-protected) instead of a GET link so it cannot
+                <!--/* L-3: logout is a POST form (CSRF-protected) instead of a GET link so it cannot
                      be force-triggered cross-site. Thymeleaf injects the _csrf hidden field. The
                      control is a <button> styled via .sidebar-logout-btn to render identically to
                      the surrounding nav anchors (an <a>-vs-<button> "font: inherit" mismatch made
@@ -169,15 +169,15 @@
                      Keycloak's cross-origin end_session_endpoint, so the CSP form-action directive
                      must list the Keycloak origin (see SecurityHeaders#cspNonceHeaderWriter) — with
                      form-action 'self' alone the browser blocks the redirect and the Keycloak SSO
-                     session is never ended, leaving a silent re-login on the next login click. -->
+                     session is never ended, leaving a silent re-login on the next login click. */-->
                 <form th:action="@{/logout}" method="post" class="sidebar-logout-form">
                     <button type="submit" class="sidebar-logout-btn" data-testid="nav-logout" th:text="#{nav.logout}">Logout</button>
                 </form>
             </span>
-                <!-- REQ-SEC-052: an anonymous visitor has nowhere to go but the login. The two
+                <!--/* REQ-SEC-052: an anonymous visitor has nowhere to go but the login. The two
                      links that stood here (the mission list and the public order form) both led to
                      pages that now redirect straight back to it, so they were an invitation to a
-                     round trip. -->
+                     round trip. */-->
                 <span sec:authorize="isAnonymous()">
                 <a th:href="@{/oauth2/authorization/keycloak}" data-testid="nav-login" th:text="#{nav.login}">Login</a>
                 <a th:href="@{/oauth2/authorization/keycloak(idp='discord')}"
@@ -196,7 +196,7 @@
                     </div>
                 </details>
             </div>
-            <!-- R5.e — active-OrgUnit switcher. Visible to any authenticated user with >1 option
+            <!--/* R5.e — active-OrgUnit switcher. Visible to any authenticated user with >1 option
                  in the dropdown: admins see the Squadron + SpecialCommand catalogue, non-admins
                  see only the OrgUnits they are a member of (Staffel + every SK membership). The
                  form posts to the /me/active-org-unit endpoint. The Spring Session-
@@ -211,7 +211,7 @@
                  on the dropdown must not arm the beforeunload guard. The auto-submit JS calls
                  form.submit() programmatically, which (per HTML spec) does NOT fire the
                  submit event that would otherwise reset isDirty, so without `no-track` the
-                 native browser "Leave site?" dialog appears every time. -->
+                 native browser "Leave site?" dialog appears every time. */-->
             <form id="squadron-switcher-form"
                   sec:authorize="isAuthenticated()"
                   th:if="${availableOrgUnits != null and availableOrgUnits.size() > 1}"

@@ -12,7 +12,7 @@
            here is a page without CSRF metadata instead of no page at all. */-->
     <meta th:if="${csrfTokenValue != null}" name="_csrf" th:content="${csrfTokenValue}"/>
     <meta th:if="${csrfHeaderName != null}" name="_csrf_header" th:content="${csrfHeaderName}"/>
-    <!--
+    <!--/*
       App favicon + touch icon (REQ-UI-019). The Basetool mark replaces the DAS KARTELL org
       mark here: at tab size the org logo was indistinguishable from every other KRT surface,
       and the design system ships a dedicated favicon glyph that drops the ring and the star
@@ -28,7 +28,7 @@
       `apple-touch-icon` gets the 512 px app icon — the mark on an opaque black tile, not the
       transparent glyph. iOS composites its own rounded mask and does NOT honour transparency,
       so a transparent icon would land on a white plate on the home screen.
-    -->
+    */-->
     <link rel="icon" type="image/svg+xml" th:href="@{/logos/basetool-favicon.svg}">
     <link rel="icon" type="image/png" sizes="32x32" th:href="@{/logos/basetool-favicon-32.png}">
     <link rel="icon" type="image/png" sizes="16x16" th:href="@{/logos/basetool-favicon-16.png}">
@@ -40,8 +40,10 @@
            reason the backend marks those reads `no-store`. See WebAppManifestController.
 
            This is a Thymeleaf PARSER-LEVEL comment, not an HTML one: everything here is for a
-           developer, and a plain comment is emitted into every page of every response. The block
-           right above this one predates that distinction. Never write the two characters that
+           developer, and a plain comment is emitted into every page of every response. Since
+           FE-PERF-02 (2026-09-23) every developer comment in the templates is one, which removed
+           ~25 KB of comment text from each rendered page; TemplateCommentHygieneTest fails the
+           build on a new plain comment. Never write the two characters that
            close a Java block comment inside here — they end this block early and dump the rest of
            the text into the page, which is how the previous revision leaked an attribute name into
            the rendered output and satisfied a test that was supposed to check the tag below.
@@ -74,16 +76,16 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <meta name="apple-mobile-web-app-title" th:content="#{pwa.short_name}">
-    <!--
+    <!--/*
       Preload the critical body font weight so the browser starts the request before stylesheet
       parsing. Without this hint, @font-face requests sit behind styles.css and a `font-display:
       swap` swap-in becomes visible. Lato-Regular is the dominant body weight; Light and Bold
       load lazily on demand (Bold now also powers headlines — the app is Lato-only, so there is
       no separate display font to preload).
-    -->
+    */-->
     <link rel="preload" th:href="@{/fonts/Lato-Regular.woff2}" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" th:href="@{/css/styles.css}">
-    <!--
+    <!--/*
       Global client-error beacon (audit finding M12). FIRST script in the document and deliberately
       NOT `defer`: it installs the window `error` + `unhandledrejection` handlers before anything
       else in this head runs, and a handler installed after the scripts it watches cannot observe
@@ -95,9 +97,9 @@
       after a fragment swap replaced the DOM under it — leaves no trace anywhere on the server.
       It reads the `_csrf` meta tags directly rather than through `window.krtCsrf`, since it must
       keep working when the very module that defines that global is what failed to load.
-    -->
+    */-->
     <script th:src="@{/js/krt-client-error.js}" th:attr="nonce=${cspNonce}"></script>
-    <!--
+    <!--/*
       Bootstrap stub for `window.krtEvents`. Defines a tiny queuing implementation
       synchronously, BEFORE any external script tag. Every inline `<script>` block on
       every page template can therefore call `window.krtEvents.on(...)` without
@@ -115,7 +117,7 @@
       or arrives slowly over the network. The watchdog in `event-delegation.js`
       additionally logs an error if the stub is still active 5 s after page load
       (i.e. the real implementation never replaced it).
-    -->
+    */-->
     <script th:attr="nonce=${cspNonce}">
         window.krtEvents = window.krtEvents || (function () {
             var queue = [];
@@ -128,7 +130,7 @@
             };
         })();
     </script>
-    <!--
+    <!--/*
       Defensive stub for `window.krtScuInput`. Defined synchronously, BEFORE
       `scu-decimal-input.js` loads, so the inline page scripts that read SCU
       amount fields live (book-out target<->amount sync, the AJAX material claim,
@@ -140,7 +142,7 @@
       file never loads, these two methods still let the live readers parse a
       comma-typed value; only the on-submit canonicalisation degrades (a stray
       comma then surfaces as a backend validation error, not a crash).
-    -->
+    */-->
     <script th:attr="nonce=${cspNonce}">
         window.krtScuInput = window.krtScuInput || {
             normalize: function (raw) {
@@ -163,19 +165,19 @@
             }
         };
     </script>
-    <!--
+    <!--/*
       Localised positivity messages for scu-decimal-input.js, kept on a separate
       global so the full helper (which replaces window.krtScuInput) cannot clobber
       them. Shown as the native constraint-validation bubble when an SCU amount is
       not > 0, or a PIECE amount is not a whole number > 0.
-    -->
+    */-->
     <script th:inline="javascript" th:attr="nonce=${cspNonce}">
         window.krtScuI18n = {
             scu: /*[[#{material.scu.validation.positive}]]*/ 'Enter an SCU amount greater than 0.',
             piece: /*[[#{material.piece.validation.positive}]]*/ 'Enter a whole number greater than 0.'
         };
     </script>
-    <!--
+    <!--/*
       `defer` on the utility scripts whose globals are only consumed from inside event-handler
       callbacks (escape-html, safe-url, datetime-splitter): they execute in document order AFTER
       the HTML has been parsed, so they no longer block first contentful paint.
@@ -188,53 +190,53 @@
       tiny in normal operation. The two files are tiny IIFEs that only register globals /
       `document.addEventListener` listeners, so they are safe to evaluate before the DOM tree
       is built.
-    -->
+    */-->
     <script th:src="@{/js/escape-html.js}" defer th:attr="nonce=${cspNonce}"></script>
     <script th:src="@{/js/safe-url.js}" defer th:attr="nonce=${cspNonce}"></script>
     <script th:src="@{/js/event-delegation.js}" th:attr="nonce=${cspNonce}"></script>
     <script th:src="@{/js/common-handlers.js}" th:attr="nonce=${cspNonce}"></script>
-    <!--
+    <!--/*
       Shared AJAX/CSRF foundation (epic #571, spec REQ-FE-*). Loaded synchronously
       (no `defer`) so `window.krtFetch` / `window.krtCsrf` exist before any inline
       `<script>` at the bottom of a body runs and before page-specific helpers
       (missions.js, operations.js, …) call `krtFetch.swap(...)`.
       Single source of truth for CSRF headers (the freshest `_csrf` meta tags),
       retry-on-403, RFC7807 409 handling, syncVersion, and fragment swaps.
-    -->
+    */-->
     <script th:src="@{/js/krt-fetch.js}" th:attr="nonce=${cspNonce}"></script>
-    <!--
+    <!--/*
       Shared tool-wide live-sync client (REQ-FE-015, ADR-0094): window.krtLiveSync.createReceiver,
       the coalescing / busy-guard / deferred-pill receiver reused by every peer-synced surface
       (mission, operation, orders, bank, materialboard). Loaded globally right after krt-fetch.js —
       like it, a small non-deferred dependency page modules use at load — so a page's inline seam
       setup can call it synchronously.
-    -->
+    */-->
     <script th:src="@{/js/krt-live-sync.js}" th:attr="nonce=${cspNonce}"></script>
-    <!--
+    <!--/*
       Shared localised label for the live-sync "updates available" pill, on a dedicated global (like
       window.krtComboboxI18n below) so krt-live-sync.js has a BUNDLE-sourced default instead of a
       hardcoded string when a page-specific pill label() is not supplied (F8). Pages that pass their
       own label() still win; this is only the shared fallback.
-    -->
+    */-->
     <script th:inline="javascript" th:attr="nonce=${cspNonce}">
         window.krtLiveSyncI18n = {
             updatesAvailable: /*[[#{livesync.updates_available}]]*/ 'Updates available'
         };
     </script>
-    <!--
+    <!--/*
       Wording for the one owner-picker rejection a member can act on (REQ-ORG-023). Defined on its
       own global, like the two dictionaries around it, because the failure can arrive on ANY of the
       five picker surfaces (book-in, hangar, mission, operation, refinery order) and krt-fetch.js
       renders it centrally from the backend's stable OWNER_ORG_UNIT_REQUIRED code. Localising it per
       page would be five copies of one sentence, and the previous behaviour — echoing the backend's
       own English `detail` into a German toast — is exactly what this replaces.
-    -->
-    <!--
+    */-->
+    <!--/*
       The page-wide defaults krt-fetch.js falls back to when a caller passes no localized string of
       its own: the success / failure toast of a write and the optimistic-lock conflict dialog. They
       replaced literal German defaults in the script (2026-09-23); a key missing here renders as its
       name and is reported as an `i18n_missing` client error (window.krtI18nText).
-    -->
+    */-->
     <script th:inline="javascript" th:attr="nonce=${cspNonce}">
         window.krtFetchI18n = {
             saved: /*[[#{frontend.ajax.saved}]]*/ 'Saved.',
@@ -251,7 +253,7 @@
             required: /*[[#{ownerPicker.error.required}]]*/ 'Please choose an org unit for this entry.'
         };
     </script>
-    <!--
+    <!--/*
       Shared default labels for the searchable combobox (krt-searchable-select.js). Defined on a
       dedicated global, like `window.krtScuI18n` above, so they are localised in ONE place and the
       ~20 pickers across the app need only the `data-krt-combobox` marker (a single control may
@@ -277,7 +279,7 @@
       search term. The value is mirrored by PickerSearch.LOCATION_RENDER_CAP on the Java side,
       whose relay fetches one row MORE than this so an overflow still trips the "keep typing" hint;
       PickerSearchLimitsParityTest pins both halves so they cannot drift apart.
-    -->
+    */-->
     <script th:inline="javascript" th:attr="nonce=${cspNonce}">
         window.krtComboboxI18n = {
             placeholder: /*[[#{userSelect.search.placeholder}]]*/ 'Search or select a user…',
@@ -322,14 +324,14 @@
             }
         };
     </script>
-    <!--
+    <!--/*
       Shared server-side user-search sources for the combobox (REQ-FE-011, ADR-0053/0089, #1193).
       Registers the `remote-users` / `remote-bank-users` remoteSource functions on
       window.krtComboboxRemoteSources; must load BEFORE the enhancer below so the registry exists
       when a `data-krt-combobox="remote-*"` picker is upgraded. No `defer` for the same reason.
-    -->
+    */-->
     <script th:src="@{/js/krt-user-search.js}" th:attr="nonce=${cspNonce}"></script>
-    <!--
+    <!--/*
       Shared server-side catalog-search sources for the combobox (REQ-FE-016): registers the
       `remote-materials*` / `remote-locations` / `remote-game-items` remoteSource functions so
       the material/location/bookable-item pickers fetch matching entries on demand instead of
@@ -337,63 +339,63 @@
       marked picker is upgraded. No `defer` for the same reason. (Comment wording note: several
       MockMvc tests assert a member page does NOT contain the book-in action's literal German
       label, and this fragment renders on every page — keep such labels out of this comment.)
-    -->
+    */-->
     <script th:src="@{/js/krt-catalog-search.js}" th:attr="nonce=${cspNonce}"></script>
-    <!--
+    <!--/*
       Shared server-side bank-account-search source for the combobox (REQ-FE-017, ADR-0106).
       Registers the `remote-bank-accounts` remoteSource on window.krtComboboxRemoteSources; must load
       BEFORE the enhancer below (same reason as the user-search / catalog sources). No `defer`.
-    -->
+    */-->
     <script th:src="@{/js/krt-bank-account-search.js}" th:attr="nonce=${cspNonce}"></script>
-    <!--
+    <!--/*
       Searchable combobox enhancer (REQ-FE-011). Loaded globally and synchronously (no `defer`) so
       `window.krtSearchableSelect` exists before any inline page `<script>` that calls it (e.g. the
       orders item-search), and so its DOMContentLoaded / `krt:swapped` auto-initialiser upgrades
       every `select[data-krt-combobox]` — including pickers inside fragments swapped in by krtFetch.
-    -->
+    */-->
     <script th:src="@{/js/krt-searchable-select.js}" th:attr="nonce=${cspNonce}"></script>
-    <!--
+    <!--/*
       Notification bell (epic #622): lazy dropdown load, no-reload mark-read/delete via krtFetch,
       and the always-on unread-badge poll. Deferred — it self-initialises on DOMContentLoaded and
       only runs where the bell is present (authenticated pages).
-    -->
+    */-->
     <script th:src="@{/js/notifications.js}" defer th:attr="nonce=${cspNonce}"></script>
     <script th:src="@{/js/datetime-splitter.js}" defer th:attr="nonce=${cspNonce}"></script>
     <script th:src="@{/js/scu-decimal-input.js}" defer th:attr="nonce=${cspNonce}"></script>
-    <!--
+    <!--/*
       Applies data-driven inline styles that cannot be a static class (progress-bar widths, formerly
       `th:style="width:<expr>%"`) via the CSSOM, so no inline `style` attribute remains and the CSP
       can drop `style-src-attr 'unsafe-inline'`. Deferred; re-runs after krtFetch fragment swaps.
-    -->
+    */-->
     <script th:src="@{/js/inline-style-apply.js}" defer th:attr="nonce=${cspNonce}"></script>
 
-    <!--
+    <!--/*
       Collapsible filter panels (REQ-FE-021). Global rather than per-page: every list page has a
       filter block, and the three pages that collapsed theirs before this existed each carried their
       own copy of the same script and stylesheet. Deferred — it only reads the DOM and installs
       listeners, so nothing on the page waits for it, and the panels stay usable if it never
       arrives.
-    -->
+    */-->
     <script th:src="@{/js/krt-filter-panel.js}" defer th:attr="nonce=${cspNonce}"></script>
 
     <title th:replace="${titleContent}"></title>
-    <!--
+    <!--/*
       Per-page extra <head> links. th:if must NOT share an element with th:replace: th:replace
       (attribute precedence 1) is processed BEFORE th:if (3), so a same-element guard is dead.
       Every caller binds additionalLinks to ~{::extraLinks} or the empty fragment ~{} (both
       non-null), so the guard never fires today, but gating an outer th:block keeps it effective
       should a future caller ever omit the parameter (null -> nothing rendered, no error).
-    -->
+    */-->
     <th:block th:if="${additionalLinks != null}">
         <th:block th:replace="${additionalLinks}"></th:block>
     </th:block>
-    <!--
+    <!--/*
       Inline-style migration classes (CSP hardening): one class per former inline `style="..."`
       value, declarations preserved verbatim. Loaded LAST — after styles.css and any per-page
       additionalLinks — so a migrated declaration wins an equal-specificity tie, replicating the
       "inline style always wins" behaviour it replaced. Lets the CSP drop
       `style-src-attr 'unsafe-inline'` (no inline style attributes remain in the templates).
-    -->
+    */-->
     <link rel="stylesheet" th:href="@{/css/inline-migration.css}">
 </head>
 </html>

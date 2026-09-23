@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialPriceOverviewDto
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
@@ -131,10 +132,9 @@ class MaterialsPageControllerMvcTest {
         // carry the :where() exclusion so it can never capture a checkbox/radio (the grouping
         // toggle sits right next to the filter's .form-group) and stretch it into a padded bar.
         .andExpect(
-            content()
-                .string(
-                    containsString(
-                        ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
+            PageStylesheets.content(
+                containsString(
+                    ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
   }
 
   /**
@@ -230,9 +230,8 @@ class MaterialsPageControllerMvcTest {
         // carry the :where() exclusion so it can never capture a checkbox/radio and stretch it into
         // a full-width padded bar (it ties the global KRT square rule and renders after it).
         .andExpect(
-            content()
-                .string(
-                    containsString(
-                        ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
+            PageStylesheets.content(
+                containsString(
+                    ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
   }
 }

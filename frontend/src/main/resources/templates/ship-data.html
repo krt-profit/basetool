@@ -3,32 +3,7 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{nav.hangar_data} + ' - ' + ${appTitle}">Schiffsdaten - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-<style th:attr="nonce=${cspNonce}">
-        .data-section {
-            margin-bottom: 3rem;
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-family: var(--font-body);
-            font-size: 0.8rem;
-        }
-        /* Checkboxes and radios are excluded: width:100% + the padding would stretch the 1.2rem
-           KRT squares (styles.css) full-width. The exclusions sit in :where() so they add ZERO
-           specificity — the rule keeps the plain `.form-group input` weight (0,1,1) and stays
-           below the (0,2,0) combobox rule `.krt-combobox .krt-combobox__input`. No .form-group
-           checkbox/radio exists here today; the exclusion closes the latent trap that broke
-           admin/materials when its flag checkboxes were added later. */
-        .form-group input:where(:not([type='checkbox']):not([type='radio'])), .form-group select, .form-group textarea {
-            width: 100%;
-            padding: 0.5rem;
-            background-color: var(--color-surface-input);
-            border: 1px solid var(--color-gray-3);
-            color: var(--color-gray-1);
-            font-family: var(--font-body);
-            box-sizing: border-box;
-        }
-    </style>
+<link rel="stylesheet" th:href="@{/css/pages/ship-data.css}">
     </th:block>
 </head>
 <body>
@@ -62,7 +37,7 @@
 
     <div class="hud-box mt-2">
 
-        <!-- ShipTypes Section -->
+        <!--/* ShipTypes Section */-->
         <div class="data-section">
             <div class="flex-between-mb">
                 <h2 th:text="#{ship.shiptypes}">Schiffstypen</h2>
@@ -113,7 +88,7 @@
             </div>
         </div>
 
-        <!-- Manufacturers Section -->
+        <!--/* Manufacturers Section */-->
         <div class="data-section">
             <div class="flex-between-mb">
                 <h2 th:text="#{ship.manufacturers}">Hersteller</h2>
@@ -161,9 +136,9 @@
     </div>
 </main>
 
-<!-- Modals -->
+<!--/* Modals */-->
 <div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
-    <!-- Reset Fitted Confirmation Modal -->
+    <!--/* Reset Fitted Confirmation Modal */-->
     <div id="reset-fitted-confirm-modal" class="krt-modal-overlay">
         <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{hangar.ship.reset_fitted.confirm.title}">
             <div class="krt-modal-head">

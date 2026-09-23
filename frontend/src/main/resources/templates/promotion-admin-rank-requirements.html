@@ -4,70 +4,7 @@
     <title th:text="#{promotion.admin.ranks.title} + ' - ' + ${appTitle}">Rangvoraussetzungen verwalten - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
     <link rel="stylesheet" th:href="@{/css/promotion-admin.css}">
-    <style th:attr="nonce=${cspNonce}">
-        .badge-level {
-            display: inline-block;
-            padding: 0.1rem 0.4rem;
-            font-size: 0.7rem;
-            font-family: var(--font-headline);
-            text-transform: uppercase;
-            border: 1px solid var(--color-primary);
-            color: var(--color-primary);
-        }
-        .rank-group { margin-bottom: 1.75rem; }
-        .rank-group-header {
-            font-family: 'Lato', sans-serif;
-            font-weight: 700;
-            font-size: 1rem;
-            color: var(--color-primary);
-            border-bottom: 1px solid #333;
-            padding-bottom: 0.35rem;
-            margin-bottom: 0.6rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-        }
-        .rank-group-header .pa-group-actions {
-            display: flex;
-            gap: 0.4rem;
-            flex-wrap: wrap;
-        }
-        .rank-subtable { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-        .rank-subtable th { color: var(--color-gray-2-text); font-weight: 400; text-align: left; padding: 0.3rem 0.6rem; border-bottom: 1px solid #2a2a2a; font-size: 0.8rem; }
-        .rank-subtable td { padding: 0.35rem 0.6rem; border-bottom: 1px solid #1e1e1e; color: var(--color-gray-1); vertical-align: top; }
-        .rank-subtable tr:last-child td { border-bottom: none; }
-
-        .rank-group.is-hidden { display: none; }
-        .pa-empty {
-            padding: 1.5rem;
-            text-align: center;
-            color: var(--color-gray-2-text);
-            font-style: italic;
-        }
-
-        /*
-         * Scope-info block in the create/edit modal: explains the three valid
-         * combinations of (topic, category) selection so the admin understands
-         * the semantic difference rather than guessing from the dropdown state.
-         */
-        .pa-scope-info {
-            font-size: 0.75rem;
-            color: var(--color-gray-2-text);
-            background: rgba(231, 126, 35, 0.04);
-            border-left: 2px solid var(--color-primary);
-            padding: 0.4rem 0.6rem;
-            margin-bottom: 0.75rem;
-        }
-        .pa-scope-info strong { color: var(--color-primary); font-weight: 700; }
-
-        @media (width <= 768px) {
-            .btn { min-height: 44px; }
-            .rank-table-wrapper { overflow-x: auto; }
-            .rank-subtable { font-size: 0.8rem; }
-        }
-    </style>
+    <link rel="stylesheet" th:href="@{/css/pages/promotion-admin-rank-requirements.css}">
     </th:block>
 </head>
 <body>
@@ -202,7 +139,7 @@
     </th:block>
 </main>
 
-<!-- Create Modal -->
+<!--/* Create Modal */-->
 <div id="modal-create" class="krt-modal-overlay" role="dialog" aria-modal="true">
     <div class="krt-modal krt-modal--wide">
         <div class="krt-modal-head">
@@ -223,7 +160,7 @@
             </div>
         </div>
 
-        <!-- Scope explanation: helps the admin avoid the global/topic-wide/category combo trap. -->
+        <!--/* Scope explanation: helps the admin avoid the global/topic-wide/category combo trap. */-->
         <div class="pa-scope-info">
             <strong th:text="#{promotion.admin.ranks.scope.label}">Anwendungsbereich</strong>:
             <span th:utext="#{promotion.admin.ranks.scope.hint}">Beide Felder leer = globale Regel. Nur Themenbereich = gilt themenbereich-weit. Themenbereich + Kategorie = nur diese Kategorie.</span>
@@ -268,7 +205,7 @@
     </div>
 </div>
 
-<!-- Edit Modal -->
+<!--/* Edit Modal */-->
 <div id="modal-edit" class="krt-modal-overlay" role="dialog" aria-modal="true">
     <div class="krt-modal krt-modal--wide">
         <div class="krt-modal-head">

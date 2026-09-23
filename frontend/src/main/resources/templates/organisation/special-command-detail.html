@@ -5,47 +5,7 @@
     <th:block th:fragment="extraLinks">
         <meta name="_csrf" th:content="${_csrf.token}"/>
         <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
-        <style th:attr="nonce=${cspNonce}">
-            .role-checkbox {
-                width: auto;
-                margin-right: 0.25rem;
-            }
-            .flags-form {
-                display: inline-flex;
-                gap: 0.5rem;
-                align-items: center;
-                margin: 0;
-            }
-            .lead-toggle-form {
-                display: inline-flex;
-                gap: 0.5rem;
-                align-items: center;
-                margin: 0;
-            }
-            .role-badge {
-                font-size: 0.7rem;
-                padding: 0.2rem 0.4rem;
-                border-radius: var(--radius-none);
-                margin-left: 0.25rem;
-            }
-            .role-badge.lead {
-                background-color: var(--color-accent-light);
-                color: var(--color-bg-black);
-            }
-            .role-badge.role-logistician {
-                background-color: var(--color-dept-search-rescue);
-                color: var(--color-bg-black);
-            }
-            .role-badge.role-mission-manager {
-                background-color: var(--color-dept-forschung);
-                color: var(--color-white);
-            }
-            .sk-meta {
-                color: var(--color-gray-2-text);
-                font-size: 0.9rem;
-                margin: 0.5rem 0;
-            }
-        </style>
+        <link rel="stylesheet" th:href="@{/css/pages/organisation-special-command-detail.css}">
     </th:block>
 </head>
 <body>
@@ -67,7 +27,7 @@
 
 <main>
     <div class="greeting hud-box">
-        <!-- Admins came from the SK overview; an SK lead came from the Leitung page. -->
+        <!--/* Admins came from the SK overview; an SK lead came from the Leitung page. */-->
         <a th:href="@{${backUrl}}" class="krtm-font-size-0-9rem-color-var-color-gray-2-58f9"
            th:text="${canToggleLead} ? #{admin.specialcommands.back_to_list} : #{admin.specialcommands.back_to_leitung}">&larr; zurück zur Übersicht</a>
         <h1 th:text="${specialCommand != null ? specialCommand.name() : ''}">Spezialkommando</h1>
@@ -79,16 +39,16 @@
            class="sk-meta" th:text="${specialCommand.description()}">Beschreibung</p>
     </div>
 
-    <!-- Member roster -->
+    <!--/* Member roster */-->
     <div class="hud-box mt-2" id="members-box" th:data-sc-id="${specialCommand != null ? specialCommand.id() : ''}">
         <div class="box-header krtm-display-flex-justify-content-space-between-a-1321">
             <h2 th:text="#{admin.specialcommands.members.title}" class="m-0">Mitglieder</h2>
             <button id="add-member-btn" class="btn btn--cta" type="button" th:text="#{admin.specialcommands.members.add}">Mitglied hinzufügen</button>
         </div>
 
-        <!-- AJAX swap target (#582): the flags / lead / remove / add-member writes re-render only
+        <!--/* AJAX swap target (#582): the flags / lead / remove / add-member writes re-render only
              this fragment, refreshing role badges, lead state and the fresh @Version on every form
-             so the next member action does not 409. -->
+             so the next member action does not 409. */-->
         <div id="members-results">
         <th:block th:fragment="membersResults">
         <div th:if="${members == null or #lists.isEmpty(members)}" class="krtm-color-var-color-gray-2-padding-1rem-0-5444" th:text="#{admin.specialcommands.members.empty}">
@@ -115,9 +75,9 @@
                             <form th:action="@{/organisation/special-commands/{id}/members/{userId}/flags(id=${specialCommand.id()},userId=${m.userId()})}"
                                   method="post" class="flags-form">
                                 <input type="hidden" name="version" th:value="${m.version()}">
-                                <!-- Spring _field markers: an unchecked checkbox sends nothing,
+                                <!--/* Spring _field markers: an unchecked checkbox sends nothing,
                                      so without these the binder would skip the field entirely
-                                     and the demote-via-uncheck path would silently no-op. -->
+                                     and the demote-via-uncheck path would silently no-op. */-->
                                 <input type="hidden" name="_isLogistician">
                                 <input type="hidden" name="_isMissionManager">
                                 <label class="krtm-display-inline-flex-align-items-center-gap-0-5ab4">
@@ -131,9 +91,9 @@
                                 <button type="submit" class="btn btn-ghost btn-icon krtm-font-size-0-8rem-padding-0-25rem-0-5rem-51c7" th:title="#{members.save}" th:aria-label="#{members.save}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg></button>
                             </form>
                         </td>
-                        <!-- The lead seat is appointed from the tier above, never from within the SK:
+                        <!--/* The lead seat is appointed from the tier above, never from within the SK:
                              only an admin toggles it here (the Bereichsleiter does it on the Leitung
-                             page), so this column and its admin-area form render for admins only. -->
+                             page), so this column and its admin-area form render for admins only. */-->
                         <td th:if="${canToggleLead}">
                             <form th:action="@{/admin/special-commands/{id}/members/{userId}/lead(id=${specialCommand.id()},userId=${m.userId()})}"
                                   method="post" class="lead-toggle-form">
@@ -162,7 +122,7 @@
     </div>
 </main>
 
-<!-- Add-Member Modal -->
+<!--/* Add-Member Modal */-->
 <div id="add-member-modal" class="krt-modal-overlay">
     <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{admin.specialcommands.members.add}">
         <div class="krt-modal-head">
@@ -173,7 +133,7 @@
             <div class="krt-modal-body">
                 <div class="form-group">
                     <label for="add-member-userid" th:text="#{admin.specialcommands.members.user_picker}">Nutzer</label>
-                    <!-- Server-side searchable combobox (remote-users, #1193): roster is searched on demand, not preloaded. -->
+                    <!--/* Server-side searchable combobox (remote-users, #1193): roster is searched on demand, not preloaded. */-->
                     <select id="add-member-userid" name="userId" required data-krt-combobox="remote-users">
                         <option value="" th:text="#{admin.specialcommands.members.user_picker.placeholder}">-- Bitte wählen --</option>
                     </select>
@@ -187,7 +147,7 @@
     </div>
 </div>
 
-<!-- Add-Member modal wiring + in-place member CRUD (#582) -->
+<!--/* Add-Member modal wiring + in-place member CRUD (#582) */-->
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     var MEMBER_MSG = {
         saved:   '[[#{notification.success.save}]]',

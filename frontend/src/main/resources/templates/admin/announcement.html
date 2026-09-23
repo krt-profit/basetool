@@ -3,17 +3,7 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{info.title} + ' - ' + ${appTitle}">Informationen - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-<style th:attr="nonce=${cspNonce}">
-        .form-group textarea {
-            width: 100%;
-            padding: 0.5rem;
-            background-color: var(--color-surface-input);
-            border: 1px solid var(--color-gray-3);
-            color: var(--color-gray-1);
-            font-family: var(--font-body);
-            box-sizing: border-box;
-        }
-    </style>
+<link rel="stylesheet" th:href="@{/css/pages/admin-announcement.css}">
     </th:block>
 </head>
 <body>
@@ -53,7 +43,7 @@
         </form>
     </div>
 
-    <!-- Delete Confirmation Modal -->
+    <!--/* Delete Confirmation Modal */-->
     <div id="delete-confirm-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
         <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{info.delete.confirm.title}">
             <div class="krt-modal-head">

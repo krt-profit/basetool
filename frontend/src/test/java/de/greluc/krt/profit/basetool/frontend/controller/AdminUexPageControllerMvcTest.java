@@ -28,11 +28,11 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.TerminalDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -108,10 +108,9 @@ class AdminUexPageControllerMvcTest {
         .perform(get("/admin/uex-data"))
         .andExpect(status().isOk())
         .andExpect(
-            content()
-                .string(
-                    containsString(
-                        ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
+            PageStylesheets.content(
+                containsString(
+                    ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
   }
 
   // covers #582 — the terminal toggle-visibility twin (X-Requested-With) flips the hidden flag off

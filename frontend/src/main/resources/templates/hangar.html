@@ -3,158 +3,7 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{hangar.title} + ' - ' + ${appTitle}">Hangar - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-<style th:attr="nonce=${cspNonce}">
-        .data-section {
-            margin-bottom: 3rem;
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-family: var(--font-body);
-            font-size: 0.9rem;
-            font-weight: 700;
-        }
-        /* Checkboxes (the ship modal's "Fitted" toggle) and radios are excluded: width:100% +
-           the 0.5rem padding would deform the 1.2rem KRT squares (styles.css). The exclusions
-           sit in :where() so they add ZERO specificity — the rule keeps the plain `.form-group
-           input` weight (0,1,1) and stays below the (0,2,0) combobox rule `.krt-combobox
-           .krt-combobox__input`. The page's old checkbox-only width:auto override is removed:
-           it only restored the width, and with the exclusion in place its (0,2,1) weight would
-           instead shrink the global 1.2rem square. */
-        .form-group input:where(:not([type='checkbox']):not([type='radio'])), .form-group select, .form-group textarea {
-            width: 100%;
-            padding: 0.5rem;
-            background-color: var(--color-surface-input);
-            border: 1px solid var(--color-gray-3);
-            color: var(--color-gray-1);
-            font-family: var(--font-body);
-            box-sizing: border-box;
-        }
-        #ship-modal .btn {
-            font-family: var(--font-body);
-            font-weight: 700;
-        }
-    /* ---- Fleetview Import Section ---- */
-        .import-section {
-            margin-top: 2rem;
-        }
-        .import-section .form-row {
-            display: flex;
-            align-items: flex-end;
-            gap: 1rem;
-            flex-wrap: wrap;
-        }
-        .import-section .form-row .form-group {
-            flex: 1 1 260px;
-            margin-bottom: 0;
-        }
-        .import-section .form-row .btn {
-            flex-shrink: 0;
-            min-height: 44px;
-        }
-        .import-status-msg {
-            margin-top: 0.75rem;
-            font-family: var(--font-body);
-            font-size: 0.9rem;
-            color: var(--color-primary);
-        }
-        /* Import result modal */
-        #import-result-modal .stat-row {
-            display: flex;
-            justify-content: space-between;
-            border-bottom: 1px solid var(--color-gray-3);
-            padding: 0.4rem 0;
-            font-family: var(--font-body);
-        }
-        #import-result-modal .stat-row span:first-child {
-            color: var(--color-gray-1);
-        }
-        #import-result-modal .stat-row span:last-child {
-            /* Result counts read as bright-neutral DATA (like .stat-value), not as
-               an action — orange is reserved for action + identity. */
-            color: var(--color-white);
-            font-weight: 700;
-        }
-        #import-result-modal .skip-list {
-            margin-top: 0.75rem;
-            max-height: 200px;
-            overflow-y: auto;
-            border: 1px solid var(--color-gray-3);
-            padding: 0.5rem;
-            font-family: var(--font-body);
-            font-size: 0.85rem;
-        }
-        #import-result-modal .skip-list p {
-            margin: 0.2rem 0;
-            color: var(--color-gray-2-text);
-        }
-        @media (width <= 768px) {
-            .import-section .form-row {
-                flex-direction: column;
-            }
-            .import-section .form-row .btn {
-                width: 100%;
-            }
-        }
-    /* ---- Delete All Ships Section ---- */
-        .delete-all-section {
-            margin-top: 1.5rem;
-            padding-top: 1.5rem;
-            border-top: 1px solid var(--color-gray-3);
-        }
-        .delete-all-section .delete-all-row {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            flex-wrap: wrap;
-        }
-        .delete-all-section .delete-all-row p {
-            margin: 0;
-            flex: 1 1 200px;
-            color: var(--color-gray-2-text);
-            font-family: var(--font-body);
-            font-size: 0.9rem;
-        }
-        .delete-all-section .delete-all-row .btn-danger {
-            flex-shrink: 0;
-            min-height: 44px;
-        }
-        @media (width <= 768px) {
-            .delete-all-section .delete-all-row {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            .delete-all-section .delete-all-row .btn-danger {
-                width: 100%;
-            }
-        }
-    /* ---- Server-side ship-type filter above the table ---- */
-        .hangar-filter-form {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 0.5rem;
-            margin-bottom: 1.25rem;
-        }
-        .hangar-filter {
-            position: relative;
-            width: 360px;
-            max-width: 100%;
-        }
-        .hangar-filter .hangar-filter-icon {
-            position: absolute;
-            left: 0.85rem;
-            top: 50%;
-            transform: translateY(-50%);
-            display: inline-flex;
-            color: var(--color-gray-2-text);
-            pointer-events: none;
-        }
-        .hangar-filter input[type="search"] {
-            width: 100%;
-            padding-left: 2.6rem;
-        }
-    </style>
+<link rel="stylesheet" th:href="@{/css/pages/hangar.css}">
     </th:block>
 </head>
 <body th:data-show-modal="${showShipModal}">
@@ -182,11 +31,11 @@
 
     <div class="hud-box mt-2">
 
-        <!-- In-place AJAX swap target (epic #571 / REQ-FE-005): ship create/edit/delete, the
+        <!--/* In-place AJAX swap target (epic #571 / REQ-FE-005): ship create/edit/delete, the
              home-location bulk set and the Fleetview import all re-render this fragment via
              GET /hangar?fragment=results instead of reloading the page. The action buttons + the
              per-row edit buttons use data-trigger so the krtEvents delegation survives each swap;
-             the modals live outside the fragment and persist. -->
+             the modals live outside the fragment and persist. */-->
         <div class="data-section" id="hangar-results">
         <th:block th:fragment="hangarResults">
             <div class="flex-between-mb">
@@ -201,10 +50,10 @@
                 </div>
             </div>
 
-            <!-- Server-side filter (REQ-HANGAR-002): the form GETs back to /hangar; a new search
+            <!--/* Server-side filter (REQ-HANGAR-002): the form GETs back to /hangar; a new search
                  resets to page 0 by omitting the page param. It stays visible while a search yields
                  nothing so the filter can always be cleared. The hidden size keeps the active page
-                 size on the no-JS submit; the .page-btn pagination links below carry it too. -->
+                 size on the no-JS submit; the .page-btn pagination links below carry it too. */-->
             <form th:if="${totalShipCount > 0 or search != null}"
                   id="hangar-filter-form" class="hangar-filter-form" role="search"
                   method="get" th:action="@{/hangar}">
@@ -284,9 +133,9 @@
             </table>
             </div>
 
-            <!-- Footer bar: size picker left, page-nav right (same pattern as the squadron overview
+            <!--/* Footer bar: size picker left, page-nav right (same pattern as the squadron overview
                  and the blueprint overview). The base URL keeps the active search so paging and
-                 re-sizing never drop the filter. -->
+                 re-sizing never drop the filter. */-->
             <div class="pagination-controls" th:if="${myShipsPage != null}">
                 <nav th:replace="~{fragments/pagination :: pageSizePicker(pageResponse=${myShipsPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
                 <nav th:replace="~{fragments/pagination :: pagination(pageResponse=${myShipsPage}, baseUrl=${paginationBaseUrl})}"></nav>
@@ -295,7 +144,7 @@
         </div>
     </div>
 
-    <!-- Ship Modal -->
+    <!--/* Ship Modal */-->
     <div id="ship-modal" class="krt-modal-overlay" th:data-title-add="#{hangar.ship.add}" th:data-title-edit="#{hangar.ship.edit}">
         <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{hangar.ship.modal_title}">
             <div class="krt-modal-head">
@@ -347,7 +196,7 @@
                     <input type="checkbox" id="ship-fitted" name="fitted" th:field="*{fitted}">
                     <label for="ship-fitted" class="krtm-margin-bottom-0-5043" th:text="#{hangar.ship.fitted.label}">Fitted (Einsatzbereit)</label>
                 </div>
-                <!-- R5.d.f owner-picker: hidden when the caller has ≤1 OrgUnit membership. -->
+                <!--/* R5.d.f owner-picker: hidden when the caller has ≤1 OrgUnit membership. */-->
                 <th:block th:replace="~{fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=*{owningOrgUnitId}, required=false)}"></th:block>
                 </div>
                 <div class="krt-modal-foot">
@@ -358,7 +207,7 @@
         </div>
     </div>
 
-    <!-- Fleetview Import Section -->
+    <!--/* Fleetview Import Section */-->
     <div class="hud-box mt-2 import-section">
         <h2 th:text="#{hangar.import.title}">Fleetview-Import</h2>
         <p th:text="#{hangar.import.description}">Importiere deine Schiffe aus einer CCU Game Fleetview-JSON-Exportdatei.</p>
@@ -377,7 +226,7 @@
         </div>
         <p id="fleetview-status" class="import-status-msg krtm-display-none-5790"></p>
 
-        <!-- Delete All Ships Section -->
+        <!--/* Delete All Ships Section */-->
         <div class="delete-all-section">
             <h3 th:text="#{hangar.delete_all.section_title}">Hangar leeren</h3>
             <div class="delete-all-row">
@@ -389,7 +238,7 @@
         </div>
     </div>
 
-    <!-- Fleetview Import Result Modal -->
+    <!--/* Fleetview Import Result Modal */-->
     <div id="import-result-modal" class="krt-modal-overlay krtm-display-none-z-index-3200-e00a">
         <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{hangar.import.result.title}">
             <div class="krt-modal-head">
@@ -424,7 +273,7 @@
         </div>
     </div>
 
-    <!-- Delete All Ships Confirmation Modal -->
+    <!--/* Delete All Ships Confirmation Modal */-->
     <div id="delete-all-confirm-modal" class="krt-modal-overlay krtm-display-none-z-index-3300-c2c8">
         <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{hangar.delete_all.modal.title}">
             <div class="krt-modal-head">
@@ -442,7 +291,7 @@
         </div>
     </div>
 
-    <!-- Set Home Location Modal -->
+    <!--/* Set Home Location Modal */-->
     <div id="home-location-modal" class="krt-modal-overlay krtm-display-none-z-index-3300-c2c8">
         <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{hangar.home_location.modal.title}">
             <div class="krt-modal-head">
@@ -479,7 +328,7 @@
         </div>
     </div>
 
-    <!-- Delete Confirmation Modal -->
+    <!--/* Delete Confirmation Modal */-->
     <div id="delete-confirm-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
         <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{info.delete.confirm.title}">
             <div class="krt-modal-head">

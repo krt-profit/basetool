@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
 <body>
-<!--
+<!--/*
   Reusable person-node for the org chart. Kept in its own fragment file (rather than inline in
   org-chart.html) so the reused markup is not also rendered in place. Resolves the rank label from
   the position type via the orgChart.rank.<TYPE> message key, and — for admins only — emits the
@@ -12,7 +12,7 @@
   6 = Stv./Ensign within a Kommando) and exposed as aria-level; aria-label announces "rank, name".
   Roving tabindex + arrow-key navigation is managed by the inline page JS, so every node starts at
   tabindex="-1".
--->
+*/-->
 <div th:fragment="ocNodeLabeled(node, level, rankKey, editable)" class="oc-node" th:if="${node != null}"
      th:with="rk=${rankKey},
               freeText=${node.userId() == null and node.displayName() != null},
@@ -25,10 +25,10 @@
     <span class="oc-node-name" th:text="${nm}">Name</span>
     <span class="oc-node-flag" th:if="${freeText}" th:text="${noAcc}"
           th:title="#{orgChart.noAccount.hint}">Kein Account</span>
-    <!-- Account-held seats mirror a functional rank (epic #800, REQ-ROLE-006) and are read-only
+    <!--/* Account-held seats mirror a functional rank (epic #800, REQ-ROLE-006) and are read-only
          here — managed under Organisation -> Leitung. Only free-text holders keep edit/remove, and
          only when `editable` (the Grand Admiral node suppresses these and uses its own OL-level
-         controls, since it lives on the OL row, not as a position — REQ-ORG-021). -->
+         controls, since it lives on the OL row, not as a position — REQ-ORG-021). */-->
     <div class="oc-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:if="${editable and node.userId() == null}">
         <button type="button" class="oc-icon-btn" data-trigger="oc-reassign"
                 th:data-position-id="${node.positionId()}"
@@ -52,16 +52,16 @@
     </div>
 </div>
 
-<!--
+<!--/*
   Thin wrapper: the default person-node derives its rank label from the node's position type. A
   caller that needs a different label invokes ocNodeLabeled directly with an explicit message key —
   the Grand Admiral seat (REQ-ORG-021) is an OL_MEMBER position rendered with the "Grand Admiral"
   title, so org-chart.html calls ocNodeLabeled(..., 'orgChart.rank.GRAND_ADMIRAL').
--->
+*/-->
 <th:block th:fragment="ocNode(node, level)"
           th:replace="~{fragments/org-chart-node :: ocNodeLabeled(${node}, ${level}, ${node == null ? '' : 'orgChart.rank.' + node.positionType()}, true)}"></th:block>
 
-<!--
+<!--/*
   One Bereich subtree (epic #692): its caption, then its own ARIA tree — the Bereichsleiter (the
   level-1 hero) with a collapse toggle, and a collapsible body holding the Stab (Koordinatoren /
   Operatoren, level 2) and the Bereich's Staffeln/SKs via the shared ocUnitFan. Factored out of
@@ -69,7 +69,7 @@
   or a flat row when there is no OL) without duplicating this markup. Each Bereich stays its OWN
   role="tree" with unchanged ARIA levels, so the per-tree roving-tabindex nav is unaffected; the
   collapse toggle hides the body and the nav skips the now-hidden treeitems.
--->
+*/-->
 <th:block th:fragment="ocBereich(b)">
     <div class="oc-caption">
         <span class="oc-dept-swatch" aria-hidden="true" th:if="${b.department() != null}"
@@ -80,7 +80,7 @@
          th:classappend="${b.department() != null ? 'oc-dept--' + b.department().toLowerCase().replace('_', '-') : ''}"
          th:aria-label="#{orgChart.a11y.bereich(${b.name()})}">
         <div class="oc-col">
-            <!-- Bereichsleiter (hero) or vacant, wrapped so the collapse toggle anchors to the box -->
+            <!--/* Bereichsleiter (hero) or vacant, wrapped so the collapse toggle anchors to the box */-->
             <div class="oc-leader-wrap">
                 <th:block th:if="${b.leadership().lead() != null}">
                     <th:block th:replace="~{fragments/org-chart-node :: ocNode(${b.leadership().lead()}, 1)}"></th:block>
@@ -91,8 +91,8 @@
                     <span class="oc-node-rank" th:text="#{orgChart.rank.BEREICHSLEITER}">Bereichsleiter</span>
                     <span class="oc-node-name" th:text="#{orgChart.vacant}">Nicht besetzt</span>
                 </div>
-                <!-- Collapse toggle: available to everyone, anchored to the Bereichsleiter box.
-                     aria-expanded reflects the state; the chevron glyph is drawn in CSS. -->
+                <!--/* Collapse toggle: available to everyone, anchored to the Bereichsleiter box.
+                     aria-expanded reflects the state; the chevron glyph is drawn in CSS. */-->
                 <button type="button" class="oc-collapse" data-trigger="oc-collapse"
                         aria-expanded="true" th:aria-controls="'oc-bbody-' + ${b.orgUnitId()}"
                         th:aria-label="#{orgChart.bereich.toggle(${b.name()})}">
@@ -105,16 +105,16 @@
                     th:data-rank-label="#{orgChart.rank.BEREICHSLEITER}"
                     th:text="#{orgChart.add.bereichLead}">Bereichsleiter zuweisen</button>
 
-            <!-- Collapsible body: the Stab + the Bereich's Staffeln/SKs -->
+            <!--/* Collapsible body: the Stab + the Bereich's Staffeln/SKs */-->
             <div class="oc-bereich-body" th:id="'oc-bbody-' + ${b.orgUnitId()}">
-                <!-- Stab: one row per rank. The Koordinatoren fan out side by side, the Operatoren
+                <!--/* Stab: one row per rank. The Koordinatoren fan out side by side, the Operatoren
                      as a second row beneath them — the same horizontal peer grouping the OL members
                      and the Staffeln/SKs already use. They used to hang off one another in a single
                      vertical spine, which drew equals as a chain of command: the third Operator read
                      as reporting to the second. The two ranks stay on separate rows because they are
                      peers *within* a rank, not across one. Each fan draws its own drop from whatever
                      sits above it, so a Bereich with no Koordinator connects its Operatoren straight
-                     to the Bereichsleiter and neither row leaves a stray connector when empty. -->
+                     to the Bereichsleiter and neither row leaves a stray connector when empty. */-->
                 <ul class="oc-fan" role="group"
                     th:if="${!#lists.isEmpty(b.leadership().coordinators())}">
                     <li th:each="n : ${b.leadership().coordinators()}">
@@ -142,25 +142,25 @@
                         th:data-rank-label="#{orgChart.rank.BEREICHSOPERATOR}"
                         th:text="#{orgChart.add.bereichOperator}">Bereichsoperator hinzufügen</button>
 
-                <!-- Tier 2: this Bereich's Staffeln + Spezialkommandos -->
+                <!--/* Tier 2: this Bereich's Staffeln + Spezialkommandos */-->
                 <th:block th:replace="~{fragments/org-chart-node :: ocUnitFan(${b.squadrons()}, ${b.specialCommands()})}"></th:block>
             </div>
         </div>
     </div>
 </th:block>
 
-<!--
+<!--/*
   Tier 2 unit fan: the Staffeln + Spezialkommandos that fan out under a leadership spine
   (Bereichsleiter for a Bereich tier, the legacy Area Lead for the ungrouped tier). Factored out of
   org-chart.html so every tier — each Bereich and the legacy area — renders its child units through
   identical markup (and identical ARIA levels: unit box = 2, Staffel-/SK-Leiter = 3, Kommando head /
   direct Ensign = 4, Kommandoleiter = 5, Stv./Ensign-in-Kommando = 6). The owning tier supplies its
   own already-filtered `squadrons` / `specialCommands` lists, so this fragment is scope-agnostic.
--->
+*/-->
 <ul th:fragment="ocUnitFan(squadrons, specialCommands)" class="oc-fan oc-fan--units" role="group"
     th:if="${!#lists.isEmpty(squadrons) or !#lists.isEmpty(specialCommands)}">
 
-    <!-- Staffeln -->
+    <!--/* Staffeln */-->
     <li th:each="sq : ${squadrons}">
         <div class="oc-col">
             <div class="oc-unit-box" role="treeitem" tabindex="-1" aria-level="2"
@@ -170,7 +170,7 @@
             </div>
             <div class="oc-v"></div>
 
-            <!-- Staffelleiter or vacant -->
+            <!--/* Staffelleiter or vacant */-->
             <th:block th:if="${sq.lead() != null}">
                 <th:block th:replace="~{fragments/org-chart-node :: ocNode(${sq.lead()}, 3)}"></th:block>
             </th:block>
@@ -186,12 +186,12 @@
                     th:data-rank-label="#{orgChart.rank.SQUADRON_LEAD}"
                     th:text="#{orgChart.add.squadronLead}">Staffelleiter zuweisen</button>
 
-            <!-- Kommandos + direct Ensigns fan out under the Staffelleiter -->
+            <!--/* Kommandos + direct Ensigns fan out under the Staffelleiter */-->
             <ul class="oc-fan" role="group"
                 th:if="${!#lists.isEmpty(sq.commands()) or !#lists.isEmpty(sq.directEnsigns())}">
 
-                <!-- Kommando(gruppe): named header, its Kommandoleiter (may be vacant),
-                     then the Stv. + Ensigns chained underneath -->
+                <!--/* Kommando(gruppe): named header, its Kommandoleiter (may be vacant),
+                     then the Stv. + Ensigns chained underneath */-->
                 <li th:each="cmd : ${sq.commands()}">
                     <div class="oc-col">
                         <div class="oc-node oc-command-head" role="treeitem" tabindex="-1"
@@ -203,10 +203,10 @@
                             <span class="oc-command-name oc-command-name--unnamed"
                                   th:if="${cmd.name() == null}"
                                   th:text="#{orgChart.command.unnamed}">Ohne Namen</span>
-                            <!-- A kommando_group-linked Kommando mirrors a functional rank (epic
+                            <!--/* A kommando_group-linked Kommando mirrors a functional rank (epic
                                  #800, REQ-ROLE-006) and is read-only here — managed under
                                  Organisation -> Leitung. Only legacy chart-only Kommandos
-                                 (kommandoGroupId null) keep the rename / remove controls. -->
+                                 (kommandoGroupId null) keep the rename / remove controls. */-->
                             <div class="oc-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
                                  th:if="${cmd.kommandoGroupId() == null}">
                                 <button type="button" class="oc-icon-btn" data-trigger="oc-rename"
@@ -243,8 +243,8 @@
                                 <span class="oc-node-name" th:text="${cmdNm}">Name</span>
                                 <span class="oc-node-flag" th:if="${cmdFreeText}" th:text="${cmdNoAcc}"
                                       th:title="#{orgChart.noAccount.hint}">Kein Account</span>
-                                <!-- An account Kommandoleiter mirrors a functional rank (REQ-ROLE-006)
-                                     and is read-only here; only a free-text leader stays editable. -->
+                                <!--/* An account Kommandoleiter mirrors a functional rank (REQ-ROLE-006)
+                                     and is read-only here; only a free-text leader stays editable. */-->
                                 <div class="oc-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
                                      th:if="${cmd.leaderUserId() == null}">
                                     <button type="button" class="oc-icon-btn" data-trigger="oc-reassign"
@@ -285,7 +285,7 @@
                                 th:data-rank-label="#{orgChart.rank.COMMAND_LEAD}"
                                 th:text="#{orgChart.add.assignLead}">Kommandoleiter zuweisen</button>
 
-                        <!-- Stv. then Ensigns: chained under the Kommandoleiter -->
+                        <!--/* Stv. then Ensigns: chained under the Kommandoleiter */-->
                         <th:block th:if="${cmd.deputy() != null}">
                             <div class="oc-v"></div>
                             <th:block th:replace="~{fragments/org-chart-node :: ocNode(${cmd.deputy()}, 6)}"></th:block>
@@ -295,9 +295,9 @@
                             <th:block th:replace="~{fragments/org-chart-node :: ocNode(${e}, 6)}"></th:block>
                         </th:block>
 
-                        <!-- A group-linked Kommando's Stv. / Ensigns are managed under Organisation
+                        <!--/* A group-linked Kommando's Stv. / Ensigns are managed under Organisation
                              -> Leitung (epic #800, REQ-ROLE-006), so the chart offers no add-child
-                             affordance on it; only a legacy chart-only Kommando keeps them. -->
+                             affordance on it; only a legacy chart-only Kommando keeps them. */-->
                         <button th:if="${cmd.kommandoGroupId() == null and cmd.deputy() == null}"
                                 type="button" class="oc-add"
                                 sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" data-trigger="oc-add"
@@ -316,7 +316,7 @@
                     </div>
                 </li>
 
-                <!-- Ensigns reporting straight to the Staffelleiter -->
+                <!--/* Ensigns reporting straight to the Staffelleiter */-->
                 <li th:each="e : ${sq.directEnsigns()}">
                     <div class="oc-col">
                         <th:block th:replace="~{fragments/org-chart-node :: ocNode(${e}, 4)}"></th:block>
@@ -338,7 +338,7 @@
         </div>
     </li>
 
-    <!-- Spezialkommandos: 1-2 SK-Leiter side by side under the unit box -->
+    <!--/* Spezialkommandos: 1-2 SK-Leiter side by side under the unit box */-->
     <li th:each="sk : ${specialCommands}">
         <div class="oc-col">
             <div class="oc-unit-box oc-unit-box--sk" role="treeitem" tabindex="-1" aria-level="2"

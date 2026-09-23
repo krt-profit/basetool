@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-<!--
+<!--/*
   Reusable owner-picker fragment (R5.d). Renders a `<select>` populated from a target user's
   OrgUnit memberships. Hidden automatically when the option list has 0 or 1 entries — at most
   one membership means there is no choice to offer, so the form falls back to the legacy
@@ -19,19 +19,19 @@
   Organisationsleitung + Bereich kinds, which a Bereichsleitung/OL leader's drill-down picker
   surfaces alongside the subordinate Staffeln/SKs they oversee. No inline event handlers — keeps
   the CSP-safe rendering invariant of the rest of the templates.
--->
+*/-->
 <div th:fragment="ownerPicker(options, name, selected, required)"
      th:if="${options != null and options.size() > 1}"
      class="form-group owner-picker">
     <label th:for="${name}" th:text="#{ownerPicker.label}">Zuordnen zu</label>
     <select th:id="${name}" th:name="${name}" th:required="${required}">
         <option value="" th:text="#{ownerPicker.placeholder}">-- Bitte wählen --</option>
-        <!--
+        <!--/*
           Render one <optgroup> per present kind when the list spans more than one kind; collapse
           to a flat list otherwise. SpEL's collection-selection syntax `.?[expr]` filters a list by
           predicate without lambdas — Thymeleaf's SpEL backend rejects Java lambda syntax (EL1042E),
           so the obvious .stream().anyMatch(o -> …) form fails when the fragment is exercised.
-        -->
+        */-->
         <th:block th:with="hasOl=${!options.?[kind == 'ORGANISATIONSLEITUNG'].isEmpty()},
                             hasBereich=${!options.?[kind == 'BEREICH'].isEmpty()},
                             hasStaffel=${!options.?[kind == 'SQUADRON'].isEmpty()},

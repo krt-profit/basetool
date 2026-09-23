@@ -25,7 +25,7 @@
         <h1 class="pf-title" th:text="#{profile.title}">Mein Profil</h1>
         <p class="pf-sub" th:text="#{profile.subtitle}">Your master data and personal preferences.</p>
 
-        <!-- ===== Identity (read-only): initials tile + name/handle + rank/squadron chips ===== -->
+        <!--/* ===== Identity (read-only): initials tile + name/handle + rank/squadron chips ===== */-->
         <div class="card card--accent">
             <div class="id-band">
                 <div class="id-tile" th:text="${initials}" aria-hidden="true">VA</div>
@@ -34,8 +34,8 @@
                     <p class="id-handle" th:text="'@' + ${username}">@valk</p>
                     <div class="id-chips">
                         <span th:if="${rank}" class="chip chip--primary" th:text="${rank}">Commander</span>
-                        <!-- REQ-ORG-017: show every Staffel the user belongs to (up to two), not just
-                             the single active-context pin. -->
+                        <!--/* REQ-ORG-017: show every Staffel the user belongs to (up to two), not just
+                             the single active-context pin. */-->
                         <span th:if="${profileSquadrons != null and !profileSquadrons.isEmpty()}"
                               th:each="sq : ${profileSquadrons}" class="squadron-badge"
                               th:text="${sq.shorthand != null ? sq.name + ' · ' + sq.shorthand : sq.name}">IRIDIUM · IRI</span>
@@ -44,7 +44,7 @@
             </div>
         </div>
 
-        <!-- ===== Read-only fact grid (absent fields are not rendered) ===== -->
+        <!--/* ===== Read-only fact grid (absent fields are not rendered) ===== */-->
         <div class="facts">
             <div class="f">
                 <p class="fk" th:text="#{profile.email}">Email</p>
@@ -60,10 +60,10 @@
             </div>
         </div>
 
-        <!-- ===== Settings: one card per editable section, each with exactly one CTA ===== -->
+        <!--/* ===== Settings: one card per editable section, each with exactly one CTA ===== */-->
         <div class="stack">
 
-            <!-- Personal data -->
+            <!--/* Personal data */-->
             <form id="profile-description-form" class="card" th:action="@{/profile/description}" method="post" th:object="${profileDescriptionForm}">
                 <input type="hidden" name="version" th:field="*{version}">
                 <div class="card-head">
@@ -86,7 +86,7 @@
                 </div>
             </form>
 
-            <!-- Default payout -->
+            <!--/* Default payout */-->
             <form id="profile-payout-form" class="card" th:action="@{/profile/payout-preference}" method="post" th:object="${profilePayoutPreferenceForm}">
                 <input type="hidden" name="version" th:field="*{version}">
                 <div class="card-head">
@@ -105,7 +105,7 @@
                 </div>
             </form>
 
-            <!-- Blueprint sharing -->
+            <!--/* Blueprint sharing */-->
             <form id="profile-blueprint-sharing-form" class="card" th:action="@{/profile/blueprint-sharing}" method="post" th:object="${profileBlueprintSharingForm}">
                 <input type="hidden" name="version" th:field="*{version}">
                 <div class="card-head">
@@ -123,7 +123,7 @@
                 </div>
             </form>
 
-            <!-- Access & security -->
+            <!--/* Access & security */-->
             <div class="card card--inset">
                 <div class="card-head">
                     <h2 class="card-title" th:text="#{profile.security.title}">Access &amp; Security</h2>
@@ -138,9 +138,9 @@
                 </div>
             </div>
 
-            <!-- Data export (REQ-SEC-058, ADR-0185). Plain GET links: a download is a
+            <!--/* Data export (REQ-SEC-058, ADR-0185). Plain GET links: a download is a
                  navigation, not a mutation, so routing it through krtFetch would only mean
-                 buffering the whole document in JavaScript to hand it back to the browser. -->
+                 buffering the whole document in JavaScript to hand it back to the browser. */-->
             <div class="card card--inset" id="profile-export-card">
                 <div class="card-head">
                     <h2 class="card-title" th:text="#{profile.export.title}">Meine Daten exportieren</h2>
@@ -164,9 +164,9 @@
                 </div>
             </div>
 
-            <!-- Art. 17 erasure request (REQ-SEC-061, ADR-0181). The card is a fragment so
+            <!--/* Art. 17 erasure request (REQ-SEC-061, ADR-0181). The card is a fragment so
                  profile.js can swap it in place after a write (REQ-FE-001) instead of
-                 reloading; this host div is the swap container. -->
+                 reloading; this host div is the swap container. */-->
             <div id="profile-deletion-host">
                 <div th:replace="~{fragments/profile-deletion-card :: card}"></div>
             </div>
@@ -174,13 +174,13 @@
         </div>
     </div>
 
-    <!--
+    <!--/*
       Confirmation for the erasure request. Not a native dialog (REQ-UI-*): the canonical
       .krt-modal shell via the shared fragment. The checkbox records the member's Art. 17 wish to
       have the surviving handle snapshots anonymised too — a wish, not an instruction: an admin
       weighs it and decides it deliberately, which the hint says in as many words so nobody ticks
       it expecting it to happen by itself.
-    -->
+    */-->
     <div th:replace="~{fragments/modal-wrapper :: modal(modalId='profile-deletion-modal', titleKey='profile.deletion.modal.title', variant=null, body=~{::.profile-deletion-form})}">
         <div class="profile-deletion-form">
             <div class="krt-modal-body">
@@ -211,16 +211,16 @@
         </div>
     </div>
 </main>
-<!-- KRT toast / confirm infrastructure (showFrontendSuccessToast / showFrontendErrorToast /
-     showKrtConfirm) used by the in-place description save below. -->
+<!--/* KRT toast / confirm infrastructure (showFrontendSuccessToast / showFrontendErrorToast /
+     showKrtConfirm) used by the in-place description save below. */-->
 <th:block th:replace="~{fragments/toast :: toast}" />
-<!--
+<!--/*
   In-place profile saves (epic #571, REQ-FE-001). Intercepts BOTH the description form and the
   payout-preference form submit and routes each through window.krtFetch.write — no page navigation
   on success. Both forms keep their th:action/method=post so a script-disabled browser still posts
   and hits the redirect handlers (ProfileController#updateDescription / #updatePayoutPreference),
   i.e. progressive enhancement with a no-JS fallback.
--->
+*/-->
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     window.krtProfileI18n = {
         saved: /*[[#{frontend.ajax.saved}]]*/ 'Saved successfully.',

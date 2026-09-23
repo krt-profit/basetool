@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-<!--
+<!--/*
   Canonical KRT HUD modal shell (S12, #918).
 
   Renders the `.krt-modal-overlay` scrim + `.krt-modal` frame (orange top edge +
@@ -25,7 +25,7 @@
   adds no inline style and the rendered shell is byte-identical to the hand-written markup.
   Modals that need a server-driven open state (a th:style/th:if on the overlay) keep
   their bespoke overlay inline for now — this fragment targets the JS-toggled ones.
--->
+*/-->
 <div th:fragment="modal(modalId, titleKey, variant, body)"
      class="krt-modal-overlay" th:id="${modalId}">
   <div class="krt-modal" th:classappend="${variant}"

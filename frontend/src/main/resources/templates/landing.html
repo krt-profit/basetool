@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
-<!--
+<!--/*
   The only page an unauthenticated visitor sees (REQ-SEC-052 / REQ-UI-018, ADR-0159, decision D7).
 
   It renders NO DATA and MINTS NO SESSION. Both halves are the requirement, not a nicety:
@@ -19,7 +19,7 @@
   does carry is what D7 named: the product's name, one paragraph, the two login
   entries, the legal links, and the Fan Kit band — which must appear on the
   home-page analogue (Fan Kit Guidelines section 2b), and this is now it.
--->
+*/-->
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
     <title th:text="${appTitle}">Profit Basetool</title>
 </head>
@@ -44,9 +44,9 @@
         <h1 th:text="#{landing.title}">Profit Basetool</h1>
         <p th:text="#{landing.lead}">Das Werkzeug der Organisation f&uuml;r Eins&auml;tze, Auftr&auml;ge, Lager und Raffinerie.</p>
 
-        <!-- The notice REQ-UI-018 requires on the landing page: this is a fan project, not a CIG
+        <!--/* The notice REQ-UI-018 requires on the landing page: this is a fan project, not a CIG
              product. It stays here, unchanged in substance, now that the page carries nothing
-             else. -->
+             else. */-->
         <p class="krt-landing-notice" th:text="#{landing.notice}">Ein inoffizielles Fan-Projekt zu Star Citizen.</p>
 
         <div class="krt-landing-actions mt-1-5">
@@ -60,9 +60,9 @@
             </a>
         </div>
 
-        <!-- Stated rather than left for the visitor to discover by clicking: every other page
+        <!--/* Stated rather than left for the visitor to discover by clicking: every other page
              sends them to the login and back, and a member arriving from a Discord deep link
-             should know that is what will happen. -->
+             should know that is what will happen. */-->
         <p class="krt-landing-hint mt-1" th:text="#{landing.members_only}">Alles Weitere ist Mitgliedern vorbehalten.</p>
 
         <nav class="krt-landing-legal mt-1-5" th:aria-label="#{nav.legal}">
@@ -75,8 +75,8 @@
 
     <th:block th:replace="~{fragments/fankit :: band}" />
 </main>
-<!-- No footer include here: the sidebar fragment this page opens with already ends with
+<!--/* No footer include here: the sidebar fragment this page opens with already ends with
      ~{fragments/footer :: footer} (fragments/sidebar.html), so a second one rendered the
-     legal band twice on the one page a logged-out visitor sees. -->
+     legal band twice on the one page a logged-out visitor sees. */-->
 </body>
 </html>

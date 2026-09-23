@@ -3,105 +3,7 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{orders.create.title} + ' - ' + ${appTitle}">Neuer Auftrag - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-<style th:attr="nonce=${cspNonce}">
-        .form-container {
-            max-width: 800px;
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-family: 'Lato', sans-serif;
-            font-weight: 700;
-            font-size: 0.9rem;
-        }
-        /* Radios (the Material <-> Item order-kind toggle) and checkboxes are excluded: the
-           0.75rem padding + surface background would inflate the 1.2rem KRT controls
-           (styles.css) into oversized ovals/squares. The exclusions sit in :where() so they add
-           ZERO specificity — the rule stays at the plain `.form-group input` weight (0,1,1) and
-           keeps losing to the (0,2,0) combobox rule `.krt-combobox .krt-combobox__input`, whose
-           right padding reserves room for the dropdown chevron. */
-        .form-group input:where(:not([type='checkbox']):not([type='radio'])), .form-group select, .form-group textarea {
-            width: 100%;
-            padding: 0.75rem;
-            background-color: var(--color-surface-input);
-            border: 1px solid var(--color-gray-3);
-            color: var(--color-gray-1);
-            font-family: var(--font-body);
-            box-sizing: border-box;
-        }
-        .form-group textarea {
-            resize: vertical;
-        }
-        .material-row {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 1rem;
-            align-items: flex-end;
-        }
-        /*
-         * The item-line row is a flex container with align-items:flex-end and a
-         * label-less "Entfernen" button next to label-bearing .form-group columns.
-         * The global `.form-group { margin-bottom: 1.25rem }` (styles.css) overrides
-         * the `.mb-0` utility on these columns (equal specificity, but `.form-group`
-         * is declared later), so the columns' margin box extends 1.25rem below their
-         * input. flex-end then aligns the margin boxes, dropping the zero-margin button
-         * 1.25rem below the inputs. Zero the margin here (specificity 0/2/0 beats the
-         * global 0/1/0) so the button's bottom edge lines up with the Anzahl field.
-         */
-        .item-line .form-group {
-            margin-bottom: 0;
-        }
-        details.scmdb-import summary::-webkit-details-marker {
-            display: none;
-        }
-        details.scmdb-import summary {
-            list-style: none;
-            cursor: pointer;
-            color: var(--color-primary);
-            font-family: 'Lato', sans-serif;
-            font-weight: 700;
-            outline: none;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        details.scmdb-import summary::before {
-            content: '▶';
-            display: inline-block;
-            transition: transform 0.2s;
-            font-size: 0.8rem;
-        }
-        details.scmdb-import[open] summary::before {
-            transform: rotate(90deg);
-        }
-        /*
-         * Classes for the item-line rows that orders-create.js builds via innerHTML. They replace
-         * the former inline style="" attributes on those elements: an inline style inside a JS
-         * innerHTML string is blocked by the CSP style-src-attr 'none' pin just like a template one
-         * (ADR-0093). Flex-item widths reuse the global .flex-1 / .flex-2 utilities, nowrap reuses
-         * .nowrap, and the SCU hint / unresolved box toggle the runtime .krtm-hidden class.
-         */
-        .oc-line-fields {
-            display: flex;
-            gap: 1rem;
-            align-items: flex-end;
-        }
-        .oc-derived-block {
-            margin-top: 0.75rem;
-        }
-        .oc-note-block {
-            margin-top: 0.5rem;
-        }
-        .oc-material-line {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-            margin-top: 0.4rem;
-        }
-        .oc-label-strong {
-            color: var(--color-gray-1);
-        }
-    </style>
+<link rel="stylesheet" th:href="@{/css/pages/orders-create.css}">
     </th:block>
 </head>
 <body>
@@ -139,8 +41,8 @@
         </div>
 
         <div class="form-container">
-            <!-- In edit mode the order kind is fixed to ITEM (only item orders are edited via this
-                 page reuse), so the toggle is hidden but the item radio is pre-checked. -->
+            <!--/* In edit mode the order kind is fixed to ITEM (only item orders are edited via this
+                 page reuse), so the toggle is hidden but the item radio is pre-checked. */-->
             <div class="form-group" th:classappend="${editOrderId != null} ? 'krtm-hidden' : ''">
                 <label th:text="#{orders.create.kind}">Auftragsart</label>
                 <div class="flex-gap-sm krtm-display-flex-gap-1-5rem-7e37">
@@ -190,10 +92,10 @@
                     <div class="material-row" th:each="mat, stat : *{materials}">
                         <div class="form-group flex-2 mb-0">
                             <label th:text="#{orders.create.material}">Material</label>
-                            <!-- Server-side-search combobox (REQ-FE-016): the marker value wires the
+                            <!--/* Server-side-search combobox (REQ-FE-016): the marker value wires the
                                  remote-materials-joborder source, so the full catalog is no longer dumped
                                  as <option>s. Only the bound row value (edit / validation redisplay) is
-                                 seeded as a single option; the enhancer harvests its label + metadata. -->
+                                 seeded as a single option; the enhancer harvests its label + metadata. */-->
                             <select th:field="*{materials[__${stat.index}__].materialId}" data-testid="order-material-select" data-role="material-select" data-krt-combobox="remote-materials-joborder" required>
                                 <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
                                 <option th:each="m : ${materials}" th:if="${m.id == jobOrderForm.materials[stat.index].materialId}" th:value="${m.id}" th:data-quantity-type="${m.quantityType}" th:text="${m.name}"></option>
@@ -270,15 +172,15 @@
         </div>
     </div>
     
-    <!-- Template for new min-quality options (650 / Keine), cloned by addMaterialRow() -->
+    <!--/* Template for new min-quality options (650 / Keine), cloned by addMaterialRow() */-->
     <select id="minquality-options-template" class="krtm-display-none-5790">
         <option value="650">650</option>
         <option value="" th:text="#{orders.material.minQuality.none}">Keine</option>
     </select>
 
-    <!-- Placeholder-only template cloned by addItemLine(); the item options themselves are fetched
+    <!--/* Placeholder-only template cloned by addItemLine(); the item options themselves are fetched
          on demand from the backend (see fetchItemOptions / GET /orders/item-search), so the picker
-         no longer preloads — and silently truncates past an alphabetical cap — the whole catalog. -->
+         no longer preloads — and silently truncates past an alphabetical cap — the whole catalog. */-->
     <select id="item-options-template" class="krtm-display-none-5790">
         <option value="" th:text="#{orders.create.item.select}">-- Item wählen --</option>
     </select>

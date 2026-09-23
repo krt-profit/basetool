@@ -20,12 +20,12 @@
     </nav>
 </header>
 <main>
-    <!--
+    <!--/*
       Reached only when the Android App Link did NOT resolve to the app (REQ-SEC-038): a device
       whose domain verification is in the sticky failed state, or a desktop browser, which has no
       app to hand the link to. The member is mid-login here, so the page has to say what happened
       before it says what to do — the previous behaviour was a bare 404, which reads as a fault.
-    -->
+    */-->
     <div class="hud-box mt-2">
         <h1 th:text="#{appLink.title}">Diese Adresse geh&ouml;rt zur App</h1>
         <p th:text="#{appLink.intro}">Die Anmeldung der App wurde im Browser ge&ouml;ffnet.</p>

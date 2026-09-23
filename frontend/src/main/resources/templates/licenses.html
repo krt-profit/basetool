@@ -20,12 +20,12 @@
     </nav>
 </header>
 <main>
-    <!--
+    <!--/*
       REQ-UI-021 / ADR-0197. A PUBLIC page (REQ-SEC-052) with no backend call: the list is the
       build-time Licensee report of every shipped module plus the bundled fonts and image layers,
       read once at startup by OssLicenseCatalog. Nothing on it mutates, so there is no live-update
       wiring; the groups fold with a native <details>, which needs no script.
-    -->
+    */-->
     <div class="hud-box mt-2">
         <h1 th:text="#{licenses.title}">Open-Source-Lizenzen</h1>
         <p th:text="#{licenses.intro}">Das Profit Basetool enth&auml;lt Open-Source-Komponenten Dritter.</p>

@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -151,10 +152,9 @@ class AdminMaterialsPageControllerMvcTest {
         .perform(get("/admin/materials"))
         .andExpect(status().isOk())
         .andExpect(
-            content()
-                .string(
-                    containsString(
-                        ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
+            PageStylesheets.content(
+                containsString(
+                    ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
   }
 
   // covers #582 — the category-create twin (X-Requested-With + JSON body) relays to the backend and

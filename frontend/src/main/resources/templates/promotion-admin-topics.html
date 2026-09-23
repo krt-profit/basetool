@@ -4,78 +4,7 @@
     <title th:text="#{promotion.admin.topics.title} + ' - ' + ${appTitle}">Themenbereiche verwalten - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
     <link rel="stylesheet" th:href="@{/css/promotion-admin.css}">
-    <style th:attr="nonce=${cspNonce}">
-        .admin-topic-card {
-            background: var(--color-bg-dark-gray);
-            border: 1px solid var(--color-gray-3);
-            margin-bottom: 1rem;
-        }
-        .admin-topic-card > summary {
-            list-style: none;
-            cursor: pointer;
-            padding: 0.75rem 1rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-            background-color: var(--color-surface-input);
-            border-bottom: 1px solid var(--color-gray-3);
-        }
-        .admin-topic-card > summary::-webkit-details-marker { display: none; }
-        .admin-topic-card > summary::before {
-            content: '+';
-            color: var(--color-primary);
-            font-weight: 700;
-            font-size: 1.1rem;
-            margin-right: 0.5rem;
-        }
-        .admin-topic-card[open] > summary::before { content: '\2212'; }
-        .admin-topic-name {
-            font-family: 'Lato', sans-serif;
-            font-weight: 700;
-            color: var(--color-primary);
-            font-size: 1rem;
-            letter-spacing: 0.05em;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        .admin-topic-body {
-            padding: 1rem;
-        }
-        .admin-topic-description {
-            font-size: 0.85rem;
-            color: var(--color-gray-2-text);
-            margin-bottom: 0.75rem;
-        }
-        .admin-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-
-        .category-list {
-            margin-top: 0.5rem;
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-
-        .category-actions-row {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-        }
-        .category-summary-name {
-            font-size: 0.9rem;
-            color: var(--color-gray-1);
-            font-weight: 600;
-            flex: 1;
-        }
-
-        @media (width <= 768px) {
-            .btn { min-height: 44px; }
-            .admin-topic-card > summary { flex-direction: column; align-items: flex-start; }
-        }
-    </style>
+    <link rel="stylesheet" th:href="@{/css/pages/promotion-admin-topics.css}">
     </th:block>
 </head>
 <body>
@@ -107,7 +36,7 @@
     <th:block th:unless="${isAllSquadronsMode}">
 
     <div class="hud-box mt-2">
-        <!-- Save-all banner: only visible while ≥1 textarea is dirty. -->
+        <!--/* Save-all banner: only visible while ≥1 textarea is dirty. */-->
         <div id="pa-save-all-banner" class="pa-save-all-banner" role="status">
             <span>
                 <span class="pa-save-all-count" id="pa-save-all-count">0</span>
@@ -234,7 +163,7 @@
                         </summary>
                         <div class="pa-category-body">
                             <th:block th:with="contents=${categoryContentMap[cat.id.toString()]}">
-                                <!-- Stufe A -->
+                                <!--/* Stufe A */-->
                                 <div class="pa-level-row"
                                      th:with="lc=${contents != null and !contents.?[level == 'LEVEL_A'].isEmpty() ? contents.?[level == 'LEVEL_A'][0] : null}">
                                     <span class="pa-level-label" th:text="#{promotion.level.a}">Stufe A</span>
@@ -253,7 +182,7 @@
                                             th:title="#{promotion.admin.levelcontent.save}"
                                             th:aria-label="#{promotion.admin.levelcontent.save}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg></button>
                                 </div>
-                                <!-- Stufe B -->
+                                <!--/* Stufe B */-->
                                 <div class="pa-level-row"
                                      th:with="lc=${contents != null and !contents.?[level == 'LEVEL_B'].isEmpty() ? contents.?[level == 'LEVEL_B'][0] : null}">
                                     <span class="pa-level-label" th:text="#{promotion.level.b}">Stufe B</span>
@@ -272,7 +201,7 @@
                                             th:title="#{promotion.admin.levelcontent.save}"
                                             th:aria-label="#{promotion.admin.levelcontent.save}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg></button>
                                 </div>
-                                <!-- Stufe C -->
+                                <!--/* Stufe C */-->
                                 <div class="pa-level-row"
                                      th:with="lc=${contents != null and !contents.?[level == 'LEVEL_C'].isEmpty() ? contents.?[level == 'LEVEL_C'][0] : null}">
                                     <span class="pa-level-label" th:text="#{promotion.level.c}">Stufe C</span>
@@ -303,7 +232,7 @@
     </th:block>
 </main>
 
-<!-- Create Topic Modal -->
+<!--/* Create Topic Modal */-->
 <div id="modal-create-topic" class="krt-modal-overlay" role="dialog" aria-modal="true">
     <div class="krt-modal krt-modal--wide">
         <div class="krt-modal-head">
@@ -333,7 +262,7 @@
     </div>
 </div>
 
-<!-- Edit Topic Modal -->
+<!--/* Edit Topic Modal */-->
 <div id="modal-edit-topic" class="krt-modal-overlay" role="dialog" aria-modal="true">
     <div class="krt-modal krt-modal--wide">
         <div class="krt-modal-head">
@@ -364,7 +293,7 @@
     </div>
 </div>
 
-<!-- Create Category Modal -->
+<!--/* Create Category Modal */-->
 <div id="modal-create-category" class="krt-modal-overlay" role="dialog" aria-modal="true">
     <div class="krt-modal krt-modal--wide">
         <div class="krt-modal-head">
@@ -394,7 +323,7 @@
     </div>
 </div>
 
-<!-- Edit Category Modal -->
+<!--/* Edit Category Modal */-->
 <div id="modal-edit-category" class="krt-modal-overlay" role="dialog" aria-modal="true">
     <div class="krt-modal krt-modal--wide">
         <div class="krt-modal-head">

@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.ManufacturerDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ShipTypeDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -127,10 +128,9 @@ class ShipDataPageControllerMvcTest {
         // carry the :where() exclusion so it can never capture a checkbox/radio and stretch it into
         // a full-width padded bar (it ties the global KRT square rule and renders after it).
         .andExpect(
-            content()
-                .string(
-                    containsString(
-                        ".form-group input:where(:not([type='checkbox']):not([type='radio']))")))
+            PageStylesheets.content(
+                containsString(
+                    ".form-group input:where(:not([type='checkbox']):not([type='radio']))")))
         .andExpect(content().string(containsString("</html>")));
   }
 }

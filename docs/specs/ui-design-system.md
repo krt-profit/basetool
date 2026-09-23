@@ -10,7 +10,7 @@
 > [0191](../adr/0191-touch-drags-the-crew-board-through-pointer-events.md) (REQ-UI-009) ·
 > [0177](../adr/0177-the-app-has-exactly-one-dialog-shape.md) (REQ-UI-013) ·
 > [0197](../adr/0197-shipped-dependencies-pass-a-gpl-compatible-licence-gate-and-are-listed-on-a-public-page.md) (REQ-UI-021) ·
-> **Next free id:** `REQ-UI-023` · **Visual source of truth:** the design
+> **Next free id:** `REQ-UI-024` · **Visual source of truth:** the design
 > skill [`.claude/skills/das-kartell-design/README.md`](../../.claude/skills/das-kartell-design/README.md)
 > (+ [`colors_and_type.css`](../../.claude/skills/das-kartell-design/colors_and_type.css)).
 
@@ -404,8 +404,9 @@ operation-detail paddings — would otherwise reserve space for a footer that is
 **Two amendments to the dense-action exception, owner-approved 2026-09-13** after the first
 measured sweep of the touch classes found both:
 
-- **`.btn-xs2` is NOT exempt.** It is a page-local 32px variant declared in an inline `<style>` by
-  `mission-detail.html` and `operation-detail.html`, and two of its instances are *form*
+- **`.btn-xs2` is NOT exempt.** It is a page-local 32px variant declared in the page stylesheets
+  of `mission-detail.html` and `operation-detail.html` (inline `<style>` blocks until FE-PERF-02,
+  now `css/pages/mission-detail.css` / `operation-detail.css`, linked in the same place), and two of its instances are *form*
   actions — „Ziel hinzufügen", „Schritt hinzufügen" on the Einsatz create form. The rule above is
   explicit that a form button keeps the floor, so the whole variant is raised to 44px on the touch
   classes and keeps its density on desktop. The override is written `.btn.btn-xs2` because the
@@ -480,8 +481,9 @@ and no stylesheet had ever declared:
   to declare the token to decline it.
 
 Three rules remain written out per control in the touch block, and each states a decision rather than
-filling a gap: `.btn.btn-xs2` and `input.item-checkbox` must out-specify a page-local `<style>` rule
-that the browser reads after `styles.css`, and the dismiss-button group (`.close-sidebar-btn`,
+filling a gap: `.btn.btn-xs2` and `input.item-checkbox` must out-specify a page-local rule (a page
+stylesheet under `css/pages/`, formerly an inline `<style>`) that the browser reads after
+`styles.css`, and the dismiss-button group (`.close-sidebar-btn`,
 `.krt-modal-close`) declares its square and its centring. *(2026-09-22: that group used to exist
 because `.close-modal` was a `<span>` no element selector reaches; the span went with the legacy
 dialog shapes in #1891, and the explicit `min-height` is kept only because it is harmless.)*
@@ -1050,6 +1052,55 @@ rendered, linked beside the terms in the footer), `OssBundledComponentsTest`, an
 entries in `AnonymousSurfaceSweepMvcTest`, `PublicPathsTest`, `TermsAcceptanceGateFilterTest` and
 `AnonymousSurfaceE2eTest`. Monitoring: `/licenses` is a `blackbox-public-surface` target
 (`REQ-OBS-012`).
+
+### REQ-UI-023 — A page ships no developer text and no inline page CSS
+
+A rendered page carries what the browser needs and nothing a developer wrote for another developer.
+
+- **Template comments are Thymeleaf parser-level comments** (`<!--/* … */-->`), which the engine
+  drops at parse time. A plain `<!-- … -->` is sent with every response. The star-slash pair may not
+  appear inside one — it closes the block early and renders the rest; write `* /`.
+- **Page CSS lives in `static/css/pages/<page>.css`**, linked by a `<link rel="stylesheet">` in the
+  place the page's `<style>` block used to stand — so a head stylesheet still sits between
+  `styles.css` and `inline-migration.css`, a body one after both, and the cascade order is the one
+  the page always had. A template carries no `<style>` element. Each file belongs to exactly one
+  template.
+- **The icon sprite stays inline, by measurement.** After the two rules above it is 16.2 KB raw and
+  2.4 KB gzipped per page; a separate file would save those 2.4 KB per navigation at the cost of a
+  second request before the first icon paints, a content-hashed URL in every `<use href>` of the
+  templates and of eight scripts, and a re-measurement of every icon. Revisit if the sprite grows.
+
+Measured on 2026-09-23 with the MockMvc render of five pages (admin, empty backend), before → after:
+
+| Page | Raw | gzip |
+| --- | --- | --- |
+| `/hangar` | 91.7 KB → 58.3 KB | 23.0 KB → 10.8 KB |
+| `/missions` | 68.2 KB → 41.2 KB | 18.6 KB → 8.0 KB |
+| `/orders` | 75.1 KB → 44.0 KB | 19.7 KB → 8.9 KB |
+| `/inventory/my` | 122.2 KB → 81.3 KB | 30.2 KB → 15.1 KB |
+| `/refinery-orders` | 71.6 KB → 41.2 KB | 18.5 KB → 8.0 KB |
+
+The comments were 24–32 KB of every page; the page CSS (up to 22 KB on the Einsatz detail) is now a
+content-hashed, `immutable` asset fetched once.
+
+**Acceptance**
+
+- [x] No template contains a plain HTML comment outside `script` / `style` / `textarea`, and no
+  parser-level comment contains an inner star-slash pair.
+- [x] No template contains a `<style>` element; every `/css/pages/` link names an existing file and
+  every file there is linked by exactly one template.
+- [x] Every moved stylesheet is equivalent to the block it replaced (whitespace, quotes and comments
+  aside — checked once at the move); the render tests that pinned a page selector read the linked
+  stylesheet instead of the response.
+- [x] The page stylesheets are linted: `:frontend:lintCssInline` reads `static/css/pages/**` with the
+  same rule set it applied to the inline blocks; `.stylelintrc.json` ignores the directory, and
+  Prettier formats it like every other stylesheet.
+
+**Enforced by:** `TemplateCommentHygieneTest` (all four rules), `PageStylesheets` in the render
+tests, `SingleModalShapeTest` (which now also reads the page stylesheets — and found three dead
+legacy `.modal` rules the inline blocks had hidden from it), `:frontend:lintCssInline`,
+`:frontend:prettierCheck` · **Related:** REQ-UI-009, REQ-UI-013, REQ-SEC-031 (`no-store` pages),
+ADR-0093 (nonce-gated style blocks), ADR-0168 (asset trees)
 
 ## Out of scope
 

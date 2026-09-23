@@ -3,32 +3,7 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{admin.settings.title} + ' - ' + ${appTitle}">Systemeinstellungen - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-        <style th:attr="nonce=${cspNonce}">
-            .data-section {
-                margin-bottom: 3rem;
-            }
-            .form-group label {
-                display: block;
-                margin-bottom: 0.5rem;
-                font-family: var(--font-body);
-                font-size: 0.8rem;
-            }
-            /* Checkboxes and radios are excluded: width:100% + the padding would stretch the
-               1.2rem KRT squares (styles.css) full-width. The exclusions sit in :where() so they
-               add ZERO specificity — the rule keeps the plain `.form-group input` weight (0,1,1)
-               and stays below the (0,2,0) combobox rule `.krt-combobox .krt-combobox__input`.
-               The promotion/profit toggles sit outside .form-group today; the exclusion closes
-               the latent trap that broke admin/materials when its checkboxes were added later. */
-            .form-group input:where(:not([type='checkbox']):not([type='radio'])), .form-group select, .form-group textarea {
-                width: 100%;
-                padding: 0.5rem;
-                background-color: var(--color-surface-input);
-                border: 1px solid var(--color-gray-3);
-                color: var(--color-gray-1);
-                font-family: var(--font-body);
-                box-sizing: border-box;
-            }
-        </style>
+        <link rel="stylesheet" th:href="@{/css/pages/admin-settings.css}">
     </th:block>
 </head>
 <body>
@@ -105,13 +80,13 @@
             </form>
         </div>
 
-        <!--
+        <!--/*
             Per-squadron promotion-feature toggle. Each row PATCHes the backend on click via
             /api/proxy/squadrons/{id}/promotion-enabled — no full form submit so the admin can
             flip several squadrons without a page reload. Flipping the flag does NOT delete any
             promotion data; the menu just becomes hidden for the squadron's non-admin members
             until the flag goes back to ON.
-        -->
+        */-->
         <div class="data-section mt-2">
             <h2 th:text="#{admin.settings.squadron.promotion}">Beförderungssystem pro Staffel</h2>
             <p class="mb-1 text-muted"
@@ -148,12 +123,12 @@
             </div>
         </div>
 
-        <!--
+        <!--/*
             Per-squadron profit-eligibility toggle. Each row PATCHes the backend on click via
             /api/proxy/squadrons/{id}/profit-eligible — no full form submit. Marking a squadron
             eligible opts it into the Job-Order responsible (processing) picker; un-marking removes
             it again. Spezialkommandos have their own per-SK toggle in the section below.
-        -->
+        */-->
         <div class="data-section mt-2">
             <h2 th:text="#{admin.settings.squadron.profit}">Auftragsbearbeitung pro Staffel</h2>
             <p class="mb-1 text-muted"
@@ -190,11 +165,11 @@
             </div>
         </div>
 
-        <!--
+        <!--/*
             Per-SK profit-eligibility toggle. Same pattern as the squadron table, but PATCHes
             /api/proxy/special-commands/{id}/profit-eligible. SKs of non-Profit Kartell departments
             stay unchecked: they may place orders but not process them.
-        -->
+        */-->
         <div class="data-section mt-2">
             <h2 th:text="#{admin.settings.sk.profit}">Auftragsbearbeitung pro Spezialkommando</h2>
             <p class="mb-1 text-muted"

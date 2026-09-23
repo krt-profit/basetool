@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-<!--
+<!--/*
   Reusable SCU input-hint marker. Renders a small focusable "?" disc that sits
   next to a material-quantity input whose unit is SCU. Hover or keyboard-focus
   reveals a KRT-styled tooltip explaining the decimal scale (cSCU = 0.01 SCU,
@@ -18,7 +18,7 @@
   The tooltip text is the i18n key `material.scu.hint`; the same string is mirrored
   onto aria-label so screen-reader users hear it on focus. The static form needs no
   unique id, so the markup is safe to clone (e.g. the order edit-modal material rows).
--->
+*/-->
 <span th:fragment="scuHint(hintId, startHidden)"
       class="scu-hint"
       th:id="${hintId}"
@@ -31,7 +31,7 @@
           th:text="#{material.scu.hint}">Eingabe in SCU. cSCU ist 0,01 SCU. &#181;SCU ist 0,001 SCU.</span>
 </span>
 
-<!--
+<!--/*
   Generic field-help marker (#997): the same focusable "?" disc + pure-CSS HUD tooltip as scuHint,
   but with a caller-supplied i18n message key so any form field can carry an inline hover/keyboard
   hint instead of small, hard-to-read sub-field text. Reuses the `.scu-hint` / `.scu-hint__bubble`
@@ -40,7 +40,7 @@
 
   Parameter:
     - messageKey : the i18n key of the hint text (e.g. 'bank.field.amount.hint').
--->
+*/-->
 <span th:fragment="fieldHint(messageKey)"
       class="scu-hint field-hint-marker"
       tabindex="0"

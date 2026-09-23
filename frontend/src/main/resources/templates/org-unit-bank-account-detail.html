@@ -35,16 +35,16 @@
       th:with="d=${detail.detail()}, acct=${detail.detail().account()}, hasSettingsTab=${settings != null}"
       th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-bank-livesync-updates=#{livesync.updates_available},data-bank-account-id=${acct.id()},data-user-id=${#authentication.name}">
 
-    <!-- Read-only account drill-in for org-unit viewers (REQ-BANK-038): history + Halter-redacted
+    <!--/* Read-only account drill-in for org-unit viewers (REQ-BANK-038): history + Halter-redacted
          Kontoauszug; no deposit/withdraw/transfer. The responsible holder / OL additionally manages
-         the balance target and configurable visibility (REQ-BANK-035/-036). -->
+         the balance target and configurable visibility (REQ-BANK-035/-036). */-->
     <div class="greeting hud-box flex-between">
         <div>
             <p class="krtm-margin-0-0-0-25rem-0b90"><a th:href="@{/org-unit-bank}" class="text-muted krtm-font-size-0-75rem-de0c"
                   th:text="'&#8592; ' + #{bank.orgUnit.detail.back}">&#8592; Zur&uuml;ck zur &Uuml;bersicht</a></p>
             <h1 th:text="${acct.name()}">Staffel IRIDIUM</h1>
-            <!-- The page only ever lists active accounts, so the always-"Aktiv" status pill is
-                 dropped; the header keeps the type chip + account number. -->
+            <!--/* The page only ever lists active accounts, so the always-"Aktiv" status pill is
+                 dropped; the header keeps the type chip + account number. */-->
             <p class="text-muted krtm-margin-0-25rem-0-0-font-size-0-8rem-cb15">
                 <span class="chip krtm-font-size-0-55rem-eff3"
                       th:text="#{'bank.account.type.' + ${acct.type()}}">Staffel</span>
@@ -58,16 +58,16 @@
         </div>
     </div>
 
-    <!-- Tab row + shared info tiles + the responsibility-settings tab panel; re-rendered in place
+    <!--/* Tab row + shared info tiles + the responsibility-settings tab panel; re-rendered in place
          after a target/visibility write (the facts carry the live balance target). The booking-history
          tab panel is the separate orgUnitBankBookings swap below, so paging it never re-fetches the
-         settings — and a settings write never resets the history page. -->
+         settings — and a settings write never resets the history page. */-->
     <div id="org-unit-bank-settings-results">
     <th:block th:fragment="orgUnitBankSettings"
               th:with="d=${detail.detail()}, acct=${detail.detail().account()}, hasSettingsTab=${settings != null}">
-        <!-- Tab row (REQ-BANK-038): Buchungshistorie | Verantwortung & Sichtbarkeit, above the shared
+        <!--/* Tab row (REQ-BANK-038): Buchungshistorie | Verantwortung & Sichtbarkeit, above the shared
              info tiles. Shown only when there is a settings tab (a manager, or a viewer with approval
-             limits to read); otherwise the history panel below renders plainly with its own heading. -->
+             limits to read); otherwise the history panel below renders plainly with its own heading. */-->
         <div class="tab-nav mt-2" role="tablist" th:if="${hasSettingsTab}" th:aria-label="${acct.name()}">
             <button type="button" class="tab active" role="tab" aria-selected="true"
                     id="oud-tab-history" aria-controls="oud-panel-history" data-tab="history"
@@ -111,23 +111,23 @@
             </div>
         </div>
 
-        <!-- Read-only approval-limit display (REQ-BANK-041): shown to a viewer who is NOT the
+        <!--/* Read-only approval-limit display (REQ-BANK-041): shown to a viewer who is NOT the
              responsible holder (settings == null) so they still see the limits that apply to their
              requests. It is deliberately OUTSIDE the responsibility tab — that tab is the responsible
-             holder's alone — and renders as a plain inline section below the info tiles. -->
-        <!-- th:if must NOT share an element with th:replace: th:replace (attribute precedence 1) runs
+             holder's alone — and renders as a plain inline section below the info tiles. */-->
+        <!--/* th:if must NOT share an element with th:replace: th:replace (attribute precedence 1) runs
              BEFORE th:if (3), so a same-element guard is dead and the read-only limits box renders
              even for a manager (settings != null), duplicating the editor shown in the settings tab.
              The condition gates an outer th:block so the display stays hidden from the responsible
-             holder. -->
+             holder. */-->
         <th:block th:if="${settings == null}">
             <th:block th:replace="~{fragments/bank-approval-limits :: limitsDisplay(${detail.detail().approvalLimits()})}"></th:block>
         </th:block>
 
-        <!-- KRT-account (CARTEL) amount-tiered approval ladder, read-only to every viewer
+        <!--/* KRT-account (CARTEL) amount-tiered approval ladder, read-only to every viewer
              (REQ-BANK-047): the amount bands and who approves each. Managed only by the Bankleitung in
              the Verwaltung tab. Shown for the KRT account regardless of settings, so a plain member and
-             the OL both see it. -->
+             the OL both see it. */-->
         <div class="hud-box mt-2" th:if="${acct.type() == 'CARTEL'}"
              data-testid="org-unit-bank-cartel-ladder"
              th:with="t1=${acct.employeeApprovalCeiling()},t2=${acct.areaLeadApprovalCeiling()}">
@@ -154,33 +154,33 @@
             </div>
         </div>
 
-        <!-- VERANTWORTUNG & SICHTBARKEIT tab panel: the responsible holder's settings (balance target,
+        <!--/* VERANTWORTUNG & SICHTBARKEIT tab panel: the responsible holder's settings (balance target,
              configurable visibility, approval limits). Shown ONLY to the responsible holder / manager
              (settings != null, == hasSettingsTab); hidden by default — Buchungshistorie is the
-             default-active tab and the tab label supplies the heading, so the panel has no h2. -->
+             default-active tab and the tab label supplies the heading, so the panel has no h2. */-->
         <div th:if="${hasSettingsTab}" id="oud-panel-settings" data-tabpanel="settings" role="tabpanel"
              aria-labelledby="oud-tab-settings" hidden>
 
-        <!-- Responsibility settings (REQ-BANK-035/-036/-041): only for the holder / OL. The three
+        <!--/* Responsibility settings (REQ-BANK-035/-036/-041): only for the holder / OL. The three
              independent areas — Sichtbarkeit, Freigabe-Limits, Kontostandsziel (in that order, the
              fill-to-target goal last) — each render as their own hud-box tile inside the responsive
              .oud-settings-grid, whose 540px track floor keeps every tile wide enough that its content
              never wraps: when two no longer fit side by side the tiles overflow to the next row rather
              than cramming. The grid keeps the org-unit-bank-settings testid so the settings swap target
-             and the tests still resolve the region. -->
+             and the tests still resolve the region. */-->
         <div class="oud-settings-grid mt-2" th:if="${settings != null}" data-testid="org-unit-bank-settings">
 
-            <!-- Configurable visibility (REQ-BANK-035): quiet per-entry toggles instead of a wall of
+            <!--/* Configurable visibility (REQ-BANK-035): quiet per-entry toggles instead of a wall of
                  filled CTAs. Each entry shows a chip--success "granted" + a ghost "remove" when the
                  grant is set, and an outline "grant" otherwise. Endpoints/methods/_id/data-refresh are
-                 unchanged from the previous chip layout. -->
+                 unchanged from the previous chip layout. */-->
             <div th:if="${settings.canConfigureVisibility() and settings.visibilityConfigurable()}" class="hud-box"
                  data-testid="org-unit-bank-visibility-settings">
                 <h3 class="sub-h" th:text="#{bank.orgUnit.settings.visibility.title}">Sichtbarkeit</h3>
                 <p class="text-muted krtm-font-size-0-8rem-0fed" th:text="#{bank.orgUnit.settings.visibility.hint}">
                     Lege fest, wer den Kontostand und die Detailansicht zus&auml;tzlich sehen darf.</p>
 
-                <!-- Role buckets + all-members in one toggle list. -->
+                <!--/* Role buckets + all-members in one toggle list. */-->
                 <div th:if="${!#lists.isEmpty(settings.availableRoleCodes())}">
                     <div class="vis-row" th:each="role : ${settings.availableRoleCodes()}"
                          th:with="granted=${settings.grantedRoleCodes().contains(role)}">
@@ -200,11 +200,11 @@
                     </div>
                 </div>
 
-                <!-- All members. The label names the audience the bucket actually admits, mirroring
+                <!--/* All members. The label names the audience the bucket actually admits, mirroring
                      the approval-limit tier (REQ-BANK-035/-041): on an ORG_UNIT / AREA account the
                      grant matches only a member of the OWNING org unit, so it reads "Alle Mitglieder
                      der Org-Einheit"; on a Sonderkonto (SPECIAL, no owning unit) the same bucket
-                     admits every KRT member, so it keeps the org-wide "Alle Mitglieder". -->
+                     admits every KRT member, so it keeps the org-wide "Alle Mitglieder". */-->
                 <div th:if="${settings.allMembersSupported()}" class="vis-row">
                     <span class="v-label" data-testid="org-unit-vis-all-members-label"
                           th:text="${settings.type() == 'SPECIAL'}
@@ -225,7 +225,7 @@
                     </span>
                 </div>
 
-                <!-- Mitglieder des Bereichs (whole area cascade, AREA accounts only, REQ-BANK-048) -->
+                <!--/* Mitglieder des Bereichs (whole area cascade, AREA accounts only, REQ-BANK-048) */-->
                 <div th:if="${settings.areaMembersSupported()}" class="vis-row">
                     <span class="v-label" th:text="#{bank.orgUnit.settings.visibility.areaMembers}">Mitglieder des Bereichs</span>
                     <span class="vis-state">
@@ -243,7 +243,7 @@
                     </span>
                 </div>
 
-                <!-- Individual users -->
+                <!--/* Individual users */-->
                 <h3 class="sub-h" th:text="#{bank.orgUnit.settings.visibility.users}">Einzelne Nutzer</h3>
                 <div th:if="${!#lists.isEmpty(settings.grantedUsers())}">
                     <div class="vis-row" th:each="u : ${settings.grantedUsers()}" data-testid="org-unit-vis-user-row">
@@ -263,9 +263,9 @@
                     <div class="field-row">
                         <div class="bank-form-row grow">
                             <label for="org-unit-vis-user-select" th:text="#{bank.orgUnit.settings.visibility.user.add}">Nutzer freigeben</label>
-                            <!-- Server-side searchable combobox (remote-users, #1193): the roster is no
+                            <!--/* Server-side searchable combobox (remote-users, #1193): the roster is no
                                  longer preloaded. Typing queries /users/search on demand; add-only picker,
-                                 so only the empty placeholder option is seeded. -->
+                                 so only the empty placeholder option is seeded. */-->
                             <select id="org-unit-vis-user-select" name="_userId" required data-krt-combobox="remote-users" data-testid="org-unit-vis-user-select">
                                 <option value="" th:text="#{bank.field.user.placeholder}">Nutzer w&auml;hlen &hellip;</option>
                             </select>
@@ -277,10 +277,10 @@
                 </form>
             </div>
 
-            <!-- Approval limits tile (REQ-BANK-041): responsible holder / management / admin set
+            <!--/* Approval limits tile (REQ-BANK-041): responsible holder / management / admin set
                  per-tier ceilings up to which a tier may request without explicit approval. Its own
                  hud-box so it sits beside the target + visibility tiles; the th:if mirrors the
-                 fragment's own canEdit guard so the tile never renders empty. -->
+                 fragment's own canEdit guard so the tile never renders empty. */-->
             <div class="hud-box"
                  th:if="${settings.approvalLimits() != null and settings.approvalLimits().canEdit()}"
                  data-testid="org-unit-bank-approval-limit-tile">
@@ -288,9 +288,9 @@
                     th:replace="~{fragments/bank-approval-limits :: limitsEditor(${acct}, ${settings.approvalLimits()}, 'orgUnitBankSettings')}"></th:block>
             </div>
 
-            <!-- Balance target tile (REQ-BANK-036): rendered LAST so the settings tab leads with the
+            <!--/* Balance target tile (REQ-BANK-036): rendered LAST so the settings tab leads with the
                  access-control areas (Sichtbarkeit + Freigabe-Limits) and closes with the quieter
-                 fill-to-target goal. -->
+                 fill-to-target goal. */-->
             <div th:if="${settings.canSetTarget()}" class="hud-box" data-testid="org-unit-bank-target-settings">
                 <h3 class="sub-h" th:text="#{bank.orgUnit.settings.target.title}">Kontostandsziel</h3>
                 <p class="text-muted krtm-font-size-0-8rem-0fed" th:text="#{bank.orgUnit.settings.target.hint}">
@@ -317,19 +317,19 @@
     </th:block>
     </div>
 
-    <!-- Buchungshistorie tab (REQ-BANK-038/-049/-051): the balance chart above the Halter-redacted
+    <!--/* Buchungshistorie tab (REQ-BANK-038/-049/-051): the balance chart above the Halter-redacted
          booking history with its period filter. When a settings tab exists this whole block is the
          default-active tab panel; otherwise it renders plainly. Both inner panels are collapsible
-         (default expanded, per-user state persisted by bank.js). -->
+         (default expanded, per-user state persisted by bank.js). */-->
     <div class="mt-2 bank-detail-panels"
          th:attr="id=${hasSettingsTab} ? 'oud-panel-history' : null,
                   data-tabpanel=${hasSettingsTab} ? 'history' : null,
                   role=${hasSettingsTab} ? 'tabpanel' : null,
                   aria-labelledby=${hasSettingsTab} ? 'oud-tab-history' : null">
 
-    <!-- Balance-over-time chart (REQ-BANK-049): collapsible; the range selector re-renders only
+    <!--/* Balance-over-time chart (REQ-BANK-049): collapsible; the range selector re-renders only
          #org-unit-bank-chart-results via fragment=orgUnitBalanceChart. Shown to every viewer of the
-         account (pure balance math, no Halter data, no manage gate). -->
+         account (pure balance math, no Halter data, no manage gate). */-->
     <div class="bank-panel" data-testid="org-unit-bank-chart-panel">
         <button type="button" class="bank-panel-head bank-collapse-head"
                 data-trigger="bank-panel-collapse" data-collapse-key="chart" aria-expanded="true"
@@ -349,9 +349,9 @@
         </div>
     </div>
 
-    <!-- Booking history (Halter redacted, REQ-BANK-038): below the chart when stacked, to its right
+    <!--/* Booking history (Halter redacted, REQ-BANK-038): below the chart when stacked, to its right
          when side by side (REQ-BANK-052). The separate orgUnitBankBookings swap paginates/filters in
-         place via krtFetch. -->
+         place via krtFetch. */-->
     <div class="bank-panel" data-testid="org-unit-bank-bookings-panel">
         <button type="button" class="bank-panel-head bank-collapse-head"
                 data-trigger="bank-panel-collapse" data-collapse-key="history" aria-expanded="true"
@@ -363,8 +363,8 @@
             </span>
         </button>
         <div class="bank-panel-body" id="oud-history-body">
-            <!-- Period filter (REQ-BANK-051): outside the swap container so it persists across pager
-                 swaps; changing a date re-renders #org-unit-bank-bookings-results. -->
+            <!--/* Period filter (REQ-BANK-051): outside the swap container so it persists across pager
+                 swaps; changing a date re-renders #org-unit-bank-bookings-results. */-->
             <form class="bank-history-filter" method="get" th:action="@{${historyBaseUrl}}"
                   data-bank-history-filter>
                 <div class="bank-history-filter-field">
@@ -417,10 +417,10 @@
                             <span th:case="'WIPE_RESET'" class="chip chip--danger" th:text="#{bank.type.WIPE_RESET}">Wipe-Reset</span>
                             <span th:case="*" class="chip" th:text="${b.type()}">?</span>
                         </td>
-                        <!-- Quell-/Zielkonto (REQ-BANK-044): a transfer's counter-account with direction,
+                        <!--/* Quell-/Zielkonto (REQ-BANK-044): a transfer's counter-account with direction,
                              or the deposit/withdrawal counterparty (Einzahler / Empf&auml;nger). The
                              counterparty is shown to members too now (owner decision); only the
-                             aUEC-custody Halter stays redacted (REQ-BANK-038). -->
+                             aUEC-custody Halter stays redacted (REQ-BANK-038). */-->
                         <td class="bank-counterparty-cell" data-testid="org-unit-bank-booking-counterparty">
                             <span th:if="${b.type() == 'TRANSFER' and b.counterAccountNo() != null}"
                                   th:text="(${b.amount().signum() < 0} ? '&#8594; ' : '&#8592; ') + ${b.counterAccountNo()}">&#8594; KB-0002</span>
@@ -436,9 +436,9 @@
                                   th:text="#{bank.fee.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.transferFee()), 1, 'POINT')} + ' &middot; ' + #{bank.fee.net.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.amount().abs().subtract(b.transferFee())), 1, 'POINT')}">Geb&uuml;hr</span>
                         </td>
                     </tr>
-                    <!-- Detail sub-row (REQ-BANK-045): Begr&uuml;ndung first, then Notiz; revealed by
+                    <!--/* Detail sub-row (REQ-BANK-045): Begr&uuml;ndung first, then Notiz; revealed by
                          clicking the row, hidden by default. Kept through redaction (not
-                         player-identifying). -->
+                         player-identifying). */-->
                     <tr class="bank-booking-detail" th:if="${hasDetail}" th:id="${detailId}" hidden
                         data-testid="org-unit-bank-booking-detail">
                         <td colspan="5" class="bank-booking-detail-cell">
@@ -474,7 +474,7 @@
     </div>
     </div>
 
-    <!-- Statement export (REQ-BANK-038): period picker -> Halter-redacted PDF via the org-unit proxy. -->
+    <!--/* Statement export (REQ-BANK-038): period picker -> Halter-redacted PDF via the org-unit proxy. */-->
     <div class="krt-modal-overlay" id="org-unit-statement-modal" th:if="${detail.canExportStatement()}">
         <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.statement.title}">
             <div class="krt-modal-head">

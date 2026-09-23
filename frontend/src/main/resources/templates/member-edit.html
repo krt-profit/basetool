@@ -3,34 +3,7 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{members.edit.title} + ' - ' + ${appTitle}">Mitglied bearbeiten - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-<style th:attr="nonce=${cspNonce}">
-        label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-family: var(--font-body);
-            font-size: 0.8rem;
-            text-transform: uppercase;
-        }
-        input[type="text"], input[type="number"], input[type="date"], select, textarea {
-            width: 100%;
-            padding: 0.8rem;
-            background-color: var(--color-surface-input);
-            border: 1px solid var(--color-gray-3);
-            color: var(--color-gray-1);
-            font-family: var(--font-body);
-            box-sizing: border-box;
-        }
-        input:focus, select:focus, textarea:focus {
-            outline: none;
-            border-color: var(--color-primary);
-            box-shadow: 0 0 5px rgba(231, 126, 35, 0.3);
-        }
-        .form-actions {
-            margin-top: 2rem;
-            display: flex;
-            gap: 1rem;
-        }
-    </style>
+<link rel="stylesheet" th:href="@{/css/pages/member-edit.css}">
     </th:block>
 </head>
 <body>
@@ -57,16 +30,16 @@
 
     <div class="hud-box mt-2">
         
-        <!-- data-member-edit gates the in-place save script (epic #571, REQ-FE-007). The form keeps
+        <!--/* data-member-edit gates the in-place save script (epic #571, REQ-FE-007). The form keeps
              its th:action/method=post so a script-disabled browser still posts and hits the redirect
-             handler (MemberManagementController#updateMember) — progressive enhancement. -->
+             handler (MemberManagementController#updateMember) — progressive enhancement. */-->
         <form id="member-edit-form" data-member-edit="true"
               th:action="@{/members/{id}/edit(id=${user.id})}" method="post" th:object="${memberEditForm}">
             <input type="hidden" name="version" th:field="*{version}">
             <input type="hidden" name="source" th:field="*{source}">
-            <!-- REQ-ORG-017: round-trips whether the authoritative Staffel-membership detail loaded
+            <!--/* REQ-ORG-017: round-trips whether the authoritative Staffel-membership detail loaded
                  on the GET. When false (detail fetch failed) the controller skips the Staffel
-                 reconcile on save, so blank slots never strip the member's Staffeln. -->
+                 reconcile on save, so blank slots never strip the member's Staffeln. */-->
             <input type="hidden" name="staffelDetailLoaded" th:field="*{staffelDetailLoaded}">
             <div class="form-group">
                 <label th:text="#{profile.rank}">Rang</label>
@@ -83,9 +56,9 @@
             <div class="form-group">
                 <label th:text="#{profile.display_name}">Anzeigename</label>
                 <input type="text" name="displayName" th:value="*{displayName}" />
-                <!-- Always present + GET-safe so the in-place save (REQ-FE-007) can paint the field
+                <!--/* Always present + GET-safe so the in-place save (REQ-FE-007) can paint the field
                      error client-side; a bare th:errors would throw on a GET with no BindingResult,
-                     and .field-error:empty{display:none} hides it until populated. -->
+                     and .field-error:empty{display:none} hides it until populated. */-->
                 <div class="field-error" data-error-for="displayName"
                      th:text="${#fields.hasErrors('displayName') ? #fields.errors('displayName')[0] : ''}"></div>
             </div>
@@ -104,24 +77,24 @@
                        class="krtm-min-height-44px-1df5" />
             </div>
 
-            <!-- Staffel memberships (admin-only, since /members/{id}/edit is admin-only). REQ-ORG-017:
+            <!--/* Staffel memberships (admin-only, since /members/{id}/edit is admin-only). REQ-ORG-017:
                  up to two Staffeln, each with its own Logistician / Mission-Manager flags
                  (REQ-SEC-005). OrgUnitContextAdvice injects `availableSquadrons`. The two fixed slots
-                 bind to staffel1*/staffel2* fields; the Save button folds the non-empty slots into one
-                 PATCH /api/v1/users/{id}/memberships reconcile. -->
+                 bind to staffel1* /staffel2* fields; the Save button folds the non-empty slots into one
+                 PATCH /api/v1/users/{id}/memberships reconcile. */-->
             <div class="form-group" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" id="staffel-section">
                 <label th:text="#{members.staffel.title}">Staffeln</label>
 
-                <!-- REQ-ORG-017: the authoritative Staffel-membership detail (each Staffel's own
+                <!--/* REQ-ORG-017: the authoritative Staffel-membership detail (each Staffel's own
                      flags) failed to load. The editable slots are hidden so the admin cannot make a
                      change that the save would silently drop, and a non-null reconcile that would
                      strip every Staffel is avoided (the controller skips the PATCH when
-                     staffelDetailLoaded is false). The other fields above still save normally. -->
+                     staffelDetailLoaded is false). The other fields above still save normally. */-->
                 <p class="field-error" th:unless="${memberEditForm.staffelDetailLoaded}"
                    th:text="#{members.staffel.detail_unavailable}">Staffel-Daten konnten nicht geladen werden.</p>
 
                 <th:block th:if="${memberEditForm.staffelDetailLoaded}">
-                <!-- Slot 1 -->
+                <!--/* Slot 1 */-->
                 <div class="staffel-slot hud-box krtm-padding-1rem-margin-bottom-0-75rem-cbd2">
                     <label for="staffel1-select" th:text="#{members.staffel.slot1}">Staffel 1</label>
                     <select id="staffel1-select" class="staffel-select krtm-min-height-44px-1df5" name="staffel1Id">
@@ -149,7 +122,7 @@
                     </div>
                 </div>
 
-                <!-- Slot 2 (optional, REQ-ORG-017 second Staffel) -->
+                <!--/* Slot 2 (optional, REQ-ORG-017 second Staffel) */-->
                 <div id="staffel-slot-2" class="staffel-slot hud-box krtm-pad-1rem-mb-075"
                      th:classappend="${memberEditForm.staffel2Id == null} ? 'krtm-hidden' : ''">
                     <label for="staffel2-select" th:text="#{members.staffel.slot2}">Staffel 2</label>
@@ -193,11 +166,11 @@
         </form>
     </div>
 
-    <!-- Art. 15 data export for this member (REQ-SEC-058, ADR-0185). For a request from somebody
+    <!--/* Art. 15 data export for this member (REQ-SEC-058, ADR-0185). For a request from somebody
          who cannot sign in: a locked-out member, or an account already disabled in Keycloak. Same
          projections and same third-party anonymisation as the member's own export - an admin
          export is not a fuller one. Plain GET links, straight at the ADMIN-gated backend endpoint:
-         a download is a navigation, and there is nothing for a proxy to add. -->
+         a download is a navigation, and there is nothing for a proxy to add. */-->
     <div class="hud-box mt-2" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
         <h2 th:text="#{members.export.title}">Datenauskunft</h2>
         <p class="form-hint" th:text="#{members.export.hint}">F&uuml;r eine Auskunftsanfrage eines Mitglieds, das sich nicht anmelden kann. Namen anderer Mitglieder sind entfernt.</p>
@@ -215,10 +188,10 @@
         </div>
     </div>
 
-    <!-- SPEZIALKOMMANDO_PLAN.md §7.4 — read-only Memberships-Übersicht. Each row links through to
+    <!--/* SPEZIALKOMMANDO_PLAN.md §7.4 — read-only Memberships-Übersicht. Each row links through to
          the corresponding management surface: Staffel rows to /admin/mission-data (squadron CRUD)
          or /members/{id}/edit (this page) for flag-toggles; SK rows to /organisation/special-commands/{id}
-         for the full roster UI. Full in-form delta-edit is a follow-up release. -->
+         for the full roster UI. Full in-form delta-edit is a follow-up release. */-->
     <div class="hud-box mt-2" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
         <h2 th:text="#{members.memberships.title}">Mitgliedschaften</h2>
         <p th:if="${memberMemberships == null or memberMemberships.isEmpty()}"
@@ -244,13 +217,13 @@
         </ul>
     </div>
 </main>
-<!--
+<!--/*
   In-place member-edit save (epic #571, REQ-FE-007). Intercepts the form submit and posts the same
   multipart body through a JSON twin (MemberManagementController#updateMemberAjax) — no navigation on
   success. FormData is used so the browser serialises the checkboxes + the Spring _field reset hidden
   inputs exactly like the native POST, and X-Requested-With routes to the twin. The form keeps its
   th:action/method=post so a script-disabled browser falls back to the redirect handler.
--->
+*/-->
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     (function () {
         'use strict';
@@ -332,13 +305,13 @@
         });
     })();
 </script>
-<!--
+<!--/*
   Two-Staffel slot management (REQ-ORG-017). Slot 1 is always visible; slot 2 is revealed by the
   "add" button and cleared+hidden by its "remove" button. Even while hidden, slot 2's inputs stay in
   the DOM and submit empty (the controller drops an empty/duplicate slot), so no DOM removal is
   needed. Each select disables the squadron currently chosen in the other, preventing the same
   Staffel twice client-side (the backend also rejects a duplicate defensively).
--->
+*/-->
 <script th:attr="nonce=${cspNonce}">
     (function () {
         'use strict';

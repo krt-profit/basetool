@@ -3,21 +3,7 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title>Lagerverwaltung - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-<style th:attr="nonce=${cspNonce}">
-        .actions-bar {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 1rem;
-            flex-wrap: wrap;
-        }
-        .material-select {
-            padding: 0.5rem;
-            background-color: var(--color-surface-input);
-            border: 1px solid var(--color-gray-3);
-            color: var(--color-gray-1);
-            font-family: var(--font-body);
-        }
-    </style>
+<link rel="stylesheet" th:href="@{/css/pages/inventory-index.css}">
     </th:block>
 </head>
 <body>
@@ -42,9 +28,9 @@
         <h1>Lagerverwaltung</h1>
     </div>
 
-    <!-- Material <-> Items view switch (REQ-INV-030): server-rendered navigation links in the
+    <!--/* Material <-> Items view switch (REQ-INV-030): server-rendered navigation links in the
          shared .tab-nav DS pattern (like bank-grants); the view= query parameter picks which
-         catalog the server renders. -->
+         catalog the server renders. */-->
     <div class="tab-nav mt-2" role="tablist" th:aria-label="#{inventory.items.view.aria}">
         <a th:href="@{/inventory}" class="tab" role="tab"
            th:classappend="${view != 'items'} ? ' active' : ''" th:aria-selected="${view != 'items'}"
@@ -66,10 +52,10 @@
                 <a th:href="${view == 'items'} ? @{/inventory/all(view='items')} : @{/inventory/all}" class="btn btn-outline" th:text="#{inventory.overview.global}">Globales Lager</a>
             </div>
         </div>
-        <!-- The aggregated view buckets quantities per material across the entire active
+        <!--/* The aggregated view buckets quantities per material across the entire active
              squadron context. In admin "all squadrons" mode the bucket merges items from
              every staffel - the row is per-material, not per-squadron-per-material - so
-             tell the admin the totals span all staffeln. Members never enter this mode. -->
+             tell the admin the totals span all staffeln. Members never enter this mode. */-->
         <div th:if="${isAllSquadronsMode}" class="squadron-badge squadron-badge-muted krtm-display-block-padding-0-6rem-0-9rem-margin-b-3373"
              th:text="#{inventory.index.all_squadrons_notice}">
             Aggregation across all squadrons. Select a single squadron to filter.
@@ -77,7 +63,7 @@
         <div class="overflow-x-auto">
             <div id="inventory-results">
             <th:block th:fragment="inventoryResults">
-            <!-- Material catalog (default view). -->
+            <!--/* Material catalog (default view). */-->
             <th:block th:if="${view != 'items'}">
             <div class="table-responsive">
             <table class="krt-table">
@@ -111,8 +97,8 @@
 
             <div th:replace="~{fragments/pagination :: pagination(pageResponse=${inventoryPage}, baseUrl='/inventory')}"></div>
             </th:block>
-            <!-- Game-item catalog (REQ-INV-030, view=items): per-item totals, no quality columns,
-                 whole-unit amounts. Rows navigate to the org-wide item tree filtered to the item. -->
+            <!--/* Game-item catalog (REQ-INV-030, view=items): per-item totals, no quality columns,
+                 whole-unit amounts. Rows navigate to the org-wide item tree filtered to the item. */-->
             <th:block th:if="${view == 'items'}">
             <div class="table-responsive">
             <table class="krt-table">

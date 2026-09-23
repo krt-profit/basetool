@@ -24,12 +24,12 @@
 </header>
 
 <main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-bank-livesync-updates=#{livesync.updates_available},data-user-id=${#authentication.name}">
-    <!-- Page head: title + the single, page-level request CTA (REQ-BANK-022/-042). The CTA opens the
+    <!--/* Page head: title + the single, page-level request CTA (REQ-BANK-022/-042). The CTA opens the
          request modal whose source selector lists every active account for a deposit and the
          caller's request-capable accounts for a withdrawal/transfer; it is shown whenever a request
          is possible at all — i.e. at least one active account exists (canRequestAny), since a deposit
          may target any active account (REQ-BANK-042). It sits OUTSIDE the swapped fragment because
-         the active-account set never changes on a request create/cancel. -->
+         the active-account set never changes on a request create/cancel. */-->
     <div class="greeting hud-box flex-between">
         <div>
             <h1 th:text="#{bank.orgUnit.title}">Bank meiner Org-Einheit</h1>
@@ -44,16 +44,16 @@
         </div>
     </div>
 
-    <!-- orgUnitBank fragment: tabs (accounts + my-requests) with their counts and both panels;
+    <!--/* orgUnitBank fragment: tabs (accounts + my-requests) with their counts and both panels;
          swapped in place after a write so the dense account list AND the request count update without
-         a reload (REQ-FE-005). Both tab panels live INSIDE the fragment for that reason. -->
+         a reload (REQ-FE-005). Both tab panels live INSIDE the fragment for that reason. */-->
     <div id="org-unit-bank-results" th:fragment="orgUnitBank"
          th:with="showKonten=${!#lists.isEmpty(balances)},
                   showTabs=${!#lists.isEmpty(balances) or !#lists.isEmpty(ownRequests) or hasResponsibleAccounts}">
 
-        <!-- Empty: nothing to list. The deposit CTA above still lets any caller file a request
+        <!--/* Empty: nothing to list. The deposit CTA above still lets any caller file a request
              (REQ-BANK-042), so this only means the caller currently views no account and has no own
-             or responsible requests yet. -->
+             or responsible requests yet. */-->
         <div class="empty-state mt-2" th:unless="${showTabs}">
             <div class="empty-text" data-testid="org-unit-bank-empty" th:text="#{bank.orgUnit.empty}">
                 Du beaufsichtigst keine Org-Einheit mit einem Bankkonto.
@@ -62,8 +62,8 @@
 
         <div th:if="${showTabs}">
             <div class="tab-nav mt-2" role="tablist" th:aria-label="#{bank.orgUnit.title}">
-                <!-- KONTEN tab only when the caller may view at least one account; otherwise "Meine
-                     Antr&auml;ge" becomes the default-active tab. -->
+                <!--/* KONTEN tab only when the caller may view at least one account; otherwise "Meine
+                     Antr&auml;ge" becomes the default-active tab. */-->
                 <button type="button" class="tab active" role="tab" aria-selected="true"
                         th:if="${showKonten}"
                         id="ou-tab-konten" aria-controls="ou-panel-konten" data-tab="konten"
@@ -79,7 +79,7 @@
                     <span th:text="#{bank.orgUnit.tab.requests}">Meine Antr&auml;ge</span>
                     <span class="tab-count" th:text="${#lists.size(ownRequests)}">0</span>
                 </button>
-                <!-- "Fremde Anträge" (REQ-BANK-041): only for a caller responsible for any account. -->
+                <!--/* "Fremde Anträge" (REQ-BANK-041): only for a caller responsible for any account. */-->
                 <button type="button" class="tab" role="tab" aria-selected="false"
                         id="ou-tab-fremde" aria-controls="ou-panel-fremde" data-tab="fremde"
                         th:if="${hasResponsibleAccounts}" data-testid="org-unit-bank-tab-foreign">
@@ -88,22 +88,22 @@
                 </button>
             </div>
 
-            <!-- KONTEN: the visible accounts as a card grid (default) or a dense table, switchable per
-                 user (REQ-BANK-021/-046). No by-Bereich grouping here (unlike the dashboard). -->
+            <!--/* KONTEN: the visible accounts as a card grid (default) or a dense table, switchable per
+                 user (REQ-BANK-021/-046). No by-Bereich grouping here (unlike the dashboard). */-->
             <div class="mt-2" id="ou-panel-konten" data-tabpanel="konten" role="tabpanel"
                  aria-labelledby="ou-tab-konten" th:if="${showKonten}">
-                <!-- Toolbar: the client-side account-name live filter (REQ-BANK-046) + the single
+                <!--/* Toolbar: the client-side account-name live filter (REQ-BANK-046) + the single
                      "Tabellenansicht" view toggle. Both live OUTSIDE the swapped #ou-acc-results
                      sub-fragment but INSIDE the orgUnitBank fragment, so a request create/cancel swap
                      re-renders them (resetting the filter to "show all") — the layout rides in the
                      query, so the checkbox keeps its state and the list re-renders in that layout
-                     server-side (bank.js owns the persistence). -->
+                     server-side (bank.js owns the persistence). */-->
                 <div class="ou-konten-toolbar mb-2">
                     <th:block th:replace="~{fragments/components :: bankAccSearch('ou-acc-filter', '#ou-acc-results', '#ou-acc-filter-empty')}"></th:block>
-                    <!-- One per-user view checkbox (card grid ⇆ table); unchecked = the default card
+                    <!--/* One per-user view checkbox (card grid ⇆ table); unchecked = the default card
                      grid. bank.js owns its checked state, persists it in localStorage and re-fetches
                      the orgUnitBankAccounts sub-fragment on change (REQ-FE-005). Distinct
-                     data-ou-view-* attributes keep it clear of the dashboard's data-bank-view-* module. -->
+                     data-ou-view-* attributes keep it clear of the dashboard's data-bank-view-* module. */-->
                     <div class="bank-view-toggles" role="group" data-ou-view-toggles
                          th:aria-label="#{bank.dashboard.view.aria}">
                         <label class="bank-check-inline">
@@ -113,9 +113,9 @@
                         </label>
                     </div>
                 </div>
-                <!-- orgUnitBankAccounts sub-fragment: the switchable account list (card grid or table);
+                <!--/* orgUnitBankAccounts sub-fragment: the switchable account list (card grid or table);
                      swapped in place when the view toggle changes (REQ-FE-005). data-ou-layout marks
-                     the server-rendered layout for readability/tests. -->
+                     the server-rendered layout for readability/tests. */-->
                 <div id="ou-acc-results" th:fragment="orgUnitBankAccounts" th:attr="data-ou-layout=${layout}">
                     <th:block th:if="${layout == 'table'}">
                         <th:block th:replace="~{fragments/org-unit-bank-views :: ouAccTable(${balances}, ${sparks})}"></th:block>
@@ -124,17 +124,17 @@
                         <th:block th:replace="~{fragments/org-unit-bank-views :: ouAccGrid(${balances}, ${sparks})}"></th:block>
                     </th:block>
                 </div>
-                <!-- No-results note for the client-side account-name filter (REQ-BANK-046): bank.js
+                <!--/* No-results note for the client-side account-name filter (REQ-BANK-046): bank.js
                      reveals it when the live filter hides every account item. Sits outside the swapped
-                     sub-fragment (the filter re-queries it by selector). -->
+                     sub-fragment (the filter re-queries it by selector). */-->
                 <div id="ou-acc-filter-empty" class="empty-state mt-2" hidden>
                     <div class="empty-text" th:text="#{bank.filter.empty}">Keine Konten passen zum Filter.</div>
                 </div>
             </div>
 
-            <!-- MEINE ANTRÄGE: the requester's own requests (per-user isolation, REQ-BANK-022).
+            <!--/* MEINE ANTRÄGE: the requester's own requests (per-user isolation, REQ-BANK-022).
                  Hidden when the Konten tab is present (it is the default-active one); the
-                 default-active panel when the caller views no account. -->
+                 default-active panel when the caller views no account. */-->
             <div class="mt-2" id="ou-panel-antraege" data-tabpanel="antraege" role="tabpanel"
                  aria-labelledby="ou-tab-antraege" th:attr="hidden=${showKonten} ? 'hidden' : null">
                 <div class="empty-state" th:if="${#lists.isEmpty(ownRequests)}">
@@ -155,14 +155,14 @@
                         </tr>
                         </thead>
                         <tbody>
-                        <!-- Expandable rows, same mechanism as the staff queue and the approval tab:
+                        <!--/* Expandable rows, same mechanism as the staff queue and the approval tab:
                              the requester reads back the Begr&uuml;ndung and Notiz they filed. The
                              detail id is prefixed `ou-own-req-` so it cannot collide with the
                              `ou-foreign-req-` one — a responsible holder who raised the request sees
                              the very same request in BOTH tables on this page, and a shared id would
                              make one chevron toggle the other's sub-row. No "Notiz Bankmitarbeiter"
                              here: the seam strips it from the own-requests list (REQ-BANK-054), so
-                             `r.staffNote()` is always null in this table. -->
+                             `r.staffNote()` is always null in this table. */-->
                         <th:block th:each="r : ${ownRequests}"
                                   th:with="hasDetail=${!#strings.isEmpty(r.justification()) or !#strings.isEmpty(r.note()) or !#strings.isEmpty(r.counterpartyHandle())},detailId='ou-own-req-' + ${r.id()}">
                         <tr data-testid="org-unit-bank-request-row" class="bank-booking-row"
@@ -180,8 +180,8 @@
                             <td class="text-right bank-amount"
                                 th:text="${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'POINT')} + ' aUEC'">5.000 aUEC</td>
                             <td>
-                                <!-- Status tone-chip: PENDING warning, CONFIRMED success, the terminal
-                                     REJECTED/CANCELLED muted (+ reason on a rejection). -->
+                                <!--/* Status tone-chip: PENDING warning, CONFIRMED success, the terminal
+                                     REJECTED/CANCELLED muted (+ reason on a rejection). */-->
                                 <span class="chip"
                                       th:classappend="${r.status() == 'PENDING'} ? ' chip--warning' : (${r.status() == 'CONFIRMED'} ? ' chip--success' : ' chip--muted')"
                                       th:text="#{'bank.request.status.' + ${r.status()}}">Ausstehend</span>
@@ -191,12 +191,12 @@
                             <td th:text="${r.holderHandle() != null} ? ${@handles.display(r.holderHandle())} : '&ndash;'">&ndash;</td>
                             <td><span class="utc-time" th:text="${r.createdAt()}">2026-06-17T14:02:00Z</span></td>
                             <td>
-                                <!-- Edit is offered only while the request is still PENDING *and*
+                                <!--/* Edit is offered only while the request is still PENDING *and*
                                      unapproved (REQ-BANK-056): once the responsible holder has signed
                                      off, the approval was given for the amount and reason as they
                                      stood, so the backend refuses the edit
                                      (BANK_REQUEST_ALREADY_APPROVED) and offering the button would
-                                     only produce a dead end. Cancel stays available either way. -->
+                                     only produce a dead end. Cancel stays available either way. */-->
                                 <button type="button" class="btn btn-ghost btn-xs"
                                         th:if="${r.status() == 'PENDING' and !r.ownerApprovalGranted()}"
                                         data-trigger="open-modal-display"
@@ -214,8 +214,8 @@
                                 <span th:unless="${r.status() == 'PENDING'}" class="text-muted">&ndash;</span>
                             </td>
                         </tr>
-                        <!-- Detail sub-row: Begr&uuml;ndung first (it carries the request's reason),
-                             then Notiz. colspan spans all seven columns incl. the expand cell. -->
+                        <!--/* Detail sub-row: Begr&uuml;ndung first (it carries the request's reason),
+                             then Notiz. colspan spans all seven columns incl. the expand cell. */-->
                         <tr class="bank-booking-detail" th:if="${hasDetail}" th:id="${detailId}" hidden
                             data-testid="org-unit-bank-request-detail">
                             <td colspan="7" class="bank-booking-detail-cell">
@@ -242,7 +242,7 @@
                         </tbody>
                     </table>
                 </div>
-                <!-- EDIT MODALS (REQ-BANK-056), one per still-editable request. Rendered here,
+                <!--/* EDIT MODALS (REQ-BANK-056), one per still-editable request. Rendered here,
                      AFTER the table, because a modal inside <tbody> is invalid HTML and the browser
                      hoists it out of the table, detaching it from the row it belongs to.
 
@@ -253,7 +253,7 @@
                      Server-seeding each row's modal sidesteps that entirely, keeps the echoed
                      `version` correct after every fragment swap, and needs no new JS. The type is
                      fixed per row, so each modal renders exactly the fields that request kind
-                     carries - no client-side gating either. -->
+                     carries - no client-side gating either. */-->
                 <div th:each="r : ${ownRequests}"
                      th:if="${r.status() == 'PENDING' and !r.ownerApprovalGranted()}"
                      class="krt-modal-overlay" th:id="'ou-req-edit-' + ${r.id()}">
@@ -268,10 +268,10 @@
                             <div class="krt-modal-body">
                                 <input type="hidden" name="_id" th:value="${r.id()}">
                                 <input type="hidden" name="version" th:value="${r.version()}">
-                                <!-- Konto and Vorgang are shown read-only: they are NOT editable
+                                <!--/* Konto and Vorgang are shown read-only: they are NOT editable
                                      (they decide the approval limit, the Begr&uuml;ndung requirement
                                      and the field shape), but hiding them would leave the requester
-                                     guessing which request they are editing. -->
+                                     guessing which request they are editing. */-->
                                 <div class="bank-form-row">
                                     <span class="bank-detail-label" th:text="#{bank.request.col.account}">Konto</span>
                                     <span class="bank-detail-value" th:text="${r.accountName()} + ' (' + ${r.accountNo()} + ')'">Staffel IRIDIUM (KB-0001)</span>
@@ -300,10 +300,10 @@
                                     <span class="bank-field-hint" th:text="#{bank.request.edit.amountHint}">&Auml;nderst du den Betrag, wird die Freigabepflicht neu bewertet.</span>
                                     <span class="bank-field-error" data-error-for="amount"></span>
                                 </div>
-                                <!-- Empf&auml;nger (REQ-BANK-055): WITHDRAWAL-only, seeded with
+                                <!--/* Empf&auml;nger (REQ-BANK-055): WITHDRAWAL-only, seeded with
                                      whatever the request currently names. Picking a different person
                                      fires the shared fillCounterpartyOrgUnits loader, which
-                                     repopulates the Einheit select from THAT user's memberships. -->
+                                     repopulates the Einheit select from THAT user's memberships. */-->
                                 <th:block th:if="${r.type() == 'WITHDRAWAL'}">
                                     <div class="bank-form-row">
                                         <label th:for="'ou-req-edit-cp-' + ${r.id()}">
@@ -360,9 +360,9 @@
                 </div>
             </div>
 
-            <!-- FREMDE ANTRÄGE: every request raised against the accounts the caller is responsible
+            <!--/* FREMDE ANTRÄGE: every request raised against the accounts the caller is responsible
                  for (REQ-BANK-041). Over-limit pending requests carry a "grant approval" action that
-                 pre-fills the bank employee's confirmation checkbox. -->
+                 pre-fills the bank employee's confirmation checkbox. */-->
             <div class="mt-2" id="ou-panel-fremde" data-tabpanel="fremde" role="tabpanel"
                  aria-labelledby="ou-tab-fremde" th:if="${hasResponsibleAccounts}" hidden>
                 <div class="empty-state" th:if="${#lists.isEmpty(foreignRequests)}">
@@ -384,14 +384,14 @@
                         </tr>
                         </thead>
                         <tbody>
-                        <!-- Expandable rows (REQ-BANK-045), mirroring the bank-staff queue: the
+                        <!--/* Expandable rows (REQ-BANK-045), mirroring the bank-staff queue: the
                              approver decides on the Begr&uuml;ndung, so it must be readable here and not
                              only in bank-requests.html. The detail id is prefixed `ou-foreign-req-`
                              because a responsible holder who raised the request themselves sees the
                              same row in BOTH tables on this page, and a shared id would make the
                              chevron of one toggle the other's sub-row. The toggle itself is the
                              document-delegated bank.js handler (no new JS, survives the fragment
-                             swap). -->
+                             swap). */-->
                         <th:block th:each="r : ${foreignRequests}"
                                   th:with="hasDetail=${!#strings.isEmpty(r.justification()) or !#strings.isEmpty(r.note()) or !#strings.isEmpty(r.staffNote()) or !#strings.isEmpty(r.counterpartyHandle())},detailId='ou-foreign-req-' + ${r.id()}">
                         <tr data-testid="org-unit-bank-foreign-row" class="bank-booking-row"
@@ -420,8 +420,8 @@
                                       th:text="#{'bank.request.status.' + ${r.status()}}">Ausstehend</span>
                             </td>
                             <td>
-                                <!-- Approval gate cell (REQ-BANK-041): a grant button only when the request
-                                     is over-limit, still pending and not yet granted; a chip once granted. -->
+                                <!--/* Approval gate cell (REQ-BANK-041): a grant button only when the request
+                                     is over-limit, still pending and not yet granted; a chip once granted. */-->
                                 <span th:if="${!r.requiresOwnerApproval()}" class="text-muted">&ndash;</span>
                                 <span th:if="${r.requiresOwnerApproval() and r.ownerApprovalGranted()}"
                                       class="chip chip--success" data-testid="org-unit-bank-foreign-granted"
@@ -440,8 +440,8 @@
                             </td>
                             <td><span class="utc-time" th:text="${r.createdAt()}">2026-06-17T14:02:00Z</span></td>
                         </tr>
-                        <!-- Detail sub-row: Begr&uuml;ndung first (it carries the decision), then Notiz.
-                             colspan spans all eight columns incl. the expand cell. -->
+                        <!--/* Detail sub-row: Begr&uuml;ndung first (it carries the decision), then Notiz.
+                             colspan spans all eight columns incl. the expand cell. */-->
                         <tr class="bank-booking-detail" th:if="${hasDetail}" th:id="${detailId}" hidden
                             data-testid="org-unit-bank-foreign-detail">
                             <td colspan="8" class="bank-booking-detail-cell">
@@ -476,10 +476,10 @@
         </div>
     </div>
 
-    <!-- Request modal (outside the swapped fragment). Its source selector lists EVERY active account
+    <!--/* Request modal (outside the swapped fragment). Its source selector lists EVERY active account
          (deposits may target any of them, REQ-BANK-042); the JS narrows it to the caller's
          request-capable accounts when a withdrawal/transfer is chosen. Shown whenever any active
-         account exists (canRequestAny). -->
+         account exists (canRequestAny). */-->
     <div class="krt-modal-overlay" id="org-unit-request-modal" th:if="${canRequestAny}">
         <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.request.modal.title}">
             <div class="krt-modal-head">
@@ -492,10 +492,10 @@
                 <div class="krt-modal-body">
                     <div class="bank-form-row">
                         <label for="org-unit-request-account" th:text="#{bank.request.col.account}">Konto</label>
-                        <!-- One merged source picker over EVERY active account. Each option is marked
+                        <!--/* One merged source picker over EVERY active account. Each option is marked
                              data-can-debit (the caller may withdraw/transfer from it) + its approval
                              limit; bank.js shows all options for a deposit (REQ-BANK-042) and only
-                             data-can-debit ones for a withdrawal/transfer (REQ-BANK-039). -->
+                             data-can-debit ones for a withdrawal/transfer (REQ-BANK-039). */-->
                         <select id="org-unit-request-account" name="sourceAccountId" required
                                 data-role="org-unit-request-account" data-testid="org-unit-request-account">
                             <option th:each="t : ${requestTransferTargets}"
@@ -509,9 +509,9 @@
                     </div>
                     <div class="bank-form-row">
                         <label for="org-unit-request-type" th:text="#{bank.request.field.type}">Vorgang</label>
-                        <!-- Withdrawal/transfer are offered only when the caller may request against
+                        <!--/* Withdrawal/transfer are offered only when the caller may request against
                              at least one account they can view (anyCanRequest); a deposit is always
-                             available (REQ-BANK-042). -->
+                             available (REQ-BANK-042). */-->
                         <select id="org-unit-request-type" name="type" required
                                 data-role="org-unit-request-type" data-testid="org-unit-request-type">
                             <option value="DEPOSIT" th:text="#{bank.request.type.DEPOSIT}">Einzahlung</option>
@@ -520,8 +520,8 @@
                         </select>
                         <span class="bank-field-error" data-error-for="type"></span>
                     </div>
-                    <!-- Transfer destination (REQ-BANK-040): any active account; shown only for TRANSFER.
-                         Disabled while hidden so it is omitted from the body for deposit/withdrawal. -->
+                    <!--/* Transfer destination (REQ-BANK-040): any active account; shown only for TRANSFER.
+                         Disabled while hidden so it is omitted from the body for deposit/withdrawal. */-->
                     <div class="bank-form-row" data-request-transfer-only hidden>
                         <label for="org-unit-request-destination" th:text="#{bank.field.destinationAccount}">Zielkonto</label>
                         <select id="org-unit-request-destination" name="targetAccountId" disabled
@@ -538,15 +538,15 @@
                                data-testid="org-unit-request-amount" th:placeholder="#{bank.field.amount.placeholder}">
                         <span class="bank-field-hint" th:text="#{bank.field.amount.hint}">Nur ganze aUEC-Betr&auml;ge.</span>
                         <span class="bank-field-error" data-error-for="amount"></span>
-                        <!-- Live over-limit warning (REQ-BANK-041): shown when the amount exceeds the
+                        <!--/* Live over-limit warning (REQ-BANK-041): shown when the amount exceeds the
                              requester's approval limit for the chosen source account; does NOT block the
-                             request, which is still filed and then flagged for the bank. -->
+                             request, which is still filed and then flagged for the bank. */-->
                         <p class="bank-limit-warning" data-limit-warning hidden
                            data-testid="org-unit-request-limit-warning"
                            th:text="#{bank.approvalLimit.requesterWarning}">Der Betrag &uuml;berschreitet dein Freigabe-Limit.</p>
                     </div>
-                    <!-- Split deposit (REQ-BANK-043): DEPOSIT-only; the wrapper is shown only when the
-                         request type is a deposit (bank.js syncRequestTypeRows). -->
+                    <!--/* Split deposit (REQ-BANK-043): DEPOSIT-only; the wrapper is shown only when the
+                         request type is a deposit (bank.js syncRequestTypeRows). */-->
                     <div data-split-deposit-only>
                         <div class="bank-form-row">
                             <label class="bank-check-label">
@@ -572,11 +572,11 @@
                             <span class="bank-field-error" data-error-for="splitPercent"></span>
                         </div>
                     </div>
-                    <!-- Begründung (REQ-BANK-045): shown only for a WITHDRAWAL/TRANSFER, and required when
+                    <!--/* Begründung (REQ-BANK-045): shown only for a WITHDRAWAL/TRANSFER, and required when
                          the chosen source account type mandates a reason (CARTEL / CARTEL_BANK / SPECIAL).
                          Both the visibility and the required flag are driven by bank.js
                          (syncRequestTypeRows + updateJustificationRequired); the input is disabled while
-                         hidden so a deposit request omits it from the body entirely. -->
+                         hidden so a deposit request omits it from the body entirely. */-->
                     <div class="bank-form-row" data-request-justification-only hidden>
                         <label for="org-unit-request-justification" th:text="#{bank.field.justification}">Begr&uuml;ndung</label>
                         <input type="text" id="org-unit-request-justification" name="justification" maxlength="500" disabled
@@ -584,10 +584,10 @@
                         <span class="bank-field-hint" th:text="#{bank.field.justification.hint}">Pflicht bei Abrufen aus dem KRT-, Bank- oder Sonderkonto.</span>
                         <span class="bank-field-error" data-error-for="justification"></span>
                     </div>
-                    <!-- Empfaenger (REQ-BANK-055): WITHDRAWAL-only, pre-filled with the requester.
+                    <!--/* Empfaenger (REQ-BANK-055): WITHDRAWAL-only, pre-filled with the requester.
                          Leaving it as-is reproduces the previous behaviour exactly (confirmation
                          derived the requester); changing it lets a member request a payout TO
-                         someone else, which was previously impossible to express. -->
+                         someone else, which was previously impossible to express. */-->
                     <th:block th:replace="~{fragments/bank-counterparty :: requestCounterpartyBlock(${requesterId}, ${requesterHandle})}"></th:block>
                     <div class="bank-form-row">
                         <label for="org-unit-request-note" th:text="#{bank.field.note}">Notiz</label>

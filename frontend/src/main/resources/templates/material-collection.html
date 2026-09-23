@@ -50,8 +50,8 @@
                     th:data-version="${entry.version}"
                     th:data-amount="${entry.quantity}">
                     <td>
-                        <!-- Server-side searchable combobox (remote-users, #1193): seed only this
-                             entry's current owner; the roster is searched on demand. -->
+                        <!--/* Server-side searchable combobox (remote-users, #1193): seed only this
+                             entry's current owner; the roster is searched on demand. */-->
                         <select class="owner-select krt-select krtm-min-height-44px-width-100-min-width-140px-ba-ded1"
                                 data-role="owner-select" data-krt-combobox="remote-users"
                                 th:data-inventory-id="${entry.inventoryEntryId}">
@@ -59,17 +59,17 @@
                                     th:value="${entry.ownerId}"
                                     th:selected="true"
                                     th:text="${entry.ownerName}"></option>
-                            <!-- Owner is blanked by the backend for a requesting-side viewer of an
-                                 SK-public order (REQ-ORDERS-029); show a dash placeholder. -->
+                            <!--/* Owner is blanked by the backend for a requesting-side viewer of an
+                                 SK-public order (REQ-ORDERS-029); show a dash placeholder. */-->
                             <option th:if="${entry.ownerId == null}" selected disabled>—</option>
                         </select>
                     </td>
                     <td>
                         <select class="location-select krt-select krtm-min-height-44px-width-100-min-width-140px-ba-ded1"
                                 th:data-inventory-id="${entry.inventoryEntryId}">
-                            <!-- Location is blanked by the backend for a requesting-side viewer of an
+                            <!--/* Location is blanked by the backend for a requesting-side viewer of an
                                  SK-public order (REQ-ORDERS-029); a dash placeholder stays selected so
-                                 the redacted row does not default-select an arbitrary location. -->
+                                 the redacted row does not default-select an arbitrary location. */-->
                             <option th:if="${entry.locationId == null}" selected disabled>—</option>
                             <option th:each="loc : ${locations}"
                                     th:value="${loc.id}"
@@ -100,15 +100,7 @@
     </div>
 </main>
 
-<style th:attr="nonce=${cspNonce}">
-    .krt-select:focus {
-        outline: 2px solid var(--color-primary);
-        outline-offset: 1px;
-    }
-    @media (width <= 768px) {
-        .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    }
-</style>
+<link rel="stylesheet" th:href="@{/css/pages/material-collection.css}">
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     // Thymeleaf-interpolated toast strings only; the imperative logic lives in the

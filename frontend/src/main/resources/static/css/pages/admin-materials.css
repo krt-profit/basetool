@@ -1,0 +1,90 @@
+/* Page stylesheet of templates/admin/materials.html, moved out of its inline style block
+ * (FE-PERF-02). Linked in the same place the block stood, so the cascade order is
+ * unchanged. */
+
+.data-section {
+    margin-bottom: 3rem;
+}
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+}
+/* Checkboxes (the create-modal's flag toggles) and radios are excluded: width:100% +
+   the 0.5rem padding would stretch the 1.2rem KRT squares (styles.css) full-width. The
+   exclusions sit in :where() so they add ZERO specificity — the rule keeps the plain
+   `.form-group input` weight (0,1,1) and stays below the (0,2,0) combobox rule
+   `.krt-combobox .krt-combobox__input`. */
+.form-group input:where(:not([type='checkbox']):not([type='radio'])),
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 0.5rem;
+    background-color: var(--color-surface-input);
+    border: 1px solid var(--color-gray-3);
+    color: var(--color-gray-1);
+    font-family: var(--font-body);
+    box-sizing: border-box;
+}
+.inline-form {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+}
+.inline-form select {
+    width: auto;
+    flex-grow: 1;
+}
+.material-manual-badge {
+    display: inline-block;
+    margin-right: 0.4rem;
+    padding: 0.05rem 0.4rem;
+    font-size: 0.7rem;
+    font-family: var(--font-headline);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-bg-black);
+    background-color: var(--color-primary);
+    border-radius: var(--radius-none);
+    vertical-align: middle;
+}
+.material-hidden-badge {
+    display: inline-block;
+    margin-right: 0.4rem;
+    padding: 0.05rem 0.4rem;
+    font-size: 0.7rem;
+    font-family: var(--font-headline);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-warning);
+    background-color: transparent;
+    border: 1px solid var(--color-warning);
+    border-radius: var(--radius-none);
+    vertical-align: middle;
+}
+.krt-modal-create-material {
+    max-width: 640px;
+}
+.krt-modal-create-material .form-checkboxes {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+.krt-modal-create-material .form-checkboxes label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    color: var(--color-gray-1);
+    text-transform: none;
+    margin: 0;
+    min-height: 44px;
+}
+@media (width <= 768px) {
+    .krt-modal-create-material .form-checkboxes {
+        grid-template-columns: 1fr;
+    }
+}

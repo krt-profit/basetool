@@ -46,13 +46,13 @@
         </div>
     </div>
 
-    <!-- In-place lifecycle writes (REQ-FE-005, #579): account/holder create/rename/close/reopen/
+    <!--/* In-place lifecycle writes (REQ-FE-005, #579): account/holder create/rename/close/reopen/
          (de)activate re-render this region via krtFetch (fragment=manageBody), refreshing the row,
          its trigger buttons' data-field-version AND the tab-count aggregates without a reload. The
-         creation modals live outside this fragment, so their one-time JS init survives the swap. -->
+         creation modals live outside this fragment, so their one-time JS init survives the swap. */-->
     <div id="bank-manage-results">
     <th:block th:fragment="manageBody">
-    <!-- W1 tab switcher (server-side via query param, same pattern as mission detail). -->
+    <!--/* W1 tab switcher (server-side via query param, same pattern as mission detail). */-->
     <div class="tab-nav mt-2" role="tablist">
         <a th:href="@{/bank/manage(tab='halter')}" class="tab" role="tab"
            th:classappend="${activeTab == 'halter'} ? ' active' : ''"
@@ -66,8 +66,8 @@
             <span th:text="#{bank.manage.tab.accounts}">Konten</span>
             <span class="tab-count" th:text="${accountCount}">7</span>
         </a>
-        <!-- KRT-Freigaben: Bankleitung-only 3-stage approval thresholds for the KRT account
-             (REQ-BANK-047). Rendered only for a management caller. -->
+        <!--/* KRT-Freigaben: Bankleitung-only 3-stage approval thresholds for the KRT account
+             (REQ-BANK-047). Rendered only for a management caller. */-->
         <a th:if="${management}" th:href="@{/bank/manage(tab='krt-freigaben')}" class="tab" role="tab"
            th:classappend="${activeTab == 'krt-freigaben'} ? ' active' : ''"
            th:aria-selected="${activeTab == 'krt-freigaben'}" data-testid="bank-tab-krt-approvals">
@@ -75,7 +75,7 @@
         </a>
     </div>
 
-    <!-- ============ Tab: KRT-Freigaben (Bankleitung-only, REQ-BANK-047) ============ -->
+    <!--/* ============ Tab: KRT-Freigaben (Bankleitung-only, REQ-BANK-047) ============ */-->
     <div class="bank-panel mt-2" th:if="${activeTab == 'krt-freigaben' and management}"
          data-testid="bank-krt-approvals-panel">
         <div class="bank-panel-body">
@@ -120,7 +120,7 @@
         </div>
     </div>
 
-    <!-- ===================== Tab: Konten ===================== -->
+    <!--/* ===================== Tab: Konten ===================== */-->
     <div class="bank-panel mt-2" th:if="${activeTab == 'konten'}" data-testid="bank-accounts-panel">
         <div class="bank-panel-body">
             <div class="table-responsive" th:if="${!#lists.isEmpty(accounts)}">
@@ -152,8 +152,8 @@
                                   th:text="#{'bank.account.status.' + ${a.status()}}">Aktiv</span>
                         </td>
                         <td class="text-right">
-                            <!-- Account-relationship lifecycle is bank-management-only (REQ-BANK-030);
-                                 a plain employee sees the row read-only and uses only SPECIAL create. -->
+                            <!--/* Account-relationship lifecycle is bank-management-only (REQ-BANK-030);
+                                 a plain employee sees the row read-only and uses only SPECIAL create. */-->
                             <th:block th:if="${management}">
                             <button type="button" class="btn btn-ghost btn-sm"
                                     data-trigger="open-modal-display" data-modal-id="bank-rename-modal"
@@ -186,11 +186,11 @@
             </div>
             <p class="text-center text-muted" th:if="${#lists.isEmpty(accounts)}"
                data-testid="bank-accounts-empty" th:text="#{bank.manage.accounts.empty}">Noch keine Konten angelegt.</p>
-            <!-- Real pagination (REQ-BANK-053, ADR-0106): the account list is now paged rather than a
+            <!--/* Real pagination (REQ-BANK-053, ADR-0106): the account list is now paged rather than a
                  500-cap preload that silently truncated. The pager + page-size links re-render the
                  manageBody fragment in place via krtFetch (REQ-FE-005, wired below); the no-JS
                  page-btn links still reload the whole page. The base URL carries ?tab=konten so the
-                 swap stays on the accounts tab. -->
+                 swap stays on the accounts tab. */-->
             <div class="pagination-controls"
                  th:if="${accountsPage != null and accountsPage.totalElements() > 0}">
                 <nav th:replace="~{fragments/pagination :: pageSizePicker(${accountsPage}, ${accountsPaginationBaseUrl}, ${pageSizes})}"></nav>
@@ -199,7 +199,7 @@
         </div>
     </div>
 
-    <!-- ===================== Tab: Halter ===================== -->
+    <!--/* ===================== Tab: Halter ===================== */-->
     <div class="bank-panel mt-2" th:if="${activeTab == 'halter'}" data-testid="bank-holders-panel">
         <div class="bank-panel-body">
             <div class="table-responsive" th:if="${!#lists.isEmpty(holders)}">
@@ -216,9 +216,9 @@
                     <tbody>
                     <tr th:each="h : ${holders}" data-testid="bank-holder-registry-row"
                         th:attr="data-holder-handle=${h.handle()}">
-                        <!-- The handle links to the holder's custody history (REQ-BANK-032).
+                        <!--/* The handle links to the holder's custody history (REQ-BANK-032).
                              Management may open every holder; a plain employee only their own row
-                             (matched on the OIDC sub). The backend canSeeHolder gate is authoritative. -->
+                             (matched on the OIDC sub). The backend canSeeHolder gate is authoritative. */-->
                         <td th:with="canViewHolder=${management or (h.userId() != null and selfUserId != null and h.userId().toString().equals(selfUserId))}">
                             <a th:if="${canViewHolder}" th:href="@{'/bank/holders/' + ${h.id()}}"
                                th:text="${@handles.display(h.handle())}" data-testid="bank-holder-history-link">greluc</a>
@@ -236,8 +236,8 @@
                                   th:text="${h.roleManaged()} ? #{bank.holder.source.auto} : #{bank.holder.source.manual}">Auto</span>
                         </td>
                         <td class="text-right">
-                            <!-- Manual (de)activation is bank-management-only (REQ-BANK-030); the
-                                 reconcile manages role-derived holders automatically (REQ-BANK-029). -->
+                            <!--/* Manual (de)activation is bank-management-only (REQ-BANK-030); the
+                                 reconcile manages role-derived holders automatically (REQ-BANK-029). */-->
                             <th:block th:if="${management}">
                             <button type="button" class="btn btn-ghost btn-sm" th:if="${h.active()}"
                                     data-trigger="open-modal-display" data-modal-id="bank-holder-deactivate-modal"
@@ -263,9 +263,9 @@
     </th:block>
     </div>
 
-    <!-- ============ Modals ============ -->
+    <!--/* ============ Modals ============ */-->
 
-    <!-- Create account -->
+    <!--/* Create account */-->
     <div class="krt-modal-overlay" id="bank-create-account-modal">
         <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.createAccount.title}">
             <div class="krt-modal-head">
@@ -286,8 +286,8 @@
                         <label for="bank-create-type" th:text="#{bank.field.accountType}">Kontotyp</label>
                         <select id="bank-create-type" name="type" required data-role="bank-account-type"
                                 data-testid="bank-create-type">
-                            <!-- A bank employee may create only SPECIAL accounts (REQ-BANK-030); the
-                                 non-special types render for bank management only. -->
+                            <!--/* A bank employee may create only SPECIAL accounts (REQ-BANK-030); the
+                                 non-special types render for bank management only. */-->
                             <option th:if="${management}" value="ORG_UNIT" th:text="#{bank.account.type.ORG_UNIT}">Org-Einheit</option>
                             <option th:if="${management}" value="AREA" th:text="#{bank.account.type.AREA}">Bereich</option>
                             <option th:if="${management}" value="CARTEL" th:text="#{bank.account.type.CARTEL}">Kartell</option>
@@ -296,10 +296,10 @@
                         </select>
                         <span class="bank-field-error" data-error-for="type"></span>
                     </div>
-                    <!-- One picker for the owning org unit, filtered by the selected account type in
+                    <!--/* One picker for the owning org unit, filtered by the selected account type in
                          bank.js: ORG_UNIT -> Staffeln/SKs, AREA -> Bereiche, CARTEL -> the
                          Organisationsleitung (epic #692 Phase 6, REQ-ORG-019). The data-kind on each
-                         option drives that filter. AREA no longer carries a free-form name. -->
+                         option drives that filter. AREA no longer carries a free-form name. */-->
                     <div class="bank-form-row bank-row-orgunit">
                         <label for="bank-create-orgunit" th:text="#{bank.field.orgUnit}">Org-Einheit</label>
                         <select id="bank-create-orgunit" name="orgUnitId" data-testid="bank-create-orgunit">
@@ -322,7 +322,7 @@
         </div>
     </div>
 
-    <!-- Rename account -->
+    <!--/* Rename account */-->
     <div class="krt-modal-overlay" id="bank-rename-modal">
         <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.rename.title}">
             <div class="krt-modal-head">
@@ -353,7 +353,7 @@
         </div>
     </div>
 
-    <!-- Set / clear balance target (REQ-BANK-036): bank staff with access to the account. -->
+    <!--/* Set / clear balance target (REQ-BANK-036): bank staff with access to the account. */-->
     <div class="krt-modal-overlay" id="bank-target-modal">
         <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.target.title}">
             <div class="krt-modal-head">
@@ -385,7 +385,7 @@
         </div>
     </div>
 
-    <!-- Close account (zero balance enforced server-side too) -->
+    <!--/* Close account (zero balance enforced server-side too) */-->
     <div class="krt-modal-overlay" id="bank-close-modal">
         <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.close.title}">
             <div class="krt-modal-head">
@@ -411,7 +411,7 @@
         </div>
     </div>
 
-    <!-- Reopen account -->
+    <!--/* Reopen account */-->
     <div class="krt-modal-overlay" id="bank-reopen-modal">
         <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.reopen.title}">
             <div class="krt-modal-head">
@@ -437,7 +437,7 @@
         </div>
     </div>
 
-    <!-- Register holder -->
+    <!--/* Register holder */-->
     <div class="krt-modal-overlay" id="bank-register-holder-modal">
         <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.registerHolder.title}">
             <div class="krt-modal-head">
@@ -451,9 +451,9 @@
                     <p class="bank-field-hint" th:text="#{bank.modal.registerHolder.hint}">Nur registrierte Tool-Nutzer k&ouml;nnen Halter werden. Angezeigt wird immer der aktuelle Anzeigename des Nutzers; der bei der Registrierung erfasste Name dient nur als R&uuml;ckfall nach einer Nutzerl&ouml;schung.</p>
                     <div class="bank-form-row">
                         <label for="bank-holder-user" th:text="#{bank.field.user}">Nutzer</label>
-                        <!-- Server-side searchable combobox (remote-bank-users, #1193): the roster is no
+                        <!--/* Server-side searchable combobox (remote-bank-users, #1193): the roster is no
                              longer preloaded. Typing queries /users/search-bank on demand (bank-widened so
-                             role-less bank staff can search); add-only picker, only the placeholder is seeded. -->
+                             role-less bank staff can search); add-only picker, only the placeholder is seeded. */-->
                         <select id="bank-holder-user" name="userId" required data-role="bank-holder-user"
                                 data-krt-combobox="remote-bank-users" data-testid="bank-holder-user">
                             <option value="" th:text="#{bank.field.user.placeholder}">Nutzer w&auml;hlen &hellip;</option>
@@ -472,7 +472,7 @@
         </div>
     </div>
 
-    <!-- Deactivate holder -->
+    <!--/* Deactivate holder */-->
     <div class="krt-modal-overlay" id="bank-holder-deactivate-modal">
         <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.holderDeactivate.title}">
             <div class="krt-modal-head">
@@ -499,7 +499,7 @@
         </div>
     </div>
 
-    <!-- Reactivate holder -->
+    <!--/* Reactivate holder */-->
     <div class="krt-modal-overlay" id="bank-holder-reactivate-modal">
         <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.holderReactivate.title}">
             <div class="krt-modal-head">
@@ -526,8 +526,8 @@
         </div>
     </div>
 
-    <!-- Holder-to-holder Umbuchung (REQ-BANK-031): moves custody between holders, no account touched.
-         Open to every bank employee; the source holder may go negative (reconciliation tool). -->
+    <!--/* Holder-to-holder Umbuchung (REQ-BANK-031): moves custody between holders, no account touched.
+         Open to every bank employee; the source holder may go negative (reconciliation tool). */-->
     <div class="krt-modal-overlay" id="bank-holder-transfer-modal">
         <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.holderTransfer.title}">
             <div class="krt-modal-head">
@@ -562,8 +562,8 @@
                         <input type="number" id="bank-holder-transfer-amount" name="amount" step="1" min="1"
                                inputmode="numeric" required data-testid="bank-holder-transfer-amount">
                         <span class="bank-field-error" data-error-for="amount"></span>
-                        <!-- No fee preview here: the holder→holder Umbuchung is fee-free
-                             (REQ-BANK-031, ADR-0052) — the staff bear any in-game fee personally. -->
+                        <!--/* No fee preview here: the holder→holder Umbuchung is fee-free
+                             (REQ-BANK-031, ADR-0052) — the staff bear any in-game fee personally. */-->
                     </div>
                     <div class="bank-form-row">
                         <label for="bank-holder-transfer-note" th:text="#{bank.field.note}">Notiz</label>

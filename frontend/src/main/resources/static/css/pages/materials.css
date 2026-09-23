@@ -1,0 +1,82 @@
+/* Page stylesheet of templates/materials.html, moved out of its inline style block
+ * (FE-PERF-02). Linked in the same place the block stood, so the cascade order is
+ * unchanged. */
+
+.material-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    cursor: pointer;
+    transition:
+        transform 0.2s,
+        box-shadow 0.2s;
+    text-decoration: none;
+}
+
+.material-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(231, 126, 35, 0.2);
+}
+
+.material-title {
+    font-family: var(--font-body);
+    font-weight: 700;
+    color: var(--color-primary);
+    font-size: 1.2rem;
+    margin: 0;
+    text-transform: uppercase;
+}
+
+.price-info {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-body);
+    color: var(--color-gray-1);
+}
+
+.price-label {
+    font-size: 0.8rem;
+    color: var(--color-gray-2-text);
+}
+
+.price-value {
+    font-weight: 700;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+    max-width: 400px;
+}
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+}
+/* Checkboxes and radios are excluded: width:100% + the padding would stretch the 1.2rem
+   KRT squares (styles.css) full-width. The exclusions sit in :where() so they add ZERO
+   specificity — the rule keeps the plain `.form-group input` weight (0,1,1) and stays
+   below the (0,2,0) combobox rule `.krt-combobox .krt-combobox__input`. The grouping
+   toggle sits outside .form-group today; the exclusion closes the latent trap that broke
+   admin/materials when its flag checkboxes were added later. */
+.form-group input:where(:not([type='checkbox']):not([type='radio'])) {
+    width: 100%;
+    padding: 0.5rem;
+    background-color: var(--color-surface-input);
+    border: 1px solid var(--color-gray-3);
+    color: var(--color-gray-1);
+    font-family: var(--font-body);
+    box-sizing: border-box;
+}
+
+.materials-grouping-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.5rem 0 1.5rem;
+}
+.materials-grouping-toggle label {
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    cursor: pointer;
+}

@@ -51,6 +51,19 @@ touching any frontend surface: `git submodule update --init .claude/skills/das-k
 or, offline, copy it from the main worktree (find it via `git worktree list`). Never do UI work
 against an empty design system and never treat its absence as "no design system applies".
 
+### What a template may send
+
+A rendered page carries no developer text and no inline page CSS (`REQ-UI-023`,
+`TemplateCommentHygieneTest`):
+
+- **Comments are Thymeleaf parser-level comments** — `<!--/* … */-->` — never `<!-- … -->`, which is
+  sent with every response. Never put the star-slash pair inside one: it closes the block early and
+  renders the rest of the text into the page. Write `* /`.
+- **Page CSS goes into `static/css/pages/<page>.css`**, linked with `<link rel="stylesheet">` where
+  a `<style>` block would stand (in the `extraLinks` fragment for the head, so it still loads after
+  `styles.css` and before `inline-migration.css`). No `<style>` element in a template. It is linted
+  by `:frontend:lintCssInline` with the tiny template rule set, and formatted by Prettier.
+
 ## Live update
 
 **Live update is a binding requirement: every part of the frontend must support live update to

@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="de">
 <body>
-<!--
+<!--/*
   Materialbörse Gesuche create / edit modal (REQ-MARKET-015/016). Included on the Materialbörse
   board page. The logic lives in materialgesuch-modal.js (window.krtMaterialRequest); strings come
   from window.materialgesuchI18n (bootstrapped below, merged so the host page can add its own).
   Unlike the offer modal there is no backing Lager row: the material/item is chosen from the
   catalogue, the desired quantity is a free number, and an optional minimum quality applies to both
   kinds.
--->
+*/-->
 <th:block th:fragment="requestModal">
     <div id="mg-modal" class="krt-modal-overlay">
         <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true"
@@ -23,8 +23,8 @@
             </div>
             <div class="krt-modal-body">
                 <div class="mb-modal-picker" data-mg-picker hidden>
-                    <!-- Material/Item kind radio: switches between the material-catalogue combobox and
-                         the blueprint-product combobox (a request has no Lager row). -->
+                    <!--/* Material/Item kind radio: switches between the material-catalogue combobox and
+                         the blueprint-product combobox (a request has no Lager row). */-->
                     <div class="mb-modal-kind" data-mg-kind role="radiogroup"
                          th:aria-label="#{materialgesuch.modal.kind.label}">
                         <label class="mb-modal-kind__opt">

@@ -29,7 +29,7 @@
         <p class="krt-subtitle" th:text="#{admin.defaultBlueprints.subtitle}">Standard-Blueprints verwalten</p>
     </div>
 
-    <!-- Add bar -->
+    <!--/* Add bar */-->
     <div class="hud-box krt-personal-inventory mt-2">
         <h2 class="krt-bp-section-title" th:text="#{admin.defaultBlueprints.add.heading}">Standard-Blueprint hinzuf&uuml;gen</h2>
 
@@ -56,13 +56,13 @@
         </form>
     </div>
 
-    <!-- Current default set -->
+    <!--/* Current default set */-->
     <div class="hud-box krt-personal-inventory mt-2">
         <h2 class="krt-bp-section-title" th:text="#{admin.defaultBlueprints.list.heading}">Aktuelle Standard-Blueprints</h2>
-        <!-- The list host is the swap target of the in-place refresh after an add or a remove
+        <!--/* The list host is the swap target of the in-place refresh after an add or a remove
              (REQ-FE-001): GET ?fragment=rows re-renders the table inside it, delete forms included,
              so the page never has to rebuild a row client-side. The fragment sits INSIDE the host
-             because krtFetch.swap replaces the host's innerHTML. -->
+             because krtFetch.swap replaces the host's innerHTML. */-->
         <div id="krt-dbp-list-host" class="table-responsive krt-pi-table-wrapper">
             <th:block th:fragment="rows">
             <table class="krt-table krt-pi-table">
@@ -79,11 +79,11 @@
                 <tr th:each="d : ${defaults}" th:attr="data-product-key=${d.productKey}">
                     <td th:text="${d.productName}">Produkt</td>
                     <td>
-                        <!-- Per-row server-rendered POST form: the action is baked by Thymeleaf and
+                        <!--/* Per-row server-rendered POST form: the action is baked by Thymeleaf and
                              never written by JS, so no URL flows from the DOM into a form action
                              (avoids the CodeQL js/xss-through-dom sink). The remove button opens the
                              shared confirm modal, whose confirm sends THIS form's action through
-                             krtFetch, or submits the form natively when krtFetch did not load. -->
+                             krtFetch, or submits the form natively when krtFetch did not load. */-->
                         <form th:id="${'krt-dbp-del-' + d.id}"
                               th:action="@{/admin/default-blueprints/{id}/delete(id=${d.id})}"
                               method="post" class="krt-dbp-del-form">
@@ -104,7 +104,7 @@
     </div>
 </main>
 
-<!-- Remove confirmation modal -->
+<!--/* Remove confirmation modal */-->
 <div id="krt-dbp-delete-modal" class="krt-modal-overlay">
     <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{admin.defaultBlueprints.modal.remove.title}">
         <div class="krt-modal-head">

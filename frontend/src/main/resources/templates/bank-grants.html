@@ -23,8 +23,8 @@
     </nav>
 </header>
 
-<!-- data-user-id keys the per-user localStorage persistence (REQ-UI-017), mirroring the other
-     bank templates (bank-dashboard.html / bank-requests.html). -->
+<!--/* data-user-id keys the per-user localStorage persistence (REQ-UI-017), mirroring the other
+     bank templates (bank-dashboard.html / bank-requests.html). */-->
 <main th:attr="data-bank-generic-error=#{bank.error.network},data-bank-saved=#{frontend.ajax.saved},data-bank-refresh-error=#{bank.refresh.failed},data-bank-livesync-updates=#{livesync.updates_available},data-user-id=${#authentication.name}">
     <div class="greeting hud-box flex-between">
         <div>
@@ -41,7 +41,7 @@
         </div>
     </div>
 
-    <!-- G2 grouping toggle + entity filter. -->
+    <!--/* G2 grouping toggle + entity filter. */-->
     <div class="bank-filterbar bank-filterbar--tabs mt-2">
         <div class="tab-nav" role="tablist">
             <a th:href="@{/bank/grants(view='account')}" class="tab" role="tab"
@@ -53,9 +53,9 @@
         </div>
         <div class="bank-form-row" th:if="${!byEmployee}">
             <label for="bank-grants-account-filter" class="visually-hidden" th:text="#{bank.grants.filter.account}">Konto</label>
-            <!-- Server-side account search (remote-bank-accounts, REQ-FE-017, ADR-0106): the account
+            <!--/* Server-side account search (remote-bank-accounts, REQ-FE-017, ADR-0106): the account
                  roster is no longer preloaded. Only the currently-selected account is seeded (edit
-                 mode) so the box shows its name; clearing the box filters to all accounts. -->
+                 mode) so the box shows its name; clearing the box filters to all accounts. */-->
             <select id="bank-grants-account-filter" data-role="bank-grants-filter"
                     data-view="account" data-param="accountId"
                     data-krt-combobox="remote-bank-accounts"
@@ -78,11 +78,11 @@
         </div>
     </div>
 
-    <!-- G1 capability matrix. In-place writes (REQ-FE-005, #579): grant create/revoke re-render this
+    <!--/* G1 capability matrix. In-place writes (REQ-FE-005, #579): grant create/revoke re-render this
          matrix via krtFetch (fragment=grantsMatrix) so the new/removed row and the empty-state toggle
          in place without a reload; the swap URL carries the active view/accountId/userId filter
          (#573) so the grouping is preserved. The single-flag toggle dom-patches its own row instead
-         (no structural change). The filter selectors + create modal live outside the fragment. -->
+         (no structural change). The filter selectors + create modal live outside the fragment. */-->
     <div class="bank-panel mt-2" data-testid="bank-grants-panel">
         <div class="bank-panel-body">
             <div id="bank-grants-results">
@@ -152,7 +152,7 @@
         </div>
     </div>
 
-    <!-- Create grant -->
+    <!--/* Create grant */-->
     <div class="krt-modal-overlay" id="bank-grant-create-modal">
         <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.grant.title}">
             <div class="krt-modal-head">
@@ -167,9 +167,9 @@
                     <p class="bank-field-hint" th:text="#{bank.modal.grant.hint}">Der Nutzer braucht die Keycloak-Rolle &quot;Bank Employee&quot;, damit die Berechtigung wirkt.</p>
                     <div class="bank-form-row">
                         <label for="bank-grant-user" th:text="#{bank.field.user}">Nutzer</label>
-                        <!-- Server-side searchable combobox (remote-bank-users, #1193): the roster is no
+                        <!--/* Server-side searchable combobox (remote-bank-users, #1193): the roster is no
                              longer preloaded. Typing queries /users/search-bank on demand (bank-widened so
-                             role-less bank staff can search); add-only picker, only the placeholder is seeded. -->
+                             role-less bank staff can search); add-only picker, only the placeholder is seeded. */-->
                         <select id="bank-grant-user" name="userId" required data-role="bank-holder-user"
                                 data-krt-combobox="remote-bank-users" data-testid="bank-grant-user">
                             <option value="" th:text="#{bank.field.user.placeholder}">Nutzer w&auml;hlen &hellip;</option>
@@ -178,9 +178,9 @@
                     </div>
                     <div class="bank-form-row">
                         <label for="bank-grant-account" th:text="#{bank.grants.col.account}">Konto</label>
-                        <!-- Server-side account search (remote-bank-accounts, REQ-FE-017, ADR-0106):
+                        <!--/* Server-side account search (remote-bank-accounts, REQ-FE-017, ADR-0106):
                              add-only picker (no edit-mode seed), only the placeholder is rendered;
-                             typing queries /api/proxy/bank/accounts/search on demand. -->
+                             typing queries /api/proxy/bank/accounts/search on demand. */-->
                         <select id="bank-grant-account" name="accountId" required
                                 data-krt-combobox="remote-bank-accounts"
                                 th:attr="data-combobox-placeholder=#{bank.account.search.placeholder},data-combobox-no-results=#{bank.account.search.noResults}"
@@ -216,7 +216,7 @@
         </div>
     </div>
 
-    <!-- Revoke grant -->
+    <!--/* Revoke grant */-->
     <div class="krt-modal-overlay" id="bank-grant-revoke-modal">
         <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.revoke.title}">
             <div class="krt-modal-head">
