@@ -676,7 +676,11 @@ x-backend: &backend-template
     # local-only SSE + the polling fallback (REQ-NOTIF-006).
     REDIS_HOST: ${REDIS_HOST:-redis}
     REDIS_PORT: ${REDIS_PORT:-6379}
-    REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    # Its own Redis ACL user once the owner has rolled the per-service users out (REQ-SEC-068,
+    # ADR-0207): publish/subscribe on two channels, no key. Unset, it is a password-only AUTH
+    # with the shared REDIS_PASSWORD, i.e. the `default` user, exactly as before.
+    REDIS_USERNAME: ${REDIS_BACKEND_USERNAME:-}
+    REDIS_PASSWORD: ${REDIS_BACKEND_PASSWORD:-${REDIS_PASSWORD:-}}
     APP_NOTIFICATIONS_REDIS_FANOUT_ENABLED: ${APP_NOTIFICATIONS_REDIS_FANOUT_ENABLED:-true}
     # The app's live-sync bridge (ADR-0143). Defaults ON here for the same reason the
     # notification fan-out does: this file describes a stack that HAS a Redis, and the
@@ -821,7 +825,12 @@ x-redis: &redis-template
   # the in-flight set and force an AOF/RDB reload). A defined maxmemory also makes
   # the RedisMemoryHigh leading-indicator alert functional: it self-guards on
   # redis_memory_max_bytes > 0 and was therefore inert while maxmemory was unset.
-  command: redis-server --save "60 1" --appendonly yes --appendfsync everysec --maxmemory 384mb --maxmemory-policy noeviction --loglevel notice --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
+  #
+  # `--notify-keyspace-events Egx` (REQ-SEC-068, ADR-0207): Spring Session needs the expired
+  # and deleted key events, and used to switch them on itself with CONFIG SET at every frontend
+  # start -- which needs the all-powerful `default` user. The server now carries the setting, so
+  # the frontend's own ACL user never needs CONFIG (TolerantKeyspaceNotificationsAction).
+  command: redis-server --save "60 1" --appendonly yes --appendfsync everysec --maxmemory 384mb --maxmemory-policy noeviction --notify-keyspace-events Egx --loglevel notice --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
   restart: unless-stopped
   logging: *default-logging
   # Runtime-hardening baseline (REQ-OPS-014). The official redis entrypoint boots as root to chown
@@ -867,8 +876,14 @@ x-redis: &redis-template
         # Redis is effectively single-process (plus a few bg threads + a transient RDB fork); 512 is
         # a fork-bomb ceiling with wide headroom.
         pids: 512
+  # Liveness without a credential (REQ-SEC-068, ADR-0207). An unauthenticated PING answers
+  # `NOAUTH` from a server that is up and enforcing authentication, and `PONG` from one that is not
+  # (dev without a password); either is a responsive event loop. It used to authenticate as
+  # `default`, which the per-service rollout switches off -- a probe that depends on the ACL state
+  # would restart Redis the moment the rollout completes. Whether authentication is ENFORCED is
+  # the conformance suite's `redis-requires-auth` check, not this probe's job.
   healthcheck:
-    test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:?}", "--no-auth-warning", "ping"]
+    test: ["CMD-SHELL", "redis-cli ping 2>&1 | grep -q -e PONG -e NOAUTH"]
     interval: 5s
     timeout: 5s
     retries: 5
@@ -1060,7 +1075,10 @@ x-frontend: &frontend-template
     # attribute is dropped. Named here because this block is a closed allow-list: the owner flips
     # production to `enforce` in the host .env once the report counter has stayed at zero.
     APP_SESSION_TYPE_ALLOW_LIST: ${APP_SESSION_TYPE_ALLOW_LIST:-report}
-    REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
+    # Its own Redis ACL user once rolled out (REQ-SEC-068, ADR-0207): the session namespace, the
+    # live-sync channels and the handoff keys it consumes. Unset = the shared `default` user, as before.
+    REDIS_USERNAME: ${REDIS_FRONTEND_USERNAME:-}
+    REDIS_PASSWORD: ${REDIS_FRONTEND_PASSWORD:-${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}}
     # Monitoring plane (epic #936, REQ-OBS-005/-009) — see the backend template for the full
     # rationale. Everything defaults OFF/empty so dev/test/e2e stay inert; the prod .env supplies the
     # real scrape credentials and enables tracing. Only the prod service joins net-monitoring-scrape.
@@ -1173,7 +1191,10 @@ x-ingest: &ingest-template
     APP_RATE_LIMIT_IP_REFILL_TOKENS: ${IRI_INGEST_RATE_LIMIT_IP_REFILL_TOKENS:-120}
     REDIS_HOST: redis
     REDIS_PORT: 6379
-    REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
+    # Its own Redis ACL user once rolled out (REQ-SEC-068, ADR-0207): the ingest:* keys only.
+    # Unset = the shared `default` user, as before.
+    REDIS_USERNAME: ${REDIS_INGEST_USERNAME:-}
+    REDIS_PASSWORD: ${REDIS_INGEST_PASSWORD:-${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}}
     # JWT audience enforcement (security review). Empty by default. Unlike the backend, the gateway
     # is NOT part of the E2E stack (E2eStackExtension brings up no ingest service), so its enforced
     # path has unit coverage only — SecurityConfigTest — and no end-to-end rehearsal. Enforce in
@@ -1296,14 +1317,25 @@ services:
     # clean rollback rather than a silent breakage. Untouched for redis-dev.
     # ADR-0094 / ADR-0126: the live-sync + notification fan-outs PUBLISH/SUBSCRIBE on the pub/sub
     # channels `basetool:livesync:changed` (frontend), `basetool:livesync:presence` (frontend,
-    # cross-instance editor-presence gossip, #1237) and `basetool:notify:published` (backend). The
-    # `default` user's `&*` grant (above) already covers all three — a new channel needs no ACL
-    # change as long as that grant stays a wildcard; the restricted `monitoring` user must NOT gain
+    # cross-instance editor-presence gossip, #1237) and `basetool:notify:published` (backend). Until
+    # 2026-09-23 the `default` user's `&*` grant covered all three and this comment promised that a
+    # new channel needed no ACL change. That is withdrawn (ADR-0207): each service's own user names
+    # its channels, so a new one IS an ACL change. The restricted `monitoring` user must never gain
     # `&*`. Pub/sub adds no keys, so the 384mb noeviction budget (ADR-0079) is unaffected.
-    command: redis-server --save "60 1" --appendonly yes --appendfsync everysec --maxmemory 384mb --maxmemory-policy noeviction --loglevel notice --aclfile /etc/redis/users.acl
+    #
+    # REQ-SEC-068 / ADR-0207: the ACL file is rendered from scripts/redis-users.acl.tmpl by
+    # scripts/render-redis-acl.py (hashes, never passwords) and carries one user per service:
+    # basetool-frontend, basetool-backend, basetool-ingest, plus `admin` (the operator) and
+    # `monitoring`. The channel list above is therefore no longer covered by a wildcard for the
+    # applications: a new channel is a template change, rendered and ACL LOADed on the host.
+    command: redis-server --save "60 1" --appendonly yes --appendfsync everysec --maxmemory 384mb --maxmemory-policy noeviction --notify-keyspace-events Egx --loglevel notice --aclfile /etc/redis/users.acl
     # A service-level `volumes:` replaces the merged template value, so the data volume is re-listed
     # alongside the read-only ACL mount.
-    # The healthcheck authenticates, so the password has to reach redis-cli -- but the two
+    # (Updated 2026-09-23, REQ-SEC-068: the health probe no longer authenticates at all -- see
+    # the template's healthcheck. The Quadlet container still receives REDIS_PASSWORD, now for the
+    # operator's `redis-cli --user admin ACL LOAD` inside it; the history below is why it is
+    # declared the way it is.)
+    # The healthcheck authenticated, so the password had to reach redis-cli -- but the two
     # deployments need it in different places, and for a while this file carried BOTH.
     #
     # Compose expands `${REDIS_PASSWORD:?}` in the healthcheck below on the HOST, at file-load

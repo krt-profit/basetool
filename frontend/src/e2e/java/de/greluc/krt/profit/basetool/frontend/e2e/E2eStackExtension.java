@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.e2e;
 
+import de.greluc.krt.profit.basetool.testsupport.redis.RedisAclTemplate;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -597,7 +598,18 @@ public final class E2eStackExtension implements BeforeAllCallback {
     env.put("KC_BOOTSTRAP_ADMIN_USERNAME", "admin");
     env.put("KC_BOOTSTRAP_ADMIN_PASSWORD", "admin-e2e-pw-do-not-use-in-prod");
     env.put("KEYCLOAK_ADMIN_CLIENT_SECRET", "e2e-client-secret-do-not-use-in-prod");
-    env.put("REDIS_PASSWORD", "redis-e2e-pw-do-not-use-in-prod");
+    // The per-service Redis ACL users (REQ-SEC-068): docker-compose.e2e.yml loads the committed
+    // docker/test-redis/users.acl with `default` OFF, so each app must reach Redis as its own user
+    // through the same REDIS_<SVC>_USERNAME / _PASSWORD mapping production uses. REDIS_PASSWORD is
+    // the operator's `admin` user here, which no application is handed.
+    env.put("REDIS_PASSWORD", RedisAclTemplate.E2E_PASSWORDS.get("REDIS_PASSWORD"));
+    env.put("REDIS_FRONTEND_USERNAME", RedisAclTemplate.FRONTEND_USER);
+    env.put(
+        "REDIS_FRONTEND_PASSWORD", RedisAclTemplate.E2E_PASSWORDS.get("REDIS_FRONTEND_PASSWORD"));
+    env.put("REDIS_BACKEND_USERNAME", RedisAclTemplate.BACKEND_USER);
+    env.put("REDIS_BACKEND_PASSWORD", RedisAclTemplate.E2E_PASSWORDS.get("REDIS_BACKEND_PASSWORD"));
+    env.put("REDIS_INGEST_USERNAME", RedisAclTemplate.INGEST_USER);
+    env.put("REDIS_INGEST_PASSWORD", RedisAclTemplate.E2E_PASSWORDS.get("REDIS_INGEST_PASSWORD"));
     env.put("SERVER_SSL_KEY_STORE_PASSWORD", KEYSTORE_PW);
     env.put("IRI_BASETOOL_VERSION", IMAGE_TAG);
     // Audit L-1 / REQ-SEC-024: exercise the enforced `aud` path. See EXPECTED_AUDIENCE — the

@@ -29,6 +29,7 @@ import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.assertions.LocatorAssertions;
+import de.greluc.krt.profit.basetool.testsupport.redis.RedisAclTemplate;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulRedisConnection;
 import java.io.IOException;
@@ -70,10 +71,28 @@ class IngestHandoffE2eTest {
 
   /**
    * The ephemeral e2e Redis, published to the host by {@code docker-compose.e2e.yml} ({@code
-   * redis-dev} → {@code 127.0.0.1:6379}) with the throwaway password from {@code
-   * E2eStackExtension}. Never a production endpoint or credential.
+   * redis-dev} → {@code 127.0.0.1:6379}), as the gateway's own ACL user (REQ-SEC-068): staging a
+   * handoff here goes through exactly the permissions the real gateway has. Throwaway password from
+   * {@code RedisAclTemplate.E2E_PASSWORDS}; never a production endpoint or credential.
    */
-  private static final String REDIS_URI = "redis://:redis-e2e-pw-do-not-use-in-prod@127.0.0.1:6379";
+  private static final String INGEST_REDIS_URI =
+      "redis://"
+          + RedisAclTemplate.INGEST_USER
+          + ":"
+          + RedisAclTemplate.E2E_PASSWORDS.get("REDIS_INGEST_PASSWORD")
+          + "@127.0.0.1:6379";
+
+  /**
+   * The same Redis as the operator's {@code admin} user, for what the test observes rather than
+   * what the gateway does: reading a handoff without consuming it and cleaning one up. The
+   * gateway's user may do neither, by design.
+   */
+  private static final String ADMIN_REDIS_URI =
+      "redis://"
+          + RedisAclTemplate.ADMIN_USER
+          + ":"
+          + RedisAclTemplate.E2E_PASSWORDS.get("REDIS_PASSWORD")
+          + "@127.0.0.1:6379";
 
   private static com.microsoft.playwright.Playwright playwright;
   private static Browser browser;
@@ -241,23 +260,31 @@ class IngestHandoffE2eTest {
    * Writes a value to the e2e Redis (as the gateway would), using the throwaway dev credentials.
    */
   private static void stage(String redisKey, String value) {
-    withRedis(commands -> commands.set(redisKey, value));
+    withRedis(INGEST_REDIS_URI, commands -> commands.set(redisKey, value));
   }
 
   /** Reads a value from the e2e Redis without consuming it (to assert single-use / isolation). */
   private static String get(String redisKey) {
-    return withRedis(commands -> commands.get(redisKey));
+    return withRedis(ADMIN_REDIS_URI, commands -> commands.get(redisKey));
   }
 
   /** Deletes a key from the e2e Redis (test cleanup for the unconsumed foreign handoff). */
   private static void del(String redisKey) {
-    withRedis(commands -> commands.del(redisKey));
+    withRedis(ADMIN_REDIS_URI, commands -> commands.del(redisKey));
   }
 
-  /** Runs one command against a short-lived Lettuce connection to the published e2e Redis. */
+  /**
+   * Runs one command against a short-lived Lettuce connection to the published e2e Redis.
+   *
+   * @param uri the connection URI, carrying the ACL user and its throwaway password.
+   * @param op the command to run.
+   * @param <R> the command's result type.
+   * @return the command's result.
+   */
   private static <R> R withRedis(
+      String uri,
       java.util.function.Function<io.lettuce.core.api.sync.RedisCommands<String, String>, R> op) {
-    RedisClient client = RedisClient.create(REDIS_URI);
+    RedisClient client = RedisClient.create(uri);
     try (StatefulRedisConnection<String, String> connection = client.connect()) {
       return op.apply(connection.sync());
     } finally {

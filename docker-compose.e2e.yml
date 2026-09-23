@@ -22,7 +22,15 @@ services:
     volumes: !override
       - iri-e2e-db-keycloak:/var/lib/postgresql/data
   redis-dev:
-    volumes: !override []
+    # The per-service Redis ACL users of production (REQ-SEC-068, ADR-0207), rendered from the
+    # committed template with the throwaway E2E passwords and `default` switched OFF -- the state
+    # production reaches at the end of its rollout. Every session, live-sync and handoff flow in the
+    # suite then runs under the users' real permissions; E2eStackExtension hands each app its
+    # REDIS_<SVC>_USERNAME / _PASSWORD. RedisAclFrontendIntegrationTest keeps this file equal to the
+    # template. No persistence: the stack is thrown away after the run.
+    command: redis-server --save "" --appendonly no --notify-keyspace-events Egx --aclfile /etc/redis/users.acl
+    volumes: !override
+      - ./docker/test-redis/users.acl:/etc/redis/users.acl:ro
   keycloak-dev:
     # KC 26 hostname-v2 rejected the browser's plain-HTTP OIDC auth request with
     # "This combination of host and port requires TLS" when KC_HOSTNAME was the

@@ -12,6 +12,8 @@
 #       serve loopback / emulator / docker-network names. Scoped to the directory, so a
 #       keystore committed anywhere ELSE still trips the scan — including the exact name
 #       `keystore.p12`, which .gitignore refuses so the production file cannot land here.
+#   - docker/test-redis/users.acl                         the E2E stack's Redis ACL (REQ-SEC-068):
+#       SHA-256 hashes of published throwaway passwords, rendered from the production template.
 #
 # The PR scan in .github/workflows/gitleaks.yml is range-scoped (it only walks
 # the commits the PR introduces), so a NEW secret added anywhere else still
@@ -28,6 +30,7 @@ paths = [
   '''frontend/src/e2e/resources/realm-export\.e2e\.json$''',
   '''docker/test-tls/basetool-test-ca\.crt$''',
   '''docker/test-tls/basetool-test-keystore\.p12$''',
+  '''docker/test-redis/users\.acl$''',
 ]
 # Obvious synthetic Discord snowflake used as a throwaway unit-test fixture (the
 # 18-digit placeholder id in UserServiceDiscordSyncTest). It is a sequential dummy,

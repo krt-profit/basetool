@@ -329,8 +329,12 @@ secrets must be assumed exposed: **rotate them once the stack is back up** (REQ-
 minimum —
 
 - the backend/Keycloak **database passwords** (`POSTGRES_PASSWORD`, `KC_POSTGRES_PASSWORD`) and the
-  **Redis password** (`REDIS_PASSWORD`) in `/var/iri/code/.env`, applied to the DBs — and to the
-  `default` line of `/var/iri/redis/users.acl`, which is where redis actually reads it;
+  **Redis passwords** (`REDIS_PASSWORD`, `REDIS_EXPORTER_PASSWORD` and, once the per-service users
+  are rolled out, `REDIS_FRONTEND_PASSWORD` / `_BACKEND_` / `_INGEST_`) in `/var/iri/code/.env`,
+  applied to the DBs — and to `/var/iri/redis/users.acl`, which is where redis actually reads them:
+  re-render it with `render-redis-acl.py` and `ACL LOAD` ([`deployment.md` → *The Redis
+  ACL*](deployment.md#the-redis-acl)). The captured ACL itself holds SHA-256 hashes, not passwords,
+  since REQ-SEC-068;
 - the **Keycloak admin** bootstrap password and the **OIDC client secrets**
   (`KEYCLOAK_ADMIN_CLIENT_SECRET`) and the **SPI shared secret** (`KRT_DISCORD_SPI_SHARED_SECRET`);
 - the internal **`keystore.p12`** (regenerate per [`deployment.md` → *Internal keystore and certificate rotation*](deployment.md#internal-keystore-and-certificate-rotation) — it must

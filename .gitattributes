@@ -138,3 +138,7 @@ docker/maintenance/** text eol=lf
 # into a whole-file line-ending diff. `.gitleaks.toml` is read inside a container, by the same
 # reasoning as the edge configuration above.
 *.toml text eol=lf
+
+# The Redis ACL files (REQ-SEC-068): read by redis-server inside a Linux container and compared
+# byte for byte by RedisAclFrontendIntegrationTest. `*.tmpl` above already covers the template.
+*.acl text eol=lf
