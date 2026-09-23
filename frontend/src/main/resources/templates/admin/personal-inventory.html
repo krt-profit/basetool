@@ -130,12 +130,8 @@
     </div>
 </main>
 
-<dialog id="krt-pi-modal" class="krt-modal-overlay" th:classappend="${showItemModal != null} ? 'krtm-modal-open' : 'krtm-hidden'">
-    <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{personalInventory.modal.create.title}">
-        <div class="krt-modal-head">
-            <h2 id="krt-pi-modal-title" th:text="#{personalInventory.modal.create.title}">Eintrag anlegen</h2>
-            <button type="button" class="krt-modal-close" data-trigger="pi-close-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-        </div>
+<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='krt-pi-modal', titleKey='personalInventory.modal.create.title', variant='krt-modal--wide', titleId='krt-pi-modal-title', open=${showItemModal != null}, closeTrigger='pi-close-modal', body=~{::krt-pi-modal-body})}">
+    <th:block th:ref="krt-pi-modal-body">
         <form id="krt-pi-form"
               th:action="${modalAction != null ? modalAction : '/admin/personal-inventory'}"
               method="post"
@@ -178,15 +174,11 @@
                 <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{personalInventory.action.save}">Speichern</span></button>
             </div>
         </form>
-    </div>
-</dialog>
+    </th:block>
+</th:block>
 
-<dialog id="krt-pi-delete-modal" class="krt-modal-overlay">
-    <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{personalInventory.action.delete.confirm.title}">
-        <div class="krt-modal-head">
-            <h2 th:text="#{personalInventory.action.delete.confirm.title}">Eintrag loeschen</h2>
-            <button type="button" class="krt-modal-close" data-trigger="pi-close-delete" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-        </div>
+<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='krt-pi-delete-modal', titleKey='personalInventory.action.delete.confirm.title', variant='krt-modal--danger', closeTrigger='pi-close-delete', body=~{::krt-pi-delete-modal-body})}">
+    <th:block th:ref="krt-pi-delete-modal-body">
         <form id="krt-pi-delete-form" method="post">
             <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
             <div class="krt-modal-body">
@@ -197,8 +189,8 @@
                 <button type="submit" class="btn krt-danger" th:text="#{personalInventory.action.delete.confirm.ok}">Loeschen</button>
             </div>
         </form>
-    </div>
-</dialog>
+    </th:block>
+</th:block>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
