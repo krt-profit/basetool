@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.PromotionLevelContentMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.PromotionCategory;
@@ -33,7 +34,6 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PromotionLevelContentResp
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionLevelContentWriteRequest;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionCategoryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionLevelContentRepository;
-import jakarta.persistence.EntityNotFoundException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -142,7 +142,7 @@ class PromotionLevelContentServiceTest {
     when(categoryRepository.findById(categoryId)).thenReturn(Optional.empty());
 
     // When / Then
-    assertThrows(EntityNotFoundException.class, () -> service.create(request));
+    assertThrows(NotFoundException.class, () -> service.create(request));
   }
 
   @Test
@@ -272,6 +272,6 @@ class PromotionLevelContentServiceTest {
     when(repository.findById(id)).thenReturn(Optional.empty());
 
     // When / Then
-    assertThrows(EntityNotFoundException.class, () -> service.get(id));
+    assertThrows(NotFoundException.class, () -> service.get(id));
   }
 }

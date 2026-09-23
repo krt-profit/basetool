@@ -1,6 +1,6 @@
 # ADR-0174 — The authorities cache TTL is an operational knob, defaulting to five minutes
 
-- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-09-13 (`e401742db`: `support.AuthoritiesCacheProperties`, `APP_SECURITY_AUTHORITIES_CACHE_TTL`).
+- **Status:** Accepted — implemented; **amended 2026-09-23** (the cache key, see *Amendment 1*). *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-09-13 (`e401742db`: `support.AuthoritiesCacheProperties`, `APP_SECURITY_AUTHORITIES_CACHE_TTL`).
 - **Date:** 2026-09-13
 - **Deciders:** @greluc (pending)
 - **Related:** specs `REQ-SEC-056` (new), `REQ-DATA-016` (new) ·
@@ -113,3 +113,44 @@ key — so re-authentication picks up new authorities immediately and this bound
 - The next question about this path becomes measurable rather than reconstructible:
   `pg_stat_statements` is installed alongside (`REQ-DATA-016`, V240), because this whole analysis
   had to be inferred from table counters for want of it.
+
+## Amendment 1 — 2026-09-23: the key is the Keycloak session, not the token
+
+*Improvement audit 2026-09, finding BE-PERF-08, approved by @greluc.*
+
+**What was wrong with the decision above.** The TTL it made configurable could not take effect.
+The cache key contained the token's `issuedAt`, Keycloak issues a new access token every five minutes
+(`accessTokenLifespan` 300 s), and every refreshed token was therefore a new key: whatever the TTL,
+no entry outlived the token it was made for. Raising the TTL above `PT5M` bought nothing.
+
+**Decision.** The key becomes `sub | session | azp | claims fingerprint`:
+
+- **session** is the token's `sid` — stable for the whole login, and verified to be present and
+  unchanged across a refresh on Keycloak 26.7 with the E2E realm (password grant, then refresh
+  grant). A token without `sid` — a client-credentials grant has no user session — falls back to
+  `issuedAt`, i.e. to the old key.
+- **azp** stays, for the REQ-SEC-036 reason given in the converter.
+- **claims fingerprint** is a SHA-256 over every claim except `iat`, `exp`, `nbf` and `jti`, rendered
+  unambiguously (sorted keys, tagged and length-prefixed values). It is what keeps a **role change as
+  fast as before**: a realm role granted or revoked in Keycloak changes the refreshed token's
+  `realm_access`, the fingerprint differs, and the next request re-assembles — exactly when the old
+  `issuedAt` key would have. The same holds for a renamed account or a changed e-mail address, which
+  `syncUser` writes down.
+
+**What the TTL now bounds, and what it does not.** It bounds changes a token cannot carry — an
+approval, a local role's permission set, an org-unit membership flag. Before, those were picked up at
+the next token refresh or at TTL expiry, whichever came first; now at TTL expiry alone. At the
+default `PT5M` the worst case is unchanged (five minutes either way). Raising the TTL towards the
+`PT15M` ceiling now genuinely trades that window for fewer misses — which is what the knob was always
+meant to do.
+
+**Observability.** The cache is bound to Micrometer as `cache="jwt-authorities"` (`recordStats()`),
+so its hit ratio appears in the Spring-apps dashboard's cache panels and `CacheHitRatioLow` /
+`CacheSizeEvictionsHigh` cover it. The effect on production misses is to be read there after the
+rollout; it is not measured yet.
+
+**Guards.** `CustomJwtGrantedAuthoritiesConverterTest`: a refreshed token of the same session is a
+hit; a refreshed token with a revoked realm role misses and no longer carries the role; a new session
+misses; two `azp` values of one session never share an entry; the per-token claims are outside the
+fingerprint and everything else inside it; hits and misses reach the meters.
+`FirstLoginAuthoritiesIntegrationTest` stays green.

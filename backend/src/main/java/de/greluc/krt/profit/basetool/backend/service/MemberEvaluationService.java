@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.mapper.MemberEvaluationMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.MemberEvaluation;
@@ -30,7 +31,6 @@ import de.greluc.krt.profit.basetool.backend.repository.PromotionCategoryReposit
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
-import jakarta.persistence.EntityNotFoundException;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -125,10 +125,9 @@ public class MemberEvaluationService {
       @NotNull MemberEvaluationUpdateRequest request) {
     ownerScopeService.assertPromotionFeatureEnabled();
     PromotionCategory category =
-        categoryRepository
-            .findById(categoryId)
-            .orElseThrow(
-                () -> new EntityNotFoundException("PromotionCategory not found: " + categoryId));
+        Entities.require(
+            categoryRepository.findById(categoryId),
+            () -> "PromotionCategory not found: " + categoryId);
     assertCallerMayEditCategory(category);
     assertCallerMayEvaluateUser(userId);
 
@@ -167,9 +166,7 @@ public class MemberEvaluationService {
   public void delete(@NotNull UUID id) {
     ownerScopeService.assertPromotionFeatureEnabled();
     MemberEvaluation entity =
-        repository
-            .findById(id)
-            .orElseThrow(() -> new EntityNotFoundException("MemberEvaluation not found: " + id));
+        Entities.require(repository.findById(id), () -> "MemberEvaluation not found: " + id);
     assertCallerMayEditCategory(entity.getCategory());
     assertCallerMayEvaluateUser(entity.getUserId());
     PromotionCategory category = entity.getCategory();

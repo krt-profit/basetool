@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.ingest.filter;
 
 import de.greluc.krt.profit.basetool.ingest.config.LoggingProperties;
-import de.greluc.krt.profit.basetool.ingest.logging.LogSafe;
+import de.greluc.krt.profit.basetool.logging.LogSafe;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

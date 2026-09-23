@@ -76,3 +76,18 @@ privileged step, and nothing else creates a release tag.**
   change the failure from an error into a wrong promise.
 - **Store the client ID in a repository variable.** It is public; the indirection would only make
   the workflow harder to read and let the App change without a diff.
+
+## Amendment 1 (2026-09-23) — the refreshVersions PR is opened by the App too
+
+`refresh-versions.yml` was the last workflow on a personal access token: it opened its weekly
+`chore/refresh-versions` PR with `REFRESH_VERSIONS_TOKEN`, for the same reason the release path had
+used `RELEASE_TOKEN` — the organisation forbids `GITHUB_TOKEN` from opening pull requests. It now
+mints a `basetool-release` token the same way, scoped to `contents: write` (create-pull-request
+pushes the branch) and `pull-requests: write`, and stops with an explicit error when
+`RELEASE_APP_PRIVATE_KEY` is missing (audit item CI-SEC-16). The commit keeps its
+`github-actions[bot]` author, so the DCO exemption is unchanged.
+
+- **`REFRESH_VERSIONS_TOKEN` is no longer read by any workflow.** Together with `RELEASE_TOKEN` and
+  the variable `RELEASE_APP_ID` it can be deleted once a refreshVersions run has opened its PR
+  through the App; deleting it is left to the owner.
+- No workflow in the repository reads a personal access token any more.

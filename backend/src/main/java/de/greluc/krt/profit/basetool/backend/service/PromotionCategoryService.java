@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.PromotionCategoryMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.PromotionCategory;
@@ -27,10 +29,9 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PromotionCategoryResponse
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionCategoryWriteRequest;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionCategoryRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionTopicRepository;
-import de.greluc.krt.profit.basetool.backend.support.LogSafe;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
-import jakarta.persistence.EntityNotFoundException;
+import de.greluc.krt.profit.basetool.logging.LogSafe;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -123,7 +124,7 @@ public class PromotionCategoryService {
    *
    * @param id identifier of the category
    * @return the matching category in response form
-   * @throws EntityNotFoundException if no category exists for that id
+   * @throws NotFoundException if no category exists for that id
    * @throws AccessDeniedException if the caller's squadron context does not match the category's
    *     owning squadron
    */
@@ -140,18 +141,16 @@ public class PromotionCategoryService {
    *
    * @param request validated payload describing the new category
    * @return the persisted category in response form
-   * @throws EntityNotFoundException if the referenced topic does not exist
+   * @throws NotFoundException if the referenced topic does not exist
    */
   @Transactional
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public PromotionCategoryResponse create(@NotNull PromotionCategoryWriteRequest request) {
     ownerScopeService.assertPromotionFeatureEnabled();
     PromotionTopic topic =
-        topicRepository
-            .findById(request.topicId())
-            .orElseThrow(
-                () ->
-                    new EntityNotFoundException("PromotionTopic not found: " + request.topicId()));
+        Entities.require(
+            topicRepository.findById(request.topicId()),
+            () -> "PromotionTopic not found: " + request.topicId());
     assertCallerMayEditTopic(topic);
     PromotionCategory entity = mapper.toEntity(request);
     entity.setTopic(topic);
@@ -182,7 +181,7 @@ public class PromotionCategoryService {
    * @param request validated payload with the new field values and the previously fetched {@code
    *     version}
    * @return the updated category in response form
-   * @throws EntityNotFoundException if the category or referenced topic does not exist
+   * @throws NotFoundException if the category or referenced topic does not exist
    * @throws ObjectOptimisticLockingFailureException if the request's {@code version} no longer
    *     matches the persisted entity
    */
@@ -195,11 +194,9 @@ public class PromotionCategoryService {
     assertCallerMayEditTopic(entity.getTopic());
     OptimisticLock.check(entity.getVersion(), request.version(), PromotionCategory.class, id);
     PromotionTopic topic =
-        topicRepository
-            .findById(request.topicId())
-            .orElseThrow(
-                () ->
-                    new EntityNotFoundException("PromotionTopic not found: " + request.topicId()));
+        Entities.require(
+            topicRepository.findById(request.topicId()),
+            () -> "PromotionTopic not found: " + request.topicId());
     assertCallerMayEditTopic(topic);
     mapper.updateEntity(entity, request);
     entity.setTopic(topic);
@@ -220,7 +217,7 @@ public class PromotionCategoryService {
    * to ADMIN or OFFICER callers.
    *
    * @param id identifier of the category to delete
-   * @throws EntityNotFoundException if no category exists for that id
+   * @throws NotFoundException if no category exists for that id
    */
   @Transactional
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
@@ -237,9 +234,7 @@ public class PromotionCategoryService {
 
   @NotNull
   private PromotionCategory load(@NotNull UUID id) {
-    return repository
-        .findById(id)
-        .orElseThrow(() -> new EntityNotFoundException("PromotionCategory not found: " + id));
+    return Entities.require(repository.findById(id), () -> "PromotionCategory not found: " + id);
   }
 
   private void assertCallerMayEditTopic(PromotionTopic topic) {

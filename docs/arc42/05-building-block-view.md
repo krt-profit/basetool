@@ -108,6 +108,10 @@ that has to cross that boundary — the active-OrgUnit pin, the correlation id �
   own signed artifact (ADR-0055).
 - **`keycloak-theme/krt-theme`** — not a Gradle module: the `login` and `account` themes in the
   organisation's design, shipped inside the config bundle.
+- **`logging-support`** — a plain library, **shipped** inside the three application JARs: the
+  one `LogSafe` and the PII maskers every `logback-spring.xml` names (ADR-0205). Closed to domain
+  meaning — no DTO, no validation rule, no bean — so it cannot become the shared-code module the
+  frontend/backend split deliberately avoids.
 - **`test-support`** — a test-only library, never shipped: endpoint enumeration and the frontend
   page-route inventory behind the backend and frontend anonymous-surface sweeps, and behind ingest's
   `IngestEndpointSurfaceTest`, which pins the gateway's routed surface to its two `/v1` endpoints.

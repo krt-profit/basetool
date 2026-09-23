@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
-import de.greluc.krt.profit.basetool.frontend.logging.LogSafe;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintCraftabilityDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintProductDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
@@ -34,6 +33,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintRecipeD
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.support.StringNormalization;
+import de.greluc.krt.profit.basetool.logging.LogSafe;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;

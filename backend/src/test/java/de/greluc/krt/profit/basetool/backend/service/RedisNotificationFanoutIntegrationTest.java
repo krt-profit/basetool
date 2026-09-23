@@ -27,6 +27,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+import de.greluc.krt.profit.basetool.testsupport.containers.TestImages;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.Collection;
 import java.util.List;
@@ -58,7 +59,7 @@ class RedisNotificationFanoutIntegrationTest {
 
   @Container
   static final GenericContainer<?> REDIS =
-      new GenericContainer<>(DockerImageName.parse("redis:7-alpine")).withExposedPorts(6379);
+      new GenericContainer<>(DockerImageName.parse(TestImages.REDIS)).withExposedPorts(6379);
 
   private LettuceConnectionFactory connectionFactory;
   private RedisMessageListenerContainer listenerContainer;

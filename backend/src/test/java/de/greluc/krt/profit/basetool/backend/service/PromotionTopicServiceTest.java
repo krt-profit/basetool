@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.PromotionTopicMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.PromotionTopic;
@@ -29,7 +30,6 @@ import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.PromotionTopicWriteRequest;
 import de.greluc.krt.profit.basetool.backend.repository.PromotionTopicRepository;
-import jakarta.persistence.EntityNotFoundException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -108,7 +108,7 @@ class PromotionTopicServiceTest {
     when(repository.findById(id)).thenReturn(Optional.empty());
 
     // When / Then
-    assertThrows(EntityNotFoundException.class, () -> service.get(id));
+    assertThrows(NotFoundException.class, () -> service.get(id));
   }
 
   @Test

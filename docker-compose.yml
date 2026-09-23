@@ -1054,6 +1054,12 @@ x-frontend: &frontend-template
     # container however the host .env spells it. 120s ships as the default; an operator meeting a
     # slow export raises it rather than editing the image.
     APP_HTTP_EXPORT_RESPONSE_TIMEOUT: ${APP_HTTP_EXPORT_RESPONSE_TIMEOUT:-120s}
+    # The session type allow-list (REQ-SEC-067, ADR-0206): off | report | enforce. `report` reads
+    # every session value exactly as before and only counts and logs a class outside the list
+    # (basetool_session_type_refused_total{mode="report"}); `enforce` refuses it, so that one
+    # attribute is dropped. Named here because this block is a closed allow-list: the owner flips
+    # production to `enforce` in the host .env once the report counter has stayed at zero.
+    APP_SESSION_TYPE_ALLOW_LIST: ${APP_SESSION_TYPE_ALLOW_LIST:-report}
     REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
     # Monitoring plane (epic #936, REQ-OBS-005/-009) — see the backend template for the full
     # rationale. Everything defaults OFF/empty so dev/test/e2e stay inert; the prod .env supplies the

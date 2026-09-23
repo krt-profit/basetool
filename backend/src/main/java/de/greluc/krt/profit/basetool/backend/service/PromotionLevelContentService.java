@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.PromotionLevelContentMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.PromotionCategory;
@@ -29,7 +31,6 @@ import de.greluc.krt.profit.basetool.backend.repository.PromotionCategoryReposit
 import de.greluc.krt.profit.basetool.backend.repository.PromotionLevelContentRepository;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
-import jakarta.persistence.EntityNotFoundException;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -101,7 +102,7 @@ public class PromotionLevelContentService {
    *
    * @param id identifier of the level content
    * @return the matching level content in response form
-   * @throws EntityNotFoundException if no level content exists for that id
+   * @throws NotFoundException if no level content exists for that id
    * @throws AccessDeniedException if the caller's squadron context does not match the level
    *     content's owning squadron
    */
@@ -118,19 +119,16 @@ public class PromotionLevelContentService {
    *
    * @param request validated payload describing the new level content
    * @return the persisted level content in response form
-   * @throws EntityNotFoundException if the referenced category does not exist
+   * @throws NotFoundException if the referenced category does not exist
    */
   @Transactional
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public PromotionLevelContentResponse create(@NotNull PromotionLevelContentWriteRequest request) {
     ownerScopeService.assertPromotionFeatureEnabled();
     PromotionCategory category =
-        categoryRepository
-            .findById(request.categoryId())
-            .orElseThrow(
-                () ->
-                    new EntityNotFoundException(
-                        "PromotionCategory not found: " + request.categoryId()));
+        Entities.require(
+            categoryRepository.findById(request.categoryId()),
+            () -> "PromotionCategory not found: " + request.categoryId());
     assertCallerMayEditCategory(category);
     PromotionLevelContent entity = mapper.toEntity(request);
     entity.setCategory(category);
@@ -154,7 +152,7 @@ public class PromotionLevelContentService {
    * @param request validated payload with the new field values and the previously fetched {@code
    *     version}
    * @return the updated level content in response form
-   * @throws EntityNotFoundException if the level content or referenced category does not exist
+   * @throws NotFoundException if the level content or referenced category does not exist
    * @throws ObjectOptimisticLockingFailureException if the request's {@code version} no longer
    *     matches the persisted entity
    */
@@ -167,12 +165,9 @@ public class PromotionLevelContentService {
     assertCallerMayEditCategory(entity.getCategory());
     OptimisticLock.check(entity.getVersion(), request.version(), PromotionLevelContent.class, id);
     PromotionCategory category =
-        categoryRepository
-            .findById(request.categoryId())
-            .orElseThrow(
-                () ->
-                    new EntityNotFoundException(
-                        "PromotionCategory not found: " + request.categoryId()));
+        Entities.require(
+            categoryRepository.findById(request.categoryId()),
+            () -> "PromotionCategory not found: " + request.categoryId());
     assertCallerMayEditCategory(category);
     mapper.updateEntity(entity, request);
     entity.setCategory(category);
@@ -195,7 +190,7 @@ public class PromotionLevelContentService {
    * callers.
    *
    * @param id identifier of the level content to delete
-   * @throws EntityNotFoundException if no level content exists for that id
+   * @throws NotFoundException if no level content exists for that id
    */
   @Transactional
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
@@ -212,9 +207,8 @@ public class PromotionLevelContentService {
 
   @NotNull
   private PromotionLevelContent load(@NotNull UUID id) {
-    return repository
-        .findById(id)
-        .orElseThrow(() -> new EntityNotFoundException("PromotionLevelContent not found: " + id));
+    return Entities.require(
+        repository.findById(id), () -> "PromotionLevelContent not found: " + id);
   }
 
   private void assertCallerMayEditCategory(PromotionCategory category) {

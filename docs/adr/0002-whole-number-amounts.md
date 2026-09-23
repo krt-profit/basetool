@@ -1,6 +1,8 @@
 # ADR-0002 — Whole-number amounts: value-based validation, reject-not-round, display-only rounding
 
-- **Status:** Accepted
+- **Status:** Accepted — the "no shared code module" clause under *Consequences* is superseded
+  for log hygiene by [ADR-0205](0205-log-hygiene-lives-in-one-shipped-logging-support-module.md)
+  (2026-09-23)
 - **Date:** 2026-06-06
 - **Deciders:** Repository owner (@greluc)
 - **Related:** spec `REQ-MISSION-001`, `REQ-ORDERS-001` / `002`, `REQ-INV-045`
@@ -64,6 +66,10 @@ and rounding it would contradict the "keep internal precision" requirement.
 - **Harder / accepted costs:**
   - `@WholeNumber` is duplicated across the two modules (no shared code module) — a small, deliberate
     copy kept in sync by identical unit tests.
+    *Amended 2026-09-23:* a shared module now exists — `logging-support`, for log hygiene only
+    ([ADR-0205](0205-log-hygiene-lives-in-one-shipped-logging-support-module.md)). Its scope is
+    closed to domain meaning, so `@WholeNumber` stays per module; moving it would be its own
+    decision.
   - A non-browser client that sends a *genuinely* fractional finance amount gets a 400 rather than a
     rounded value. This is intentional (input is whole) and contrasts with the SCU path; the
     divergence is recorded here so it is not mistaken for an inconsistency.

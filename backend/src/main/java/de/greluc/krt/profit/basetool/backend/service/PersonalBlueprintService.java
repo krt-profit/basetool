@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.PersonalBlueprintMapper;
 import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintBatchResult;
@@ -31,9 +33,8 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintUpdateRe
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
-import de.greluc.krt.profit.basetool.backend.support.LogSafe;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
-import jakarta.persistence.EntityNotFoundException;
+import de.greluc.krt.profit.basetool.logging.LogSafe;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
@@ -106,19 +107,16 @@ public class PersonalBlueprintService {
    * @param ownerUserId {@code app_user.id} of the caller
    * @param request the add payload (product key + optional acquisition date / note)
    * @return the persisted DTO
-   * @throws EntityNotFoundException if the product key matches no active product
+   * @throws NotFoundException if the product key matches no active product
    * @throws DuplicateEntityException if the caller already owns the product
    */
   @Transactional
   public PersonalBlueprintResponse add(
       @NotNull UUID ownerUserId, @NotNull PersonalBlueprintCreateRequest request) {
     ResolvedProduct product =
-        blueprintProductService
-            .resolveByProductKey(request.productKey())
-            .orElseThrow(
-                () ->
-                    new EntityNotFoundException(
-                        "Blueprint product not found: " + request.productKey()));
+        Entities.require(
+            blueprintProductService.resolveByProductKey(request.productKey()),
+            () -> "Blueprint product not found: " + request.productKey());
     if (repository.existsByOwnerUserIdAndProductKey(ownerUserId, product.productKey())) {
       throw new DuplicateEntityException(
           "Blueprint '" + product.productName() + "' is already owned.");
@@ -183,7 +181,7 @@ public class PersonalBlueprintService {
    * @param id entry primary key
    * @param request the update payload (carries the expected version)
    * @return the persisted DTO
-   * @throws EntityNotFoundException when the entry is missing or owned by someone else
+   * @throws NotFoundException when the entry is missing or owned by someone else
    * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
    */
   @Transactional
@@ -202,7 +200,7 @@ public class PersonalBlueprintService {
    *
    * @param ownerUserId {@code app_user.id} of the caller
    * @param id entry primary key
-   * @throws EntityNotFoundException when the entry is missing or owned by someone else
+   * @throws NotFoundException when the entry is missing or owned by someone else
    */
   @Transactional
   public void delete(@NotNull UUID ownerUserId, @NotNull UUID id) {
@@ -240,7 +238,7 @@ public class PersonalBlueprintService {
    * @param ownerUserId {@code app_user.id} of the caller
    * @param id owned-blueprint entry id
    * @return the recipe view (never {@code null}; empty graph when the product is unresolved)
-   * @throws EntityNotFoundException when the entry is missing or owned by someone else
+   * @throws NotFoundException when the entry is missing or owned by someone else
    */
   @NotNull
   public PersonalBlueprintRecipeResponse recipeForOwn(@NotNull UUID ownerUserId, @NotNull UUID id) {
@@ -318,16 +316,14 @@ public class PersonalBlueprintService {
    * @param id entry primary key
    * @param request the update payload (carries the expected version)
    * @return the persisted DTO
-   * @throws EntityNotFoundException when the entry id is unknown
+   * @throws NotFoundException when the entry id is unknown
    * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
    */
   @Transactional
   public PersonalBlueprintResponse updateForUser(
       @NotNull UUID id, @NotNull PersonalBlueprintUpdateRequest request) {
     PersonalBlueprint entity =
-        repository
-            .findById(id)
-            .orElseThrow(() -> new EntityNotFoundException("PersonalBlueprint not found: " + id));
+        Entities.require(repository.findById(id), () -> "PersonalBlueprint not found: " + id);
     PersonalBlueprintResponse response = applyUpdate(entity, request);
     log.info("Admin updated blueprint id={} ownerUserId={}", id, entity.getOwnerUserId());
     return response;
@@ -338,14 +334,12 @@ public class PersonalBlueprintService {
    * an admin call removed.
    *
    * @param id entry primary key
-   * @throws EntityNotFoundException when the entry id is unknown
+   * @throws NotFoundException when the entry id is unknown
    */
   @Transactional
   public void deleteForUser(@NotNull UUID id) {
     PersonalBlueprint entity =
-        repository
-            .findById(id)
-            .orElseThrow(() -> new EntityNotFoundException("PersonalBlueprint not found: " + id));
+        Entities.require(repository.findById(id), () -> "PersonalBlueprint not found: " + id);
     requireRemovable(entity);
     repository.delete(entity);
     log.info("Admin deleted blueprint id={} ownerUserId={}", id, entity.getOwnerUserId());
@@ -439,8 +433,8 @@ public class PersonalBlueprintService {
   }
 
   /**
-   * Owner-scoped load; 404 (via {@link EntityNotFoundException}) for an unknown id or a row owned
-   * by a different user — the two cases are deliberately indistinguishable on the wire.
+   * Owner-scoped load; 404 (via {@link NotFoundException}) for an unknown id or a row owned by a
+   * different user — the two cases are deliberately indistinguishable on the wire.
    *
    * @param ownerUserId {@code app_user.id} of the caller
    * @param id entry primary key
@@ -454,7 +448,7 @@ public class PersonalBlueprintService {
             () -> {
               log.warn(
                   "Access denied or not found: ownerUserId={} requested id={}", ownerUserId, id);
-              return new EntityNotFoundException("PersonalBlueprint not found: " + id);
+              return new NotFoundException("PersonalBlueprint not found: " + id);
             });
   }
 }

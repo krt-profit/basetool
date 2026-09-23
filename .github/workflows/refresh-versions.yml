@@ -1,22 +1,27 @@
 name: Refresh Versions
 
-# `./gradlew refreshVersions` is the project's canonical way to surface
-# dependency / plugin updates (see CLAUDE.md: versions live in the version
-# catalog at `gradle/libs.versions.toml`, which refreshVersions annotates in
-# place with `## ⬆ = "…"` markers).
-# This workflow runs it on a weekly cadence and opens a single rolling pull
-# request whenever the tool annotates new versions into `gradle/libs.versions.toml`
-# (`versions.properties` is vestigial and holds no versions, but is still listed
-# below so a stray annotation there could never be silently dropped). The
-# maintainer then promotes the desired
-# bumps by hand — the workflow deliberately does NOT auto-apply updates,
-# because refreshVersions emits proposals as comments rather than mutations.
+# `./gradlew refreshVersions -PrefreshVersions` is the project's canonical way to surface
+# dependency / plugin updates (see CLAUDE.md: versions live in the version catalog at
+# `gradle/libs.versions.toml`, which refreshVersions annotates in place with `## ⬆ = "…"` markers).
+# The `-PrefreshVersions` flag is what applies the refreshVersions settings plugin at all: since
+# 2026-09-23 it is on the settings classpath but applied only on request, because applied
+# unconditionally it kept the configuration cache off for every other build (BLD-PERF-04).
 #
-# The PR step uses a dedicated `REFRESH_VERSIONS_TOKEN` secret (fine-grained
-# PAT or GitHub App token) instead of the default `GITHUB_TOKEN`, because the
-# `krt-profit` organization policy forbids Actions from creating or approving
-# pull requests. Required token scopes on this repo: `pull-requests: write`
-# and `contents: write`.
+# This workflow runs it on a weekly cadence and opens a single rolling pull request whenever the
+# tool annotates new versions into `gradle/libs.versions.toml`. The maintainer then promotes the
+# desired bumps by hand — the workflow deliberately does NOT auto-apply updates, because
+# refreshVersions emits proposals as comments rather than mutations. The tool also (re)creates an
+# empty `versions.properties` on every run; that file is gitignored and deliberately not in
+# `add-paths` below — it held zero versions and was removed from the repository on 2026-09-23.
+#
+# The PR is opened with a short-lived token of the `basetool-release` GitHub App (ADR-0201), not
+# with GITHUB_TOKEN — the `krt-profit` organization policy forbids Actions from creating pull
+# requests — and, since 2026-09-23, no longer with the `REFRESH_VERSIONS_TOKEN` personal access
+# token either (audit item CI-SEC-16): a PAT is a long-lived, repository-wide credential, an App
+# token lives for an hour and carries only the two permissions requested below. The App's
+# installation grants Contents RW and Pull requests RW, which is what pushing
+# `chore/refresh-versions` and opening the PR need. A PR opened by an App identity also triggers
+# the pull_request workflows, which a GITHUB_TOKEN-opened PR would not.
 on:
   schedule:
     # Monday, scheduled 04:11 UTC (off the full hour). GitHub starts it hours late -- the September
@@ -30,10 +35,9 @@ concurrency:
   cancel-in-progress: false
 
 # Read-only for GITHUB_TOKEN. Every write this workflow makes -- pushing `chore/refresh-versions`
-# and opening the PR -- goes through REFRESH_VERSIONS_TOKEN, which create-pull-request uses for both
-# (its `token` input), so `contents: write` and `pull-requests: write` here were never exercised
-# (audit item CI-SEC-05). The checkout persists no credential either; create-pull-request
-# configures its own.
+# and opening the PR -- goes through the App token, which create-pull-request uses for both (its
+# `token` input). The checkout persists no credential either; create-pull-request configures its
+# own.
 permissions:
   contents: read
 
@@ -54,13 +58,37 @@ jobs:
         with:
           cache-read-only: 'false'
 
+      # Without the configuration cache on purpose: the refreshVersions plugin is not compatible
+      # with it, which is the very reason it is applied only under this flag.
       - name: Run refreshVersions
-        run: ./gradlew refreshVersions --stacktrace
+        run: ./gradlew refreshVersions -PrefreshVersions --stacktrace
+
+      - name: Refuse to continue without the release App's key
+        env:
+          HAS_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY != '' }}
+        run: |
+          if [ "${HAS_KEY}" != "true" ]; then
+            echo "::error::secret RELEASE_APP_PRIVATE_KEY is not set -- opening the refreshVersions PR needs the basetool-release GitHub App (ADR-0201); GITHUB_TOKEN may not open PRs in this organization"
+            exit 1
+          fi
+
+      - name: Mint a basetool-release App token
+        id: app
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          # The App's CLIENT ID, a public value, and the same literal release-prepare.yml and
+          # release-publish.yml use. Not `app-id`: that input is deprecated in v3.
+          client-id: Iv23liHT1h5peKsDnrUD
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          # Scoped to what create-pull-request needs, not to everything the installation allows:
+          # push the branch, open or update the PR.
+          permission-contents: write
+          permission-pull-requests: write
 
       - name: Open / update pull request with proposed bumps
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
-          token: ${{ secrets.REFRESH_VERSIONS_TOKEN }}
+          token: ${{ steps.app.outputs.token }}
           # Author the commit as the GitHub Actions bot so the DCO check
           # (dco.yml) takes its documented bot exemption. Without this,
           # create-pull-request defaults the author to github.actor — on a
@@ -75,19 +103,17 @@ jobs:
           commit-message: "chore(deps): refreshVersions proposals"
           body: |
             Automated dependency-update proposals generated by
-            `./gradlew refreshVersions`.
+            `./gradlew refreshVersions -PrefreshVersions`.
 
             Review the new `## ⬆ = "…"` markers in
             `gradle/libs.versions.toml` — that is the marker this tool
             writes, and that catalog is the only file in this repo that
-            carries versions (`versions.properties` is vestigial and stays
-            empty). Then bump the entries you want to take by hand
+            carries versions. Then bump the entries you want to take by hand
             (refreshVersions never auto-applies — it only annotates), and
             leave a comment next to each saying why it was taken or held.
 
             Closes any previous open `chore/refresh-versions` PR.
           add-paths: |
-            versions.properties
             gradle/libs.versions.toml
           delete-branch: true
           labels: |

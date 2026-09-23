@@ -16,7 +16,8 @@ It caught the two ways the set had already drifted (v1.7.3):
   provider-JAR bundle to the production Keycloak alongside the app images.
 
 Every module in ``settings.gradle.kts`` must therefore be either wired for an
-SBOM end to end, or listed in ``NOT_SHIPPED`` with the reason it ships nothing.
+SBOM end to end, listed in ``NOT_SHIPPED`` with the reason it ships nothing, or
+listed in ``SHIPPED_INSIDE`` with the modules whose artifacts -- and BOMs -- carry it.
 A new module is a failure until somebody decides which it is -- that decision
 being the whole point, since both drifts above were silence, not a wrong answer.
 
@@ -56,6 +57,19 @@ NOT_SHIPPED = {
         "test-only helper library shared by the anonymous-surface sweeps (#1804). Nothing depends "
         "on it at runtime and no image carries it, so publishing its BOM would list JUnit and "
         "Mockito as components of the delivered product"
+    ),
+}
+
+# Modules that DO ship, but only as a library inside other modules' artifacts, with the
+# modules that carry them. Such a module publishes no SBOM of its own: it appears as a component
+# of each carrier's BOM (the carriers' `runtimeClasspath` is what their BOM enumerates), and a
+# second, stand-alone BOM would describe an artifact nobody can download. The entry is only
+# honest while every carrier really depends on it at runtime, so that is asserted, not trusted.
+SHIPPED_INSIDE = {
+    "logging-support": (
+        "LogSafe and the PII maskers every application's logback configuration names (ADR-0205); "
+        "a plain JAR inside the three boot JARs, never an artifact of its own",
+        ("backend", "frontend", "ingest"),
     ),
 }
 
@@ -142,6 +156,32 @@ def check_module(module: str, prepare: str, publish: str) -> list[str]:
                 f"and as a release asset (found {publish.count(asset)} of 2)"
             )
 
+    return problems
+
+
+def check_shipped_inside(module: str, carriers: tuple[str, ...]) -> list[str]:
+    """Assert a library-only module is a runtime dependency of every module said to carry it.
+
+    A ``SHIPPED_INSIDE`` entry exempts a module from publishing its own SBOM on the
+    ground that it is listed in its carriers' BOMs. That ground disappears silently if
+    a carrier stops depending on it -- or never did -- so each carrier's build script
+    must declare it as ``implementation(project(":<module>"))``, the configuration
+    its ``runtimeClasspath`` and therefore its BOM are built from.
+
+    :param module: the library module, e.g. ``logging-support``.
+    :param carriers: the shipped modules whose artifacts contain it.
+    :return: one human-readable problem per carrier that does not depend on it.
+    """
+    problems: list[str] = []
+    declaration = f'implementation(project(":{module}"))'
+    for carrier in carriers:
+        build = REPO / carrier / "build.gradle.kts"
+        if declaration not in build.read_text(encoding="utf-8"):
+            problems.append(
+                f"{module}: SHIPPED_INSIDE names {carrier} as a carrier, but "
+                f"{build.relative_to(REPO)} does not declare `{declaration}` -- the module would "
+                f"ship in no SBOM at all"
+            )
     return problems
 
 
@@ -248,7 +288,17 @@ def main() -> None:
             f"exemption list keeps meaning something"
         )
 
-    shipped = [m for m in declared if m not in NOT_SHIPPED]
+    for stale in sorted(set(SHIPPED_INSIDE) - set(declared)):
+        problems.append(
+            f"{stale}: listed in SHIPPED_INSIDE but no longer a module -- drop the entry so the "
+            f"exemption list keeps meaning something"
+        )
+
+    for module, (_reason, carriers) in SHIPPED_INSIDE.items():
+        if module in declared:
+            problems.extend(check_shipped_inside(module, carriers))
+
+    shipped = [m for m in declared if m not in NOT_SHIPPED and m not in SHIPPED_INSIDE]
     for module in shipped:
         problems.extend(check_module(module, prepare, publish))
 
@@ -266,7 +316,11 @@ def main() -> None:
         raise SystemExit(1)
 
     exempt = ", ".join(sorted(NOT_SHIPPED)) or "none"
-    print(f"SBOM coverage OK: {', '.join(shipped)} (not shipped: {exempt})")
+    inside = ", ".join(sorted(SHIPPED_INSIDE)) or "none"
+    print(
+        f"SBOM coverage OK: {', '.join(shipped)} (not shipped: {exempt}; "
+        f"shipped inside another module's artifact: {inside})"
+    )
     print("Release-notes footer OK: image list matches the build matrix, SBOM list matches above")
 
 

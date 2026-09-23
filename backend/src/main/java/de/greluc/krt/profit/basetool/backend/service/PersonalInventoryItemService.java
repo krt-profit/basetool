@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.PersonalInventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.City;
@@ -34,7 +36,6 @@ import de.greluc.krt.profit.basetool.backend.repository.PersonalInventoryItemRep
 import de.greluc.krt.profit.basetool.backend.repository.SpaceStationRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
-import jakarta.persistence.EntityNotFoundException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -124,7 +125,7 @@ public class PersonalInventoryItemService {
    * @param ownerUserId {@code app_user.id} of the caller
    * @param id item primary key
    * @return response DTO
-   * @throws EntityNotFoundException when the item is missing or owned by someone else
+   * @throws NotFoundException when the item is missing or owned by someone else
    */
   public PersonalInventoryItemResponse getOwn(@NotNull UUID ownerUserId, @NotNull UUID id) {
     return mapper.toResponse(loadOwn(ownerUserId, id));
@@ -169,7 +170,7 @@ public class PersonalInventoryItemService {
    * @param id item primary key
    * @param request update payload (carries the expected version)
    * @return the persisted DTO
-   * @throws EntityNotFoundException when the item is missing or owned by someone else
+   * @throws NotFoundException when the item is missing or owned by someone else
    * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
    */
   @Transactional
@@ -186,7 +187,7 @@ public class PersonalInventoryItemService {
    *
    * @param ownerUserId {@code app_user.id} of the caller
    * @param id item primary key
-   * @throws EntityNotFoundException when the item is missing or owned by someone else
+   * @throws NotFoundException when the item is missing or owned by someone else
    */
   @Transactional
   public void deleteOwn(@NotNull UUID ownerUserId, @NotNull UUID id) {
@@ -240,17 +241,14 @@ public class PersonalInventoryItemService {
    * @param id item primary key
    * @param request update payload (carries the expected version)
    * @return the persisted DTO
-   * @throws EntityNotFoundException when the item id is unknown
+   * @throws NotFoundException when the item id is unknown
    * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
    */
   @Transactional
   public PersonalInventoryItemResponse updateForUser(
       @NotNull UUID id, @NotNull PersonalInventoryItemUpdateRequest request) {
     PersonalInventoryItem entity =
-        repository
-            .findById(id)
-            .orElseThrow(
-                () -> new EntityNotFoundException("PersonalInventoryItem not found: " + id));
+        Entities.require(repository.findById(id), () -> "PersonalInventoryItem not found: " + id);
     return applyUpdate(entity, request);
   }
 
@@ -259,15 +257,12 @@ public class PersonalInventoryItemService {
    * which user's data was removed by which admin call.
    *
    * @param id item primary key
-   * @throws EntityNotFoundException when the item id is unknown
+   * @throws NotFoundException when the item id is unknown
    */
   @Transactional
   public void deleteForUser(@NotNull UUID id) {
     PersonalInventoryItem entity =
-        repository
-            .findById(id)
-            .orElseThrow(
-                () -> new EntityNotFoundException("PersonalInventoryItem not found: " + id));
+        Entities.require(repository.findById(id), () -> "PersonalInventoryItem not found: " + id);
     String label = personalLabel(entity);
     UUID ownerUserId = entity.getOwnerUserId();
     repository.delete(entity);
@@ -338,7 +333,7 @@ public class PersonalInventoryItemService {
             () -> {
               log.warn(
                   "Access denied or not found: ownerUserId={} requested id={}", ownerUserId, id);
-              return new EntityNotFoundException("PersonalInventoryItem not found: " + id);
+              return new NotFoundException("PersonalInventoryItem not found: " + id);
             });
   }
 
@@ -388,24 +383,21 @@ public class PersonalInventoryItemService {
 
   /**
    * Resolves the human-readable name of a UEX location from the local mirror. Throws {@link
-   * EntityNotFoundException} (→ HTTP 404 via the global handler) if the referenced location does
-   * not exist – this prevents creating dangling references.
+   * NotFoundException} (→ HTTP 404 via the global handler) if the referenced location does not
+   * exist – this prevents creating dangling references.
    */
   @NotNull
   private String resolveLocationName(
       @NotNull PersonalInventoryLocationType type, @NotNull Integer uexId) {
     return switch (type) {
       case CITY ->
-          cityRepository
-              .findByIdCity(uexId)
-              .map(City::getName)
-              .orElseThrow(() -> new EntityNotFoundException("UEX city not found: id=" + uexId));
+          Entities.require(
+              cityRepository.findByIdCity(uexId).map(City::getName),
+              () -> "UEX city not found: id=" + uexId);
       case SPACE_STATION ->
-          spaceStationRepository
-              .findByIdSpaceStation(uexId)
-              .map(SpaceStation::getName)
-              .orElseThrow(
-                  () -> new EntityNotFoundException("UEX space station not found: id=" + uexId));
+          Entities.require(
+              spaceStationRepository.findByIdSpaceStation(uexId).map(SpaceStation::getName),
+              () -> "UEX space station not found: id=" + uexId);
     };
   }
 }

@@ -37,7 +37,7 @@
 
   <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
     <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
-      <layout class="de.greluc.krt.profit.basetool.ingest.logging.PiiMaskingPatternLayout">
+      <layout class="de.greluc.krt.profit.basetool.logging.PiiMaskingPatternLayout">
         <pattern>${LOG_PATTERN_CONSOLE}</pattern>
       </layout>
     </encoder>
@@ -52,7 +52,7 @@
       <totalSizeCap>2GB</totalSizeCap>
     </rollingPolicy>
     <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
-      <layout class="de.greluc.krt.profit.basetool.ingest.logging.PiiMaskingPatternLayout">
+      <layout class="de.greluc.krt.profit.basetool.logging.PiiMaskingPatternLayout">
         <pattern>${LOG_PATTERN_FILE}</pattern>
       </layout>
     </encoder>
@@ -72,7 +72,7 @@
       <totalSizeCap>500MB</totalSizeCap>
     </rollingPolicy>
     <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
-      <layout class="de.greluc.krt.profit.basetool.ingest.logging.PiiMaskingPatternLayout">
+      <layout class="de.greluc.krt.profit.basetool.logging.PiiMaskingPatternLayout">
         <pattern>${LOG_PATTERN_FILE}</pattern>
       </layout>
     </encoder>
@@ -135,7 +135,7 @@
         <maxHistory>30</maxHistory>
         <totalSizeCap>2GB</totalSizeCap>
       </rollingPolicy>
-      <encoder class="de.greluc.krt.profit.basetool.ingest.logging.PiiMaskingLogstashEncoder">
+      <encoder class="de.greluc.krt.profit.basetool.logging.PiiMaskingLogstashEncoder">
         <includeMdcKeyName>correlationId</includeMdcKeyName>
         <includeMdcKeyName>userId</includeMdcKeyName>
         <!-- REQ-OBS-009 (epic #936 Phase 1b): trace correlation fields for the Grafana

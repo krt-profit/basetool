@@ -20,11 +20,10 @@ COPY --chmod=755 gradlew .
 COPY gradle/ gradle/
 COPY build.gradle.kts .
 COPY settings.gradle.kts .
-COPY versions.properties .
 COPY gradle.properties .
 COPY backend/build.gradle.kts backend/
 COPY frontend/build.gradle.kts frontend/
-# settings.gradle.kts includes all five modules, so Gradle configuration needs every
+# settings.gradle.kts includes all six modules, so Gradle configuration needs every
 # module's build script present even when only :frontend is built. A module added to
 # settings.gradle.kts without a COPY here fails at SETTINGS evaluation, before any task
 # runs: "Configuring project ':x' without an existing directory is not allowed". Only the
@@ -32,6 +31,7 @@ COPY frontend/build.gradle.kts frontend/
 COPY ingest/build.gradle.kts ingest/
 COPY keycloak-spi/build.gradle.kts keycloak-spi/
 COPY test-support/build.gradle.kts test-support/
+COPY logging-support/build.gradle.kts logging-support/
 
 # Dependencies herunterladen, um sie im Docker-Cache zu behalten. The previous
 # `|| true` masked legitimate failures (wrapper download problems, transient
@@ -73,6 +73,10 @@ COPY frontend/src/ frontend/src/
 # source set references `Call` from that module, so without these the image build fails
 # to compile tests it will never run. Only `src/main` - its own tests are not needed.
 COPY test-support/src/main/ test-support/src/main/
+# The shared logging-support MAIN sources, for a stronger reason than the line above: this one
+# SHIPS. The logback configuration names its layout and encoder, and the application code
+# calls its LogSafe, so the boot JAR carries it in BOOT-INF/lib (ADR-0205).
+COPY logging-support/src/main/ logging-support/src/main/
 # And the backend's committed API document, for the same reason one directory over. The frontend's
 # TEST source set generates its wire models from it (ADR-0161 8.2, GeneratedDtoAgreementTest), so
 # `openApiGenerate` runs as a dependency of the `compileTestJava` this image never needs -- and

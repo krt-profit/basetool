@@ -177,9 +177,12 @@ not happened.
   from before identity moved onto the app origin (ADR-0166). It is documented so the count does not
   read as a missing certificate; pruning it is a deliberate edge change, not a clean-up to do in
   passing.
-- **`versions.properties` is vestigial** — zero entries, nothing reads it. It survives because
-  deleting it has never been worth a commit, and it is recorded here because an earlier revision of
-  `CLAUDE.md` pointed readers at it.
+- ~~**`versions.properties` is vestigial**~~ — **resolved 2026-09-23.** The entry said "nothing
+  reads it", which was wrong: the three application Dockerfiles copied it, and the refreshVersions
+  settings plugin — applied on every build — recreated it when missing, which is why deleting it
+  was never a one-line change. It went together with that plugin's unconditional application
+  (audit items BLD-PERF-04, DOC-20): refreshVersions now runs only under `-PrefreshVersions`, its
+  recreated file is gitignored, and the configuration cache it was blocking is on in CI.
 - **Sessions are not carried across a host move** unless somebody chooses to copy the Redis data.
   Skipping it logs everyone out at the moment of the move — a user-visible choice rather than a
   technical one. The archived cutover runbook has the copy, including the `--numeric-owner` trap.

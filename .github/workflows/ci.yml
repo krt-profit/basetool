@@ -82,8 +82,29 @@ jobs:
       # `--continue` keeps the build going past the first failing task so the lint reports still
       # get generated when tests fail and vice versa -- the upload steps below exist for exactly
       # that. It does NOT mask a failure: Gradle still exits non-zero and the job still fails.
+      #
+      # `--configuration-cache` (audit item BLD-PERF-04): CI is where the cache is switched on
+      # first, before gradle.properties makes it the default. It is STRICT here -- a task that is
+      # not compatible fails the build instead of degrading to a warning -- so an incompatibility
+      # reaches the PR that introduces it. setup-gradle carries the cache entry between runs.
       - name: Build, run tests and lint
-        run: ./gradlew build --continue --stacktrace
+        run: ./gradlew build --continue --stacktrace --configuration-cache
+
+      # The committed API documents must be the ones the build just generated (REQ-API-007,
+      # REQ-API-009; audit item BLD-CI-09). Each module's OpenApiGeneratorTest rewrites its
+      # document during `test` above, and `springdoc.writer-with-order-by-keys` in the test profile
+      # makes the output byte-stable, so any diff here is an API change whose document was not
+      # regenerated and committed -- which is exactly what ExternalContractTest and the frontend
+      # contract tests would otherwise be checking against. EOL-safe: `.gitattributes` pins
+      # `*.json` to LF, so git compares normalised content and a CRLF-writing generator cannot
+      # produce a diff on its own. It runs only after a green build (the default step condition):
+      # a red one may have stopped before the generator ran.
+      - name: Fail if a committed openapi.json is stale
+        run: |
+          if ! git diff --exit-code --stat -- '*/src/main/resources/api/openapi.json'; then
+            echo "::error::openapi.json is stale -- run ./gradlew :backend:test --tests '*.OpenApiGeneratorTest' (and :ingest:test for the ingest document) and commit the result"
+            exit 1
+          fi
 
       - name: Upload JUnit test reports
         if: always()

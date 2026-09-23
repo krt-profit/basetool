@@ -235,6 +235,8 @@ jobs:
       # `-Pe2e.prebuilt=true` makes it boot the images loaded above with `--no-build` instead of
       # building them, and refuse to start if either is missing. Docker + compose v2 ship on the
       # runner.
+      #
+      # `--configuration-cache`: switched on in CI first (audit item BLD-PERF-04), see ci.yml.
       - name: Run e2e flows
         env:
           BROWSER: ${{ matrix.browser }}
@@ -245,6 +247,7 @@ jobs:
           -Pe2e.device="$DEVICE"
           -Pe2e.prebuilt=true
           --stacktrace
+          --configuration-cache
 
       # Playwright traces, failure screenshots/HTML dumps and the docker compose
       # boot logs all land under frontend/build/e2e.

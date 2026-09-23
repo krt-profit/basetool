@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.testsupport.containers.TestImages;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
@@ -75,7 +76,7 @@ class SessionAttributeRepairIntegrationTest {
 
   @Container
   static final GenericContainer<?> REDIS =
-      new GenericContainer<>(DockerImageName.parse("redis:7-alpine")).withExposedPorts(6379);
+      new GenericContainer<>(DockerImageName.parse(TestImages.REDIS)).withExposedPorts(6379);
 
   private final MeterRegistry registry = new SimpleMeterRegistry();
   private LettuceConnectionFactory connectionFactory;

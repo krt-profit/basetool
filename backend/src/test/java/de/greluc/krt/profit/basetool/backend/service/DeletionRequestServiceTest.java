@@ -38,6 +38,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.event.AccountDeletionRequestDeclinedEvent;
 import de.greluc.krt.profit.basetool.backend.event.AccountDeletionRequestResolvedEvent;
 import de.greluc.krt.profit.basetool.backend.event.AccountDeletionRequestedEvent;
+import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.DeletionRequest;
@@ -48,7 +49,6 @@ import de.greluc.krt.profit.basetool.backend.repository.DeletionRequestRepositor
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import jakarta.persistence.EntityNotFoundException;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -309,7 +309,7 @@ class DeletionRequestServiceTest {
     when(deletionRequestRepository.findByIdForDecision(REQUEST)).thenReturn(Optional.of(done));
 
     assertThatThrownBy(() -> service.decline(REQUEST, "a reason", null))
-        .isInstanceOf(EntityNotFoundException.class);
+        .isInstanceOf(NotFoundException.class);
   }
 
   // covers REQ-SEC-061 — anonymise BEFORE the delete (the FK still points at the account) and reach

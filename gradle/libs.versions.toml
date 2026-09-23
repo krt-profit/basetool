@@ -6,7 +6,7 @@ spring-boot = { id = "org.springframework.boot", version.ref = "springBoot" }
 spring-dependency-management = { id = "io.spring.dependency-management", version.ref = "springDependencyManagement" }
 cyclonedx-bom = { id = "org.cyclonedx.bom", version.ref = "cyclonedx" }
 # Build-tooling plugins, consolidated here from the per-module build scripts so the single source of
-# truth lives in this catalog and `./gradlew refreshVersions` surfaces updates for them too.
+# truth lives in this catalog and `./gradlew refreshVersions -PrefreshVersions` surfaces updates for them too.
 spotbugs-base = { id = "com.github.spotbugs-base", version.ref = "spotbugs" }
 pitest = { id = "info.solidsoft.pitest", version.ref = "pitest" }
 node-gradle = { id = "com.github.node-gradle.node", version.ref = "nodeGradle" }
@@ -276,7 +276,7 @@ commonmark-core = { module = "org.commonmark:commonmark", version.ref = "commonm
 findsecbugs-plugin = { module = "com.h3xstream.findsecbugs:findsecbugs-plugin", version.ref = "findsecbugs" }
 # Version-tracking aliases only (NOT declared as dependencies anywhere): the Checkstyle CLI,
 # google-java-format and the Pitest JUnit5 plugin are configured by version string in the build
-# scripts. Mapping their coordinates here lets `./gradlew refreshVersions` annotate available updates
+# scripts. Mapping their coordinates here lets `./gradlew refreshVersions -PrefreshVersions` annotate available updates
 # for them alongside everything else; the generated `libs.*` accessors are intentionally unused.
 checkstyle = { module = "com.puppycrawl.tools:checkstyle", version.ref = "checkstyle" }
 google-java-format = { module = "com.google.googlejavaformat:google-java-format", version.ref = "googleJavaFormat" }

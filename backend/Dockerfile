@@ -16,11 +16,10 @@ COPY --chmod=755 gradlew .
 COPY gradle/ gradle/
 COPY build.gradle.kts .
 COPY settings.gradle.kts .
-COPY versions.properties .
 COPY gradle.properties .
 COPY backend/build.gradle.kts backend/
 COPY frontend/build.gradle.kts frontend/
-# settings.gradle.kts includes all five modules, so Gradle configuration needs every
+# settings.gradle.kts includes all six modules, so Gradle configuration needs every
 # module's build script present even when only :backend is built. A module added to
 # settings.gradle.kts without a COPY here fails at SETTINGS evaluation, before any task
 # runs: "Configuring project ':x' without an existing directory is not allowed". Only the
@@ -28,6 +27,7 @@ COPY frontend/build.gradle.kts frontend/
 COPY ingest/build.gradle.kts ingest/
 COPY keycloak-spi/build.gradle.kts keycloak-spi/
 COPY test-support/build.gradle.kts test-support/
+COPY logging-support/build.gradle.kts logging-support/
 
 # Dependencies herunterladen, um sie im Docker-Cache zu behalten. The previous
 # `|| true` masked legitimate failures (wrapper download problems, transient
@@ -55,6 +55,10 @@ COPY backend/src/ backend/src/
 # source set references `Call` from that module, so without these the image build fails
 # to compile tests it will never run. Only `src/main` - its own tests are not needed.
 COPY test-support/src/main/ test-support/src/main/
+# The shared logging-support MAIN sources, for a stronger reason than the line above: this one
+# SHIPS. The logback configuration names its layout and encoder, and the application code
+# calls its LogSafe, so the boot JAR carries it in BOOT-INF/lib (ADR-0205).
+COPY logging-support/src/main/ logging-support/src/main/
 RUN ./gradlew :backend:build \
     -x test \
     -x checkstyleMain \
@@ -65,8 +69,9 @@ RUN ./gradlew :backend:build \
 
 # Layered JAR extrahieren. The Spring Boot Gradle plugin produces exactly one
 # bootable `backend-<version>.jar` alongside `backend-<version>-plain.jar`
-# (the lightweight non-bootable classifier) and `backend-<version>-sources.jar`
-# (sources artifact from `withSourcesJar()`). The bootable jar is the one
+# (the lightweight non-bootable classifier). A `-sources.jar` came from
+# `withSourcesJar()` until 2026-09-23 (BLD-PERF-02); the rule below still skips
+# one, so reintroducing it cannot break this step. The bootable jar is the one
 # without a classifier — match it explicitly via two filename rules instead
 # of the old `find … | head -n 1` pipeline, which silently picked whichever
 # the directory iterator surfaced first. Building the candidate list in a

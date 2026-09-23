@@ -20,13 +20,14 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.DefaultBlueprintMapper;
 import de.greluc.krt.profit.basetool.backend.model.DefaultBlueprint;
 import de.greluc.krt.profit.basetool.backend.model.dto.DefaultBlueprintResponse;
 import de.greluc.krt.profit.basetool.backend.repository.DefaultBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
-import jakarta.persistence.EntityNotFoundException;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -82,17 +83,16 @@ public class DefaultBlueprintService {
    * @param createdBy the adding admin's {@code app_user.id} rendered as text, or {@code "system"}
    *     for a seeded row (provenance, not a foreign key)
    * @return the persisted DTO
-   * @throws EntityNotFoundException if the product key matches no active product
+   * @throws NotFoundException if the product key matches no active product
    * @throws DuplicateEntityException if the product is already a default
    */
   @Transactional
   @NotNull
   public DefaultBlueprintResponse add(@NotNull String productKey, @Nullable String createdBy) {
     ResolvedProduct product =
-        blueprintProductService
-            .resolveByProductKey(productKey)
-            .orElseThrow(
-                () -> new EntityNotFoundException("Blueprint product not found: " + productKey));
+        Entities.require(
+            blueprintProductService.resolveByProductKey(productKey),
+            () -> "Blueprint product not found: " + productKey);
     if (repository.existsByProductKey(product.productKey())) {
       throw new DuplicateEntityException(
           "Default blueprint '" + product.productName() + "' already exists.");
@@ -120,14 +120,12 @@ public class DefaultBlueprintService {
    * them (they become ordinary removable owned rows); only the curated default row is deleted.
    *
    * @param id default-blueprint entry id
-   * @throws EntityNotFoundException when the id is unknown
+   * @throws NotFoundException when the id is unknown
    */
   @Transactional
   public void remove(@NotNull UUID id) {
     DefaultBlueprint entity =
-        repository
-            .findById(id)
-            .orElseThrow(() -> new EntityNotFoundException("DefaultBlueprint not found: " + id));
+        Entities.require(repository.findById(id), () -> "DefaultBlueprint not found: " + id);
     repository.delete(entity);
     keyService.refresh();
     log.info("Removed default blueprint id={} productKey='{}'", id, entity.getProductKey());

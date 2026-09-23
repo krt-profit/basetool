@@ -259,12 +259,16 @@ the chain (the pre-existing value wins and is never overwritten). Levels are unc
 `WARN`, the 401 stays `DEBUG`. The `sub` UUID is the only identifier permitted here (REQ-OBS-004).
 
 **Client free text is sanitised in all three modules, not only at the gateway.** The `LogSafe` guard
-described above for the ingest gateway now exists as a module-local twin in the backend
-(`backend…logging.LogSafe`) and the frontend (`frontend…logging.LogSafe`) with a byte-identical
-contract: `text(value, maxLength)` truncates to the cap first, replaces every
+described above for the ingest gateway is one class, `de.greluc.krt.profit.basetool.logging.LogSafe`
+in the shipped `logging-support` module, which the backend, the frontend and the gateway all depend
+on (ADR-0205; until 2026-09-23 it was three hand-mirrored copies held together by a parity test).
+Its contract: `text(value, maxLength)` truncates to the cap first, replaces every
 `Character.isISOControl` character with `?`, appends the truncation marker only when the *original*
-exceeded the cap, and renders null/blank as the stable token `none`. There is no shared module
-between the three, so this is a deliberate triplicate rather than a missed extraction. The realistic
+exceeded the cap, and renders null/blank as the stable token `none`. The same module holds
+`PiiMasker`, `PiiMaskingPatternLayout` and `PiiMaskingLogstashEncoder`, so all three applications
+scrub with one implementation; each application's `ProdLogMaskingTest` loads its real
+`logback-spring.xml` with the `prod` profile and asserts that a bearer token and an e-mail address
+reach neither the JSON nor the text file. The realistic
 actor here is not an internet caller but an authenticated squadron member — or a guest holding an
 edit link — typing into a search box, a filter or a form field: a pasted newline plus a fabricated
 `ERROR ---` prefix reads as a genuine line during incident triage (CWE-117), and neither the Logback
@@ -1955,6 +1959,21 @@ session read can fail:
   everybody is being signed out. Backs `SessionUnmappableSustained` (> 20 per 15 m held 30 m,
   warning), which sums **across** `missing_key` precisely so a format break that loses all three
   fields at once cannot hide below a per-series threshold.
+
+A fifth frontend session meter came with the session type allow-list (REQ-SEC-067, ADR-0206):
+
+- `basetool_session_type_refused_total{mode}` — counter bumped by `SessionTypeAllowList` when a
+  session value names a class outside the allow-list. `mode` is `report` or `enforce`, a closed set
+  (`off` never counts); the class name goes into a once-per-class `WARN`, never into a tag, because a
+  type id comes out of a stored payload and is unbounded. Under `report` — what a deploy ships — the
+  value is read anyway and Jackson caches the deserializer it resolved, so the counter rises **once
+  per class and slot per frontend lifetime**: it answers "does such a class occur", which is exactly
+  the gate for switching to `enforce`. Under `enforce` every refused read counts, and the dropped
+  attribute is also counted on `basetool_session_value_dropped_total{cause="InvalidTypeIdException"}`,
+  so a sustained stream trips `SessionValueDropsSustained` as well. Backs
+  `SessionTypeOutsideAllowList` (`sum by (mode) (increase(…[1h])) > 0`, no `for`, warning) — a rate
+  threshold would never see the single report-mode step. Pinned by
+  `monitoring/prometheus/tests/session_type_allow_list_alert_test.yml`.
 
 Two frontend meters were added by the 2026-08 logging audit:
 

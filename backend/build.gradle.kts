@@ -1,10 +1,10 @@
-import org.cyclonedx.Version
-
 plugins {
   java
   checkstyle
   id("jacoco")
-  id("application")
+  // No `application` plugin and no `withSourcesJar()` (audit item BLD-PERF-02): the image ships the
+  // Spring Boot jar, and nothing consumed the distZip/distTar/bootDistZip/bootDistTar archives or
+  // the sources jar that every `build` assembled -- no workflow, no Dockerfile, no SBOM.
   id("idea")
   alias(libs.plugins.spring.boot)
   alias(libs.plugins.spring.dependency.management)
@@ -15,28 +15,16 @@ plugins {
   id("com.diffplug.spotless")
 }
 
-group = "de.greluc.krt.profit.basetool"
-
-version = "0.0.1-SNAPSHOT"
-
-// Force :test-support to be evaluated before this project. With org.gradle.configureondemand=true
-// it would otherwise be configured lazily, mid-configuration of this one, and Spotless cannot
-// register its afterEvaluate hook that late.
-evaluationDependsOn(":test-support")
-
 description = "backend"
 
-java {
-  toolchain { languageVersion = JavaLanguageVersion.of(25) }
-  withSourcesJar()
-}
+// Group, version, toolchain, repositories, Lombok/JetBrains, the Mockito agent, `spotbugsMain`, the
+// SBOM settings come from the root build.gradle.kts
+// (`subprojects { plugins.withId(...) }`) and settings.gradle.kts.
 
 // Lombok + the MapStruct annotation processor expose APIs we use at compile
 // time as well. Extending compileOnly from annotationProcessor lets `javac`
 // see them without dragging them onto the runtime classpath.
 configurations { compileOnly { extendsFrom(configurations.annotationProcessor.get()) } }
-
-repositories { mavenCentral() }
 
 dependencies {
   implementation("org.springframework.boot:spring-boot-starter-web")
@@ -101,6 +89,9 @@ dependencies {
   implementation(libs.semver4j.core)
   // Structured JSON logging (LogstashEncoder) for production profile in logback-spring.xml.
   implementation(libs.logstash.logback.encoder)
+  // The one implementation of LogSafe and the PII maskers the logback configuration names
+  // (ADR-0205). `implementation`, not `testImplementation`: it ships inside the boot JAR.
+  implementation(project(":logging-support"))
 
   // MapStruct for compile-time mappers
   implementation(libs.mapstruct.core)
@@ -111,22 +102,6 @@ dependencies {
   implementation(libs.flyway.core)
   implementation(libs.flyway.postgresql)
 
-  compileOnly("org.projectlombok:lombok")
-  annotationProcessor("org.projectlombok:lombok")
-  compileOnly(libs.jetbrains.annotations)
-
-  // The same two toolchains on the TEST source set. The three lines above configure `main` only:
-  // Gradle's `testCompileOnly` does NOT extend `compileOnly`, and `testAnnotationProcessor` does
-  // not
-  // extend `annotationProcessor`, so until these were added the test sources could use neither
-  // Lombok nor the JetBrains annotations. That was never a decision -- it was the default
-  // source-set wiring -- and it stopped the "maximize Lombok" / "JetBrains annotations wherever
-  // they
-  // communicate a real contract" conventions (CLAUDE.md `Java conventions`) at the `src/main`
-  // boundary. Lombok stays off the runtime classpath here exactly as it does for `main`.
-  testCompileOnly("org.projectlombok:lombok")
-  testAnnotationProcessor("org.projectlombok:lombok")
-  testCompileOnly(libs.jetbrains.annotations)
   // PDF generation
   implementation(libs.openpdf.core)
   // Ensure MapStruct understands Lombok-generated accessors
@@ -134,12 +109,9 @@ dependencies {
 
   developmentOnly("org.springframework.boot:spring-boot-devtools")
 
-  // FindSecBugs: security-focused SpotBugs detector plugin (taint analysis for
-  // SQLi / path traversal / SSRF / weak crypto / XXE on our OWN code). Loaded
-  // into spotbugsMain via `pluginJarFiles` below. Runs inside the Gradle build,
-  // complementing CodeQL (CI-only) with the same class of analysis on every
-  // local `check`.
-  spotbugsPlugins(libs.findsecbugs.plugin)
+  // Attached to every Test JVM as a Java agent by the root build (BLD-PERF-10); the version is the
+  // Boot-managed one, the same mockito-core that spring-boot-starter-test puts on the classpath.
+  "mockitoAgent"("org.mockito:mockito-core")
 
   // The endpoint-enumeration engine behind AnonymousSurfaceSweep* (#1804), shared with the other
   // module's sweep so a defect in it cannot blind both guards at once. Test-scoped: nothing from
@@ -174,75 +146,19 @@ idea {
   }
 }
 
-// Test, JavaCompile and BootRun task setup is shared with the frontend module via
-// the `basetool.java-conventions` precompiled script plugin (see buildSrc/).
+// Test, JavaCompile, BootRun, JaCoCo, SpotBugs and SBOM setup is shared with the other modules via
+// the root build.gradle.kts `subprojects { plugins.withId(...) }` blocks (there is no buildSrc).
 
-// SpotBugs task for the main source set. We use the `-base` variant of the
-// plugin which does not auto-create tasks, so we register one explicitly and
-// wire it into `check`. BLOCKING (`ignoreFailures = false`): a HIGH-confidence
-// finding (incl. the FindSecBugs security detectors) fails the build. The
-// codebase is currently clean at this level, so the gate starts green.
-tasks.register<com.github.spotbugs.snom.SpotBugsTask>("spotbugsMain") {
-  group = "verification"
-  description = "Runs SpotBugs analysis on the main source set."
-  sourceDirs.from(sourceSets.main.get().allSource.sourceDirectories)
-  classDirs.from(sourceSets.main.get().output.classesDirs)
-  auxClassPaths.from(sourceSets.main.get().compileClasspath)
-  // Suppress EI_EXPOSE_REP / EI_EXPOSE_REP2 on JPA entities — see the long
-  // architectural justification in the filter file. Keeps the bot's
-  // recurring per-commit re-flagging out of PR threads.
+// The one backend-specific part of `spotbugsMain`: suppress EI_EXPOSE_REP / EI_EXPOSE_REP2 on JPA
+// entities — see the long architectural justification in the filter file. Keeps the bot's recurring
+// per-commit re-flagging out of PR threads.
+tasks.named<com.github.spotbugs.snom.SpotBugsTask>("spotbugsMain") {
   excludeFilter.set(rootProject.file("config/spotbugs/exclude.xml"))
-  // Wire the FindSecBugs detectors (declared in the `spotbugsPlugins`
-  // configuration) into this manually-registered task. The convention
-  // `spotbugsMain` task auto-wires this, but the `-base` plugin variant used
-  // here does not, so it is explicit.
-  pluginJarFiles.from(configurations.named("spotbugsPlugins"))
-  effort.set(com.github.spotbugs.snom.Effort.DEFAULT)
-  reportLevel.set(com.github.spotbugs.snom.Confidence.HIGH)
-  ignoreFailures = false
-  // XML reporter ONLY — do NOT also enable HTML here. SpotBugs 4.9.8 has a
-  // multi-output ordering bug: with both reporters configured the plugin
-  // passes `-html` before `-xml`, and in that order SpotBugs writes a report
-  // with ZERO analyzed classes — i.e. the gate silently scans nothing
-  // (verified: html+xml -> total_classes=0; xml-only -> total_classes=768).
-  // XML is the canonical machine-readable format (IDE import, quality tooling).
-  // Re-add an HTML report only once SpotBugs fixes the ordering.
-  reports.create("xml") {
-    required.set(true)
-    outputLocation.set(layout.buildDirectory.file("reports/spotbugs/main.xml"))
-  }
-  dependsOn("classes")
 }
 
-tasks.named("check").configure { dependsOn("spotbugsMain") }
-
-tasks {
-  javadoc {
-    options { (this as CoreJavadocOptions).addStringOption("Xdoclint:none", "-quiet") }
-    destinationDir = project.file("docs/javadoc")
-  }
-
-  cyclonedxBom {
-    schemaVersion.set(Version.VERSION_16)
-    jsonOutput.set(file("docs/${project.name}-bom.json"))
-    xmlOutput.set(file("docs/${project.name}-bom.xml"))
-    includeBomSerialNumber = true
-    includeLicenseText = true
-    includeBuildSystem = true
-  }
-}
-
-// Restrict the SBOM to the shipped runtime classpath so the signed BOM reflects only what actually
-// ships in the bootJar/image — not build/test-scoped components (test, checkstyle, spotbugs,
-// annotationProcessor, compileOnly), which otherwise inflate the BOM with tooling that never runs
-// in
-// production and produce false-positive CVE hits for downstream scanners against a service that
-// does
-// not actually carry the flagged library. The dependency scan runs in `cyclonedxDirectBom`
-// (CyclonedxDirectTask, cyclonedx-gradle 3.x); `includeConfigs` is an allow-list of
-// configuration-name regexes, so only the resolved runtime graph is enumerated.
-tasks.named<org.cyclonedx.gradle.CyclonedxDirectTask>("cyclonedxDirectBom") {
-  includeConfigs.set(listOf("^runtimeClasspath$"))
+tasks.javadoc {
+  options { (this as CoreJavadocOptions).addStringOption("Xdoclint:none", "-quiet") }
+  destinationDir = project.file("docs/javadoc")
 }
 
 // Cross-module parity tests read the OTHER modules' sources directly (they cannot see those classes
@@ -253,22 +169,6 @@ tasks.named<org.cyclonedx.gradle.CyclonedxDirectTask>("cyclonedxDirectBom") {
 //
 // Declared file by file rather than as whole source trees: this must invalidate on the handful of
 // files the assertions actually read, not on every Java change in two other modules.
-// The six sources `LogSafeTest` compares. The guard exists once per module and asserts that the
-// marked region of all three `LogSafe.java` implementations, and the expectation table in all
-// three test classes, are byte-identical — so a sanitiser fix in one module cannot leave the other
-// two logging what it strips. Every module declares the whole set rather than only the four that
-// live elsewhere: two are already covered here by `classes`/`testClasses`, listing them costs
-// nothing, and the three build files then carry the identical list instead of three different
-// subsets a reader has to reason about.
-val logSafeMirrorSources =
-  listOf(
-    "backend/src/main/java/de/greluc/krt/profit/basetool/backend/support/LogSafe.java",
-    "frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/logging/LogSafe.java",
-    "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/logging/LogSafe.java",
-    "backend/src/test/java/de/greluc/krt/profit/basetool/backend/support/LogSafeTest.java",
-    "frontend/src/test/java/de/greluc/krt/profit/basetool/frontend/logging/LogSafeTest.java",
-    "ingest/src/test/java/de/greluc/krt/profit/basetool/ingest/logging/LogSafeTest.java",
-  )
 
 // Where the CI step drops the previous release's openapi.json for the second half of
 // REQ-API-009's schema diff (ADR-0136, ADR-0161 8.4). The path is ALWAYS handed to the test JVM;
@@ -293,9 +193,13 @@ tasks.named<Test>("test") {
   // PathSensitivity.NONE chosen one line above and make the task non-relocatable. The provider
   // carries no input annotation, so the PATH contributes nothing to the key while the file's
   // CONTENT still does.
+  //
+  // Copied into a local first: a script-level `val` read from inside the lambda is a reference to
+  // the build script object, which the configuration cache refuses to serialise.
+  val baseline = contractBaseline
   jvmArgumentProviders.add(
     CommandLineArgumentProvider {
-      listOf("-Dcontract.baseline=" + contractBaseline.get().asFile.absolutePath)
+      listOf("-Dcontract.baseline=" + baseline.get().asFile.absolutePath)
     }
   )
 
@@ -331,19 +235,6 @@ tasks.named<Test>("test") {
   inputs
     .file(rootProject.file("docker/edge/include/api-allowlist.conf"))
     .withPropertyName("apiVhostAllowList")
-    .withPathSensitivity(PathSensitivity.RELATIVE)
-
-  // The same defect a third time, and here it was never theoretical. `crossModuleParitySources`
-  // covers the `ObservationPrivacyFilter` trio and nothing else, so `LogSafeTest` read four files
-  // outside this module that reached the task through neither the classpath nor a declaration. It
-  // matters more here than in `frontend`: that module runs `bootBuildInfo`, whose fresh
-  // `build.time` lands on the test runtime classpath and re-ran `:frontend:test` unconditionally,
-  // accidentally covering its copy of the same gap. `backend` runs no `bootBuildInfo`, so
-  // `:backend:test` genuinely did report UP-TO-DATE after a cross-module `LogSafe` edit and the
-  // mirror assertion genuinely was skipped — a live false green, not a latent one.
-  inputs
-    .files(logSafeMirrorSources.map { rootProject.file(it) })
-    .withPropertyName("logSafeMirrorSources")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 
   // `LiveSyncTopicRegistryParityTest` reads the frontend's `LiveSyncTopicClass` enum as source and

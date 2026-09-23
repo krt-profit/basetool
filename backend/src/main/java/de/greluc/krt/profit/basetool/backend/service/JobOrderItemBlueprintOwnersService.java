@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
@@ -32,7 +34,6 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import jakarta.persistence.EntityNotFoundException;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -97,14 +98,14 @@ public class JobOrderItemBlueprintOwnersService {
    * @param jobOrderId the job order to inspect; never {@code null}
    * @return the coverage view (required families with variant-inclusive owner counts + owning
    *     members with the concrete variant blueprints they hold); never {@code null}
-   * @throws EntityNotFoundException when the order id is unknown
+   * @throws NotFoundException when the order id is unknown
    */
   @NotNull
   public JobOrderItemBlueprintOwnersDto getBlueprintOwners(@NotNull UUID jobOrderId) {
     JobOrder order =
-        jobOrderRepository
-            .findByIdWithItemBlueprints(jobOrderId)
-            .orElseThrow(() -> new EntityNotFoundException("Job order not found: " + jobOrderId));
+        Entities.require(
+            jobOrderRepository.findByIdWithItemBlueprints(jobOrderId),
+            () -> "Job order not found: " + jobOrderId);
 
     // Per-order counting toggle (REQ-ORDERS-021, issue #822): when true the coverage counts
     // cosmetic
