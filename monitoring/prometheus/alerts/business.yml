@@ -934,6 +934,26 @@ groups:
           summary: "Frontend cannot map session hashes ({{ $value | printf \"%.0f\" }} per 15m)"
           description: "Session hashes in Redis exist but are missing a required field, so those requests are served as if they carried no session and the members are signed out. Find the WARN line from SessionAttributeDiagnosticMapper in the frontend log: it names which required field was absent. This is normally a hash that was lost and then half re-created by a delta write, so check Redis first — a restart, an AOF truncation or a session purge run against live traffic all produce it, and the burst should decay on its own once the affected browsers get fresh sessions. A rate that keeps climbing with no such event means session hashes are being lost in volume; a rate that covers the whole active population at once means the session wire format broke and everybody is being signed out (REQ-SEC-063). Before ADR-0186 this state answered HTTP 500 on every request from that browser for up to 30 days instead."
 
+      # (REQ-SEC-067 / ADR-0206) A session value named a class outside SessionTypeAllowList. Two
+      # meanings, told apart by the `mode` label:
+      #   - mode="report" (what a deploy ships): the value was READ anyway, so nobody noticed
+      #     anything — but switching APP_SESSION_TYPE_ALLOW_LIST to `enforce` would drop it. This is
+      #     the gate for that switch: the owner enforces only after this has stayed silent.
+      #   - mode="enforce": the value was REFUSED and that one attribute dropped (it is also counted
+      #     on basetool_session_value_dropped_total, so a sustained stream trips
+      #     SessionValueDropsSustained as well). Either the list lacks a class the application
+      #     legitimately stores, or something other than this frontend wrote into the session store.
+      # No `for` and a one-hour window, deliberately: under `report` Jackson caches the deserializer
+      # it resolved, so the counter rises ONCE per class and slot per frontend lifetime. A single
+      # increment is the whole signal, and a rule that waited for a rate would never see it.
+      - alert: SessionTypeOutsideAllowList
+        expr: sum by (mode) (increase(basetool_session_type_refused_total[1h])) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "A session value names a class outside the session type allow-list (mode={{ $labels.mode }})"
+          description: "The frontend read a session value whose @class type id is not on SessionTypeAllowList. Find the WARN line from SessionTypeAllowList in the frontend log: it names the class once per frontend lifetime. mode=report means the value was read as before and nothing broke, but APP_SESSION_TYPE_ALLOW_LIST=enforce would drop it: if the class is legitimately stored in the session (a new form or DTO outside frontend.model, a new Spring or container type) add it to the list and do not enforce until this has stayed silent; if it is not, something other than this frontend wrote into Redis. mode=enforce means the value was refused and that attribute reads as not set, which is correct for a foreign class and a defect for a legitimate one (REQ-SEC-067)."
+
       # (2026-09-02 log triage) Cross-instance Redis fan-out not subscribed. Until this release, a
       # Redis unreachable during context refresh threw out of SmartLifecycle#start() and aborted the
       # refresh — the backend crash-looped, which needed no metric to notice. That is now survivable

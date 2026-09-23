@@ -107,8 +107,20 @@ public class RedisSessionConfig {
    *       {@link ForcedTypeIdMixin} for the whole failure and why this is the fix.
    * </ul>
    */
-  private static final List<String> CONTAINER_WRITTEN_FINAL_SESSION_TYPES =
+  static final List<String> CONTAINER_WRITTEN_FINAL_SESSION_TYPES =
       List.of("org.apache.tomcat.websocket.server.WsHttpSessionBindingListener");
+
+  /**
+   * Raw {@code app.session.type-allow-list} value (default {@code report}), parsed leniently by
+   * {@link SessionTypeAllowList.Mode#parse(String)} — see {@link SessionTypeAllowList} for the
+   * three modes and why {@code report} is the default (REQ-SEC-067, ADR-0206).
+   *
+   * <p>A {@link String} rather than the enum for the reason {@link #flushModeValue} is one: an
+   * {@code @Value} enum binding is case-sensitive and would turn a lowercase {@code enforce} into a
+   * failed startup, where this degrades a typo to the unchanged {@code report} behaviour.
+   */
+  @Value("${app.session.type-allow-list:report}")
+  private String typeAllowListValue;
 
   /**
    * <em>Anonymous</em> session idle timeout read from {@code app.session.anonymous-timeout}
@@ -184,57 +196,79 @@ public class RedisSessionConfig {
    *   <li>{@code WebJacksonModule}, {@code WebServletJacksonModule} — web types
    * </ul>
    *
-   * <p>A custom {@link BasicPolymorphicTypeValidator} with {@code allowIfBaseType(Object.class)}
-   * permits any class that is a subtype of {@code Object} (effectively all Java classes). This is
-   * required because Spring Session serializes heterogeneous types — {@code Long}, {@code HashMap},
-   * {@code Instant}, {@code OidcUser}, {@code OAuth2AuthorizedClient}, etc. In Jackson 3, {@code
-   * allowIfSubType(String)} does NOT match by name prefix; it checks class hierarchy. Therefore,
-   * package-prefix strings like {@code "java.lang."} do NOT match final classes such as {@code
-   * Long}. The {@code allowIfBaseType(Object.class)} approach is safe because session data
-   * originates only from our own application and Keycloak. The builder is passed to {@link
-   * SecurityJacksonModules#getModules(ClassLoader, BasicPolymorphicTypeValidator.Builder)} which
-   * extends it with all required Spring Security type allowances.
+   * <p>The polymorphic type validator is {@link SessionTypeAllowList}'s, in the mode {@code
+   * app.session.type-allow-list} selects (REQ-SEC-067, ADR-0206). Until that list existed this bean
+   * used {@code allowIfBaseType(Object.class)}, which allowed every class on the classpath as a
+   * session value's type id; the justification given here — "session data originates only from our
+   * own application" — described the writer and not the store, which three services share. The
+   * builder is passed to {@link SecurityJacksonModules#getModules(ClassLoader,
+   * BasicPolymorphicTypeValidator.Builder)}, which adds Spring Security's own exact types before it
+   * builds the validator.
    *
-   * @param meterRegistry provider for the registry {@code basetool_session_value_dropped_total}
-   *     binds to. An {@link ObjectProvider} rather than the registry itself: this bean is consumed
-   *     by the configuration {@code @EnableRedisIndexedHttpSession} imports onto this very class,
-   *     and a hard dependency would drag Micrometer's auto-configuration into session-repository
-   *     creation.
+   * @param meterRegistry provider for the registry {@code basetool_session_value_dropped_total} and
+   *     {@code basetool_session_type_refused_total} bind to. An {@link ObjectProvider} rather than
+   *     the registry itself: this bean is consumed by the configuration
+   *     {@code @EnableRedisIndexedHttpSession} imports onto this very class, and a hard dependency
+   *     would drag Micrometer's auto-configuration into session-repository creation.
    * @return the configured {@link RedisSerializer} for session data
    */
   @NotNull
   @Bean
   public RedisSerializer<Object> springSessionDefaultRedisSerializer(
       ObjectProvider<MeterRegistry> meterRegistry) {
+    SessionTypeAllowList.Mode mode = SessionTypeAllowList.Mode.parse(typeAllowListValue);
+    // One line, because a mode that is not the one the operator meant is otherwise invisible:
+    // REPORT
+    // and OFF read identically, and ENFORCE differs only once something outside the list turns up.
+    log.info("Session type allow-list mode: {}", mode);
     // Wrapped, because the read path has no error handling of its own: a value that cannot be
     // deserialized leaves RedisIndexedSessionRepository uncaught and becomes an HTTP 500 on every
     // request carrying a session cookie. That is the 2026-09-02 outage. The wrapper turns an
     // unreadable ATTRIBUTE into "not set", i.e. a signed-out member; it cannot mask a bad write,
     // and it cannot hide the required timestamps, which are final types and never fail. See
-    // FaultTolerantSessionSerializer for why that is both safe and sufficient.
+    // FaultTolerantSessionSerializer for why that is both safe and sufficient. An attribute the
+    // allow-list refuses under ENFORCE takes exactly that path.
     return new FaultTolerantSessionSerializer(
-        new GenericJacksonJsonRedisSerializer(buildSessionJsonMapper(getClass().getClassLoader())),
+        new GenericJacksonJsonRedisSerializer(
+            buildSessionJsonMapper(
+                getClass().getClassLoader(),
+                SessionTypeAllowList.validatorBuilder(
+                    mode, new SessionTypeAllowList.MeteredRefusalListener(meterRegistry)))),
         meterRegistry);
   }
 
   /**
-   * Build the {@link JsonMapper} used by {@link #springSessionDefaultRedisSerializer()}. Extracted
-   * into a package-private static factory so the configuration of polymorphic-type handling, the
-   * Spring Security / OAuth2 modules and the {@link BindingResultMixin} stays unit-testable without
-   * bootstrapping the full Spring application context.
+   * Builds the session {@link JsonMapper} with the allow-list <em>enforced</em> and refusals
+   * reported nowhere.
+   *
+   * <p>The form every unit test uses: a value that round-trips here round-trips in production under
+   * every mode, because {@code ENFORCE} is the strictest of the three.
+   *
+   * @param loader the class loader Spring Security's modules and the container types resolve
+   *     against.
+   * @return the configured mapper.
+   */
+  static JsonMapper buildSessionJsonMapper(ClassLoader loader) {
+    return buildSessionJsonMapper(
+        loader,
+        SessionTypeAllowList.validatorBuilder(
+            SessionTypeAllowList.Mode.ENFORCE, SessionTypeAllowList.RefusalListener.NONE));
+  }
+
+  /**
+   * Build the {@link JsonMapper} used by {@link
+   * #springSessionDefaultRedisSerializer(ObjectProvider)}. Extracted into a package-private static
+   * factory so the configuration of polymorphic-type handling, the Spring Security / OAuth2 modules
+   * and the {@link BindingResultMixin} stays unit-testable without bootstrapping the full Spring
+   * application context.
    *
    * <p>Configuration notes:
    *
    * <ul>
-   *   <li><b>Type validator:</b> Jackson 3's {@code BasicPolymorphicTypeValidator
-   *       .allowIfSubType(String)} checks the class hierarchy for a class/interface with the given
-   *       fully-qualified name; it does NOT match by package prefix the way the Jackson 2 default
-   *       validator did. {@code "java.lang."} therefore would NOT match {@code java.lang.Long} (a
-   *       final class with no parent of that name). Spring Session serialises many heterogeneous
-   *       types — {@code Long}, {@code HashMap}, {@code Instant}, {@code OidcUser}, {@code
-   *       OAuth2AuthorizedClient} — so we use {@code allowIfBaseType(Object.class)}: every class is
-   *       a subtype of {@code Object}. Safe because session data originates from our own code plus
-   *       Keycloak's OAuth2 flow, not from user-controlled input.
+   *   <li><b>Type validator:</b> {@code typeValidator}, normally {@link
+   *       SessionTypeAllowList#validatorBuilder}'s. It only governs <em>reading</em>: what is
+   *       written is the same under every validator, which is why the mode can be switched without
+   *       touching a stored session.
    *   <li><b>Spring Security modules:</b> {@code SecurityJacksonModules.getModules(loader, …)}
    *       registers {@code CoreJacksonModule} (SecurityContext / Authentication /
    *       GrantedAuthority), {@code OAuth2ClientJacksonModule} (OidcUser, tokens, authorized
@@ -253,13 +287,18 @@ public class RedisSessionConfig {
    *       the {@link Errors} interface and the {@link AbstractBindingResult} base class so every
    *       concrete BindingResult subtype inherits it regardless of Jackson's resolution order.
    * </ul>
+   *
+   * @param loader the class loader Spring Security's modules and the container types resolve
+   *     against.
+   * @param typeValidator the polymorphic type validator builder; {@code SecurityJacksonModules}
+   *     adds its own types to it and builds it.
+   * @return the configured mapper.
    */
-  static JsonMapper buildSessionJsonMapper(ClassLoader loader) {
-    BasicPolymorphicTypeValidator.Builder typeValidatorBuilder =
-        BasicPolymorphicTypeValidator.builder().allowIfBaseType(Object.class);
+  static JsonMapper buildSessionJsonMapper(
+      ClassLoader loader, BasicPolymorphicTypeValidator.@NotNull Builder typeValidator) {
     JsonMapper.Builder builder =
         JsonMapper.builder()
-            .addModules(SecurityJacksonModules.getModules(loader, typeValidatorBuilder))
+            .addModules(SecurityJacksonModules.getModules(loader, typeValidator))
             .addMixIn(Errors.class, BindingResultMixin.class)
             .addMixIn(AbstractBindingResult.class, BindingResultMixin.class);
     List<String> forced = new ArrayList<>();

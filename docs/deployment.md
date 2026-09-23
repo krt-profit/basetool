@@ -519,6 +519,53 @@ systemctl start iri-deploy.timer
 
 `backend` and `keycloak` are not restarted with it; their pools reconnect.
 
+### Session type allow-list: report, then enforce
+
+The frontend reads a stored session value only if the class it names is on `SessionTypeAllowList`
+(REQ-SEC-067, ADR-0206). It ships in **`report`** mode — every value is read exactly as before,
+and a class outside the list is only counted and logged. Switching production to **`enforce`** is a
+`.env` change plus a frontend restart: a production write, so it waits for the owner's yes.
+
+**Precondition** — since the release carrying the list went live, over at least a week of ordinary
+use (logins, token refresh, a failed form, a refinery import, a live-sync page), the report counter
+has stayed at zero and the log names no class:
+
+```text
+# Grafana → Explore → Prometheus: must return nothing
+sum by (mode) (increase(basetool_session_type_refused_total[7d])) > 0
+# Grafana → Explore → Loki, last 7 days: must return nothing
+{app="frontend"} |= "not on the session type allow-list"
+```
+
+A hit names the class. If it is legitimate, add it to `SessionTypeAllowList` in a PR and restart the
+week; do not enforce around it.
+
+**Apply** (as root, from `/`; `${UCTL}` from [Shell conventions](#shell-conventions-used-below)):
+
+```bash
+cd /
+cp -p /var/iri/code/.env /var/iri/code/.env.backup-$(date +%Y%m%d-%H%M%S)
+sudo -u deploy "${EDITOR:-vi}" /var/iri/code/.env      # set APP_SESSION_TYPE_ALLOW_LIST=enforce (one line)
+grep -c '^APP_SESSION_TYPE_ALLOW_LIST=' /var/iri/code/.env       # 1
+sudo -u deploy /var/iri/code/scripts/render-env-d.py \
+  --env /var/iri/code/.env --templates /var/iri/code/quadlet/env.d --out /var/iri/code/env.d
+grep -c '^APP_SESSION_TYPE_ALLOW_LIST=enforce$' /var/iri/code/env.d/frontend.env   # 1
+${UCTL} restart frontend.service                        # blocks until healthy; sessions live in Redis
+${UPOD} logs --since 5m frontend 2>&1 | grep 'Session type allow-list mode'   # ... mode: ENFORCE
+```
+
+**Expected effect:** none a member can see. Nobody is signed out by the restart, and every value the
+parity test and the E2E suite (which runs `enforce`) cover reads identically. Watch for an hour:
+`SessionTypeOutsideAllowList` and `SessionValueDropsSustained` stay silent, and
+`sum by (mode) (increase(basetool_session_type_refused_total[1h]))` stays empty. Should a class
+outside the list turn up after all, that one attribute is dropped once per session and repaired on
+the same request (REQ-SEC-050) — the member keeps the login.
+
+**Rollback:** edit the line back to `APP_SESSION_TYPE_ALLOW_LIST=report` (or delete it), render
+`env.d/` again with the same command and `${UCTL} restart frontend.service`. No stored session is
+touched either way: the mode governs reading only. `off` restores the pre-list validator exactly, for
+the case where the reporting itself misbehaves.
+
 ### Network changes are installed, not applied
 
 A changed `.network` unit reaches the host like any other and is **not** applied by it: Quadlet

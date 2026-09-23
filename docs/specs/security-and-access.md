@@ -19,7 +19,7 @@ read/write is isolated to the calling user unless the caller is privileged.
 > linking of a registration). The mission finance-entry scope below shared `REQ-SEC-019` with the
 > Discord-link indicator until 2026-09-22, when it was renumbered to **REQ-SEC-065** on the owner's
 > decision (see the renumbering table in [`INDEX.md`](INDEX.md)). **REQ-SEC-054** was never
-> allocated. The next free id is **REQ-SEC-067** — re-check `origin/main` and open PRs before
+> allocated. The next free id is **REQ-SEC-068** — re-check `origin/main` and open PRs before
 > claiming it. Requirements are grouped by subject, not strictly by number.
 
 ### REQ-SEC-001 — OIDC topology
@@ -3247,6 +3247,67 @@ session is unaffected) · `SessionAttributeDiagnosticMapperTest` (each required 
 [ADR-0157](../adr/0157-a-dropped-session-value-is-repaired-on-the-request-that-found-it.md) for why
 the repair does not live here · **Related:** REQ-SEC-025, REQ-SEC-049, REQ-SEC-050, REQ-OBS-006
 
+### REQ-SEC-067 — A session value may name only an allow-listed class
+
+Every non-final session value is written with an `@class` type id (REQ-SEC-049), and the reader
+instantiates whatever class that id names. Until 2026-09-23 the session serializer's type validator
+was `allowIfBaseType(Object.class)` — every class on the frontend's classpath — so the session store
+was a deserialization sink: whoever can write one field of one `basetool:session:*` hash can have
+Jackson build any class and call its setters on the next request carrying that cookie. That store is
+Redis, which three services reach (APPSEC-05, improvement audit 2026-09-22).
+
+**The rule:** a session value's type id must name a class on `SessionTypeAllowList`, matched by
+**name** before the class is loaded:
+
+| Entry | Why it is in a session |
+| --- | --- |
+| `java.util.*`, `java.time.*` — direct members only | collections, dates and durations written by Spring Session, Spring Security and our filters; `java.util.logging` / `java.util.concurrent` are **not** covered |
+| `org.springframework.security.*` | security context, OAuth2 login and authorized-client state, CSRF token, saved request (the Security Jackson modules add their own exact types on top) |
+| `org.springframework.web.servlet.FlashMap`, `org.springframework.util.LinkedMultiValueMap`, direct members of `org.springframework.validation` | a redirect's flash attributes; `validation.beanvalidation` is **not** covered |
+| `de.greluc.krt.profit.basetool.frontend.model.*` | the application's own forms and DTOs, flashed across a redirect |
+| `CONTAINER_WRITTEN_FINAL_SESSION_TYPES` | Tomcat's WebSocket binding listener (REQ-SEC-049) |
+
+A new session attribute of a type outside the list is a change to this table, in the same PR.
+
+**Three modes**, `app.session.type-allow-list` / `APP_SESSION_TYPE_ALLOW_LIST`:
+
+- `off` — the permissive validator of before, byte for byte; the escape hatch.
+- `report` (**default**, and what a merge deploys) — every value is read exactly as before; a class
+  outside the list is counted on `basetool_session_type_refused_total{mode="report"}` and named once
+  in a `WARN`.
+- `enforce` — a class outside the list is refused; `FaultTolerantSessionSerializer` drops that one
+  attribute (REQ-SEC-049/050 — it is repaired on the same request), the member keeps the rest of the
+  session. Production is switched to it by the owner once the report counter has stayed at zero
+  ([`deployment.md` → *Session type allow-list*](../deployment.md#session-type-allow-list-report-then-enforce)).
+
+The mode governs **reading** only: what is written is identical in all three, so a mode switch
+touches no stored session and needs no migration.
+
+**Acceptance**
+
+- [ ] Every value a production session holds — the OIDC security context, the authorized client
+  with both tokens, the pre-login authorization request, the CSRF token, the saved request, the flash
+  maps, our filters' attributes, Tomcat's listener — reads back under `enforce` byte-identically to
+  the permissive validator.
+- [ ] A gadget-shaped class outside the list is refused under `enforce` **before** it is
+  instantiated, dropped as an unreadable attribute and counted on both counters.
+- [ ] Under `report` that same value is read and reported; under `off` it is read and not reported.
+- [ ] A subpackage of an allowed JDK or Spring package is not allowed by the parent entry.
+- [ ] A mistyped mode falls back to `report`, never to a failed startup.
+- [ ] The E2E stack runs with `enforce`, so every login, refresh, flash redirect and live-sync
+  handshake in the suite is a session read under the strictest mode.
+
+**Enforced by:** `SessionTypeAllowListTest` (parity over a realistic session, gadget refusal before
+construction, report/off reading, package boundaries, metrics, mode parsing) ·
+`SessionSerializerRoundTripTest`, `RedisSessionImportFlashRoundTripTest`,
+`FaultTolerantSessionSerializerTest`, `HalfWrittenSessionHashIntegrationTest`,
+`SessionAttributeRepairIntegrationTest` (all built on the enforcing mapper) · the E2E suite
+(`docker-compose.e2e.yml` sets `enforce`) · `monitoring/prometheus/tests/session_type_allow_list_alert_test.yml`
+· **Code:** `SessionTypeAllowList`, `RedisSessionConfig#springSessionDefaultRedisSerializer` ·
+**Monitoring:** `SessionTypeOutsideAllowList`, `basetool_session_type_refused_total{mode}`
+([`observability.md`](observability.md)) · **ADR:** [ADR-0206](../adr/0206-a-session-value-may-name-only-an-allow-listed-class.md) · **Related:** REQ-SEC-049,
+REQ-SEC-050, REQ-SEC-063
+
 ### REQ-SEC-051 — A relayed request parameter is bound to the backend's own type
 
 The frontend is a proxy: a page or proxy controller binds a request parameter, drops it into a
@@ -3676,8 +3737,11 @@ it) · `UserRegistrationServiceTest` (the `PENDING` path passes the waiver) ·
 
 ### REQ-SEC-056 — The authorities cache TTL is configuration, bounded at both ends
 
-`CustomJwtGrantedAuthoritiesConverter` memoises the assembled authority collection per `(sub, token
-issuedAt, azp)`. That memoisation is the single control on how much load the authorization path puts
+`CustomJwtGrantedAuthoritiesConverter` memoises the assembled authority collection per `(sub,
+Keycloak session, azp, claims fingerprint)` — the session is the token's `sid`, falling back to its
+`issuedAt` for a token without one (amended 2026-09-23, BE-PERF-08; until then the key was `(sub,
+token issuedAt, azp)`, so every five-minute token refresh was a miss and a TTL above the
+access-token lifespan bought nothing). That memoisation is the single control on how much load the authorization path puts
 on [`PostgreSQL`](data-persistence.md): the converter runs on **every** authenticated call, and a
 **miss** costs a write-capable `syncUser` transaction plus five to eight SELECTs — user load,
 `user_roles`, **one role lookup per realm role**, and the membership read.
@@ -3697,9 +3761,19 @@ The TTL is therefore configuration — `app.security.authorities-cache.ttl`, rea
 It is **bounded at both ends, and the context refuses to start outside them**. Zero or negative
 would disable the cache and silently restore the storm. Above `PT15M` widens something else: the TTL
 is also **the window in which a revoked role, a withdrawn permission, a reversed approval or a
-removed org-unit membership stays effective on an already-issued token**. A fresh login always
-misses, because `issuedAt` is part of the key, so re-authentication picks up new authorities at once
-and this bounds staleness only *within* one token's life.
+removed org-unit membership stays effective within one Keycloak session**. A fresh login always
+misses, because it opens a new session, so re-authentication picks up new authorities at once. A
+refreshed token whose **claims** changed — a realm role granted or revoked in Keycloak, a renamed
+account, a new e-mail address — also misses: every claim except `iat`, `exp`, `nbf` and `jti` is
+hashed into the key, so a Keycloak-side role change bites on the next refresh, as it did while
+`issuedAt` was in the key. What the TTL alone bounds is a change the token cannot carry: an approval,
+a local role's permissions, an org-unit membership flag. At the default `PT5M` that window equals
+the five-minute access-token lifespan that bounded it before; raising the TTL now really widens it,
+which is what the `PT15M` ceiling is for.
+
+The cache publishes its hits, misses, evictions and size as `cache_gets_total{cache="jwt-authorities"}`
+and siblings, so the Spring-apps dashboard's cache panels and the `CacheHitRatioLow` /
+`CacheSizeEvictionsHigh` alerts cover it like every `CacheConfig` cache.
 
 **Acceptance**
 
@@ -3709,6 +3783,10 @@ and this bounds staleness only *within* one token's life.
   than degrading at run time; `PT15M` exactly is accepted.
 - [x] A fresh login misses the cache regardless of the configured TTL, so re-authentication applies
   new authorities immediately.
+- [x] A refreshed token of the same session and with unchanged claims is a hit; one with changed
+  claims (e.g. a revoked realm role) is a miss and carries the change; two clients (`azp`) of one
+  session never share an entry; a token without `sid` falls back to the `issuedAt` key.
+- [x] Hits and misses are published under `cache="jwt-authorities"`.
 - [x] The properties class sits in `support`, keeping `ArchitectureTest`'s package-cycle and
   `support`-is-a-leaf invariants green.
 - [x] The operator's `IRI_AUTHORITIES_CACHE_TTL` in the host `.env` reaches the container as
@@ -3718,7 +3796,8 @@ and this bounds staleness only *within* one token's life.
 
 **Enforced by:** `BackendPropertiesValidationTest` (default, both bounds, and the ceiling accepted
 exactly) · `CustomJwtGrantedAuthoritiesConverterTest` (the converter builds against the real
-properties) · `ArchitectureTest` (`supportPackageMustStayADependencyLeaf`,
+properties; the session key, the claims fingerprint, the `azp` split, the `iat` fallback and the
+cache meters) · `FirstLoginAuthoritiesIntegrationTest` · `ArchitectureTest` (`supportPackageMustStayADependencyLeaf`,
 `backendPackagesShouldBeFreeOfDependencyCycles`) · **Code:** `AuthoritiesCacheProperties`,
 `CustomJwtGrantedAuthoritiesConverter`, `application.yml`, `docker-compose.yml`,
 `quadlet/env.d/backend.env.tmpl` · **Decision:**

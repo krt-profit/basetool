@@ -21,6 +21,9 @@ Beyond roles there are three mechanisms that are easy to miss:
   reading a peer's mission (`MissionPeerRedactor`, guarded by an ArchUnit rule), a requester-only
   viewer of a job order (`REQ-ORDERS-023`). There is no anonymous or guest tier any more — ADR-0159
   removed both audiences.
+- **The session store is not a trust boundary** — a session value names its own class, so the
+  frontend reads only classes on `SessionTypeAllowList` (REQ-SEC-067, ADR-0206). Shipped in
+  `report` mode, enforced in the E2E stack; production switches to `enforce` by one `.env` value.
 
 Authority: [`security-and-access.md`](../specs/security-and-access.md) (`REQ-SEC-*`),
 [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md), `ArchitectureTest`.
