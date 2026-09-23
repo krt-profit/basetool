@@ -60,6 +60,7 @@ import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -78,6 +79,12 @@ import org.springframework.transaction.annotation.Transactional;
  * denormalised name string that is stored verbatim — so they have no ordering constraint, and
  * running them ahead of every step that can abort the tick is what keeps {@code terminal.type}, the
  * refinery picker's only source, from staying unpopulated for a full 24-hour sweep interval.
+ *
+ * <p><strong>Transactions (BE-PERF-09, REQ-DATA-005).</strong> A sync method holds no transaction
+ * across its HTTP fetch: it fetches with none open, then writes the rows through {@link
+ * SyncChunkWriter} in chunk transactions of their own, a refused chunk replayed row by row. Until
+ * 2026-09-22 each method was one transaction around the fetch and every row, so a pooled connection
+ * idled while UEX answered and one refused row rolled the whole catalogue back.
  *
  * <p>Every sync method follows the same pattern: pull the full UEX catalog for that entity, upsert
  * by UEX id (with name-based fallback for legacy rows missing the id), per-field dirty checking to
@@ -106,12 +113,15 @@ public class UexUniverseSyncService {
   private final TerminalRepository terminalRepository;
   private final LocationRepository locationRepository;
 
+  /** Writes each catalogue in short isolated transactions after its fetch (BE-PERF-09). */
+  private final SyncChunkWriter chunkWriter;
+
   /**
    * Syncs UEX cities into {@code city}. Parents (planet, moon) are resolved against the local
    * mirror; rows with an unresolved parent are still upserted but with the parent reference
    * cleared.
    */
-  @Transactional
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public void syncCities() {
     log.info("Starting sync for Citys...");
     UexClient.FetchResult<UexCityDto> fetched = uexClient.getCities();
@@ -124,88 +134,98 @@ public class UexUniverseSyncService {
       log.warn("No cities received from UEX API. Aborting city synchronization.");
       return;
     }
-    for (UexCityDto dto : dtos) {
-      if (dto.id() == null) {
-        continue;
-      }
-      City entity =
-          cityRepository
-              .findByIdCity(dto.id())
-              .orElseGet(
-                  () ->
-                      cityRepository
-                          .findByName(dto.name())
-                          .map(
-                              e -> {
-                                e.setIdCity(dto.id());
-                                return cityRepository.save(e);
-                              })
-                          .orElseGet(
-                              () -> {
-                                City n = new City();
-                                n.setIdCity(dto.id());
-                                n.setName(dto.name());
-                                return cityRepository.save(n);
-                              }));
-      entity.setName(dto.name());
-      entity.setCode(dto.code());
-      entity.setIsAvailableLive(dto.checkIsAvailableLive());
-      entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
-      entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
-      entity.setIsDefault(UexValues.asBooleanOrFalse(dto.isDefault()));
-      entity.setIsMonitored(UexValues.asBooleanOrFalse(dto.isMonitored()));
-      entity.setIsArmistice(UexValues.asBooleanOrFalse(dto.isArmistice()));
-      entity.setIsLandable(UexValues.asBooleanOrFalse(dto.isLandable()));
-      entity.setIsDecommissioned(UexValues.asBooleanOrFalse(dto.isDecommissioned()));
-      entity.setHasQuantumMarker(UexValues.asBooleanOrFalse(dto.hasQuantumMarker()));
-      entity.setHasTradeTerminal(UexValues.asBooleanOrFalse(dto.hasTradeTerminal()));
-      entity.setHasHabitation(UexValues.asBooleanOrFalse(dto.hasHabitation()));
-      entity.setHasRefinery(UexValues.asBooleanOrFalse(dto.hasRefinery()));
-      entity.setHasCargoCenter(UexValues.asBooleanOrFalse(dto.hasCargoCenter()));
-      entity.setHasClinic(UexValues.asBooleanOrFalse(dto.hasClinic()));
-      entity.setHasFood(UexValues.asBooleanOrFalse(dto.hasFood()));
-      entity.setHasShops(UexValues.asBooleanOrFalse(dto.hasShops()));
-      entity.setHasRefuel(UexValues.asBooleanOrFalse(dto.hasRefuel()));
-      entity.setHasRepair(UexValues.asBooleanOrFalse(dto.hasRepair()));
-      entity.setHasGravity(UexValues.asBooleanOrFalse(dto.hasGravity()));
-      if (!Boolean.TRUE.equals(entity.getHasLoadingDockOverridden())) {
-        entity.setHasLoadingDock(UexValues.asBooleanOrFalse(dto.hasLoadingDock()));
-      }
-      entity.setHasDockingPort(UexValues.asBooleanOrFalse(dto.hasDockingPort()));
-      entity.setHasFreightElevator(UexValues.asBooleanOrFalse(dto.hasFreightElevator()));
-      entity.setPadTypes(dto.padTypes());
-      entity.setStarSystemName(dto.starSystemName());
-      entity.setPlanetName(dto.planetName());
-      entity.setOrbitName(dto.orbitName());
-      entity.setMoonName(dto.moonName());
-      entity.setFactionName(dto.factionName());
-      entity.setJurisdictionName(dto.jurisdictionName());
-      cityRepository.save(entity);
+    // BE-PERF-09 / REQ-DATA-005: written after the fetch, in chunk transactions of their own;
+    // a chunk the database refuses is replayed row by row, so one bad row costs only itself.
+    chunkWriter.write(
+        dtos,
+        SyncChunkWriter.DEFAULT_CHUNK_SIZE,
+        chunk -> {
+          for (UexCityDto dto : chunk) {
+            if (dto.id() == null) {
+              continue;
+            }
+            City entity =
+                cityRepository
+                    .findByIdCity(dto.id())
+                    .orElseGet(
+                        () ->
+                            cityRepository
+                                .findByName(dto.name())
+                                .map(
+                                    e -> {
+                                      e.setIdCity(dto.id());
+                                      return cityRepository.save(e);
+                                    })
+                                .orElseGet(
+                                    () -> {
+                                      City n = new City();
+                                      n.setIdCity(dto.id());
+                                      n.setName(dto.name());
+                                      return cityRepository.save(n);
+                                    }));
+            entity.setName(dto.name());
+            entity.setCode(dto.code());
+            entity.setIsAvailableLive(dto.checkIsAvailableLive());
+            entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
+            entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
+            entity.setIsDefault(UexValues.asBooleanOrFalse(dto.isDefault()));
+            entity.setIsMonitored(UexValues.asBooleanOrFalse(dto.isMonitored()));
+            entity.setIsArmistice(UexValues.asBooleanOrFalse(dto.isArmistice()));
+            entity.setIsLandable(UexValues.asBooleanOrFalse(dto.isLandable()));
+            entity.setIsDecommissioned(UexValues.asBooleanOrFalse(dto.isDecommissioned()));
+            entity.setHasQuantumMarker(UexValues.asBooleanOrFalse(dto.hasQuantumMarker()));
+            entity.setHasTradeTerminal(UexValues.asBooleanOrFalse(dto.hasTradeTerminal()));
+            entity.setHasHabitation(UexValues.asBooleanOrFalse(dto.hasHabitation()));
+            entity.setHasRefinery(UexValues.asBooleanOrFalse(dto.hasRefinery()));
+            entity.setHasCargoCenter(UexValues.asBooleanOrFalse(dto.hasCargoCenter()));
+            entity.setHasClinic(UexValues.asBooleanOrFalse(dto.hasClinic()));
+            entity.setHasFood(UexValues.asBooleanOrFalse(dto.hasFood()));
+            entity.setHasShops(UexValues.asBooleanOrFalse(dto.hasShops()));
+            entity.setHasRefuel(UexValues.asBooleanOrFalse(dto.hasRefuel()));
+            entity.setHasRepair(UexValues.asBooleanOrFalse(dto.hasRepair()));
+            entity.setHasGravity(UexValues.asBooleanOrFalse(dto.hasGravity()));
+            if (!Boolean.TRUE.equals(entity.getHasLoadingDockOverridden())) {
+              entity.setHasLoadingDock(UexValues.asBooleanOrFalse(dto.hasLoadingDock()));
+            }
+            entity.setHasDockingPort(UexValues.asBooleanOrFalse(dto.hasDockingPort()));
+            entity.setHasFreightElevator(UexValues.asBooleanOrFalse(dto.hasFreightElevator()));
+            entity.setPadTypes(dto.padTypes());
+            entity.setStarSystemName(dto.starSystemName());
+            entity.setPlanetName(dto.planetName());
+            entity.setOrbitName(dto.orbitName());
+            entity.setMoonName(dto.moonName());
+            entity.setFactionName(dto.factionName());
+            entity.setJurisdictionName(dto.jurisdictionName());
+            cityRepository.save(entity);
 
-      if (Boolean.TRUE.equals(entity.getIsAvailableLive())) {
-        Location location =
-            locationRepository
-                .findByCityId(entity.getId())
-                .orElseGet(
-                    () ->
-                        locationRepository
-                            .findByName(entity.getName())
-                            .map(
-                                l -> {
-                                  l.setCity(entity);
-                                  return l;
-                                })
-                            .orElseGet(
-                                () -> {
-                                  Location l = new Location();
-                                  l.setName(entity.getName());
-                                  l.setCity(entity);
-                                  return l;
-                                }));
-        location.setName(entity.getName());
-        locationRepository.save(location);
-      }
-    }
+            if (Boolean.TRUE.equals(entity.getIsAvailableLive())) {
+              Location location =
+                  locationRepository
+                      .findByCityId(entity.getId())
+                      .orElseGet(
+                          () ->
+                              locationRepository
+                                  .findByName(entity.getName())
+                                  .map(
+                                      l -> {
+                                        l.setCity(entity);
+                                        return l;
+                                      })
+                                  .orElseGet(
+                                      () -> {
+                                        Location l = new Location();
+                                        l.setName(entity.getName());
+                                        l.setCity(entity);
+                                        return l;
+                                      }));
+              location.setName(entity.getName());
+              locationRepository.save(location);
+            }
+          }
+          return chunk;
+        },
+        "city",
+        dto -> "(id=" + dto.id() + ")");
     log.info("Finished sync for Citys.");
   }
 
@@ -213,7 +233,7 @@ public class UexUniverseSyncService {
    * Syncs UEX factions. No parent table — factions stand alone, so this method can run first in the
    * universe sweep.
    */
-  @Transactional
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public void syncFactions() {
     log.info("Starting sync for Factions...");
     UexClient.FetchResult<UexFactionDto> fetched = uexClient.getFactions();
@@ -226,38 +246,51 @@ public class UexUniverseSyncService {
       log.warn("No factions received from UEX API. Aborting faction synchronization.");
       return;
     }
-    for (UexFactionDto dto : dtos) {
-      if (dto.id() == null) {
-        continue;
-      }
-      Faction entity =
-          factionRepository
-              .findByIdFaction(dto.id())
-              .orElseGet(
-                  () ->
-                      factionRepository
-                          .findByName(dto.name())
-                          .map(
-                              e -> {
-                                e.setIdFaction(dto.id());
-                                return factionRepository.save(e);
-                              })
-                          .orElseGet(
-                              () -> {
-                                Faction n = new Faction();
-                                n.setIdFaction(dto.id());
-                                n.setName(dto.name());
-                                return factionRepository.save(n);
-                              }));
-      entity.setName(dto.name());
-      // No code / is_available_live: UEX's /factions payload carries neither (REQ-DATA-015). The
-      // absent flag decoded to null, which checkIsAvailableLive() turned into a hard `false` — a
-      // value UEX never stated — so the column is now left to whatever a source that knows writes.
-      entity.setWiki(dto.wiki());
-      entity.setIsPiracy(dto.checkIsPiracy());
-      entity.setIsBountyHunting(dto.checkIsBountyHunting());
-      factionRepository.save(entity);
-    }
+    // BE-PERF-09 / REQ-DATA-005: written after the fetch, in chunk transactions of their own;
+    // a chunk the database refuses is replayed row by row, so one bad row costs only itself.
+    chunkWriter.write(
+        dtos,
+        SyncChunkWriter.DEFAULT_CHUNK_SIZE,
+        chunk -> {
+          for (UexFactionDto dto : chunk) {
+            if (dto.id() == null) {
+              continue;
+            }
+            Faction entity =
+                factionRepository
+                    .findByIdFaction(dto.id())
+                    .orElseGet(
+                        () ->
+                            factionRepository
+                                .findByName(dto.name())
+                                .map(
+                                    e -> {
+                                      e.setIdFaction(dto.id());
+                                      return factionRepository.save(e);
+                                    })
+                                .orElseGet(
+                                    () -> {
+                                      Faction n = new Faction();
+                                      n.setIdFaction(dto.id());
+                                      n.setName(dto.name());
+                                      return factionRepository.save(n);
+                                    }));
+            entity.setName(dto.name());
+            // No code / is_available_live: UEX's /factions payload carries neither (REQ-DATA-015).
+            // The
+            // absent flag decoded to null, which checkIsAvailableLive() turned into a hard `false`
+            // — a
+            // value UEX never stated — so the column is now left to whatever a source that knows
+            // writes.
+            entity.setWiki(dto.wiki());
+            entity.setIsPiracy(dto.checkIsPiracy());
+            entity.setIsBountyHunting(dto.checkIsBountyHunting());
+            factionRepository.save(entity);
+          }
+          return chunk;
+        },
+        "faction",
+        dto -> "(id=" + dto.id() + ")");
     log.info("Finished sync for Factions.");
   }
 
@@ -265,7 +298,7 @@ public class UexUniverseSyncService {
    * Syncs UEX jurisdictions. Parent is faction; unresolved faction → jurisdiction's faction
    * reference stays null.
    */
-  @Transactional
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public void syncJurisdictions() {
     log.info("Starting sync for Jurisdictions...");
     UexClient.FetchResult<UexJurisdictionDto> fetched = uexClient.getJurisdictions();
@@ -279,44 +312,54 @@ public class UexUniverseSyncService {
       log.warn("No jurisdictions received from UEX API. Aborting jurisdiction synchronization.");
       return;
     }
-    for (UexJurisdictionDto dto : dtos) {
-      if (dto.id() == null) {
-        continue;
-      }
-      Jurisdiction entity =
-          jurisdictionRepository
-              .findByIdJurisdiction(dto.id())
-              .orElseGet(
-                  () ->
-                      jurisdictionRepository
-                          .findByName(dto.name())
-                          .map(
-                              e -> {
-                                e.setIdJurisdiction(dto.id());
-                                return jurisdictionRepository.save(e);
-                              })
-                          .orElseGet(
-                              () -> {
-                                Jurisdiction n = new Jurisdiction();
-                                n.setIdJurisdiction(dto.id());
-                                n.setName(dto.name());
-                                return jurisdictionRepository.save(n);
-                              }));
-      entity.setName(dto.name());
-      // No code: UEX's /jurisdictions payload has no `code` field (it carries `nickname`,
-      // which is mapped above), so writing one only cleared the column (REQ-DATA-015).
-      entity.setIsAvailableLive(dto.checkIsAvailableLive());
+    // BE-PERF-09 / REQ-DATA-005: written after the fetch, in chunk transactions of their own;
+    // a chunk the database refuses is replayed row by row, so one bad row costs only itself.
+    chunkWriter.write(
+        dtos,
+        SyncChunkWriter.DEFAULT_CHUNK_SIZE,
+        chunk -> {
+          for (UexJurisdictionDto dto : chunk) {
+            if (dto.id() == null) {
+              continue;
+            }
+            Jurisdiction entity =
+                jurisdictionRepository
+                    .findByIdJurisdiction(dto.id())
+                    .orElseGet(
+                        () ->
+                            jurisdictionRepository
+                                .findByName(dto.name())
+                                .map(
+                                    e -> {
+                                      e.setIdJurisdiction(dto.id());
+                                      return jurisdictionRepository.save(e);
+                                    })
+                                .orElseGet(
+                                    () -> {
+                                      Jurisdiction n = new Jurisdiction();
+                                      n.setIdJurisdiction(dto.id());
+                                      n.setName(dto.name());
+                                      return jurisdictionRepository.save(n);
+                                    }));
+            entity.setName(dto.name());
+            // No code: UEX's /jurisdictions payload has no `code` field (it carries `nickname`,
+            // which is mapped above), so writing one only cleared the column (REQ-DATA-015).
+            entity.setIsAvailableLive(dto.checkIsAvailableLive());
 
-      entity.setNickname(dto.nickname());
-      entity.setWiki(dto.wiki());
-      entity.setFactionName(dto.factionName());
-      jurisdictionRepository.save(entity);
-    }
+            entity.setNickname(dto.nickname());
+            entity.setWiki(dto.wiki());
+            entity.setFactionName(dto.factionName());
+            jurisdictionRepository.save(entity);
+          }
+          return chunk;
+        },
+        "jurisdiction",
+        dto -> "(id=" + dto.id() + ")");
     log.info("Finished sync for Jurisdictions.");
   }
 
   /** Syncs UEX moons. Parent is planet. */
-  @Transactional
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public void syncMoons() {
     log.info("Starting sync for Moons...");
     UexClient.FetchResult<UexMoonDto> fetched = uexClient.getMoons();
@@ -329,47 +372,57 @@ public class UexUniverseSyncService {
       log.warn("No moons received from UEX API. Aborting moon synchronization.");
       return;
     }
-    for (UexMoonDto dto : dtos) {
-      if (dto.id() == null) {
-        continue;
-      }
-      Moon entity =
-          moonRepository
-              .findByIdMoon(dto.id())
-              .orElseGet(
-                  () ->
-                      moonRepository
-                          .findByName(dto.name())
-                          .map(
-                              e -> {
-                                e.setIdMoon(dto.id());
-                                return moonRepository.save(e);
-                              })
-                          .orElseGet(
-                              () -> {
-                                Moon n = new Moon();
-                                n.setIdMoon(dto.id());
-                                n.setName(dto.name());
-                                return moonRepository.save(n);
-                              }));
-      entity.setName(dto.name());
-      entity.setCode(dto.code());
-      entity.setIsAvailableLive(dto.checkIsAvailableLive());
-      entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
-      entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
-      entity.setIsDefault(UexValues.asBooleanOrFalse(dto.isDefault()));
-      entity.setStarSystemName(dto.starSystemName());
-      entity.setPlanetName(dto.planetName());
-      entity.setOrbitName(dto.orbitName());
-      entity.setFactionName(dto.factionName());
-      entity.setJurisdictionName(dto.jurisdictionName());
-      moonRepository.save(entity);
-    }
+    // BE-PERF-09 / REQ-DATA-005: written after the fetch, in chunk transactions of their own;
+    // a chunk the database refuses is replayed row by row, so one bad row costs only itself.
+    chunkWriter.write(
+        dtos,
+        SyncChunkWriter.DEFAULT_CHUNK_SIZE,
+        chunk -> {
+          for (UexMoonDto dto : chunk) {
+            if (dto.id() == null) {
+              continue;
+            }
+            Moon entity =
+                moonRepository
+                    .findByIdMoon(dto.id())
+                    .orElseGet(
+                        () ->
+                            moonRepository
+                                .findByName(dto.name())
+                                .map(
+                                    e -> {
+                                      e.setIdMoon(dto.id());
+                                      return moonRepository.save(e);
+                                    })
+                                .orElseGet(
+                                    () -> {
+                                      Moon n = new Moon();
+                                      n.setIdMoon(dto.id());
+                                      n.setName(dto.name());
+                                      return moonRepository.save(n);
+                                    }));
+            entity.setName(dto.name());
+            entity.setCode(dto.code());
+            entity.setIsAvailableLive(dto.checkIsAvailableLive());
+            entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
+            entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
+            entity.setIsDefault(UexValues.asBooleanOrFalse(dto.isDefault()));
+            entity.setStarSystemName(dto.starSystemName());
+            entity.setPlanetName(dto.planetName());
+            entity.setOrbitName(dto.orbitName());
+            entity.setFactionName(dto.factionName());
+            entity.setJurisdictionName(dto.jurisdictionName());
+            moonRepository.save(entity);
+          }
+          return chunk;
+        },
+        "moon",
+        dto -> "(id=" + dto.id() + ")");
     log.info("Finished sync for Moons.");
   }
 
   /** Syncs UEX orbits (orbital positions / lagrange points around a planet). Parent is planet. */
-  @Transactional
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public void syncOrbits() {
     log.info("Starting sync for Orbits...");
     UexClient.FetchResult<UexOrbitDto> fetched = uexClient.getOrbits();
@@ -382,38 +435,48 @@ public class UexUniverseSyncService {
       log.warn("No orbits received from UEX API. Aborting orbit synchronization.");
       return;
     }
-    for (UexOrbitDto dto : dtos) {
-      if (dto.id() == null) {
-        continue;
-      }
-      Orbit entity =
-          orbitRepository
-              .findByIdOrbit(dto.id())
-              .orElseGet(
-                  () ->
-                      orbitRepository
-                          .findByName(dto.name())
-                          .map(
-                              e -> {
-                                e.setIdOrbit(dto.id());
-                                return orbitRepository.save(e);
-                              })
-                          .orElseGet(
-                              () -> {
-                                Orbit n = new Orbit();
-                                n.setIdOrbit(dto.id());
-                                n.setName(dto.name());
-                                return orbitRepository.save(n);
-                              }));
-      entity.setName(dto.name());
-      entity.setCode(dto.code());
-      entity.setIsAvailableLive(dto.checkIsAvailableLive());
+    // BE-PERF-09 / REQ-DATA-005: written after the fetch, in chunk transactions of their own;
+    // a chunk the database refuses is replayed row by row, so one bad row costs only itself.
+    chunkWriter.write(
+        dtos,
+        SyncChunkWriter.DEFAULT_CHUNK_SIZE,
+        chunk -> {
+          for (UexOrbitDto dto : chunk) {
+            if (dto.id() == null) {
+              continue;
+            }
+            Orbit entity =
+                orbitRepository
+                    .findByIdOrbit(dto.id())
+                    .orElseGet(
+                        () ->
+                            orbitRepository
+                                .findByName(dto.name())
+                                .map(
+                                    e -> {
+                                      e.setIdOrbit(dto.id());
+                                      return orbitRepository.save(e);
+                                    })
+                                .orElseGet(
+                                    () -> {
+                                      Orbit n = new Orbit();
+                                      n.setIdOrbit(dto.id());
+                                      n.setName(dto.name());
+                                      return orbitRepository.save(n);
+                                    }));
+            entity.setName(dto.name());
+            entity.setCode(dto.code());
+            entity.setIsAvailableLive(dto.checkIsAvailableLive());
 
-      entity.setStarSystemName(dto.starSystemName());
-      entity.setFactionName(dto.factionName());
-      entity.setJurisdictionName(dto.jurisdictionName());
-      orbitRepository.save(entity);
-    }
+            entity.setStarSystemName(dto.starSystemName());
+            entity.setFactionName(dto.factionName());
+            entity.setJurisdictionName(dto.jurisdictionName());
+            orbitRepository.save(entity);
+          }
+          return chunk;
+        },
+        "orbit",
+        dto -> "(id=" + dto.id() + ")");
     log.info("Finished sync for Orbits.");
   }
 
@@ -421,7 +484,7 @@ public class UexUniverseSyncService {
    * Syncs UEX outposts (surface settlements). Parent is planet or moon — UEX provides exactly one
    * of the two ids.
    */
-  @Transactional
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public void syncOutposts() {
     log.info("Starting sync for Outposts...");
     UexClient.FetchResult<UexOutpostDto> fetched = uexClient.getOutposts();
@@ -434,66 +497,76 @@ public class UexUniverseSyncService {
       log.warn("No outposts received from UEX API. Aborting outpost synchronization.");
       return;
     }
-    for (UexOutpostDto dto : dtos) {
-      if (dto.id() == null) {
-        continue;
-      }
-      Outpost entity =
-          outpostRepository
-              .findByIdOutpost(dto.id())
-              .orElseGet(
-                  () ->
-                      outpostRepository
-                          .findByName(dto.name())
-                          .map(
-                              e -> {
-                                e.setIdOutpost(dto.id());
-                                return outpostRepository.save(e);
-                              })
-                          .orElseGet(
-                              () -> {
-                                Outpost n = new Outpost();
-                                n.setIdOutpost(dto.id());
-                                n.setName(dto.name());
-                                return outpostRepository.save(n);
-                              }));
-      entity.setName(dto.name());
-      // No code: UEX's /outposts payload has no `code` field (it carries `nickname`,
-      // which is mapped above), so writing one only cleared the column (REQ-DATA-015).
-      entity.setIsAvailableLive(dto.checkIsAvailableLive());
-      entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
-      entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
-      entity.setIsDefault(UexValues.asBooleanOrFalse(dto.isDefault()));
-      entity.setIsMonitored(UexValues.asBooleanOrFalse(dto.isMonitored()));
-      entity.setIsArmistice(UexValues.asBooleanOrFalse(dto.isArmistice()));
-      entity.setIsLandable(UexValues.asBooleanOrFalse(dto.isLandable()));
-      entity.setIsDecommissioned(UexValues.asBooleanOrFalse(dto.isDecommissioned()));
-      entity.setHasQuantumMarker(UexValues.asBooleanOrFalse(dto.hasQuantumMarker()));
-      entity.setHasTradeTerminal(UexValues.asBooleanOrFalse(dto.hasTradeTerminal()));
-      entity.setHasHabitation(UexValues.asBooleanOrFalse(dto.hasHabitation()));
-      entity.setHasRefinery(UexValues.asBooleanOrFalse(dto.hasRefinery()));
-      entity.setHasCargoCenter(UexValues.asBooleanOrFalse(dto.hasCargoCenter()));
-      entity.setHasClinic(UexValues.asBooleanOrFalse(dto.hasClinic()));
-      entity.setHasFood(UexValues.asBooleanOrFalse(dto.hasFood()));
-      entity.setHasShops(UexValues.asBooleanOrFalse(dto.hasShops()));
-      entity.setHasRefuel(UexValues.asBooleanOrFalse(dto.hasRefuel()));
-      entity.setHasRepair(UexValues.asBooleanOrFalse(dto.hasRepair()));
-      entity.setHasGravity(UexValues.asBooleanOrFalse(dto.hasGravity()));
-      if (!Boolean.TRUE.equals(entity.getHasLoadingDockOverridden())) {
-        entity.setHasLoadingDock(UexValues.asBooleanOrFalse(dto.hasLoadingDock()));
-      }
-      entity.setHasDockingPort(UexValues.asBooleanOrFalse(dto.hasDockingPort()));
-      entity.setHasFreightElevator(UexValues.asBooleanOrFalse(dto.hasFreightElevator()));
-      entity.setPadTypes(dto.padTypes());
-      entity.setNickname(dto.nickname());
-      entity.setStarSystemName(dto.starSystemName());
-      entity.setPlanetName(dto.planetName());
-      entity.setOrbitName(dto.orbitName());
-      entity.setMoonName(dto.moonName());
-      entity.setFactionName(dto.factionName());
-      entity.setJurisdictionName(dto.jurisdictionName());
-      outpostRepository.save(entity);
-    }
+    // BE-PERF-09 / REQ-DATA-005: written after the fetch, in chunk transactions of their own;
+    // a chunk the database refuses is replayed row by row, so one bad row costs only itself.
+    chunkWriter.write(
+        dtos,
+        SyncChunkWriter.DEFAULT_CHUNK_SIZE,
+        chunk -> {
+          for (UexOutpostDto dto : chunk) {
+            if (dto.id() == null) {
+              continue;
+            }
+            Outpost entity =
+                outpostRepository
+                    .findByIdOutpost(dto.id())
+                    .orElseGet(
+                        () ->
+                            outpostRepository
+                                .findByName(dto.name())
+                                .map(
+                                    e -> {
+                                      e.setIdOutpost(dto.id());
+                                      return outpostRepository.save(e);
+                                    })
+                                .orElseGet(
+                                    () -> {
+                                      Outpost n = new Outpost();
+                                      n.setIdOutpost(dto.id());
+                                      n.setName(dto.name());
+                                      return outpostRepository.save(n);
+                                    }));
+            entity.setName(dto.name());
+            // No code: UEX's /outposts payload has no `code` field (it carries `nickname`,
+            // which is mapped above), so writing one only cleared the column (REQ-DATA-015).
+            entity.setIsAvailableLive(dto.checkIsAvailableLive());
+            entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
+            entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
+            entity.setIsDefault(UexValues.asBooleanOrFalse(dto.isDefault()));
+            entity.setIsMonitored(UexValues.asBooleanOrFalse(dto.isMonitored()));
+            entity.setIsArmistice(UexValues.asBooleanOrFalse(dto.isArmistice()));
+            entity.setIsLandable(UexValues.asBooleanOrFalse(dto.isLandable()));
+            entity.setIsDecommissioned(UexValues.asBooleanOrFalse(dto.isDecommissioned()));
+            entity.setHasQuantumMarker(UexValues.asBooleanOrFalse(dto.hasQuantumMarker()));
+            entity.setHasTradeTerminal(UexValues.asBooleanOrFalse(dto.hasTradeTerminal()));
+            entity.setHasHabitation(UexValues.asBooleanOrFalse(dto.hasHabitation()));
+            entity.setHasRefinery(UexValues.asBooleanOrFalse(dto.hasRefinery()));
+            entity.setHasCargoCenter(UexValues.asBooleanOrFalse(dto.hasCargoCenter()));
+            entity.setHasClinic(UexValues.asBooleanOrFalse(dto.hasClinic()));
+            entity.setHasFood(UexValues.asBooleanOrFalse(dto.hasFood()));
+            entity.setHasShops(UexValues.asBooleanOrFalse(dto.hasShops()));
+            entity.setHasRefuel(UexValues.asBooleanOrFalse(dto.hasRefuel()));
+            entity.setHasRepair(UexValues.asBooleanOrFalse(dto.hasRepair()));
+            entity.setHasGravity(UexValues.asBooleanOrFalse(dto.hasGravity()));
+            if (!Boolean.TRUE.equals(entity.getHasLoadingDockOverridden())) {
+              entity.setHasLoadingDock(UexValues.asBooleanOrFalse(dto.hasLoadingDock()));
+            }
+            entity.setHasDockingPort(UexValues.asBooleanOrFalse(dto.hasDockingPort()));
+            entity.setHasFreightElevator(UexValues.asBooleanOrFalse(dto.hasFreightElevator()));
+            entity.setPadTypes(dto.padTypes());
+            entity.setNickname(dto.nickname());
+            entity.setStarSystemName(dto.starSystemName());
+            entity.setPlanetName(dto.planetName());
+            entity.setOrbitName(dto.orbitName());
+            entity.setMoonName(dto.moonName());
+            entity.setFactionName(dto.factionName());
+            entity.setJurisdictionName(dto.jurisdictionName());
+            outpostRepository.save(entity);
+          }
+          return chunk;
+        },
+        "outpost",
+        dto -> "(id=" + dto.id() + ")");
     log.info("Finished sync for Outposts.");
   }
 
@@ -501,7 +574,7 @@ public class UexUniverseSyncService {
    * Syncs UEX planets. Parent is star system; this method must run AFTER the star-system sync
    * (which lives in {@link UexStarSystemService}) so unresolved parents stay rare.
    */
-  @Transactional
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public void syncPlanets() {
     log.info("Starting sync for Planets...");
     UexClient.FetchResult<UexPlanetDto> fetched = uexClient.getPlanets();
@@ -514,40 +587,50 @@ public class UexUniverseSyncService {
       log.warn("No planets received from UEX API. Aborting planet synchronization.");
       return;
     }
-    for (UexPlanetDto dto : dtos) {
-      if (dto.id() == null) {
-        continue;
-      }
-      Planet entity =
-          planetRepository
-              .findByIdPlanet(dto.id())
-              .orElseGet(
-                  () ->
-                      planetRepository
-                          .findByName(dto.name())
-                          .map(
-                              e -> {
-                                e.setIdPlanet(dto.id());
-                                return planetRepository.save(e);
-                              })
-                          .orElseGet(
-                              () -> {
-                                Planet n = new Planet();
-                                n.setIdPlanet(dto.id());
-                                n.setName(dto.name());
-                                return planetRepository.save(n);
-                              }));
-      entity.setName(dto.name());
-      entity.setCode(dto.code());
-      entity.setIsAvailableLive(dto.checkIsAvailableLive());
-      entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
-      entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
-      entity.setIsDefault(UexValues.asBooleanOrFalse(dto.isDefault()));
-      entity.setStarSystemName(dto.starSystemName());
-      entity.setFactionName(dto.factionName());
-      entity.setJurisdictionName(dto.jurisdictionName());
-      planetRepository.save(entity);
-    }
+    // BE-PERF-09 / REQ-DATA-005: written after the fetch, in chunk transactions of their own;
+    // a chunk the database refuses is replayed row by row, so one bad row costs only itself.
+    chunkWriter.write(
+        dtos,
+        SyncChunkWriter.DEFAULT_CHUNK_SIZE,
+        chunk -> {
+          for (UexPlanetDto dto : chunk) {
+            if (dto.id() == null) {
+              continue;
+            }
+            Planet entity =
+                planetRepository
+                    .findByIdPlanet(dto.id())
+                    .orElseGet(
+                        () ->
+                            planetRepository
+                                .findByName(dto.name())
+                                .map(
+                                    e -> {
+                                      e.setIdPlanet(dto.id());
+                                      return planetRepository.save(e);
+                                    })
+                                .orElseGet(
+                                    () -> {
+                                      Planet n = new Planet();
+                                      n.setIdPlanet(dto.id());
+                                      n.setName(dto.name());
+                                      return planetRepository.save(n);
+                                    }));
+            entity.setName(dto.name());
+            entity.setCode(dto.code());
+            entity.setIsAvailableLive(dto.checkIsAvailableLive());
+            entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
+            entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
+            entity.setIsDefault(UexValues.asBooleanOrFalse(dto.isDefault()));
+            entity.setStarSystemName(dto.starSystemName());
+            entity.setFactionName(dto.factionName());
+            entity.setJurisdictionName(dto.jurisdictionName());
+            planetRepository.save(entity);
+          }
+          return chunk;
+        },
+        "planet",
+        dto -> "(id=" + dto.id() + ")");
     log.info("Finished sync for Planets.");
   }
 
@@ -555,7 +638,7 @@ public class UexUniverseSyncService {
    * Syncs UEX points of interest (derelicts, anomalies, lagrange POIs). Parent varies by POI type —
    * star system, planet or moon.
    */
-  @Transactional
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public void syncPois() {
     log.info("Starting sync for Pois...");
     UexClient.FetchResult<UexPoiDto> fetched = uexClient.getPoi();
@@ -570,69 +653,79 @@ public class UexUniverseSyncService {
       log.warn("No points of interest received from UEX API. Aborting POI synchronization.");
       return;
     }
-    for (UexPoiDto dto : dtos) {
-      if (dto.id() == null) {
-        continue;
-      }
-      Poi entity =
-          poiRepository
-              .findByIdPoi(dto.id())
-              .orElseGet(
-                  () ->
-                      poiRepository
-                          .findByName(dto.name())
-                          .map(
-                              e -> {
-                                e.setIdPoi(dto.id());
-                                return poiRepository.save(e);
-                              })
-                          .orElseGet(
-                              () -> {
-                                Poi n = new Poi();
-                                n.setIdPoi(dto.id());
-                                n.setName(dto.name());
-                                return poiRepository.save(n);
-                              }));
-      entity.setName(dto.name());
-      // No code: UEX's /poi payload has no `code` field (it carries `nickname`,
-      // which is mapped above), so writing one only cleared the column (REQ-DATA-015).
-      entity.setIsAvailableLive(dto.checkIsAvailableLive());
-      entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
-      entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
-      entity.setIsDefault(UexValues.asBooleanOrFalse(dto.isDefault()));
-      entity.setIsMonitored(UexValues.asBooleanOrFalse(dto.isMonitored()));
-      entity.setIsArmistice(UexValues.asBooleanOrFalse(dto.isArmistice()));
-      entity.setIsLandable(UexValues.asBooleanOrFalse(dto.isLandable()));
-      entity.setIsDecommissioned(UexValues.asBooleanOrFalse(dto.isDecommissioned()));
-      entity.setHasQuantumMarker(UexValues.asBooleanOrFalse(dto.hasQuantumMarker()));
-      entity.setHasTradeTerminal(UexValues.asBooleanOrFalse(dto.hasTradeTerminal()));
-      entity.setHasHabitation(UexValues.asBooleanOrFalse(dto.hasHabitation()));
-      entity.setHasRefinery(UexValues.asBooleanOrFalse(dto.hasRefinery()));
-      entity.setHasCargoCenter(UexValues.asBooleanOrFalse(dto.hasCargoCenter()));
-      entity.setHasClinic(UexValues.asBooleanOrFalse(dto.hasClinic()));
-      entity.setHasFood(UexValues.asBooleanOrFalse(dto.hasFood()));
-      entity.setHasShops(UexValues.asBooleanOrFalse(dto.hasShops()));
-      entity.setHasRefuel(UexValues.asBooleanOrFalse(dto.hasRefuel()));
-      entity.setHasRepair(UexValues.asBooleanOrFalse(dto.hasRepair()));
-      entity.setHasGravity(UexValues.asBooleanOrFalse(dto.hasGravity()));
-      if (!Boolean.TRUE.equals(entity.getHasLoadingDockOverridden())) {
-        entity.setHasLoadingDock(UexValues.asBooleanOrFalse(dto.hasLoadingDock()));
-      }
-      entity.setHasDockingPort(UexValues.asBooleanOrFalse(dto.hasDockingPort()));
-      entity.setHasFreightElevator(UexValues.asBooleanOrFalse(dto.hasFreightElevator()));
-      entity.setPadTypes(dto.padTypes());
-      entity.setNickname(dto.nickname());
-      entity.setStarSystemName(dto.starSystemName());
-      entity.setPlanetName(dto.planetName());
-      entity.setOrbitName(dto.orbitName());
-      entity.setMoonName(dto.moonName());
-      entity.setSpaceStationName(dto.spaceStationName());
-      entity.setOutpostName(dto.outpostName());
-      entity.setCityName(dto.cityName());
-      entity.setFactionName(dto.factionName());
-      entity.setJurisdictionName(dto.jurisdictionName());
-      poiRepository.save(entity);
-    }
+    // BE-PERF-09 / REQ-DATA-005: written after the fetch, in chunk transactions of their own;
+    // a chunk the database refuses is replayed row by row, so one bad row costs only itself.
+    chunkWriter.write(
+        dtos,
+        SyncChunkWriter.DEFAULT_CHUNK_SIZE,
+        chunk -> {
+          for (UexPoiDto dto : chunk) {
+            if (dto.id() == null) {
+              continue;
+            }
+            Poi entity =
+                poiRepository
+                    .findByIdPoi(dto.id())
+                    .orElseGet(
+                        () ->
+                            poiRepository
+                                .findByName(dto.name())
+                                .map(
+                                    e -> {
+                                      e.setIdPoi(dto.id());
+                                      return poiRepository.save(e);
+                                    })
+                                .orElseGet(
+                                    () -> {
+                                      Poi n = new Poi();
+                                      n.setIdPoi(dto.id());
+                                      n.setName(dto.name());
+                                      return poiRepository.save(n);
+                                    }));
+            entity.setName(dto.name());
+            // No code: UEX's /poi payload has no `code` field (it carries `nickname`,
+            // which is mapped above), so writing one only cleared the column (REQ-DATA-015).
+            entity.setIsAvailableLive(dto.checkIsAvailableLive());
+            entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
+            entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
+            entity.setIsDefault(UexValues.asBooleanOrFalse(dto.isDefault()));
+            entity.setIsMonitored(UexValues.asBooleanOrFalse(dto.isMonitored()));
+            entity.setIsArmistice(UexValues.asBooleanOrFalse(dto.isArmistice()));
+            entity.setIsLandable(UexValues.asBooleanOrFalse(dto.isLandable()));
+            entity.setIsDecommissioned(UexValues.asBooleanOrFalse(dto.isDecommissioned()));
+            entity.setHasQuantumMarker(UexValues.asBooleanOrFalse(dto.hasQuantumMarker()));
+            entity.setHasTradeTerminal(UexValues.asBooleanOrFalse(dto.hasTradeTerminal()));
+            entity.setHasHabitation(UexValues.asBooleanOrFalse(dto.hasHabitation()));
+            entity.setHasRefinery(UexValues.asBooleanOrFalse(dto.hasRefinery()));
+            entity.setHasCargoCenter(UexValues.asBooleanOrFalse(dto.hasCargoCenter()));
+            entity.setHasClinic(UexValues.asBooleanOrFalse(dto.hasClinic()));
+            entity.setHasFood(UexValues.asBooleanOrFalse(dto.hasFood()));
+            entity.setHasShops(UexValues.asBooleanOrFalse(dto.hasShops()));
+            entity.setHasRefuel(UexValues.asBooleanOrFalse(dto.hasRefuel()));
+            entity.setHasRepair(UexValues.asBooleanOrFalse(dto.hasRepair()));
+            entity.setHasGravity(UexValues.asBooleanOrFalse(dto.hasGravity()));
+            if (!Boolean.TRUE.equals(entity.getHasLoadingDockOverridden())) {
+              entity.setHasLoadingDock(UexValues.asBooleanOrFalse(dto.hasLoadingDock()));
+            }
+            entity.setHasDockingPort(UexValues.asBooleanOrFalse(dto.hasDockingPort()));
+            entity.setHasFreightElevator(UexValues.asBooleanOrFalse(dto.hasFreightElevator()));
+            entity.setPadTypes(dto.padTypes());
+            entity.setNickname(dto.nickname());
+            entity.setStarSystemName(dto.starSystemName());
+            entity.setPlanetName(dto.planetName());
+            entity.setOrbitName(dto.orbitName());
+            entity.setMoonName(dto.moonName());
+            entity.setSpaceStationName(dto.spaceStationName());
+            entity.setOutpostName(dto.outpostName());
+            entity.setCityName(dto.cityName());
+            entity.setFactionName(dto.factionName());
+            entity.setJurisdictionName(dto.jurisdictionName());
+            poiRepository.save(entity);
+          }
+          return chunk;
+        },
+        "point of interest",
+        dto -> "(id=" + dto.id() + ")");
     log.info("Finished sync for Pois.");
   }
 
@@ -640,7 +733,7 @@ public class UexUniverseSyncService {
    * Syncs UEX space stations. Parent is star system or orbit; carries the loading-dock / jump-point
    * / auto-load flags used by the profit-calculation page.
    */
-  @Transactional
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public void syncSpaceStations() {
     log.info("Starting sync for SpaceStations...");
     UexClient.FetchResult<UexSpaceStationDto> fetched = uexClient.getSpaceStations();
@@ -654,93 +747,103 @@ public class UexUniverseSyncService {
       log.warn("No space stations received from UEX API. Aborting space station synchronization.");
       return;
     }
-    for (UexSpaceStationDto dto : dtos) {
-      if (dto.id() == null) {
-        continue;
-      }
-      SpaceStation entity =
-          spacestationRepository
-              .findByIdSpaceStation(dto.id())
-              .orElseGet(
-                  () ->
-                      spacestationRepository
-                          .findByName(dto.name())
-                          .map(
-                              e -> {
-                                e.setIdSpaceStation(dto.id());
-                                return spacestationRepository.save(e);
-                              })
-                          .orElseGet(
-                              () -> {
-                                SpaceStation n = new SpaceStation();
-                                n.setIdSpaceStation(dto.id());
-                                n.setName(dto.name());
-                                return spacestationRepository.save(n);
-                              }));
-      entity.setName(dto.name());
-      // No code: UEX's /space_stations payload has no `code` field (it carries `nickname`,
-      // which is mapped above), so writing one only cleared the column (REQ-DATA-015).
-      entity.setIsAvailableLive(dto.checkIsAvailableLive());
-      entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
-      entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
-      entity.setIsDefault(UexValues.asBooleanOrFalse(dto.isDefault()));
-      entity.setIsMonitored(UexValues.asBooleanOrFalse(dto.isMonitored()));
-      entity.setIsArmistice(UexValues.asBooleanOrFalse(dto.isArmistice()));
-      entity.setIsLandable(UexValues.asBooleanOrFalse(dto.isLandable()));
-      entity.setIsDecommissioned(UexValues.asBooleanOrFalse(dto.isDecommissioned()));
-      entity.setIsLagrange(UexValues.asBooleanOrFalse(dto.isLagrange()));
-      entity.setIsJumpPoint(UexValues.asBooleanOrFalse(dto.isJumpPoint()));
-      entity.setHasQuantumMarker(UexValues.asBooleanOrFalse(dto.hasQuantumMarker()));
-      entity.setHasTradeTerminal(UexValues.asBooleanOrFalse(dto.hasTradeTerminal()));
-      entity.setHasHabitation(UexValues.asBooleanOrFalse(dto.hasHabitation()));
-      entity.setHasRefinery(UexValues.asBooleanOrFalse(dto.hasRefinery()));
-      entity.setHasCargoCenter(UexValues.asBooleanOrFalse(dto.hasCargoCenter()));
-      entity.setHasClinic(UexValues.asBooleanOrFalse(dto.hasClinic()));
-      entity.setHasFood(UexValues.asBooleanOrFalse(dto.hasFood()));
-      entity.setHasShops(UexValues.asBooleanOrFalse(dto.hasShops()));
-      entity.setHasRefuel(UexValues.asBooleanOrFalse(dto.hasRefuel()));
-      entity.setHasRepair(UexValues.asBooleanOrFalse(dto.hasRepair()));
-      entity.setHasGravity(UexValues.asBooleanOrFalse(dto.hasGravity()));
-      if (!Boolean.TRUE.equals(entity.getHasLoadingDockOverridden())) {
-        entity.setHasLoadingDock(UexValues.asBooleanOrFalse(dto.hasLoadingDock()));
-      }
-      entity.setHasDockingPort(UexValues.asBooleanOrFalse(dto.hasDockingPort()));
-      entity.setHasFreightElevator(UexValues.asBooleanOrFalse(dto.hasFreightElevator()));
-      entity.setPadTypes(dto.padTypes());
-      entity.setNickname(dto.nickname());
-      entity.setStarSystemName(dto.starSystemName());
-      entity.setPlanetName(dto.planetName());
-      entity.setOrbitName(dto.orbitName());
-      entity.setMoonName(dto.moonName());
-      entity.setCityName(dto.cityName());
-      entity.setFactionName(dto.factionName());
-      entity.setJurisdictionName(dto.jurisdictionName());
-      spacestationRepository.save(entity);
+    // BE-PERF-09 / REQ-DATA-005: written after the fetch, in chunk transactions of their own;
+    // a chunk the database refuses is replayed row by row, so one bad row costs only itself.
+    chunkWriter.write(
+        dtos,
+        SyncChunkWriter.DEFAULT_CHUNK_SIZE,
+        chunk -> {
+          for (UexSpaceStationDto dto : chunk) {
+            if (dto.id() == null) {
+              continue;
+            }
+            SpaceStation entity =
+                spacestationRepository
+                    .findByIdSpaceStation(dto.id())
+                    .orElseGet(
+                        () ->
+                            spacestationRepository
+                                .findByName(dto.name())
+                                .map(
+                                    e -> {
+                                      e.setIdSpaceStation(dto.id());
+                                      return spacestationRepository.save(e);
+                                    })
+                                .orElseGet(
+                                    () -> {
+                                      SpaceStation n = new SpaceStation();
+                                      n.setIdSpaceStation(dto.id());
+                                      n.setName(dto.name());
+                                      return spacestationRepository.save(n);
+                                    }));
+            entity.setName(dto.name());
+            // No code: UEX's /space_stations payload has no `code` field (it carries `nickname`,
+            // which is mapped above), so writing one only cleared the column (REQ-DATA-015).
+            entity.setIsAvailableLive(dto.checkIsAvailableLive());
+            entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
+            entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
+            entity.setIsDefault(UexValues.asBooleanOrFalse(dto.isDefault()));
+            entity.setIsMonitored(UexValues.asBooleanOrFalse(dto.isMonitored()));
+            entity.setIsArmistice(UexValues.asBooleanOrFalse(dto.isArmistice()));
+            entity.setIsLandable(UexValues.asBooleanOrFalse(dto.isLandable()));
+            entity.setIsDecommissioned(UexValues.asBooleanOrFalse(dto.isDecommissioned()));
+            entity.setIsLagrange(UexValues.asBooleanOrFalse(dto.isLagrange()));
+            entity.setIsJumpPoint(UexValues.asBooleanOrFalse(dto.isJumpPoint()));
+            entity.setHasQuantumMarker(UexValues.asBooleanOrFalse(dto.hasQuantumMarker()));
+            entity.setHasTradeTerminal(UexValues.asBooleanOrFalse(dto.hasTradeTerminal()));
+            entity.setHasHabitation(UexValues.asBooleanOrFalse(dto.hasHabitation()));
+            entity.setHasRefinery(UexValues.asBooleanOrFalse(dto.hasRefinery()));
+            entity.setHasCargoCenter(UexValues.asBooleanOrFalse(dto.hasCargoCenter()));
+            entity.setHasClinic(UexValues.asBooleanOrFalse(dto.hasClinic()));
+            entity.setHasFood(UexValues.asBooleanOrFalse(dto.hasFood()));
+            entity.setHasShops(UexValues.asBooleanOrFalse(dto.hasShops()));
+            entity.setHasRefuel(UexValues.asBooleanOrFalse(dto.hasRefuel()));
+            entity.setHasRepair(UexValues.asBooleanOrFalse(dto.hasRepair()));
+            entity.setHasGravity(UexValues.asBooleanOrFalse(dto.hasGravity()));
+            if (!Boolean.TRUE.equals(entity.getHasLoadingDockOverridden())) {
+              entity.setHasLoadingDock(UexValues.asBooleanOrFalse(dto.hasLoadingDock()));
+            }
+            entity.setHasDockingPort(UexValues.asBooleanOrFalse(dto.hasDockingPort()));
+            entity.setHasFreightElevator(UexValues.asBooleanOrFalse(dto.hasFreightElevator()));
+            entity.setPadTypes(dto.padTypes());
+            entity.setNickname(dto.nickname());
+            entity.setStarSystemName(dto.starSystemName());
+            entity.setPlanetName(dto.planetName());
+            entity.setOrbitName(dto.orbitName());
+            entity.setMoonName(dto.moonName());
+            entity.setCityName(dto.cityName());
+            entity.setFactionName(dto.factionName());
+            entity.setJurisdictionName(dto.jurisdictionName());
+            spacestationRepository.save(entity);
 
-      if (Boolean.TRUE.equals(entity.getIsAvailableLive())) {
-        Location location =
-            locationRepository
-                .findBySpaceStationId(entity.getId())
-                .orElseGet(
-                    () ->
-                        locationRepository
-                            .findByName(entity.getName())
-                            .map(
-                                l -> {
-                                  l.setSpaceStation(entity);
-                                  return l;
-                                })
-                            .orElseGet(
-                                () -> {
-                                  Location l = new Location();
-                                  l.setName(entity.getName());
-                                  l.setSpaceStation(entity);
-                                  return l;
-                                }));
-        location.setName(entity.getName());
-        locationRepository.save(location);
-      }
-    }
+            if (Boolean.TRUE.equals(entity.getIsAvailableLive())) {
+              Location location =
+                  locationRepository
+                      .findBySpaceStationId(entity.getId())
+                      .orElseGet(
+                          () ->
+                              locationRepository
+                                  .findByName(entity.getName())
+                                  .map(
+                                      l -> {
+                                        l.setSpaceStation(entity);
+                                        return l;
+                                      })
+                                  .orElseGet(
+                                      () -> {
+                                        Location l = new Location();
+                                        l.setName(entity.getName());
+                                        l.setSpaceStation(entity);
+                                        return l;
+                                      }));
+              location.setName(entity.getName());
+              locationRepository.save(location);
+            }
+          }
+          return chunk;
+        },
+        "space station",
+        dto -> "(id=" + dto.id() + ")");
     log.info("Finished sync for SpaceStations.");
   }
 
@@ -750,7 +853,7 @@ public class UexUniverseSyncService {
    * sync methods produce. Unknown-parent terminals are upserted with the parent reference cleared —
    * the next sweep usually fixes the row.
    */
-  @Transactional
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public void syncTerminals() {
     log.info("Starting sync for Terminals...");
     UexClient.FetchResult<UexTerminalDto> fetched = uexClient.getTerminals();
@@ -764,65 +867,77 @@ public class UexUniverseSyncService {
       return;
     }
     Instant syncedAt = Instant.now();
-    for (UexTerminalDto dto : dtos) {
-      if (dto.id() == null) {
-        continue;
-      }
-      Terminal entity =
-          terminalRepository
-              .findByIdTerminal(dto.id())
-              .orElseGet(
-                  () ->
-                      terminalRepository
-                          .findByName(dto.name())
-                          .map(
-                              e -> {
-                                e.setIdTerminal(dto.id());
-                                return terminalRepository.save(e);
-                              })
-                          .orElseGet(
-                              () -> {
-                                Terminal n = new Terminal();
-                                n.setIdTerminal(dto.id());
-                                n.setName(dto.name());
-                                return terminalRepository.save(n);
-                              }));
-      entity.setName(dto.name());
-      entity.setCode(dto.code());
-      // The terminal kind is what actually proves a refinery exists at the parent location; the
-      // parent's own has_refinery flag is unreliable upstream (REQ-REFINERY-020).
-      entity.setType(dto.type());
-      entity.setIsAvailableLive(dto.checkIsAvailableLive());
-      entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
-      entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
-      entity.setIsJumpPoint(UexValues.asBooleanOrFalse(dto.isJumpPoint()));
-      // The raw UEX state is recorded on every sweep, regardless of the override flags,
-      // so the admin UI can show what UEX currently claims even while a pin is active.
-      Boolean uexLoadingDock = dto.hasLoadingDock() == null ? null : dto.hasLoadingDock() == 1;
-      Boolean uexAutoLoad = dto.isAutoLoad() == null ? null : dto.isAutoLoad() == 1;
-      entity.setUexHasLoadingDock(uexLoadingDock);
-      entity.setUexIsAutoLoad(uexAutoLoad);
-      entity.setUexSyncedAt(syncedAt);
-      if (!Boolean.TRUE.equals(entity.getHasLoadingDockOverridden())) {
-        entity.setHasLoadingDock(Boolean.TRUE.equals(uexLoadingDock));
-      }
-      entity.setHasDockingPort(UexValues.asBooleanOrFalse(dto.hasDockingPort()));
-      entity.setHasFreightElevator(UexValues.asBooleanOrFalse(dto.hasFreightElevator()));
-      if (!Boolean.TRUE.equals(entity.getIsAutoLoadOverridden())) {
-        entity.setIsAutoLoad(Boolean.TRUE.equals(uexAutoLoad));
-      }
-      entity.setNickname(dto.nickname());
-      entity.setStarSystemName(dto.starSystemName());
-      entity.setPlanetName(dto.planetName());
-      entity.setOrbitName(dto.orbitName());
-      entity.setMoonName(dto.moonName());
-      entity.setSpaceStationName(dto.spaceStationName());
-      entity.setOutpostName(dto.outpostName());
-      entity.setCityName(dto.cityName());
-      entity.setFactionName(dto.factionName());
-      entity.setCompanyName(dto.companyName());
-      terminalRepository.save(entity);
-    }
+    // BE-PERF-09 / REQ-DATA-005: written after the fetch, in chunk transactions of their own;
+    // a chunk the database refuses is replayed row by row, so one bad row costs only itself.
+    chunkWriter.write(
+        dtos,
+        SyncChunkWriter.DEFAULT_CHUNK_SIZE,
+        chunk -> {
+          for (UexTerminalDto dto : chunk) {
+            if (dto.id() == null) {
+              continue;
+            }
+            Terminal entity =
+                terminalRepository
+                    .findByIdTerminal(dto.id())
+                    .orElseGet(
+                        () ->
+                            terminalRepository
+                                .findByName(dto.name())
+                                .map(
+                                    e -> {
+                                      e.setIdTerminal(dto.id());
+                                      return terminalRepository.save(e);
+                                    })
+                                .orElseGet(
+                                    () -> {
+                                      Terminal n = new Terminal();
+                                      n.setIdTerminal(dto.id());
+                                      n.setName(dto.name());
+                                      return terminalRepository.save(n);
+                                    }));
+            entity.setName(dto.name());
+            entity.setCode(dto.code());
+            // The terminal kind is what actually proves a refinery exists at the parent location;
+            // the
+            // parent's own has_refinery flag is unreliable upstream (REQ-REFINERY-020).
+            entity.setType(dto.type());
+            entity.setIsAvailableLive(dto.checkIsAvailableLive());
+            entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
+            entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
+            entity.setIsJumpPoint(UexValues.asBooleanOrFalse(dto.isJumpPoint()));
+            // The raw UEX state is recorded on every sweep, regardless of the override flags,
+            // so the admin UI can show what UEX currently claims even while a pin is active.
+            Boolean uexLoadingDock =
+                dto.hasLoadingDock() == null ? null : dto.hasLoadingDock() == 1;
+            Boolean uexAutoLoad = dto.isAutoLoad() == null ? null : dto.isAutoLoad() == 1;
+            entity.setUexHasLoadingDock(uexLoadingDock);
+            entity.setUexIsAutoLoad(uexAutoLoad);
+            entity.setUexSyncedAt(syncedAt);
+            if (!Boolean.TRUE.equals(entity.getHasLoadingDockOverridden())) {
+              entity.setHasLoadingDock(Boolean.TRUE.equals(uexLoadingDock));
+            }
+            entity.setHasDockingPort(UexValues.asBooleanOrFalse(dto.hasDockingPort()));
+            entity.setHasFreightElevator(UexValues.asBooleanOrFalse(dto.hasFreightElevator()));
+            if (!Boolean.TRUE.equals(entity.getIsAutoLoadOverridden())) {
+              entity.setIsAutoLoad(Boolean.TRUE.equals(uexAutoLoad));
+            }
+            entity.setNickname(dto.nickname());
+            entity.setStarSystemName(dto.starSystemName());
+            entity.setPlanetName(dto.planetName());
+            entity.setOrbitName(dto.orbitName());
+            entity.setMoonName(dto.moonName());
+            entity.setSpaceStationName(dto.spaceStationName());
+            entity.setOutpostName(dto.outpostName());
+            entity.setCityName(dto.cityName());
+            entity.setFactionName(dto.factionName());
+            entity.setCompanyName(dto.companyName());
+            terminalRepository.save(entity);
+          }
+          return chunk;
+        },
+        "terminal",
+        dto -> "(id=" + dto.id() + ")");
     log.info("Finished sync for Terminals.");
   }
 

@@ -262,4 +262,16 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
       """)
   java.util.List<MaterialPrice> findAllAutoLoadPricesInSystems(
       @Param("starSystems") java.util.Collection<String> starSystems);
+
+  /**
+   * The (material, terminal) key and id of every commodity price row. One query for the whole
+   * matrix; the UEX sync resolves "does this pair have a row yet" in memory instead of with a
+   * lookup per row (BE-PERF-09).
+   *
+   * @return one (parent id, terminal id, row id) row per matrix row
+   */
+  @Query(
+      "SELECT e.material.id AS parentId, e.terminal.id AS terminalId, e.id AS id FROM MaterialPrice"
+          + " e")
+  List<PairKeyRef> findPriceKeyRefs();
 }

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static de.greluc.krt.profit.basetool.backend.service.UexRefs.ref;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -51,6 +52,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -69,6 +71,9 @@ class UexItemSyncServiceTest {
   @Mock private ShipTypeRepository shipTypeRepository;
   @Mock private SyncReportService syncReportService;
   @Mock private ObjectProvider<UexItemSyncService> self;
+
+  /** A real chunk writer, so the rows are actually written through its callbacks (BE-PERF-09). */
+  @Spy private SyncChunkWriter chunkWriter = new SyncChunkWriter(new RecordingTransactionManager());
 
   @InjectMocks private UexItemSyncService service;
 
@@ -140,11 +145,15 @@ class UexItemSyncServiceTest {
     when(uexClient.getItemsForCategory(3)).thenReturn(fetched(helmet));
     when(gameItemRepository.findByUexItemId(42)).thenReturn(Optional.empty());
     when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
-    when(manufacturerAliasRepository.findManufacturerByUexCompanyId(1))
-        .thenReturn(Optional.of(rsi));
+    // BE-PERF-09: the company alias is read once per run into an id map, and the per-item
+    // transaction turns the id back into a reference — no per-item alias query.
+    when(manufacturerAliasRepository.findCompanyRefs()).thenReturn(List.of(ref(1, rsi.getId())));
+    when(manufacturerRepository.getReferenceById(rsi.getId())).thenReturn(rsi);
     when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
 
     service.syncItems();
+
+    verify(manufacturerAliasRepository, never()).findManufacturerByUexCompanyId(any());
 
     ArgumentCaptor<GameItem> saved = ArgumentCaptor.forClass(GameItem.class);
     verify(gameItemRepository).save(saved.capture());
@@ -581,6 +590,19 @@ class UexItemSyncServiceTest {
         Propagation.REQUIRES_NEW,
         tx.propagation(),
         "the per-item write must run in its own transaction so a collision isolates to one item");
+    // The run calls the overload that takes the preloaded lookups (BE-PERF-09); it must be
+    // REQUIRES_NEW just the same.
+    Transactional withLookups =
+        UexItemSyncService.class
+            .getMethod(
+                "upsertItemWithinTransaction",
+                UexItemDto.class,
+                UexCategory.class,
+                Instant.class,
+                UexItemSyncService.ItemLookups.class)
+            .getAnnotation(Transactional.class);
+    assertNotNull(withLookups);
+    assertEquals(Propagation.REQUIRES_NEW, withLookups.propagation());
   }
 
   @Test

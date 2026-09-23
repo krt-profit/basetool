@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.repository;
 
 import de.greluc.krt.profit.basetool.backend.model.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.model.ManufacturerUexCompany;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -49,4 +50,13 @@ public interface ManufacturerUexCompanyRepository
   @Query("SELECT a.manufacturer FROM ManufacturerUexCompany a WHERE a.uexCompanyId = :uexCompanyId")
   Optional<Manufacturer> findManufacturerByUexCompanyId(
       @Param("uexCompanyId") Integer uexCompanyId);
+
+  /**
+   * Every alias as a (UEX company id, manufacturer id) pair, in one query — the item sync resolves
+   * each row's manufacturer against the resulting map instead of per row (BE-PERF-09).
+   *
+   * @return one row per alias
+   */
+  @Query("SELECT a.uexCompanyId AS uexId, a.manufacturer.id AS id FROM ManufacturerUexCompany a")
+  List<UexKeyRef> findCompanyRefs();
 }

@@ -23,19 +23,26 @@ import de.greluc.krt.profit.basetool.backend.dto.uex.UexRefineryYieldDto;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexRefiningMethodDto;
 import de.greluc.krt.profit.basetool.backend.integration.UexClient;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
-import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.RefineryYield;
 import de.greluc.krt.profit.basetool.backend.model.RefiningMethod;
-import de.greluc.krt.profit.basetool.backend.model.Terminal;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryYieldRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.repository.TerminalRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -46,6 +53,12 @@ import org.springframework.transaction.annotation.Transactional;
  * commodity catalog and the universe sync are the single sources of truth for those tables. A yield
  * row with an unknown commodity or terminal id is silently skipped (the row gets retried on the
  * next sync once the parent catalog catches up).
+ *
+ * <p><strong>Transactions (BE-PERF-09, REQ-DATA-005).</strong> Both feeds are fetched with no
+ * transaction open and written through {@link SyncChunkWriter} — chunks in their own transactions,
+ * a failed chunk replayed row by row. The yield matrix resolves the material, the terminal and the
+ * existing yield row from three id maps read once per run instead of three lookups per row. The one
+ * audit summary per run is written in a transaction of its own, after the rows.
  */
 @Slf4j
 @Service
@@ -60,11 +73,14 @@ public class UexRefinerySyncService {
   private final TerminalRepository terminalRepository;
   private final AuditService auditService;
 
+  /** Writes the rows in short isolated transactions after the fetch (BE-PERF-09). */
+  private final SyncChunkWriter chunkWriter;
+
   /**
    * Syncs the {@code refining_method} table from UEX. Rows are upserted by name. Empty response or
-   * a row with blank name is silently skipped.
+   * a row with blank name is silently skipped. Holds no transaction across the fetch.
    */
-  @Transactional
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public void syncRefiningMethods() {
     log.info("Starting sync for Refining Methods...");
     List<UexRefiningMethodDto> dtos = uexClient.getRefineriesMethods();
@@ -74,55 +90,65 @@ public class UexRefinerySyncService {
       return;
     }
 
-    int added = 0;
-    int updated = 0;
-
-    for (UexRefiningMethodDto dto : dtos) {
-      if (dto.name() == null || dto.name().isBlank()) {
-        continue;
-      }
-
-      RefiningMethod entity =
-          refiningMethodRepository
-              .findByName(dto.name())
-              .orElseGet(
-                  () -> {
-                    RefiningMethod n = new RefiningMethod();
-                    n.setName(dto.name());
-                    return n;
-                  });
-
-      final boolean isNew = entity.getId() == null;
-
-      entity.setCode(dto.code());
-      entity.setRatingYield(dto.ratingYield());
-      entity.setRatingCost(dto.ratingCost());
-      entity.setRatingSpeed(dto.ratingSpeed());
-
-      refiningMethodRepository.save(entity);
-
-      if (isNew) {
-        added++;
-      } else {
-        updated++;
-      }
-    }
+    SyncChunkWriter.Outcome<Boolean> outcome =
+        chunkWriter.write(
+            dtos,
+            SyncChunkWriter.DEFAULT_CHUNK_SIZE,
+            chunk -> chunk.stream().map(this::upsertMethod).filter(r -> r != null).toList(),
+            "refining method",
+            dto -> "(code=" + dto.code() + ")");
+    int added = (int) outcome.results().stream().filter(Boolean::booleanValue).count();
+    int updated = outcome.results().size() - added;
     log.info("Finished UEX Refining Methods sync: {} added, {} updated", added, updated);
     // System-actor summary event (one per run, never per row); actor resolves to "system" as no
-    // security context exists on the scheduled path.
-    auditService.record(
-        AuditEventType.REFINERY_METHODS_SYNCED,
-        null,
-        null,
-        null,
-        AuditDetails.of("source", "UEX").with("added", added).with("updated", updated));
+    // security context exists on the scheduled path. AuditService.record is MANDATORY, so it gets
+    // a transaction of its own now that the sync holds none.
+    chunkWriter.inNewTransaction(
+        () ->
+            auditService.record(
+                AuditEventType.REFINERY_METHODS_SYNCED,
+                null,
+                null,
+                null,
+                AuditDetails.of("source", "UEX").with("added", added).with("updated", updated)));
+  }
+
+  /**
+   * Upserts one refining method by name inside the caller's chunk transaction.
+   *
+   * @param dto the inbound UEX row
+   * @return {@code true} when the row was created, {@code false} when it was updated, {@code null}
+   *     when it was skipped for a blank name
+   */
+  @Nullable
+  private Boolean upsertMethod(@NotNull UexRefiningMethodDto dto) {
+    if (dto.name() == null || dto.name().isBlank()) {
+      return null;
+    }
+    RefiningMethod entity =
+        refiningMethodRepository
+            .findByName(dto.name())
+            .orElseGet(
+                () -> {
+                  RefiningMethod n = new RefiningMethod();
+                  n.setName(dto.name());
+                  return n;
+                });
+    final boolean isNew = entity.getId() == null;
+    entity.setCode(dto.code());
+    entity.setRatingYield(dto.ratingYield());
+    entity.setRatingCost(dto.ratingCost());
+    entity.setRatingSpeed(dto.ratingSpeed());
+    refiningMethodRepository.save(entity);
+    return isNew;
   }
 
   /**
    * Syncs the {@code refinery_yield} matrix from UEX. Rows where the commodity or terminal id is
-   * unknown locally are silently skipped — the catalog parents own those tables.
+   * unknown locally are silently skipped — the catalog parents own those tables. Holds no
+   * transaction across the fetch.
    */
-  @Transactional
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public void syncRefineryYields() {
     log.info("Starting sync for Refinery Yields...");
     List<UexRefineryYieldDto> dtos = uexClient.getRefineriesYields();
@@ -132,41 +158,93 @@ public class UexRefinerySyncService {
       return;
     }
 
-    int processed = 0;
+    UexMatrixLookups lookups =
+        chunkWriter.inNewTransaction(
+            () ->
+                new UexMatrixLookups(
+                    materialRepository.findUexCommodityRefs(),
+                    terminalRepository.findUexTerminalRefs(),
+                    refineryYieldRepository.findYieldKeyRefs()));
+    SyncChunkWriter.Outcome<UUID> outcome =
+        chunkWriter.write(
+            dtos,
+            SyncChunkWriter.DEFAULT_CHUNK_SIZE,
+            chunk -> writeYieldChunk(chunk, lookups),
+            "refinery yield",
+            dto -> "(idCommodity=" + dto.idCommodity() + ", idTerminal=" + dto.idTerminal() + ")");
+    int processed = outcome.results().size();
+    log.info("Finished UEX Refinery Yields sync: Processed {} yields", processed);
+    chunkWriter.inNewTransaction(
+        () ->
+            auditService.record(
+                AuditEventType.REFINERY_YIELDS_SYNCED,
+                null,
+                null,
+                null,
+                AuditDetails.of("source", "UEX").with("processed", processed)));
+  }
 
-    for (UexRefineryYieldDto dto : dtos) {
+  /**
+   * Writes one chunk of yield rows inside its transaction: the chunk's existing rows load with one
+   * {@code findAllById}, the rest are created against {@code getReferenceById} parents. A row with
+   * a missing id or value, or an unknown commodity or terminal, is skipped — never a placeholder
+   * parent.
+   *
+   * @param chunk the rows of this chunk
+   * @param lookups the preloaded id maps, extended with every row written
+   * @return the ids of the yield rows written, one per row processed
+   */
+  @NotNull
+  private List<UUID> writeYieldChunk(
+      @NotNull List<UexRefineryYieldDto> chunk, @NotNull UexMatrixLookups lookups) {
+    List<UUID> existingIds = new ArrayList<>();
+    for (UexRefineryYieldDto dto : chunk) {
+      UUID materialId = lookups.parentId(dto.idCommodity());
+      UUID terminalId = lookups.terminalId(dto.idTerminal());
+      UUID yieldId =
+          materialId == null || terminalId == null ? null : lookups.rowId(materialId, terminalId);
+      if (yieldId != null) {
+        existingIds.add(yieldId);
+      }
+    }
+    Map<UUID, RefineryYield> existing =
+        existingIds.isEmpty()
+            ? Map.of()
+            : refineryYieldRepository.findAllById(existingIds).stream()
+                .collect(Collectors.toMap(RefineryYield::getId, Function.identity()));
+    Map<UexMatrixLookups.Pair, RefineryYield> written = new LinkedHashMap<>();
+    List<UexMatrixLookups.Pair> rowKeys = new ArrayList<>();
+    for (UexRefineryYieldDto dto : chunk) {
       if (dto.idCommodity() == null || dto.idTerminal() == null || dto.value() == null) {
         continue;
       }
-
-      Material material = materialRepository.findByIdCommodity(dto.idCommodity()).orElse(null);
-      Terminal terminal = terminalRepository.findByIdTerminal(dto.idTerminal()).orElse(null);
-
-      if (material == null || terminal == null) {
+      UUID materialId = lookups.parentId(dto.idCommodity());
+      UUID terminalId = lookups.terminalId(dto.idTerminal());
+      if (materialId == null || terminalId == null) {
         continue;
       }
-
-      RefineryYield entity =
-          refineryYieldRepository
-              .findByTerminalIdAndMaterialId(terminal.getId(), material.getId())
-              .orElseGet(
-                  () -> {
-                    RefineryYield n = new RefineryYield();
-                    n.setTerminal(terminal);
-                    n.setMaterial(material);
-                    return n;
-                  });
-
+      UexMatrixLookups.Pair key = new UexMatrixLookups.Pair(materialId, terminalId);
+      RefineryYield entity = written.get(key);
+      if (entity == null) {
+        UUID yieldId = lookups.rowId(materialId, terminalId);
+        entity = yieldId == null ? null : existing.get(yieldId);
+      }
+      if (entity == null) {
+        entity = new RefineryYield();
+        entity.setTerminal(terminalRepository.getReferenceById(terminalId));
+        entity.setMaterial(materialRepository.getReferenceById(materialId));
+      }
       entity.setYieldBonus(dto.value());
-      refineryYieldRepository.save(entity);
-      processed++;
+      written.put(key, entity);
+      rowKeys.add(key);
     }
-    log.info("Finished UEX Refinery Yields sync: Processed {} yields", processed);
-    auditService.record(
-        AuditEventType.REFINERY_YIELDS_SYNCED,
-        null,
-        null,
-        null,
-        AuditDetails.of("source", "UEX").with("processed", processed));
+    Map<UexMatrixLookups.Pair, UUID> savedIds = new LinkedHashMap<>();
+    for (Map.Entry<UexMatrixLookups.Pair, RefineryYield> entry : written.entrySet()) {
+      UUID id = refineryYieldRepository.save(entry.getValue()).getId();
+      lookups.rememberRow(entry.getKey().parentId(), entry.getKey().terminalId(), id);
+      savedIds.put(entry.getKey(), id);
+    }
+    // One result per row processed (the pre-2026-09-22 tally counted rows, not distinct pairs).
+    return rowKeys.stream().map(savedIds::get).toList();
   }
 }

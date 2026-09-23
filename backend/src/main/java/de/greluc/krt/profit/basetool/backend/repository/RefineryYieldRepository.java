@@ -63,4 +63,16 @@ public interface RefineryYieldRepository extends JpaRepository<RefineryYield, UU
       """)
   List<RefineryYield> findAllForLocation(
       @Param("cityName") String cityName, @Param("spaceStationName") String spaceStationName);
+
+  /**
+   * The (material, terminal) key and id of every refinery yield row. One query for the whole
+   * matrix; the UEX sync resolves "does this pair have a row yet" in memory instead of with a
+   * lookup per row (BE-PERF-09).
+   *
+   * @return one (parent id, terminal id, row id) row per matrix row
+   */
+  @Query(
+      "SELECT e.material.id AS parentId, e.terminal.id AS terminalId, e.id AS id FROM RefineryYield"
+          + " e")
+  List<PairKeyRef> findYieldKeyRefs();
 }
