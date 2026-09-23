@@ -203,6 +203,49 @@ mockito = "5.23.0"
 # Drop it once the catalog's `keycloak` resolves netty >= this version on its own (Quarkus 3.33.3.3
 # manages 4.1.138.Final; no Keycloak release uses it yet as of 2026-09-22).
 netty41 = "4.1.138.Final"
+# protobuf-java 3.x floor for the keycloak-spi module ONLY, the same construction as `netty41` above:
+# imported as a platform on the compileOnly and test classpaths, so it adds version constraints and
+# nothing reaches the provider JAR, its runtimeClasspath or its SBOM. Keycloak 26.7.4 -> Quarkus
+# 3.33.3.2 (quarkus-opentelemetry -> vertx-grpc -> grpc-protobuf 1.65.0) drags protobuf-java 3.25.1
+# onto them, which carries CVE-2024-7254 (unbounded recursion on nested groups, CVSS 7.5, Dependabot
+# alert #12), fixed in 3.25.5. 3.25.9 is the newest patch on the 3.25 line grpc 1.65 was built for,
+# so the floor stays on that line rather than jumping to 4.x. Drop it once `keycloak` resolves
+# protobuf-java >= 3.25.5 on its own (2026-09-23).
+protobuf3 = "3.25.9"
+# OpenTelemetry API/SDK floor for the keycloak-spi module ONLY, same construction again. Keycloak
+# 26.7.4 -> keycloak-server-spi-private and quarkus-opentelemetry pull the 1.57.0 family, and
+# opentelemetry-api <= 1.61.0 carries CVE-2026-45292 (W3C/Jaeger/OT baggage extraction without a
+# size or entry limit, Dependabot alert #14), fixed in 1.62.0. 1.62.0 is also exactly what the Boot
+# 4.1.1 BOM puts on the backend, frontend and ingest runtime classpaths, so the whole build resolves
+# one opentelemetry-api. The `-alpha` artifacts (opentelemetry-api-incubator 1.57.0-alpha) are not
+# in this BOM and stay where Keycloak puts them; no advisory names them. Drop the floor once
+# `keycloak` resolves >= 1.62.0 on its own (2026-09-23).
+opentelemetry = "1.62.0"
+# Build-classpath overrides, NOT dependencies of any module: both force a transitive of a Gradle
+# plugin on the buildscript classpath that loads it (constraint blocks in the named build scripts).
+# Nothing here ships or reaches an SBOM; they exist because the dependency-submission workflow puts
+# every build classpath into GitHub's dependency graph, and there Dependabot matched both.
+#   * handlebars -- openapi-generator 7.25.0 (the frontend's `org.openapi.generator` plugin) pins
+#     handlebars 4.3.1, which carries CVE-2026-55760 (FileTemplateLoader path traversal, CVSS 7.5,
+#     Dependabot alert #15), fixed in 4.5.2; 4.5.5 is the newest patch on that line. `handlebars-
+#     jackson2` stays at 4.3.1 -- its last release; `handlebars-jackson` succeeds it from 4.4.0 --
+#     and carries no advisory. 7.25.0 is the newest openapi-generator and upstream
+#     master still pins 4.3.1, so no plugin bump fixes it. The build generates with the default
+#     Mustache engine and never loads a Handlebars template. Drop it once the catalog's
+#     `openapiGenerator` brings handlebars >= 4.5.2 itself.
+#   * plexusUtils -- licensee 1.14.1 (the newest) -> maven-model-builder 3.9.11 pins plexus-utils
+#     3.6.0, which carries CVE-2025-67030 (Expand.extractFile directory traversal, Dependabot alert
+#     #13), fixed in 3.6.1. 3.6.1 is the version every subproject's buildscript classpath already
+#     resolves through the CycloneDX and Spring Boot plugins, so the root classpath -- which the
+#     subprojects' classloaders delegate to first -- now agrees with them. Drop it once `licensee`
+#     brings plexus-utils >= 3.6.1 itself.
+# refreshVersions will offer a major for two of these four, and neither is a drop-in: `protobuf3`
+# 4.x leaves the 3.x line grpc-protobuf 1.65 was built against, and `plexusUtils` 4.x moved the
+# `org.codehaus.plexus.util.xml` classes maven-model 3.9 needs into a separate `plexus-xml` artifact
+# (the Android app took 4.1.0 without it on 2026-09-04 and every Gradle invocation died with
+# NoClassDefFoundError). A floor only has to clear the advisory; stay on the lines above.
+handlebars = "4.5.5"
+plexusUtils = "3.6.1"
 
 [libraries]
 
@@ -243,6 +286,10 @@ keycloak-server-spi-private = { module = "org.keycloak:keycloak-server-spi-priva
 keycloak-services = { module = "org.keycloak:keycloak-services", version.ref = "keycloak" }
 keycloak-core = { module = "org.keycloak:keycloak-core", version.ref = "keycloak" }
 netty41-bom = { module = "io.netty:netty-bom", version.ref = "netty41" }
+protobuf3-bom = { module = "com.google.protobuf:protobuf-bom", version.ref = "protobuf3" }
+opentelemetry-bom = { module = "io.opentelemetry:opentelemetry-bom", version.ref = "opentelemetry" }
+handlebars = { module = "com.github.jknack:handlebars", version.ref = "handlebars" }
+plexus-utils = { module = "org.codehaus.plexus:plexus-utils", version.ref = "plexusUtils" }
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
 mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
