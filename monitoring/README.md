@@ -256,6 +256,7 @@ section above.
 | **DiscordPrecheckUnauthorizedSpike / DiscordPrecheckDisabledOnProd** | The Discord precheck is answering 401 at an elevated rate (secret guessing), or 503 with a blank secret (config drift — the SPI then fails open). |
 | **RateLimitRejectionRatioHigh** | More than 1% of rate-limit evaluations on one module/bucket are rejected. Check the source and whether the limit needs tuning. |
 | **KeycloakLoginErrorSpike / KeycloakErrorRateHigh / KeycloakEventMetricsAbsent** | Login errors jumped, Keycloak is logging ERRORs (check the fail-open Discord SPI path first), or the event counter is missing while Keycloak serves token traffic (check `KC_METRICS_ENABLED=true` in `.env` — the generated template defaults it to off). |
+| **JvmStartupCacheRejected** | A backend, frontend or ingest JVM refused the AOT cache baked into its image and started without it (`{app=~"(backend\|frontend\|ingest)-stdout"} \|~ "Unable to use AOT cache"`). The service is up, only slower to start. The usual cause is a `-XX:UseCompactObjectHeaders` in `JAVA_TOOL_OPTIONS` / `IRI_EXTRA_JAVA_OPTS` that differs from the image's (ADR-0180 rollback lever); expected while that lever is pulled on purpose, otherwise align the flag or rebuild the image (REQ-OPS-030, ADR-0209). |
 | **SshPasswordLoginOnKeyOnlyHost** | **CRITICAL — possible compromise.** Treat as an intrusion: review auth logs, lock the account, rotate keys. |
 | **SshFailedAuthSpike** | Failed SSH auth surge. Check source IPs; confirm fail2ban and firewalld are active. |
 | **SshRootLoginAccepted** | A successful **root** SSH login. Expected only for a deliberate operator session — confirm it was you; if not, treat it as compromise (review auth logs, rotate keys). |
@@ -512,7 +513,7 @@ collector otherwise reports the **old** CA's expiry until the next 03:40.
 `JvmNativeThreadExhaustion` (`loki/rules/fake/basetool-log-alerts.yml`) matches
 `pthread_create failed|unable to create native thread` in the `<svc>-stdout` streams. That wording is
 written by HotSpot and glibc outside logback and is **JVM-version-dependent**, so every bump of the
-`eclipse-temurin:25-jre-alpine` runtime digest in the three Dockerfiles owes a re-check — otherwise
+`eclipse-temurin:25-jre-alpine` runtime digest in `docker/app/Dockerfile` owes a re-check — otherwise
 the rule keeps parsing, keeps deploying and can never fire again. It was verified on
 `…@sha256:28db6fdf…` (2026-08-29) and **re-verified on `…@sha256:3137541d…` (Temurin 25.0.4+7) on
 2026-09-22**, the digest the Dockerfiles pin: steps 1–3 below, plus the stream check on production
@@ -530,6 +531,11 @@ On a workstation, never on production:
    phrase (they match a JWT, an e-mail address and a bearer/token/session-id keyword), and that the
    only `stage.drop` is still `older_than = "167h"`.
 4. Record the verified digest and date in the rule's comment and run `scripts/check-loki-rules.sh`.
+5. The same bump owes `JvmStartupCacheRejected` its re-check (same file, same stream): build an app
+   image on the new digest, start it with `JAVA_TOOL_OPTIONS=-XX:-UseCompactObjectHeaders` (the
+   image's cache is trained with the flag on), and compare the `[aot]` lines it prints with the
+   filter. Any re-recorded line goes into `scripts/check-loki-rule-signatures.py`, which also holds
+   the recorded lines of step 2 — run it after either change.
 
 For an end-to-end check, provoke it on the isolated test stack (`.env.test`, lowered `pids` limit on
 one app service), confirm the line appears in Loki under `{app="<svc>-stdout"}` and not only in the

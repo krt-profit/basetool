@@ -957,7 +957,7 @@ and its measured revisions in [ADR-0085](../adr/0085-scale-user-sync-and-stack-c
   round-number bump, or "to be safe", without a measurement.
 - The sum of limits is recomputed and recorded whenever any limit changes.
 
-### REQ-OPS-021 — One build per commit; the release tag re-tags what main already produced
+### REQ-OPS-021 — One build per change of the image inputs; the release tag and input-free main pushes re-tag
 
 A release fires `release-images.yml` **twice for one commit**: the release PR merges to `main`, then
 `release-publish.yml` tags that same merge commit `vX.Y.Z`. Both pushes are wanted — the first
@@ -1011,6 +1011,38 @@ scanned by the main run under the same SARIF categories. The `basetool-config` a
 images off the critical path, and leaving them alone keeps the reuse logic confined to the three
 app images.
 
+**A `main` push that changes no image input re-tags the previous `main` build** (CI-07, 2026-09-23,
+[ADR-0210](../adr/0210-a-main-push-that-changes-no-image-input-re-tags-the-previous-build.md)).
+Most of what lands on `main` — documentation, specs, tests, monitoring, compose, other workflows —
+changes no byte of an image, and each such push used to rebuild all three on six runners. The `plan`
+job's main path applies only to a `push` on `refs/heads/main`, and admits reuse only when **every**
+gate passes:
+
+1. `.github/scripts/image_reuse_plan.py` finds **no image input** among the files changed between
+   `github.event.before` and the pushed commit. An image input is, precisely: every build-context path
+   a `COPY` in `docker/app/Dockerfile` reads (parsed, with `${MODULE}` expanded to all three modules —
+   today the Gradle wrapper and `gradle/` including the version catalog and
+   `verification-metadata.xml`, the root build scripts and `gradle.properties`, all six module build
+   scripts, the `src/main` of backend, frontend, ingest and logging-support, and
+   `frontend/oss-bundled-components.json`); the Dockerfile itself (which pins both base-image
+   digests); the root `.dockerignore`; `release-images.yml`; `.github/actions/setup-buildx/`; and
+   `.github/scripts/app_version.py`. A base that is missing, all-zero or not an ancestor of the pushed
+   commit is a build;
+2. the range contains **no release commit** (no new dated CHANGELOG section) — a release commit is
+   always built;
+3. `:sha-<short>` of the previous tip resolves for all three images, each index carries both
+   architectures, and each digest cosign-verifies against this workflow's identity pinned to
+   `refs/heads/main` (the tag path's gates 3–5);
+4. each candidate was **built within the last 7 days** (`org.opencontainers.image.created`), because
+   the runtime stage's `apk upgrade` makes an image only as patched as its build day.
+
+Reuse is decided for the three images together. `merge` applies `:edge` and this commit's
+`:sha-<short>` to the verified digests and signs them; `scan` is skipped (the digest was scanned when
+it was built, at most seven days earlier, and `promote.yml` rescans before any promotion). A
+re-tagged image's `org.opencontainers.image.revision` label, buildx provenance and the frontend's
+version chip name **the commit that built it** — whose bytes are, by gate 1, what the tagging commit
+would have built.
+
 The image build carries **no BuildKit layer cache**. `cache-to: type=gha,mode=max` wrote ~5.3 GB per
 release across six scopes; with CodeQL, the `ci.yml` Gradle caches and the Trivy DB the repository
 sat at 10.5 GB against GitHub's 10 GB per-repo limit, so LRU eviction removed each run's blobs before
@@ -1039,8 +1071,16 @@ produced artifact.
   limit — at the quota, a new cache consumer only degrades every existing one.
 - [ ] Trivy runs in its own job, not inside `build`: a failure of the scan action or of the SARIF
   upload must not skip `merge` and cost the release its tags and signature.
+- [x] A `main` push whose range changes no image input, contains no release commit, and whose
+  predecessor's three images verify and are at most 7 days old re-tags them; any other `main` push
+  builds. `image_reuse_plan.py --selftest` pins the git half and runs in `repo-lint.yml`; the plan
+  script was exercised against stubbed registry answers for every gate (2026-09-23), and
+  `image_reuse_plan.py --dry-run 30` replays the decision over recent `main` history (7 of 30 re-tag
+  on 2026-09-23).
 
-**Enforced by:** `.github/workflows/release-images.yml` (`plan`, `build`, `scan`, `merge`) · **Decision:** [ADR-0137](../adr/0137-one-image-build-per-commit-and-no-buildkit-layer-cache.md)
+**Enforced by:** `.github/workflows/release-images.yml` (`plan`, `build`, `scan`, `merge`) ·
+`.github/scripts/image_reuse_plan.py` · **Decision:** [ADR-0137](../adr/0137-one-image-build-per-commit-and-no-buildkit-layer-cache.md),
+[ADR-0210](../adr/0210-a-main-push-that-changes-no-image-input-re-tags-the-previous-build.md)
 
 ### REQ-OPS-022 — Non-production environments are fed by their own promotion channel
 
@@ -1619,7 +1659,7 @@ generated one is a silent-drift machine — did not stop at the artifacts themse
 `.github/scripts/check_sbom_coverage.py` · `.github/workflows/repo-lint.yml` (`sbom-coverage`) ·
 **Related:** REQ-OPS-025 (the set it mirrors), REQ-OPS-023 (provenance for those same assets)
 
-### REQ-OPS-030 — The object layout is set once and matched by the baked CDS archive
+### REQ-OPS-030 — The object layout is set once and matched by the baked startup cache
 
 All three application JVMs run **`-XX:+UseCompactObjectHeaders`** (64-bit object headers instead of
 96-bit), a product option since JDK 25 (JEP 519) and the default from JDK 27 (JEP 534). It is taken
@@ -1628,19 +1668,33 @@ on the LTS the stack already runs rather than waited for, because the stack is m
 
 **The flag is set in two places and both are mandatory:**
 
-|                            Place                            |                              Why                              |
-|-------------------------------------------------------------|---------------------------------------------------------------|
-| `docker-compose.yml` → each `JAVA_TOOL_OPTIONS`             | The runtime layout; beside the collector flag of REQ-OPS-028  |
-| `<module>/Dockerfile` → the `-XX:ArchiveClassesAtExit` line | The AppCDS training run, which cannot see `JAVA_TOOL_OPTIONS` |
+|                               Place                               |                               Why                                |
+|-------------------------------------------------------------------|------------------------------------------------------------------|
+| `docker-compose.yml` / `quadlet/env.d` → each `JAVA_TOOL_OPTIONS` | The runtime layout; beside the collector flag of REQ-OPS-028     |
+| `docker/app/Dockerfile` → `layout=` in the AOT-cache training run | The image build's training run, which cannot see `JAVA_TOOL_OPTIONS` |
 
-A CDS archive records the object layout it was dumped with and the JVM validates it at startup, so
-the two settings must agree. They cannot be kept in step by accident: the training run happens during
-the **image build**, where `JAVA_TOOL_OPTIONS` is not set, and a mismatch is **not** caught by the
-`ENTRYPOINT`'s fallback — that tests whether the `.jsa` *exists*, and it does. The JVM prints
-`The shared archive file's UseCompactObjectHeaders setting (disabled) does not equal the current
-UseCompactObjectHeaders setting (enabled)` followed by `Loading dynamic archive failed`, and then
-**starts normally without CDS**. Setting the flag on one side only therefore trades the 30–50 %
-startup saving away silently, with nothing failing anywhere. The check rules in both directions.
+Each image carries a startup cache created during its build — since 2026-09-23 the Java 25 **AOT
+cache** `/app/app.aot` (ADR-0209), before that a dynamic AppCDS archive `/app/application.jsa`. The
+cache records the object layout it was created with and the JVM validates it at startup, so the two
+settings must agree. They cannot be kept in step by accident: the training run happens during the
+**image build**, where `JAVA_TOOL_OPTIONS` is not set. A JVM started with the other layout prints
+`Unable to use AOT cache. The AOT cache's UseCompactObjectHeaders setting (enabled) does not equal
+the current UseCompactObjectHeaders setting (disabled)` and **starts normally without the cache**
+(the AppCDS wording was `Unable to use shared archive file` / `Loading dynamic archive failed`).
+Setting the flag on one side only therefore costs the startup saving — measured on the three images
+in ADR-0209 — with nothing failing. The check rules in both directions.
+
+**Both halves of that failure are now detected** (IMG-CI-13, 2026-09-23):
+
+- **At build time.** The training run must complete the context refresh, the cache must be written,
+  and a second start under `-XX:AOTMode=on` with the image's own layout must accept it — otherwise
+  the image build fails. Until 2026-09-23 the AppCDS run was best-effort (`|| true`, an entrypoint
+  that only tested whether the archive *existed*), and the backend and frontend training runs had in
+  fact been dying at the missing keystore for as long as that code existed, unnoticed.
+- **At run time.** A deployment that starts with a different layout — including the documented
+  rollback `IRI_EXTRA_JAVA_OPTS=-XX:-UseCompactObjectHeaders` — writes the lines above to its
+  `<svc>-stdout` stream, and the Loki rule **`JvmStartupCacheRejected`** (warning) fires on them.
+  `scripts/check-loki-rule-signatures.py` holds the rule to the verbatim lines.
 
 **The heap saving does not license a smaller budget until it is measured.** Every figure in the
 `JVM CONTAINER SIZING` block of `docker-compose.yml` was measured with 96-bit headers and is the
@@ -1653,23 +1707,36 @@ on two different collectors).
 
 - [x] `backend`, `frontend` and `ingest` each pass `-XX:+UseCompactObjectHeaders` in
   `JAVA_TOOL_OPTIONS`.
-- [x] Each module's `Dockerfile` passes the same flag on its AppCDS training run, and both sides
-  carry a comment naming the other.
+- [x] The image's training run passes the same flag, and both sides carry a comment naming the
+  other.
+- [x] The image build fails when the training run does not complete the context refresh, when no
+  cache is written, or when a start under `-XX:AOTMode=on` with the image's layout refuses the cache
+  (verified 2026-09-23 with two deliberately broken ingest builds — a verifying start under the
+  other layout, and a training run without its JWK-set stub — each failed with its `[AOT] FAILED`
+  message).
+- [x] `JvmStartupCacheRejected` fires on the JVM's rejection lines and stays silent on an accepted
+  start (`check-loki-rule-signatures.py`, run in `repo-lint.yml`).
 - [x] No memory limit and no `MaxRAMPercentage` changed in the same unit of work.
-- [x] No monitoring change is required: `jvm_memory_*` and the container working-set alert are the
-  measurement instrument, and the 90 % `ContainerMemoryHigh` line can only move further away.
+- [x] No change to the memory monitoring is required: `jvm_memory_*` and the container working-set
+  alert are the measurement instrument, and the 90 % `ContainerMemoryHigh` line can only move
+  further away.
 - [ ] Re-measured on production after a full week under the new layout, with the snapshot queries in
   `monitoring/README.md`, and the new table written into the `JVM CONTAINER SIZING` block. Freed
   headroom may be spent only after that.
 
-**Code:** `docker-compose.yml` (each service's `JAVA_TOOL_OPTIONS`) · `backend/Dockerfile` ·
-`frontend/Dockerfile` · `ingest/Dockerfile` · **Decision:**
-[ADR-0180](../adr/0180-compact-object-headers-on-java-25.md) · **Related:** REQ-OPS-028 (the other
-JVM flag, same file, same failure class), REQ-OPS-020 (the measured limits this must not pre-empt)
+**Code:** `docker-compose.yml` and `quadlet/env.d/*.env.tmpl` (each service's `JAVA_TOOL_OPTIONS`) ·
+`docker/app/Dockerfile` (the training `RUN`) · `monitoring/loki/rules/fake/basetool-log-alerts.yml`
+(`JvmStartupCacheRejected`) · **Decision:**
+[ADR-0180](../adr/0180-compact-object-headers-on-java-25.md),
+[ADR-0209](../adr/0209-the-images-ship-a-java-aot-cache-trained-eagerly-and-verified-at-build.md) ·
+**Related:** REQ-OPS-028 (the other JVM flag, same file, same failure class), REQ-OPS-020 (the
+measured limits this must not pre-empt)
 
 ### REQ-OPS-031 — The image build leaves nothing root-owned behind, and the image starts unmounted
 
-The AppCDS training run of REQ-OPS-030 is a **real application start**, so Logback builds every
+The startup-cache training run of REQ-OPS-030 is a **real application start** — since 2026-09-23 two
+of them, the training run and the start under `-XX:AOTMode=on` that verifies its cache — so Logback
+builds every
 appender `logback-spring.xml` declares and creates `logs/<svc>.log` and `logs/<svc>-error.log`
 relative to `WORKDIR /app`. It runs *before* `USER 10001:10001`, and a `USER` switch does not change
 an existing file's owner — so without cleanup those files ship inside the image owned by `root`.
@@ -1678,7 +1745,9 @@ an existing file's owner — so without cleanup those files ship inside the imag
 whole requirement: a later `RUN rm` only stacks a whiteout on top and still ships the bytes
 underneath, so "cleaned up afterwards" would leave the payload in the published image and merely
 hide it. `/app/logs` itself must survive, owned by `10001:10001` — it is the mount point the compose
-templates bind `/var/iri/<svc>/log` over.
+templates bind `/var/iri/<svc>/log` over. The same `RUN` also removes the empty, root-owned
+`/tmp/tomcat.*` and `/tmp/tomcat-docbase.*` working directories each start leaves behind (found
+2026-09-23; every image since the training run existed carried two of them).
 
 **The property this protects is that a published image starts with nothing mounted over it.** The
 baked files broke it, in a way that reads as an application defect: `/app/logs` *is* writable by the
@@ -1713,14 +1782,16 @@ reads an empty value as *no explicit config* and falls back to the classpath `lo
   were the only instance of it.
 - [x] `docker run` on the image with **no** `/app/logs` mount gets past Logback — it fails on missing
   configuration, not on `(Permission denied)`.
-- [x] The training run's flags are unchanged, so the REQ-OPS-030 archive stays representative: the
-  classes the runtime loads at startup are the classes training loaded.
+- [x] The training run keeps the full logging configuration, so the REQ-OPS-030 cache stays
+  representative: the appender and masking classes every real startup loads are in it. (The other
+  training flags changed on 2026-09-23 — an eager refresh with per-module stubs instead of
+  `lazy-initialization`, ADR-0209.)
 - [ ] The `find /app -user 0` assertion runs in `release-images.yml` against the built image, so a
   future build-stage side effect fails the build instead of waiting to be noticed. Not built — today
-  the guarantee rests on the three `Dockerfile`s and this requirement.
+  the guarantee rests on `docker/app/Dockerfile` and this requirement.
 
-**Code:** `backend/Dockerfile` · `frontend/Dockerfile` · `ingest/Dockerfile` (the
-`-XX:ArchiveClassesAtExit` `RUN` in each) · **Related:** REQ-OPS-030 (the training run this cleans up
+**Code:** `docker/app/Dockerfile` (the training `RUN`; one file for all three images since
+2026-09-23) · **Related:** REQ-OPS-030 (the training run this cleans up
 after, and the same silent-degradation failure class), REQ-OPS-014 (the runtime posture the fixed
 UID/GID serves)
 
@@ -1827,7 +1898,8 @@ archive the frontend's linters run on — and Gradle refuses an artifact whose b
 that has no entry at all, before it is used.
 
 - **Strict everywhere a product is built**: CI, the E2E and PIT workflows, the three image builds
-  (they copy `gradle/` already) and the release workflows run in the default strict mode.
+  (`docker/app/Dockerfile` copies `gradle/`; verified strict on an empty cache in all three builds
+  on 2026-09-23) and the release workflows run in the default strict mode.
   `dependency-submission.yml` alone runs lenient — it ships nothing, and its action injects an
   init-script plugin the file does not describe.
 - **Checksums only.** PGP signatures are not verified (ADR-0208 says why and when to revisit).
@@ -1852,7 +1924,7 @@ that has no entry at all, before it is used.
   "Dependency verification failed" (the negative case, run once at introduction).
 
 **Enforced by:** `gradle/verification-metadata.xml` (every Gradle invocation) · `ci.yml`,
-`e2e.yml`, `pitest.yml`, `release-images.yml`, the three `Dockerfile`s (strict by default) ·
+`e2e.yml`, `pitest.yml`, `release-images.yml`, `docker/app/Dockerfile` (strict by default) ·
 **Decision:** [ADR-0208](../adr/0208-gradle-verifies-every-dependency-against-a-committed-sha-256.md)
 · **Related:** REQ-OPS-025 (the SBOMs describing what these artifacts become), REQ-OPS-021 (one
 image build per commit)

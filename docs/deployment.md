@@ -72,6 +72,11 @@ disaster recovery: [`backup.md`](backup.md). The monitoring plane:
   `keycloak-theme`, `monitoring` and **`quadlet/`** — the unit files and their `env.d` templates.
   It is promoted in lock-step with the app images and the `basetool-keycloak-spi` JAR bundle
   (ADR-0055), so a promoted unit change reaches the host by the next tick.
+- **The three app images are one Dockerfile (ADR-0209).** `docker/app/Dockerfile`, built with
+  `--build-arg MODULE=backend|frontend|ingest` from the repository root. Each image carries a Java
+  AOT cache its build verified; a host that starts one with a different
+  `-XX:UseCompactObjectHeaders` (for instance the ADR-0180 rollback through `IRI_EXTRA_JAVA_OPTS`)
+  starts without the cache — slower, not broken — and `JvmStartupCacheRejected` says so.
 - **Provisioning is separate from delivery (ADR-0188).** Packages, users, directories, SELinux,
   firewall, haproxy, the host monitoring services and the operational scripts and timers come from
   the Ansible role in [`ansible/`](../ansible/README.md), run by an operator. It never deploys a
@@ -411,7 +416,9 @@ Two phases, PR-based; no hand-pushed tag, no tag ever moved.
 
 The tag run **does not rebuild**: it cosign-verifies and re-tags the `:sha-<short>` digest `main`
 already built, so `:X.Y.Z` and `:sha-<short>` are the same bytes (REQ-OPS-021, ADR-0137). Any doubt
-falls back to a full build. The tag is created with a short-lived token of the **`basetool-release`
+falls back to a full build. A `main` push that changes no image input does the same with the previous
+`main` build (ADR-0210) — so an `:edge` or `:sha-<short>` image can carry an earlier commit's
+revision label and version chip; the release commit itself is always built. The tag is created with a short-lived token of the **`basetool-release`
 GitHub App** (ADR-0201), minted from the secret `RELEASE_APP_PRIVATE_KEY`: the tag ruleset "Version"
 lets only that App and @greluc create `v*` tags, and an App token's events trigger
 `release-images.yml` where `GITHUB_TOKEN`'s would not. There is no fallback — without the key the
@@ -736,6 +743,12 @@ the target has. Run it on a **new** host's realm, and on the **testing** host wh
 lines. The procedure, and the `.env` values a newly created confidential client needs, are in
 [`INGEST_KEYCLOAK_SETUP.md` → *New or out-of-date realm*](INGEST_KEYCLOAK_SETUP.md#new-or-out-of-date-realm-run-the-provisioner).
 On production an `--apply` is a gated write like any other.
+
+**The frontend's client type** (public or confidential, ADR-0001) is changed only by
+`--frontend-client public|confidential`; a run without it leaves the type as it is. The switch to
+confidential is a two-step owner rollout with no login window — the frontend receives
+`KEYCLOAK_FRONTEND_CLIENT_SECRET` first, then the provisioner flips Keycloak with the same value:
+[`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md).
 
 The backend refuses to start under `prod` without `IRI_BACKEND_EXPECTED_AUDIENCES`, and the
 frontend's token carries that audience only once the realm is in shape — so on a host whose realm

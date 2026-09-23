@@ -225,14 +225,19 @@ public class MissionService {
   }
 
   /**
-   * Returns the mission.
+   * Returns the mission with the graph its detail DTO reads already loaded: the participants and
+   * their three to-ones through {@code findById}'s entity graph, the units and theirs through
+   * {@link MissionRepository#fetchAssignedUnitGraph(UUID)} into the same persistence context
+   * (BE-PERF-11). Only the detail GET calls it, from inside the controller's transaction.
    *
    * @param id mission primary key
    * @return the mission
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no match
    */
   public Mission getMissionById(@NotNull UUID id) {
-    return Entities.require(missionRepository.findById(id), "Mission not found");
+    Mission mission = Entities.require(missionRepository.findById(id), "Mission not found");
+    missionRepository.fetchAssignedUnitGraph(id);
+    return mission;
   }
 
   /**

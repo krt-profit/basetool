@@ -768,9 +768,10 @@ x-backend: &backend-template
     #
     # -XX:+UseCompactObjectHeaders added 2026-09-15 (ADR-0180): 64-bit instead of 96-bit object
     # headers. A product option since JDK 25 (JEP 519) and the default from JDK 27 (JEP 534), so this
-    # takes the heap saving on the LTS the stack already runs. It MUST match the flag on the AppCDS
-    # training run in `backend/Dockerfile` — the archive records the setting and a mismatch makes the
-    # JVM reject it while starting normally, i.e. AppCDS would be lost with no failure anywhere.
+    # takes the heap saving on the LTS the stack already runs. It MUST match the flag on the AOT-cache
+    # training run in `docker/app/Dockerfile` — the cache records the setting and a mismatch makes the
+    # JVM reject it while starting normally (since 2026-09-23 the Loki rule JvmStartupCacheRejected
+    # says so; before that the startup saving was lost with no signal anywhere).
     JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:+UseG1GC -XX:+UseCompactObjectHeaders -XX:MaxRAMPercentage=57.0 -XX:InitialRAMPercentage=35.0 ${IRI_EXTRA_JAVA_OPTS:-}
   volumes:
     - /var/iri/backend/log:/app/logs
@@ -1062,6 +1063,12 @@ x-frontend: &frontend-template
     APP_LOGGING_SLOW_REQUEST_THRESHOLD_MS: ${APP_LOGGING_SLOW_REQUEST_THRESHOLD_MS:-2000}
     # Derived from KC_HOSTNAME — see the rationale on the backend template's KEYCLOAK_ISSUER_URI.
     KEYCLOAK_ISSUER_URI: ${IRI_KEYCLOAK_ISSUER_URI:-${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/iri}
+    # ADR-0001 / REQ-SEC-069: set, the frontend logs in as a CONFIDENTIAL client (client secret +
+    # PKCE); empty, as the public client it has always been. Deliberately optional (`:-`, not `:?`):
+    # merging and deploying this changes nothing until the owner puts the secret into the host .env,
+    # and the order of that and the Keycloak switch does not matter (Keycloak ignores a secret sent
+    # by a client it still considers public) -- docs/OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md.
+    KEYCLOAK_FRONTEND_CLIENT_SECRET: ${KEYCLOAK_FRONTEND_CLIENT_SECRET:-}
     BACKEND_URL: https://backend:11261
     # The frontend->backend transport levers (ADR-0161 8.1 / 8.5, REQ-API-011). Listed here because
     # this block is a CLOSED ALLOW-LIST and there is no `env_file:` anywhere: a variable that is not
@@ -1114,7 +1121,7 @@ x-frontend: &frontend-template
     # limit → 640M ceiling`, which the limit change in that same commit had already superseded.)
     #
     # -XX:+UseCompactObjectHeaders added 2026-09-15 (ADR-0180) — see the backend block for the full
-    # rationale. It MUST match the flag on the AppCDS training run in `frontend/Dockerfile`.
+    # rationale. It MUST match the flag on the AOT-cache training run in `docker/app/Dockerfile`.
     JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:+UseG1GC -XX:+UseCompactObjectHeaders -XX:MaxRAMPercentage=50.0 -XX:InitialRAMPercentage=35.0 ${IRI_EXTRA_JAVA_OPTS:-}
   volumes:
     - /var/iri/frontend/log:/app/logs
@@ -1299,7 +1306,7 @@ x-ingest: &ingest-template
     # rationale. The saving is smallest here in absolute terms and the flag is still set, because the
     # object layout is a property of the STACK and not of one service: three JVMs on one layout is
     # one thing to reason about, and it is the layout JDK 27 will impose anyway. It MUST match the
-    # flag on the AppCDS training run in `ingest/Dockerfile`.
+    # flag on the AOT-cache training run in `docker/app/Dockerfile`.
     JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:+UseSerialGC -XX:+UseCompactObjectHeaders -XX:MaxRAMPercentage=60.0 -XX:InitialRAMPercentage=50.0 ${IRI_EXTRA_JAVA_OPTS:-}
   volumes:
     # This service's OWN key (REQ-SEC-TBD04T): unset it is the shared keystore, as it always was;

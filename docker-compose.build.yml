@@ -45,13 +45,17 @@
 x-backend-build: &backend-build
   build:
     context: .
-    dockerfile: backend/Dockerfile
+    dockerfile: docker/app/Dockerfile
+    args:
+      MODULE: backend
   image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-profit}/basetool-backend:${IRI_BASETOOL_VERSION:-local}
 
 x-frontend-build: &frontend-build
   build:
     context: .
-    dockerfile: frontend/Dockerfile
+    dockerfile: docker/app/Dockerfile
+    args:
+      MODULE: frontend
   image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-profit}/basetool-frontend:${IRI_BASETOOL_VERSION:-local}
 
 # Watch specs are service-specific (they reference module source roots), so
@@ -85,7 +89,9 @@ x-frontend-watch: &frontend-watch
 x-ingest-build: &ingest-build
   build:
     context: .
-    dockerfile: ingest/Dockerfile
+    dockerfile: docker/app/Dockerfile
+    args:
+      MODULE: ingest
   image: ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-profit}/basetool-ingest:${IRI_BASETOOL_VERSION:-local}
 
 x-ingest-watch: &ingest-watch

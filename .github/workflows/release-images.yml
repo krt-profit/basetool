@@ -22,11 +22,14 @@ name: Release Images
 #      spend a second full pipeline reproducing images that already existed.
 #      On a tag push `plan` resolves `:sha-<short>` for all three app images,
 #      cosign-verifies each against this workflow's main-branch identity, and
-#      asserts the index really carries both linux/amd64 and linux/arm64. Only
-#      if EVERY check passes does it emit `reuse=true`; anything else — a
-#      missing tag, a failed signature, a one-armed index, a
-#      `workflow_dispatch` rebuild, a main-branch push — falls back to a full
-#      build. Fail-safe by construction: the doubt case is always "build".
+#      asserts the index really carries both linux/amd64 and linux/arm64. On a
+#      main push (ADR-0210) it first asks .github/scripts/image_reuse_plan.py
+#      whether the pushed range changes any image input; if not, the same gates
+#      run against the previous main tip's `:sha-<short>`, plus an age limit.
+#      Only if EVERY check passes does it emit `reuse=true`; anything else — a
+#      changed input, a release commit, a missing tag, a failed signature, a
+#      one-armed index, a stale image, a `workflow_dispatch` rebuild — falls back
+#      to a full build. Fail-safe by construction: the doubt case is "build".
 #   1. `build` matrix (6 jobs, fully parallel): one job per (module, platform),
 #      skipped entirely when `plan` said reuse. Each runs natively on the
 #      matching architecture's runner — linux/amd64 on the regular
@@ -34,7 +37,7 @@ name: Release Images
 #      `ubuntu-24.04-arm` fleet — and pushes the resulting image to GHCR
 #      **by digest** only (no tag). The previous all-in-one matrix went
 #      through qemu-aarch64 emulation for the arm64 stage and was ~3-6x
-#      slower than amd64 because every javac / Gradle / AppCDS JVM invocation
+#      slower than amd64 because every javac / Gradle / AOT-training JVM invocation
 #      ran translated. With native runners both architectures finish in
 #      roughly the same wall time.
 #   2. `merge` matrix (3 jobs, one per module): assembles a multi-arch OCI
@@ -210,31 +213,38 @@ jobs:
           esac
 
   # Decide whether this run has to build the three app images at all, or whether
-  # it may re-tag the already-built, already-signed index the main-branch run
-  # produced for the very same commit (REQ-OPS-021, ADR-0137).
+  # it may re-tag images an earlier run already built and signed (REQ-OPS-021,
+  # ADR-0137, ADR-0210). Two reuse paths, one set of registry gates:
   #
-  # Why this exists: a release fires this workflow twice for ONE commit — the
-  # release commit lands on `main`, then release-publish.yml tags that same merge
-  # commit `vX.Y.Z`. The `release-images-${{ github.sha }}` concurrency group
-  # serialises the pair on purpose (see its comment above), so the two pipelines
-  # ADD UP: v1.5.53 spent 6:56 on the main run and another 11:40 on the tag run
-  # to produce bit-equivalent images. The tag run's only real product is the set
-  # of semver tags, and `imagetools create` applies those to an existing digest
-  # without moving a single layer — which is exactly what promote.yml already
-  # does for `:stable`.
+  #   TAG PATH — a release fires this workflow twice for ONE commit: the release
+  #   commit lands on `main`, then release-publish.yml tags that same merge commit
+  #   `vX.Y.Z`. The `release-images-${{ github.sha }}` concurrency group serialises
+  #   the pair on purpose (see its comment above), so the two pipelines ADD UP:
+  #   v1.5.53 spent 6:56 on the main run and another 11:40 on the tag run to
+  #   produce bit-equivalent images. The tag run re-tags `:sha-<short>` of its own
+  #   commit instead.
+  #
+  #   MAIN PATH (CI-07, ADR-0210) — a main push whose range changes no image input
+  #   re-tags `:sha-<short>` of the previous main tip (`github.event.before`).
+  #   What counts as an image input is decided by .github/scripts/image_reuse_plan.py,
+  #   which derives it from docker/app/Dockerfile's COPY lines plus the Dockerfile,
+  #   .dockerignore, this workflow, the BuildKit carrier and app_version.py. A range
+  #   containing a release commit always builds.
   #
   # Reuse is gated on several independent conditions, ALL of which must hold. The
   # decision defaults to "build" and only ever moves to "reuse" on a complete
   # positive result, so every failure mode — registry hiccup, unsigned image,
-  # half-pushed index, unexpected tag shape — degrades to today's behaviour
-  # rather than to a bad release.
+  # half-pushed index, unexpected tag shape, a git question the script cannot
+  # answer — degrades to a full build rather than to a bad image.
   plan:
     name: Plan (rebuild or reuse)
     needs: ref-guard
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Reads only: resolves tags and verifies signatures of the private packages.
+    # Reads only: the checkout for the main path's diff, and the private packages'
+    # tags and signatures.
     permissions:
+      contents: read
       packages: read
 
     outputs:
@@ -247,23 +257,34 @@ jobs:
       # `{}` when not reusing. The merge job re-tags THIS digest — the one that
       # was verified — so no window opens between the check and the use.
       digests: ${{ steps.decide.outputs.digests }}
-      # The `:sha-<short>` tag the reuse candidate was resolved from, surfaced
-      # for the step summary and for debugging a reuse that did not happen.
-      source_tag: ${{ steps.source-tag.outputs.version }}
+      # The `:sha-<short>` tag the reuse candidate was resolved from — this
+      # commit's on the tag path, the previous main tip's on the main path —
+      # surfaced for the step summary and for debugging a reuse that did not happen.
+      source_tag: ${{ steps.decide.outputs.source_tag }}
 
     steps:
-      # Derive the `:sha-<short>` tag through metadata-action itself rather than
-      # slicing `github.sha` by hand. The merge job below writes that tag with
-      # the same action and the same `type=sha,prefix=sha-,format=short` rule;
-      # deriving it twice from one implementation means the reuse lookup and the
-      # tag it looks up cannot drift if the action ever changes its short-sha
-      # width. With a single tag rule configured, `outputs.version` IS that tag.
+      # Derive the `:sha-<short>` tag of THIS commit through metadata-action itself
+      # rather than slicing `github.sha` by hand. The merge job below writes that
+      # tag with the same action and the same `type=sha,prefix=sha-,format=short`
+      # rule; deriving it twice from one implementation means the reuse lookup and
+      # the tag it looks up cannot drift if the action ever changes its short-sha
+      # width. With a single tag rule configured, `outputs.version` IS that tag. The
+      # main path takes the previous tip's tag at the same width.
       - name: Derive the :sha-<short> tag of the source images
         id: source-tag
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-backend
           tags: type=sha,prefix=sha-,format=short
+
+      # Full history: the main path diffs the previous main tip against this one and
+      # asks whether the former is an ancestor. Nothing from the checkout runs except
+      # the planning script, which only reads git.
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Log in to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -281,19 +302,33 @@ jobs:
           SOURCE_TAG: ${{ steps.source-tag.outputs.version }}
           REPO: ${{ github.repository }}
           EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
           REF_TYPE: ${{ github.ref_type }}
+          SHA: ${{ github.sha }}
+          # The previous tip of the pushed ref; all zeros for a new ref. Only a push
+          # event carries it.
+          BEFORE: ${{ github.event.before }}
           IMAGE_PREFIX: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool
+          # The main path's age limit. The runtime stage runs `apk upgrade`, so an
+          # image is only as patched as the day it was built; a quiet week of docs
+          # must not stretch that. Seven days = the Dependabot cadence the owner
+          # chose for the base image (2026-09-03, .github/dependabot.yml).
+          MAX_REUSE_AGE_HOURS: '168'
         run: |
           set -euo pipefail
 
           # Record the decision and stop. Every exit from this script goes
-          # through here, so `reuse` and `digests` are always both written — a
-          # job that emitted only one of them would leave the merge job reading
-          # an empty `digests` while `reuse` said true.
+          # through here, so `reuse`, `digests` and `source_tag` are always all
+          # written — a job that emitted only some of them would leave the merge
+          # job reading an empty `digests` while `reuse` said true.
           #   $1 = true|false   $2 = digests JSON   $3 = human-readable reason
+          #   $4 = the source tag looked up (may be empty)
           decide() {
-            printf 'reuse=%s\n' "$1" >> "$GITHUB_OUTPUT"
-            printf 'digests=%s\n' "$2" >> "$GITHUB_OUTPUT"
+            {
+              printf 'reuse=%s\n' "$1"
+              printf 'digests=%s\n' "$2"
+              printf 'source_tag=%s\n' "${4:-}"
+            } >> "$GITHUB_OUTPUT"
             if [ "$1" = true ]; then verdict='reuse existing images'; else verdict='full build'; fi
             {
               echo "### Build plan"
@@ -301,89 +336,135 @@ jobs:
               echo "| Field | Value |"
               echo "|---|---|"
               echo "| Decision | ${verdict} |"
-              echo "| Source tag | \`${SOURCE_TAG}\` |"
+              echo "| Source tag | \`${4:-none}\` |"
               echo "| Reason | ${3} |"
             } >> "$GITHUB_STEP_SUMMARY"
             echo "plan: reuse=$1 (${3})"
             exit 0
           }
 
-          # Gate 1 — only the PUSH of a version tag is a reuse candidate.
-          # A main-branch push is the run that produces the source images in the
-          # first place. `workflow_dispatch` is deliberately excluded even on a
-          # tag: "Run workflow" is the documented manual kick for a release whose
-          # images are missing or suspect (see release-publish.yml), and an
-          # operator who reaches for it wants a REBUILD, not a re-tag.
-          if [ "$EVENT_NAME" != "push" ] || [ "$REF_TYPE" != "tag" ]; then
-            decide false '{}' "not a version-tag push (event=${EVENT_NAME}, ref_type=${REF_TYPE})"
-          fi
+          # The registry gates, shared by both paths. Resolves `$1` for all three
+          # app images and admits them only if every image exists, carries both
+          # architectures and this workflow's main-branch signature, and — when
+          # `$2` is non-empty — was built at most `$2` hours ago. Sets `digests` on
+          # success; calls `decide false` (which exits) on the first failure.
+          #
+          # stderr of the probes is deliberately NOT swallowed. The `decide` line
+          # says WHICH gate refused; the tool's own message says why, and without
+          # it a registry blip and a genuinely absent (or unsigned) image produce
+          # byte-identical operator-facing output — the failure mode promote.yml's
+          # verify step was fixed for.
+          verify_candidates() {
+            local tag="$1" max_age="$2" module image digest raw want created built age
+            digests='{}'
+            for module in backend frontend ingest; do
+              image="${IMAGE_PREFIX}-${module}"
 
-          # Gate 2 — the derived tag must actually look like a short-sha tag.
-          # Cheap insurance against a metadata-action change silently handing us
-          # something else: an empty string would resolve to the implicit
-          # `:latest`, and re-tagging THAT as a release would be a spectacular
-          # way to ship the wrong image.
+              # Gate — the source index must exist. Missing means the run that
+              # should have produced it never got here (failed, cancelled, still
+              # running, or the commit never had a run of its own).
+              if ! digest=$(docker buildx imagetools inspect "${image}:${tag}" \
+                              --format '{{.Manifest.Digest}}') || [ -z "$digest" ]; then
+                decide false '{}' "no ${image}:${tag} in the registry" "$tag"
+              fi
+
+              # Gate — the index must carry BOTH architectures. `imagetools
+              # create` happily re-tags a single-arch index, and an image that
+              # silently dropped linux/arm64 would only surface on the host at
+              # pull time. `--raw` rather than a Go template because the template
+              # context for an index has differed across buildx versions while the
+              # raw OCI JSON has not. The `select` also drops the attestation
+              # manifests, which carry platform `unknown/unknown`.
+              raw=$(docker buildx imagetools inspect "${image}@${digest}" --raw || true)
+              for want in amd64 arm64; do
+                if ! printf '%s' "$raw" | jq -e --arg a "$want" \
+                     '[.manifests[]? | select(.platform.os == "linux" and .platform.architecture == $a)] | length > 0' \
+                     >/dev/null 2>&1; then
+                  decide false '{}' "${image}@${digest} has no linux/${want} child" "$tag"
+                fi
+              done
+
+              # Gate — the digest must carry this workflow's own keyless
+              # signature, minted on the MAIN branch. Pinned to `refs/heads/main`
+              # rather than promote.yml's wider `(heads/main|tags/vX.Y.Z)`, and
+              # anchored like it (scripts/check-cosign-identity.py): the only
+              # legitimate producer of a reuse candidate is a main-branch run, so
+              # anything else — a tag-run signature included — means the
+              # provenance is not what this optimisation assumes and the run
+              # should simply build. This is the same supply-chain seam
+              # promote.yml (REQ-OPS-002) and scripts/deploy.sh (REQ-OPS-015)
+              # stand on; reuse must not widen it.
+              if ! cosign verify "${image}@${digest}" \
+                   --certificate-identity-regexp "^https://github\\.com/${REPO}/\\.github/workflows/release-images\\.yml@refs/heads/main$" \
+                   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+                   >/dev/null; then
+                decide false '{}' "no valid main-branch signature on ${image}@${digest}" "$tag"
+              fi
+
+              # Gate (main path only) — the image must be recent. `{{json .Image}}`
+              # is a map by platform for an index and a plain config for a
+              # manifest; the jq takes the linux/amd64 config in the first case and
+              # reads metadata-action's `created` label, falling back to the
+              # config's own `created`. Unreadable means "build", like every gate.
+              if [ -n "$max_age" ]; then
+                created=$(docker buildx imagetools inspect "${image}@${digest}" --format '{{json .Image}}' \
+                  | jq -r '(if type == "object" and has("config") then . else (.["linux/amd64"] // {}) end) as $i
+                           | ($i.config.Labels["org.opencontainers.image.created"] // $i.created // empty)' || true)
+                if [ -z "$created" ] || ! built=$(date -u -d "$created" +%s); then
+                  decide false '{}' "cannot read when ${image}@${digest} was built" "$tag"
+                fi
+                age=$(( ($(date -u +%s) - built) / 3600 ))
+                if [ "$age" -gt "$max_age" ]; then
+                  decide false '{}' "${image}@${digest} was built ${age}h ago, more than ${max_age}h (apk upgrade freshness)" "$tag"
+                fi
+              fi
+
+              digests=$(jq -cn --argjson d "$digests" --arg m "$module" --arg v "$digest" '$d + {($m): $v}')
+              echo "reuse candidate ok: ${image}:${tag} -> ${digest}"
+            done
+          }
+
+          # The derived tag must look like a short-sha tag. Cheap insurance
+          # against a metadata-action change silently handing us something else:
+          # an empty string would resolve to the implicit `:latest`, and re-tagging
+          # THAT would be a spectacular way to ship the wrong image.
           case "$SOURCE_TAG" in
             sha-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]*) ;;
-            *) decide false '{}' "unexpected source tag shape '${SOURCE_TAG}'" ;;
+            *) decide false '{}' "unexpected source tag shape '${SOURCE_TAG}'" "" ;;
           esac
 
-          digests='{}'
-          for module in backend frontend ingest; do
-            image="${IMAGE_PREFIX}-${module}"
+          # `workflow_dispatch` never reuses, on either path: "Run workflow" is the
+          # documented manual kick for images that are missing or suspect (see
+          # release-publish.yml), and an operator who reaches for it wants a
+          # REBUILD, not a re-tag.
+          if [ "$EVENT_NAME" != "push" ]; then
+            decide false '{}' "not a push (event=${EVENT_NAME}); a manual run always builds" ""
+          fi
 
-            # Gate 3 — the source index must exist. Missing means the main-branch
-            # run never got here (failed, cancelled, or the tag sits on a commit
-            # that never landed on main).
-            #
-            # stderr of these three probes is deliberately NOT swallowed. The
-            # `decide` line says WHICH gate refused; the tool's own message says
-            # why, and without it a registry blip and a genuinely absent (or
-            # unsigned) image produce byte-identical operator-facing output —
-            # the failure mode promote.yml's verify step was fixed for.
-            if ! digest=$(docker buildx imagetools inspect "${image}:${SOURCE_TAG}" \
-                            --format '{{.Manifest.Digest}}') || [ -z "$digest" ]; then
-              decide false '{}' "no ${image}:${SOURCE_TAG} in the registry"
+          # TAG PATH — the push of a version tag re-tags what the main-branch run
+          # of this very commit built.
+          if [ "$REF_TYPE" = "tag" ]; then
+            verify_candidates "$SOURCE_TAG" ""
+            decide true "$digests" "all three app images exist, are dual-arch and carry the main-branch run's signature" "$SOURCE_TAG"
+          fi
+
+          # MAIN PATH — a main push that changes no image input re-tags the
+          # previous main tip's images.
+          if [ "$REF" = "refs/heads/main" ]; then
+            plan=$(python3 .github/scripts/image_reuse_plan.py --base "$BEFORE" --head "$SHA") \
+              || decide false '{}' "image_reuse_plan.py failed" ""
+            reason=$(jq -r '.reason' <<< "$plan")
+            if [ "$(jq -r '.eligible' <<< "$plan")" != "true" ]; then
+              decide false '{}' "main push builds: ${reason}" ""
             fi
+            # The previous tip's tag, at the width metadata-action used for ours.
+            width=$(( ${#SOURCE_TAG} - 4 ))
+            previous="sha-${BEFORE:0:${width}}"
+            verify_candidates "$previous" "$MAX_REUSE_AGE_HOURS"
+            decide true "$digests" "no image input changed since ${BEFORE:0:12} (${reason}); its images exist, are dual-arch, main-signed and younger than ${MAX_REUSE_AGE_HOURS}h" "$previous"
+          fi
 
-            # Gate 4 — the index must carry BOTH architectures. `imagetools
-            # create` happily re-tags a single-arch index, and a release that
-            # silently dropped linux/arm64 would only surface on the host at
-            # `docker pull` time. `--raw` rather than a Go template because the
-            # template context for an index has differed across buildx versions
-            # while the raw OCI JSON has not. The `select` also drops the
-            # attestation manifests, which carry platform `unknown/unknown`.
-            raw=$(docker buildx imagetools inspect "${image}@${digest}" --raw || true)
-            for want in amd64 arm64; do
-              if ! printf '%s' "$raw" | jq -e --arg a "$want" \
-                   '[.manifests[]? | select(.platform.os == "linux" and .platform.architecture == $a)] | length > 0' \
-                   >/dev/null 2>&1; then
-                decide false '{}' "${image}@${digest} has no linux/${want} child"
-              fi
-            done
-
-            # Gate 5 — the digest must carry this workflow's own keyless
-            # signature, minted on the MAIN branch. Pinned to `refs/heads/main`
-            # rather than promote.yml's wider `(heads/main|tags/vX.Y.Z)`, and
-            # anchored like it (scripts/check-cosign-identity.py): the only
-            # legitimate producer of a reuse candidate is the main-branch run of
-            # this very commit, so anything else — a tag-run signature included —
-            # means the provenance is not what this optimisation assumes and the
-            # run should simply build. This is the same supply-chain seam
-            # promote.yml (REQ-OPS-002) and scripts/deploy.sh (REQ-OPS-015) stand
-            # on; reuse must not widen it.
-            if ! cosign verify "${image}@${digest}" \
-                 --certificate-identity-regexp "^https://github\\.com/${REPO}/\\.github/workflows/release-images\\.yml@refs/heads/main$" \
-                 --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-                 >/dev/null; then
-              decide false '{}' "no valid main-branch signature on ${image}@${digest}"
-            fi
-
-            digests=$(jq -cn --argjson d "$digests" --arg m "$module" --arg v "$digest" '$d + {($m): $v}')
-            echo "reuse candidate ok: ${image}:${SOURCE_TAG} -> ${digest}"
-          done
-
-          decide true "$digests" "all three app images exist, are dual-arch and carry the main-branch run's signature"
+          decide false '{}' "ref ${REF} is neither a version tag nor main" ""
 
   build:
     name: Build (${{ matrix.module }} / ${{ matrix.platform }})
@@ -522,14 +603,15 @@ jobs:
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
-          file: ${{ matrix.module }}/Dockerfile
+          # One Dockerfile for all three app images (IMG-SIMP-14); MODULE selects the
+          # Gradle project, the training flags and the per-module port/healthcheck stage.
+          file: docker/app/Dockerfile
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
-          # Forwarded to both module Dockerfiles. The frontend consumes it via
-          # `-PappVersion=...` to override `bootBuildInfo`'s default version;
-          # the backend just declares the ARG to silence BuildKit's "unused
-          # build arg" warning (it has no UI to render a version chip on).
+          # APP_VERSION goes to Gradle as `-PappVersion=...` for every module; only
+          # the frontend reads it (`bootBuildInfo`, the sidebar's version chip).
           build-args: |
+            MODULE=${{ matrix.module }}
             APP_VERSION=${{ steps.app-version.outputs.version }}
           # Push the per-arch image as a digest-only reference (no tag). The
           # merge job below assembles all per-arch digests into a single
@@ -1031,7 +1113,7 @@ jobs:
         run: |
           set -eu
           if [ "$REUSE" = "true" ]; then
-            origin="reused \`${SOURCE_TAG}\` (built by the main-branch run of this commit)"
+            origin="reused \`${SOURCE_TAG}\` (built and signed by an earlier main-branch run; see the plan job)"
           else
             origin="built by this run"
           fi

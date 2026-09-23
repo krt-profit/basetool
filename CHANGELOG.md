@@ -18,6 +18,10 @@
   
 ### Added
 
+- **Anmeldung: das Webtool kann sich als vertraulicher Client bei Keycloak ausweisen.** Mit
+  `KEYCLOAK_FRONTEND_CLIENT_SECRET` sendet es beim Einlösen des Anmelde-Codes zusätzlich zu PKCE
+  ein Geheimnis; ohne die Variable bleibt alles wie bisher. Die Umstellung meldet niemanden ab.
+
 - **Sicherheit: Sitzungsdaten dürfen nur noch bekannte Klassen enthalten.** Das Webtool liest einen
   in Redis gespeicherten Sitzungswert nur, wenn dessen Typ auf einer festen Liste steht. Neue
   Variable `APP_SESSION_TYPE_ALLOW_LIST` (`report` als Vorgabe: nichts ändert sich, Abweichungen
@@ -61,6 +65,11 @@
   erneuerten Tokens sie nicht mehr jedes Mal neu laden. Eine in Keycloak entzogene Rolle wirkt
   weiterhin beim nächsten Token (ADR-0174).
   
+
+- **Backend: Datenbankzugriffe laden nur noch, was sie brauchen.** Verknüpfte Datensätze (z. B.
+  Schiffstyp, Besitzer, Material-Kategorie) werden nicht mehr bei jedem Laden automatisch
+  mitgeholt, sondern gezielt dort, wo eine Ansicht sie anzeigt. Das entlastet vor allem die
+  UEX-Abgleiche und Listen; sichtbar ändert sich nichts.
 - **Intern: eine gemeinsame Log-Bereinigung für Backend, Webtool und Ingest.** Maskierung von
   Tokens und E-Mail-Adressen sowie der Schutz gegen gefälschte Logzeilen liegen jetzt einmal im
   neuen Modul `logging-support` statt dreifach kopiert (ADR-0205). Keine Funktionsänderung.

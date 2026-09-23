@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.repository.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
+import de.greluc.krt.profit.basetool.backend.support.CachedEntityGraphs;
 import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.List;
@@ -70,10 +71,10 @@ public class LocationService {
    */
   @Cacheable(cacheNames = CacheConfig.LOCATIONS_CACHE)
   public Page<Location> getAllLocations(@NotNull Pageable pageable, boolean includeHidden) {
-    if (includeHidden) {
-      return locationRepository.findAll(pageable);
-    }
-    return locationRepository.findByHiddenFalse(pageable);
+    return CachedEntityGraphs.locations(
+        includeHidden
+            ? locationRepository.findAll(pageable)
+            : locationRepository.findByHiddenFalse(pageable));
   }
 
   /**
@@ -113,7 +114,8 @@ public class LocationService {
    */
   @Cacheable(cacheNames = CacheConfig.LOCATIONS_CACHE)
   public Location getLocation(@NotNull UUID id) {
-    return Entities.require(locationRepository.findById(id), "Location not found");
+    return CachedEntityGraphs.location(
+        Entities.require(locationRepository.findById(id), "Location not found"));
   }
 
   /**
@@ -124,7 +126,7 @@ public class LocationService {
    */
   @Cacheable(cacheNames = CacheConfig.LOCATIONS_CACHE, key = "'refineries'")
   public List<Location> getRefineryLocations() {
-    return locationRepository.findLocationsWithRefinery();
+    return CachedEntityGraphs.locations(locationRepository.findLocationsWithRefinery());
   }
 
   /**
@@ -136,7 +138,8 @@ public class LocationService {
    */
   @Cacheable(cacheNames = CacheConfig.LOCATIONS_CACHE, key = "'homeLocations'")
   public List<Location> getHomeLocations() {
-    return locationRepository.findByHomeLocationTrueAndHiddenFalseOrderByNameDesc();
+    return CachedEntityGraphs.locations(
+        locationRepository.findByHomeLocationTrueAndHiddenFalseOrderByNameDesc());
   }
 
   /**

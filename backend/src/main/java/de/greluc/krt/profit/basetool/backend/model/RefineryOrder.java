@@ -58,24 +58,28 @@ public class RefineryOrder extends AbstractEntity<UUID> {
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
-  @ManyToOne
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "owner_id", nullable = false)
+  @ToString.Exclude
   private User owner;
 
-  @ManyToOne
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "location_id", nullable = false)
+  @ToString.Exclude
   private Location location;
 
-  @ManyToOne
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "mission_id")
+  @ToString.Exclude
   private Mission mission;
 
   private Instant startedAt;
 
   @PositiveOrZero private Long durationMinutes;
 
-  @ManyToOne
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "refining_method_id")
+  @ToString.Exclude
   private RefiningMethod refiningMethod;
 
   /**

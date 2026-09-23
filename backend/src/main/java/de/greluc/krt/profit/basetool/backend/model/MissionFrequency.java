@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.model;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -68,17 +69,19 @@ public class MissionFrequency extends AbstractEntity<UUID> {
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
-  @ManyToOne(optional = false)
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "mission_id", nullable = false)
   @JsonIgnore
+  @ToString.Exclude
   private Mission mission;
 
   /**
    * The global frequency type this row supplies a value for, or {@code null} for a custom
    * (mission-specific) channel. Nullable since V201; mutually exclusive with {@link #name}.
    */
-  @ManyToOne
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "frequency_type_id")
+  @ToString.Exclude
   private FrequencyType frequencyType;
 
   /**

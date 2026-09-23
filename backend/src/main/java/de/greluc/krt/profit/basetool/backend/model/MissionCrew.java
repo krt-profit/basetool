@@ -44,7 +44,7 @@ import lombok.ToString;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@ToString(exclude = {"missionUnit"})
+@ToString(exclude = {"missionUnit", "participant"})
 public class MissionCrew extends AbstractEntity<UUID> {
 
   @Getter(onMethod_ = @__(@Override))
@@ -52,12 +52,12 @@ public class MissionCrew extends AbstractEntity<UUID> {
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
-  @ManyToOne
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "mission_ship_id", nullable = false)
   @JsonIgnore
   private MissionUnit missionUnit;
 
-  @ManyToOne
+  @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "mission_participant_id", nullable = false)
   private MissionParticipant participant;
 

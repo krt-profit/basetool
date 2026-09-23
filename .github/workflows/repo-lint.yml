@@ -156,14 +156,14 @@ jobs:
 
       # Threshold lives in .hadolint.yaml (warning) so local + CI agree.
       #
-      # All THREE production Dockerfiles. `ingest` was missing until 2026-09-04 and
-      # nobody noticed, because it is the one image with no HEALTHCHECK and the
-      # shortest runtime stage -- so it never produced a finding to be missed. It is
-      # promoted and vulnerability-scanned exactly like the other two (REQ-OPS-024),
-      # which is the list this should have matched all along.
+      # Every Dockerfile that produces a shipped image. The three app images share ONE
+      # Dockerfile since 2026-09-23 (IMG-SIMP-14); before that `ingest/Dockerfile` was missing
+      # from this list for two months and nobody noticed, which is the drift a single file
+      # removes. The two `FROM scratch` bundles are linted too: they are promoted and signed
+      # like the app images.
       - name: hadolint / Run hadolint
         if: ${{ !cancelled() }}
-        run: hadolint backend/Dockerfile frontend/Dockerfile ingest/Dockerfile
+        run: hadolint docker/app/Dockerfile docker/config/Dockerfile docker/keycloak-spi/Dockerfile
 
   repo-gates:
     name: Repository gates
@@ -278,12 +278,6 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 .github/scripts/check_probe_against_allowlist.py
 
-      # frontend/Dockerfile runs `:frontend:build` with every lint task excluded BY NAME, because
-      # the image has no Node toolchain to run them with. So a task wired into `check` is silently
-      # added to the image build too. `lintCssInline` was, on 2026-09-13, and the failure mode is as
-      # indirect as it gets: the image build failed, the e2e stack's `up --wait` never saw a healthy
-      # service, and all 94 e2e classes reported `initializationError` with the real cause visible
-      # only inside compose-up.log in the uploaded artifact. Nothing in the build output said lint.
       # The gateway's audience is basetool-ingest; every frontend session token carries
       # basetool-backend, so a gateway configured with the backend's value admits the very tokens
       # its client gate exists to refuse -- and the check still passes, so nothing notices. It went
@@ -296,13 +290,32 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/check-ingest-audience.py
 
-      - name: frontend-image-lint-exclusions / Self-test the comparison
+      # Two Loki alerts fire on wording HotSpot writes outside logback (JvmNativeThreadExhaustion,
+      # JvmStartupCacheRejected). check-loki-rules.sh proves they parse; this proves they still
+      # MATCH the verbatim lines reproduced on the pinned Temurin image, and stay silent on the
+      # neighbouring ones. A filter edited into valid LogQL that matches nothing would otherwise
+      # deploy and never fire again (REQ-OBS-014's dead-alert shape).
+      - name: loki-rule-signatures / Self-test the signature matcher
         if: ${{ !cancelled() }}
-        run: python3 .github/scripts/check_frontend_image_lint_exclusions.py --selftest
+        run: python3 scripts/check-loki-rule-signatures.py --selftest
 
-      - name: frontend-image-lint-exclusions / Check the frontend image excludes every Node-based task
+      - name: loki-rule-signatures / Check the JVM-wording alerts against their recorded lines
         if: ${{ !cancelled() }}
-        run: python3 .github/scripts/check_frontend_image_lint_exclusions.py
+        run: python3 scripts/check-loki-rule-signatures.py
+
+      # REQ-OPS-030 / ADR-0180. The image's AOT cache is trained with one object layout
+      # (docker/app/Dockerfile, where JAVA_TOOL_OPTIONS does not exist) and every JVM is started
+      # with the one its JAVA_TOOL_OPTIONS names (compose, quadlet/env.d). A mismatch fails nothing:
+      # the JVM starts without the cache. The image build proves the cache is usable with the
+      # Dockerfile's layout and the Loki rule JvmStartupCacheRejected catches a runtime override;
+      # this closes the pre-merge gap between the two files.
+      - name: object-layout-parity / Self-test the parity check
+        if: ${{ !cancelled() }}
+        run: python3 scripts/check-object-layout-parity.py --selftest
+
+      - name: object-layout-parity / Check the image layout against every JAVA_TOOL_OPTIONS
+        if: ${{ !cancelled() }}
+        run: python3 scripts/check-object-layout-parity.py
 
       # The E2E matrix's `device:` axis and TouchClassLayoutE2eTest's DEVICE_CLASSES are verbatim
       # copies of one another, and only ONE of the two drift directions is loud. A device the
@@ -723,6 +736,15 @@ jobs:
       - name: internal-tls / Self-test the internal TLS minter
         if: ${{ !cancelled() }}
         run: bash scripts/mint-internal-tls.test.sh
+
+      # The main-push reuse decision of release-images.yml (REQ-OPS-021, ADR-0210). The script decides
+      # whether a pushed range changed anything that goes into an image; a wrong "no" would ship a
+      # stale image under a new commit's tag, so the self-test pins every branch of the decision and
+      # fails when the COPY parser stops seeing the real Dockerfile's inputs (an empty input set would
+      # make every push look input-free).
+      - name: image-reuse-plan / Self-test the release reuse decision
+        if: ${{ !cancelled() }}
+        run: python3 .github/scripts/image_reuse_plan.py --selftest
 
   container-checks:
     name: Container checks

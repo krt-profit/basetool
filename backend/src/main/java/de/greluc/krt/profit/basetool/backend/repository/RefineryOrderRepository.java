@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
@@ -39,6 +40,33 @@ import org.springframework.stereotype.Repository;
 /** Spring Data repository for Refinery Order. */
 @Repository
 public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UUID> {
+
+  /**
+   * Loads one refinery order with everything its detail DTO reads: the four to-one associations and
+   * the goods with their input and output materials.
+   *
+   * <p>The to-ones were EAGER until BE-PERF-11 and loaded in the same statement; lazy, they would
+   * each cost a statement on the detail read and on every mutator that re-reads the order. One
+   * collection ({@code goods}) is fetch-joined, which is safe for a single row — the
+   * cartesian-product and in-memory-pagination hazards only apply to two sibling collections or to
+   * a paged query.
+   *
+   * @param id the order id
+   * @return the order with its detail graph loaded, or empty when none exists
+   */
+  @Override
+  @NotNull
+  @EntityGraph(
+      attributePaths = {
+        "owner",
+        "location",
+        "mission",
+        "refiningMethod",
+        "goods",
+        "goods.inputMaterial",
+        "goods.outputMaterial"
+      })
+  Optional<RefineryOrder> findById(@NotNull UUID id);
 
   /**
    * Counts refinery orders in the given lifecycle status, backing the {@code

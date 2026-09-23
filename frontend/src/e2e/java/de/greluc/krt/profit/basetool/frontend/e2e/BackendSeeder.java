@@ -61,9 +61,9 @@ import javax.net.ssl.TrustManagerFactory;
  *
  * <p>Local-stack only: it talks to Keycloak on {@code http://localhost:18080} and the backend on
  * {@code https://localhost:11261} (self-signed dev cert — the HTTP client trusts only that cert).
- * The bearer token is minted with the Keycloak password grant on the public {@code
- * basetool-frontend} client; the backend resource server accepts it on issuer + signature alone (no
- * audience check).
+ * The bearer token is minted with the Keycloak password grant on the {@code basetool-frontend}
+ * client (confidential in the E2E realm since ADR-0001 was carried out, so with its throwaway
+ * secret); the backend resource server accepts it on issuer + signature alone (no audience check).
  */
 public final class BackendSeeder {
 
@@ -2531,8 +2531,9 @@ public final class BackendSeeder {
   }
 
   /**
-   * Performs a Keycloak Resource-Owner-Password-Credentials grant on the public {@code
-   * basetool-frontend} client and returns the access token.
+   * Performs a Keycloak Resource-Owner-Password-Credentials grant on the {@code basetool-frontend}
+   * client (confidential in the E2E realm, so with its throwaway secret) and returns the access
+   * token.
    *
    * @param username Keycloak username
    * @param password Keycloak password
@@ -2543,6 +2544,10 @@ public final class BackendSeeder {
     String form =
         "grant_type=password&client_id="
             + CLIENT_ID
+            // The client is confidential in the E2E realm (ADR-0001), so the grant carries its
+            // throwaway secret like the frontend does.
+            + "&client_secret="
+            + enc(E2eStackExtension.FRONTEND_CLIENT_SECRET)
             + "&username="
             + enc(username)
             + "&password="

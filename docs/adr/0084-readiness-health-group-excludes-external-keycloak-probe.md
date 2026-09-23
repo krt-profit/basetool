@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-07-09
 - **Deciders:** @greluc
-- **Related:** `backend/src/main/resources/application.yml` · `frontend/src/main/resources/application.yml` · `backend/Dockerfile` · `frontend/Dockerfile` · `KeycloakHealthIndicator` (backend + frontend) · REQ-SEC-024 · ADR-0083 · the 2026-07-09 native-thread exhaustion incident
+- **Related:** `backend/src/main/resources/application.yml` · `frontend/src/main/resources/application.yml` · `docker/app/Dockerfile` (the per-module HEALTHCHECK stages; `backend/Dockerfile` and `frontend/Dockerfile` until 2026-09-23) · `KeycloakHealthIndicator` (backend + frontend) · REQ-SEC-024 · ADR-0083 · the 2026-07-09 native-thread exhaustion incident
 
 ## Context
 

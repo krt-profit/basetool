@@ -226,6 +226,24 @@ job in `release-images.yml`), and only the jobs that sign hold the OIDC token th
 the jobs that run the build do not. `promote.yml`, `promote-testing.yml` and `deploy.sh` trust the
 same anchored signer identity (REQ-OPS-015).
 
+**The three app images come from one Dockerfile** (`docker/app/Dockerfile`, since 2026-09-23), with
+`MODULE` selecting the Gradle project, the training stubs and a per-module tail stage for the port and
+the healthcheck. The build runs `:<module>:bootJar` — exactly the artefact that ships, none of the
+`check` gates, which CI runs — and bakes a Java **AOT cache** (`/app/app.aot`) from a training start
+that refreshes the whole Spring context against stubs for the database, Keycloak and Redis. A
+training run that does not complete, or a cache a JVM with the image's object layout would refuse,
+fails the image build; a deployment whose `JAVA_TOOL_OPTIONS` layout differs starts without the cache
+and trips `JvmStartupCacheRejected` (REQ-OPS-030,
+[ADR-0209](../adr/0209-the-images-ship-a-java-aot-cache-trained-eagerly-and-verified-at-build.md)).
+The entrypoint is `java` itself, in exec form — no shell between the runtime and the JVM.
+
+**A push builds only when it changes an image.** The release-tag run re-tags what `main` built for
+the same commit (ADR-0137), and a `main` push whose range touches no image input — the paths
+`docker/app/Dockerfile` copies, the Dockerfile, `.dockerignore`, the release workflow and its BuildKit
+and version inputs — re-tags the previous `main` build after verifying its signature, both
+architectures and an age of at most seven days (ADR-0210, REQ-OPS-021). Release commits always
+build.
+
 `deploy.sh` and the host's own `iri-*` units are **not** part of the config bundle: a bundle cannot
 rewrite the thing that applies bundles, so they arrive with the Ansible role. The Quadlet units do
 ride the bundle. Provider JARs are barred from the config bundle and get their own promotable,
