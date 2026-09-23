@@ -23,6 +23,9 @@
   
 ### Added
 
+- **Backend: der interne Schlüsselabruf bei Keycloak lässt sich jetzt einschalten.** Neue
+  optionale Variable `IRI_BACKEND_KEYCLOAK_JWK_SET_URI`; ohne sie bleibt alles wie bisher.
+
 - **Anmeldung: das Webtool kann sich als vertraulicher Client bei Keycloak ausweisen.** Mit
   `KEYCLOAK_FRONTEND_CLIENT_SECRET` sendet es beim Einlösen des Anmelde-Codes zusätzlich zu PKCE
   ein Geheimnis; ohne die Variable bleibt alles wie bisher. Die Umstellung meldet niemanden ab.
