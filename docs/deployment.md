@@ -858,6 +858,49 @@ client ──► haproxy :80/:443 (host, v4+v6) ──send-proxy-v2──► edg
 - **The API vhost's allow-list** is `docker/edge/include/api-allowlist.conf`, the source of truth
   (ADR-0135). `edge-deny-probe.yml` probes the public deny rules from outside every day.
 
+### The edge verifies Grafana
+
+Every upstream the edge re-encrypts to is verified against the internal CA
+(`include/upstream-tls.conf`), except Grafana: it serves its own self-signed certificate
+(`/var/iri/monitoring/certs/grafana.crt`, minted once per host, [`monitoring/README.md`](../monitoring/README.md)
+step 3). Since 2026-09-23 the edge can verify that hop too, pinning that very certificate as the
+Grafana upstream's only anchor and checking the name `grafana` (`include/upstream-grafana-tls.conf`,
+REQ-OBS-008). It is behind **`EDGE_GRAFANA_UPSTREAM_VERIFY`**, `off` by default, so the release that
+carries it changes nothing but one read-only mount: the edge now mounts `grafana.crt`, the same file
+Grafana itself needs to start, and `deploy.sh` refuses a release whose edge unit names a missing
+one.
+
+**Precondition** (read-only): the certificate names `grafana`.
+
+```bash
+openssl x509 -in /var/iri/monitoring/certs/grafana.crt -noout -subject -enddate -ext subjectAltName
+# subjectAltName must list DNS:grafana; enddate in the future
+```
+
+If it does not, re-mint it first (monitoring/README.md step 3) and restart Grafana.
+
+**Apply** (as root, from `/`; a production write, so it waits for the owner's yes):
+
+```bash
+cd /
+cp -p /var/iri/code/.env /var/iri/code/.env.backup-$(date +%Y%m%d-%H%M%S)
+printf 'EDGE_GRAFANA_UPSTREAM_VERIFY=on\n' >> /var/iri/code/.env
+grep -c '^EDGE_GRAFANA_UPSTREAM_VERIFY=' /var/iri/code/.env              # 1
+sudo -u deploy /var/iri/code/scripts/render-env-d.py \
+  --env /var/iri/code/.env --templates /var/iri/code/quadlet/env.d --out /var/iri/code/env.d
+${UCTL} restart edge.service                                            # blocks until healthy
+${UPOD} logs --since 2m edge 2>&1 | grep "Grafana's upstream"           # ... is verified (pinned)
+curl -sS -o /dev/null -w '%{http_code}\n' "https://$(sed -n 's/^EDGE_HOST_GRAFANA=//p' /var/iri/code/.env)/api/health"   # 200
+```
+
+A verification failure shows as the maintenance page / `503` on the Grafana host and an
+`upstream SSL certificate verify error` line in the edge log. **Rollback:** delete the line, render
+`env.d/` again, restart the edge.
+
+**From then on, a re-minted `grafana.crt` needs the edge restarted as well as Grafana:** the edge
+mounts the file (a single-file mount pins the inode) and pins its contents. Until the restart the
+edge refuses the new certificate and Grafana answers `503`.
+
 ### Maintenance page
 
 `include/maintenance.conf` turns an upstream 502/503/504 into a `503` with `Retry-After: 60` — the

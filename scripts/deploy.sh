@@ -1003,9 +1003,13 @@ fi
 # EVERY PKCS#12 mounted under /run/secrets/, not the first one (REQ-SEC-070): since the
 # per-service keystores each service mounts its own file plus the internal truststore, and one
 # missing file among several is exactly the case `head -n1` could not see.
+#
+# And the edge's two trust anchors under /etc/nginx/*.crt (REQ-OBS-008): the internal CA and, since
+# 2026-09-23, Grafana's own certificate. A single-file bind mount whose source is missing does not
+# start the container at all, and for the edge that is the whole site.
 keystore_mount_sources() {
   local src=""
-  src="$(grep -h -E '^Volume=[^:]+:/run/secrets/[A-Za-z0-9._-]+\.p12(:|$)' "${RT_UNIT_DIR}"/*.container \
+  src="$(grep -h -E '^Volume=[^:]+:(/run/secrets/[A-Za-z0-9._-]+\.p12|/etc/nginx/[A-Za-z0-9._-]+\.crt)(:|$)' "${RT_UNIT_DIR}"/*.container \
            2>/dev/null | sed -E 's/^Volume=([^:]+):.*/\1/' | sort -u || true)"
   if [[ -z "${src}" ]]; then
     src="$(read_env IRI_KEYSTORE_HOST_PATH || true)"

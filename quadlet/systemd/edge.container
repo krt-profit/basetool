@@ -27,6 +27,7 @@ Volume=/var/iri/code/docker/edge:/etc/nginx/edge:ro
 Volume=edge-certs.volume:/etc/nginx/certs:ro
 Volume=edge-acme-webroot.volume:/var/www/acme:ro
 Volume=/var/iri/monitoring/certs/basetool-ca.crt:/etc/nginx/upstream-ca.crt:ro
+Volume=/var/iri/monitoring/certs/grafana.crt:/etc/nginx/grafana-upstream.crt:ro
 Volume=/var/iri/code/docker/maintenance/static:/usr/share/nginx/html/maintenance:ro
 EnvironmentFile=/var/iri/code/env.d/edge.env
 Exec=/bin/sh /etc/nginx/edge/render-and-run.sh

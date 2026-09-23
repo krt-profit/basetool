@@ -151,11 +151,46 @@ for a in ${EDGE_ADMIN_ALLOW:-}; do
 done
 export EDGE_ADMIN_ALLOW_EXTRA
 
+# --- Grafana's upstream certificate, verified once the owner switches it on ---------------------
+#
+# Every other upstream is verified against the internal CA (include/upstream-tls.conf). Grafana
+# serves its own self-signed certificate instead, so its anchor is that certificate itself, which
+# the edge mounts at /etc/nginx/grafana-upstream.crt (include/upstream-grafana-tls.conf, REQ-OBS-008).
+# OFF by default so the release carrying this changes nothing: the owner checks the certificate's
+# SAN first (docs/deployment.md, "The edge verifies Grafana").
+#
+# Refused rather than guessed: `on` without a readable certificate would make nginx die on the
+# directive with a message about a file nobody set, and an unknown value is more likely a typo of
+# `on` than a wish for `off` -- either way, say so at start-up.
+GRAFANA_UPSTREAM_CERT=/etc/nginx/grafana-upstream.crt
+case "${EDGE_GRAFANA_UPSTREAM_VERIFY:-off}" in
+  on|true)
+    if [ ! -s "${GRAFANA_UPSTREAM_CERT}" ]; then
+      echo "edge: refusing to start - EDGE_GRAFANA_UPSTREAM_VERIFY=on but ${GRAFANA_UPSTREAM_CERT}" >&2
+      echo "edge: is missing or empty. It is Grafana's own certificate, mounted from" >&2
+      echo "edge: /var/iri/monitoring/certs/grafana.crt (monitoring/README.md)." >&2
+      exit 1
+    fi
+    EDGE_GRAFANA_UPSTREAM_TLS='include /etc/nginx/edge/include/upstream-grafana-tls.conf;'
+    echo "edge: Grafana's upstream certificate is verified (pinned)"
+    ;;
+  off|false|'')
+    EDGE_GRAFANA_UPSTREAM_TLS='# EDGE_GRAFANA_UPSTREAM_VERIFY=off - Grafana upstream encrypted, not verified'
+    echo "edge: Grafana's upstream certificate is NOT verified (EDGE_GRAFANA_UPSTREAM_VERIFY=off)"
+    ;;
+  *)
+    echo "edge: refusing to start - EDGE_GRAFANA_UPSTREAM_VERIFY=${EDGE_GRAFANA_UPSTREAM_VERIFY}" >&2
+    echo "edge: expected on or off." >&2
+    exit 1
+    ;;
+esac
+export EDGE_GRAFANA_UPSTREAM_TLS
+
 # shellcheck disable=SC2016  # the literal token is the point: this is envsubst's allow-list of
 # names to substitute, not an expansion. Expanding it here would hand envsubst the VALUE and it
 # would then substitute nothing, which fails silently -- every listener would render without its
 # options and the proxy_protocol shape would quietly become the plain one.
-SHELL_FORMAT='${EDGE_LISTEN_OPTS}${EDGE_ADMIN_ALLOW_EXTRA}'
+SHELL_FORMAT='${EDGE_LISTEN_OPTS}${EDGE_ADMIN_ALLOW_EXTRA}${EDGE_GRAFANA_UPSTREAM_TLS}'
 for v in ${EDGE_VARS}; do
   SHELL_FORMAT="${SHELL_FORMAT}\${${v}}"
 done

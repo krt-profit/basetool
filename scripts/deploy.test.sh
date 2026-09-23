@@ -2334,6 +2334,24 @@ scenario_podman_missing_per_service_keystore_refuses() {
 
 # --- the working directory podman inherits -----------------------------------
 
+scenario_podman_missing_edge_trust_anchor_refuses() {
+  echo "Scenario: ...and so is the edge's Grafana trust anchor, whose absence would keep the edge down"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  podman_units "${tmp}"
+  write_marker "${PMARKER}"
+  # REQ-OBS-008: the edge mounts Grafana's certificate. On a host that never minted it the edge
+  # container could not start, so the pre-flight refuses before anything is applied.
+  printf 'Volume=%s/certs/grafana.crt:/etc/nginx/grafana-upstream.crt:ro\n' "${tmp}" >> "${T_UNIT_DIR}/backend.container"
+  mapfile -t pod < <(podman_env)
+  mapfile -t conv < <(podman_converged_env)
+  run_deploy -- "${pod[@]}" "${conv[@]}" || rc=$?
+  assert_exit 1 "$rc" "podman: a missing edge trust anchor refuses before anything is applied"
+  assert_contains "required file missing: ${tmp}/certs/grafana.crt" "podman: ...and names the file"
+  rm -rf "${tmp}"
+}
+
 scenario_podman_runs_podman_from_root_dir() {
   echo "Scenario: podman is never run from the caller's working directory"
   local tmp rc=0 first
@@ -2370,6 +2388,7 @@ scenario_podman_acme_is_part_of_the_stack
 scenario_podman_keystore_checked_where_the_unit_mounts_it
 scenario_podman_missing_mounted_keystore_refuses
 scenario_podman_missing_per_service_keystore_refuses
+scenario_podman_missing_edge_trust_anchor_refuses
 scenario_podman_runs_podman_from_root_dir
 
 echo

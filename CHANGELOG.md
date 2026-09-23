@@ -4,6 +4,10 @@
 
 ### Security
 
+- **Edge: die Verbindung zu Grafana lässt sich jetzt prüfen.** Mit
+  `EDGE_GRAFANA_UPSTREAM_VERIFY=on` prüft der Edge Grafanas Zertifikat wie bei allen anderen
+  Diensten; ohne die Variable bleibt alles wie bisher.
+
 - **Redis: jeder Dienst bekommt einen eigenen ACL-Benutzer.** Backend, Webtool und Ingest können
   Redis künftig mit eigenen, eng begrenzten Zugängen nutzen statt mit einem gemeinsamen
   Vollzugriff. Neue Variablen `REDIS_<DIENST>_USERNAME`/`_PASSWORD` und `REDIS_DEFAULT_USER`;

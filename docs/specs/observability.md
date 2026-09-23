@@ -811,6 +811,14 @@ not silent — so the only detector was a human reading a log export.
   owner-approved (2026-07-02, epic #936) and amends the HTTPS-only posture; the REQ-SEC-014
   wording in [`security-and-access.md`](security-and-access.md) is amended in the Phase-2 PR
   that actually creates those networks. Rationale and residual risk live in ADR-0072.
+- **The edge→Grafana hop can be verified** (added 2026-09-23). Grafana's certificate is its own,
+  self-signed and minted once per host, so the edge pins that certificate as the Grafana
+  upstream's sole anchor and checks the name `grafana` (`include/upstream-grafana-tls.conf`) —
+  never mixed into `upstream-ca.crt`, since `openssl req -x509` makes it `CA:TRUE` and it would
+  then vouch for other upstreams. Behind `EDGE_GRAFANA_UPSTREAM_VERIFY` (`off` until the owner
+  switches it on, [`deployment.md` → *The edge verifies Grafana*](../deployment.md#the-edge-verifies-grafana));
+  `on` without the certificate, or an unknown value, refuses to start. `check-edge-nginx.sh`
+  renders and starts both shapes and asserts the anchor and the name.
 - The private key of the shared `keystore.p12` never leaves the four existing services — and, once
   REQ-SEC-070 is rolled out, each of those four holds only its own leaf's key; Grafana gets its
   own self-signed certificate.
