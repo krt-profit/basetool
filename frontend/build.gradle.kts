@@ -777,9 +777,9 @@ val playwrightSuiteConfig: Test.() -> Unit = {
   testClassesDirs = sourceSets["e2e"].output.classesDirs
   classpath = sourceSets["e2e"].runtimeClasspath
   dependsOn(playwrightInstall)
-  // ServedBuildCheck compares the stack's stylesheets with the minified copies under
-  // build/resources/main, which the e2e source set does not otherwise depend on: without this a
-  // CSS change leaves them stale and the check reports a mismatch that is not there.
+  // ServedBuildCheck compares the stack's stylesheets with this task's output
+  // (build/generated/minified-css), which the e2e source set does not otherwise depend on: without
+  // this a CSS change leaves it stale and the check reports a mismatch that is not there.
   dependsOn("minifyStaticCss")
   // These flows run against a full stack that E2eStackExtension builds at RUNTIME from the
   // entire app (main code, Thymeleaf templates, Flyway migrations, the backend image) — none of

@@ -121,9 +121,11 @@ final class ServedBuildCheck {
    * it links is byte for byte this checkout's file.
    *
    * <p>Scripts are served as they are in {@code src/main/resources/static/js}. Stylesheets are
-   * served after {@code minifyStaticCss}, so they are compared with the processed copy under {@code
-   * build/resources/main/static/css}, which the e2e compile has just produced from the same
-   * sources.
+   * served as {@code minifyStaticCss} writes them, so they are compared with that task's own output
+   * under {@code build/generated/minified-css}, which the Playwright tasks depend on and so have
+   * just produced from the same sources. Not {@code build/resources/main}: {@code processResources}
+   * copies the minified files there, but nothing on the e2e path runs it, so that copy can be a
+   * build behind the sources.
    *
    * @param baseUrl the frontend origin
    * @param root the checkout's root directory
@@ -190,7 +192,7 @@ final class ServedBuildCheck {
       Path local =
           "js".equals(kind)
               ? root.resolve("frontend/src/main/resources/static/js/" + name + ".js")
-              : root.resolve("frontend/build/resources/main/static/css/" + name + ".css");
+              : root.resolve("frontend/build/generated/minified-css/" + name + ".css");
       if (!Files.isRegularFile(local)) {
         mismatches.add(kind + "/" + name + " is served but missing locally (" + local + ")");
         continue;
