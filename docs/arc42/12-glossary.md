@@ -72,6 +72,6 @@ worth reading even if you know the domain.
 | Looks like | Actually |
 | --- | --- |
 | `basetool_docker_cleanup_*` | The cleanup job's **former** metric name. The alert accepted it while the rename crossed two delivery channels, until 2026-09-22 — §11.1. Nothing writes it. |
-| `versions.properties` | Vestigial. Zero entries, nothing reads it. Versions live in `gradle/libs.versions.toml`. |
+| `versions.properties` | Removed 2026-09-23. It held zero versions; `./gradlew refreshVersions -PrefreshVersions` recreates an empty one, which is gitignored. Versions live in `gradle/libs.versions.toml`. |
 | `keycloak.<domain>` in `edge-certs` | A fifth certificate directory that nothing serves and nothing renews, left from before ADR-0166. |
 | `IRI_COSIGN_VERIFY=false` | A break-glass for a Sigstore outage, **not** the way to run an unsigned image. The sanctioned override for a different signing identity is `IRI_COSIGN_IDENTITY_REGEXP`. |

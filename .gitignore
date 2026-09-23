@@ -97,3 +97,7 @@ ansible/collections/
 ansible/gpg/
 # ansible-lint drops a cache here the first time it runs. Fetched state, like collections/.
 ansible/.ansible/
+# refreshVersions recreates this on every `./gradlew refreshVersions -PrefreshVersions` run, even in
+# catalog mode where it holds no versions. It was committed, empty, until 2026-09-23 (BLD-PERF-04,
+# DOC-20); nothing reads it, and a copy lying around is tool output, not source.
+/versions.properties

@@ -103,7 +103,7 @@ The README is the overview; everything else lives in dedicated, versioned docs:
 - [Docker](https://www.docker.com/) and Docker Compose — for the dependency stack and the dev/test stacks.
 - Access to a Keycloak server — the Docker Compose stack ships one.
 
-The project uses **Gradle 9 with the Kotlin DSL**. Always use the wrapper (`./gradlew`); never the IDE test runner. Dependency versions live in the **version catalog** at `gradle/libs.versions.toml` — edit that, not `build.gradle.kts`. [refreshVersions](https://jmfayard.github.io/refreshVersions/) runs in catalog mode: `./gradlew refreshVersions` annotates the catalog in place with `## ⬆ = "…"` comments for each available update rather than changing any version itself. (`versions.properties` is a vestigial refreshVersions file and holds no versions; nothing reads it.)
+The project uses **Gradle 9 with the Kotlin DSL**. Always use the wrapper (`./gradlew`); never the IDE test runner. Dependency versions live in the **version catalog** at `gradle/libs.versions.toml` — edit that, not `build.gradle.kts`. [refreshVersions](https://jmfayard.github.io/refreshVersions/) runs in catalog mode and only on request: `./gradlew refreshVersions -PrefreshVersions` annotates the catalog in place with `## ⬆ = "…"` comments for each available update rather than changing any version itself. (The empty `versions.properties` it recreates on each run is gitignored.) CI builds with the configuration cache (`--configuration-cache`); a local build can opt in the same way.
 
 ### Local development (apps from Gradle)
 

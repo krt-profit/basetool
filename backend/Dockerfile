@@ -16,7 +16,6 @@ COPY --chmod=755 gradlew .
 COPY gradle/ gradle/
 COPY build.gradle.kts .
 COPY settings.gradle.kts .
-COPY versions.properties .
 COPY gradle.properties .
 COPY backend/build.gradle.kts backend/
 COPY frontend/build.gradle.kts frontend/
@@ -70,8 +69,9 @@ RUN ./gradlew :backend:build \
 
 # Layered JAR extrahieren. The Spring Boot Gradle plugin produces exactly one
 # bootable `backend-<version>.jar` alongside `backend-<version>-plain.jar`
-# (the lightweight non-bootable classifier) and `backend-<version>-sources.jar`
-# (sources artifact from `withSourcesJar()`). The bootable jar is the one
+# (the lightweight non-bootable classifier). A `-sources.jar` came from
+# `withSourcesJar()` until 2026-09-23 (BLD-PERF-02); the rule below still skips
+# one, so reintroducing it cannot break this step. The bootable jar is the one
 # without a classifier — match it explicitly via two filename rules instead
 # of the old `find … | head -n 1` pipeline, which silently picked whichever
 # the directory iterator surfaced first. Building the candidate list in a

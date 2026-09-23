@@ -28,6 +28,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.service.LiveSyncPresenceService;
+import de.greluc.krt.profit.basetool.testsupport.containers.TestImages;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import java.util.Map;
@@ -61,7 +62,7 @@ class RedisLiveSyncFanoutIntegrationTest {
 
   @Container
   static final GenericContainer<?> REDIS =
-      new GenericContainer<>(DockerImageName.parse("redis:7-alpine")).withExposedPorts(6379);
+      new GenericContainer<>(DockerImageName.parse(TestImages.REDIS)).withExposedPorts(6379);
 
   private LettuceConnectionFactory connectionFactory;
   private RedisMessageListenerContainer listenerContainer;

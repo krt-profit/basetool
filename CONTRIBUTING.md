@@ -233,13 +233,34 @@ and "works in the IDE" is not a passing state.
 
 ### CI
 
-The [CI workflow](.github/workflows/ci.yml) runs `./gradlew build --continue`
-on every PR and push to `main`. That includes Spotless, Checkstyle,
+The [CI workflow](.github/workflows/ci.yml) runs `./gradlew build --continue
+--configuration-cache` on every PR and push to `main`. That includes Spotless, Checkstyle,
 SpotBugs, the frontend asset linters and JS type check, the full JUnit
 suite, and the JaCoCo coverage report. Reports are uploaded as workflow
 artefacts so reviewers can download them when investigating a failure.
-**CI must be green before a PR merges** — there is no "rerun until it
-passes" allowance.
+After a green build it fails the job when a committed `openapi.json` differs
+from the one the build just generated (`git diff --exit-code`): an API change
+must commit its regenerated document. **CI must be green before a PR merges** —
+there is no "rerun until it passes" allowance.
+
+**The build scripts must stay configuration-cache compatible**, because CI
+runs with the cache switched on and strict. The usual mistakes are a task
+action (`doLast`, a `CommandLineArgumentProvider`, a `rename {}`) that reads a
+script-level `val` or `project` at execution time — copy the value into a
+local inside the task's configuration block first — and a process started at
+configuration time (use `providers.exec`). Check a build-script change with
+`./gradlew help --configuration-cache` twice (the second run must report
+*Reusing configuration cache*) and `./gradlew build -m --configuration-cache`.
+Repositories are declared only in `settings.gradle.kts`; a module script that
+declares one fails the build (`FAIL_ON_PROJECT_REPOS`).
+
+**Dependency updates** are surfaced by the weekly
+[refresh-versions workflow](.github/workflows/refresh-versions.yml), which runs
+`./gradlew refreshVersions -PrefreshVersions`. The flag is what applies the
+refreshVersions plugin; without it the task does not exist, because the plugin
+is not configuration-cache compatible and is kept off every other build. The
+run annotates `gradle/libs.versions.toml` and recreates an empty, gitignored
+`versions.properties` — do not commit that file.
 
 The `main` ruleset makes five checks **required**: *Build, Test & Lint*
 ([`ci.yml`](.github/workflows/ci.yml)), the two CodeQL *Analyze* jobs
@@ -822,6 +843,12 @@ because of real bugs that shipped. The short version:
 - Structure: Given / When / Then (or Arrange / Act / Assert).
 - Mock external / complex dependencies with Mockito (`@Mock`,
   `@InjectMocks`).
+- Test-only configuration — the `test` profile's `application-test.yml`
+  included — lives in `src/test/resources`, never in `src/main/resources`;
+  the `jar` / `bootJar` tasks fail when a shipped jar contains one.
+- A Testcontainers image a test starts must be the one production runs:
+  Redis comes from `TestImages.REDIS` in `test-support`, which a guard test
+  keeps equal to the compose file and the Quadlet unit.
 - **Every new feature ships with tests.** No exceptions.
 - **Never use production / real credentials in tests or local test
   stacks.** This is a hard rule covering Mockito unit tests, MockMvc,
@@ -852,7 +879,8 @@ the PR — every box should be reasonably tickable.
 - [ ] For schema changes: a new `V<n>__<desc>.sql` migration, `ddl-auto=validate` still passes, destructive operations follow the two-phase rule.
 - [ ] For API changes: `openapi.json` updated, every endpoint carries SpringDoc annotations, write DTOs carry Jakarta validation annotations, list endpoints whitelist sort fields, all timestamps in UTC.
 - [ ] For UI changes: verified on at least one of each device class (Smartphone / Tablet / Desktop / Ultra-wide), every user-visible string in `messages.properties` (DE + EN + fallback), umlauts encoded `\uXXXX` in `.properties`, literal in Markdown.
-- [ ] For dependency upgrades: edited the version catalog `gradle/libs.versions.toml`, not `build.gradle.kts` directly (`versions.properties` is vestigial and holds no versions).
+- [ ] For dependency upgrades: edited the version catalog `gradle/libs.versions.toml`, not `build.gradle.kts` directly (there is no `versions.properties`; the refreshVersions run recreates an empty, gitignored one).
+- [ ] For build-script changes: `./gradlew help --configuration-cache` twice (second run reuses the entry) and `./gradlew build -m --configuration-cache` are green.
 
 If you find yourself wanting to skip a checklist item "for now", that is
 the moment to add a follow-up issue and link it from the PR description

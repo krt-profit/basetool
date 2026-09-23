@@ -24,19 +24,22 @@ plugins {
   // type stays on the classpath for the strongly-typed `subprojects {}` block,
   // which configures the per-module Java formatting. Applying via the plugins DSL
   // (rather than an imperative `apply(...)` in the script body) keeps task
-  // registration in the right phase under `--configure-on-demand`.
+  // registration in the right phase.
   alias(libs.plugins.spotless)
   // `apply false`, like pitest above: puts `LicenseeExtension` / `LicenseeTask` on this script's
   // classpath for the shared licence gate in `subprojects {}` below. Each shipped module applies
   // the plugin itself.
   alias(libs.plugins.licensee) apply false
+  // `apply false`, for the same reason: `SpotBugsTask` and the CycloneDX task types for the shared
+  // `spotbugsMain` registration and SBOM settings in `subprojects {}` below (BLD-SIMP-06).
+  alias(libs.plugins.spotbugs.base) apply false
+  alias(libs.plugins.cyclonedx.bom) apply false
 }
 
+// Repositories are declared once, in settings.gradle.kts (`dependencyResolutionManagement`).
 allprojects {
   group = "de.greluc.krt.profit.basetool"
   version = "0.0.1-SNAPSHOT"
-
-  repositories { mavenCentral() }
 }
 
 // ---------------------------------------------------------------------------
@@ -56,7 +59,8 @@ allprojects {
 //   - `CHANGELOG.md`: the release workflow parses the `[Unreleased]` section, so
 //     a reflow could break it.
 //   - Vendored / build output: `node_modules`, `.gradle`, `build`, `.claude`.
-//   - Tool-managed: `versions.properties` (refreshVersions), the Gradle wrapper.
+//   - Tool-managed: the Gradle wrapper, and a local `versions.properties` that
+//     `-PrefreshVersions` recreates (gitignored, see settings.gradle.kts).
 //
 // YAML and `.properties` get whitespace/newline hygiene ONLY (not a parse-and-
 // re-serialise) so heavily-commented YAML (workflows, `application.yml`,
@@ -64,6 +68,13 @@ allprojects {
 // space and their `\uXXXX` escapes.
 configure<com.diffplug.gradle.spotless.SpotlessExtension> {
   isEnforceCheck = true
+  // LF, stated rather than derived. The default (`GIT_ATTRIBUTES_FAST_ALLSAME`) reads the line
+  // ending out of .gitattributes through a provider that walks the project directory, and under the
+  // configuration cache that walk hashes whatever lies there -- on Windows it died on Gradle's own
+  // locked `.gradle/<version>/checksums/checksums.lock` (measured 2026-09-23, BLD-PERF-04). The
+  // answer it derived was LF for every format below anyway: .gitattributes pins `eol=lf` on
+  // `*.kts`, `*.json`, `*.yml`/`*.yaml`, `*.md`, `*.properties` and `*.java`.
+  lineEndings = com.diffplug.spotless.LineEnding.UNIX
   // Trees Spotless must not touch: generated, vendored, or fetched. The last two are both
   // ansible's — `ansible-galaxy install` drops a few thousand upstream files into
   // `ansible/collections/`, and ansible-lint caches a second copy under `ansible/.ansible/`. Both
@@ -76,8 +87,15 @@ configure<com.diffplug.gradle.spotless.SpotlessExtension> {
   //     Unsupported file type for …/setup_snap/tasks/D-Fedora.yml
   //
   // — so the whole pre-push gate is unrunnable on any workstation that has ever run ansible-lint.
-  // Measured 2026-09-20. targetExclude is evaluated after Gradle snapshots the inputs, which is
-  // why the failure comes from the snapshot rather than from the formatter.
+  // Measured 2026-09-20. `targetExclude` is evaluated after Gradle snapshots the inputs, which is
+  // why the failure came from the snapshot rather than from the formatter.
+  //
+  // Hence `sources(...)` below: the vendored trees are excluded IN the file tree each target is
+  // built from, so the walk prunes them instead of snapshotting them first (2026-09-23). It is not
+  // only about speed. With the configuration cache on, `:spotlessYaml` ran concurrently with
+  // `:frontend:processResources` and died walking `frontend/build/resources/main/META-INF/...` as
+  // that task rewrote it ("Could not read path"), a red build for a file no formatter wanted.
+  // `targetExclude` stays for the handful of in-tree files each format deliberately skips.
   val vendored =
     arrayOf(
       "**/build/**",
@@ -88,10 +106,14 @@ configure<com.diffplug.gradle.spotless.SpotlessExtension> {
       "ansible/collections/**",
       "ansible/.ansible/**",
     )
+  fun sources(vararg includes: String) =
+    fileTree(rootDir) {
+      include(*includes)
+      exclude(*vendored)
+    }
 
   kotlinGradle {
-    target("**/*.gradle.kts")
-    targetExclude(*vendored)
+    target(sources("**/*.gradle.kts"))
     // ktfmt (Google style = 2-space, matching the root build script) is a pure
     // formatter, so `spotlessApply` output always satisfies `spotlessCheck` — no
     // unfixable lint rule can wedge CI the way ktlint's max-line-length would on
@@ -100,9 +122,8 @@ configure<com.diffplug.gradle.spotless.SpotlessExtension> {
   }
 
   json {
-    target("**/*.json")
+    target(sources("**/*.json"))
     targetExclude(
-      *vendored,
       // Test/e2e fixtures may be asserted verbatim — never reflow them.
       "**/src/test/**",
       "**/src/e2e/**",
@@ -121,8 +142,7 @@ configure<com.diffplug.gradle.spotless.SpotlessExtension> {
   }
 
   format("yaml") {
-    target("**/*.yml", "**/*.yaml")
-    targetExclude(*vendored)
+    target(sources("**/*.yml", "**/*.yaml"))
     trimTrailingWhitespace()
     endWithNewline()
   }
@@ -156,16 +176,16 @@ configure<com.diffplug.gradle.spotless.SpotlessExtension> {
   //     every run. That is caused by Spotless TOUCHING the file at all, not by the reflow,
   //     so dropping flexmark does not fix it and the exclusion is still needed.
   format("markdown") {
-    target("**/*.md")
-    targetExclude(*vendored, "CHANGELOG.md", "CHANGELOG-ARCHIVE.md", "LICENSE.md", "CLAUDE.md")
+    target(sources("**/*.md"))
+    targetExclude("CHANGELOG.md", "CHANGELOG-ARCHIVE.md", "LICENSE.md", "CLAUDE.md")
     trimTrailingWhitespace()
     endWithNewline()
   }
 
   format("properties") {
-    target("**/*.properties")
+    target(sources("**/*.properties"))
     // No trimTrailingWhitespace(): an i18n value may legitimately end in a space.
-    targetExclude(*vendored, "versions.properties", "**/gradle-wrapper.properties")
+    targetExclude("versions.properties", "**/gradle-wrapper.properties")
     endWithNewline()
   }
 }
@@ -253,13 +273,105 @@ extra["ossLicenseCoordinateOverrides"] =
     versionAndId.second
   }
 
-// Shared Java conventions for the backend and frontend modules. Both subprojects
-// apply the Spring Boot plugin and need an identical Test/BootRun/JavaCompile
-// setup — centralising it here removes the previous duplication while still
-// letting each module add its own specifics (frontend wires
-// `finalizedBy(tasks.jacocoTestReport)` separately, for example).
+// Shared conventions for every module. Each block below hangs off a plugin id, so a module opts in
+// by applying the plugin and gets the one shared setup; module scripts carry only what is genuinely
+// theirs. Until audit item BLD-SIMP-06 (2026-09-23) the toolchain, Lombok/JetBrains wiring,
+// `spotbugsMain` and the SBOM settings were copied into up to six module scripts each, and the
+// copies had already started to differ in their comments.
 subprojects {
   plugins.withId("java") {
+    // One toolchain for every module. keycloak-spi additionally emits `--release 21` bytecode for
+    // the Keycloak JVM; that is its own script's business.
+    extensions.configure<JavaPluginExtension> {
+      toolchain { languageVersion = JavaLanguageVersion.of(25) }
+    }
+
+    // Lombok and the JetBrains annotations on `main` AND `test`, compile-only on each, so
+    // neither reaches a runtime classpath, an image or an SBOM (ADR-0192). Gradle's
+    // `testCompileOnly` does not extend `compileOnly`, and `testAnnotationProcessor` does not
+    // extend `annotationProcessor`, which is why all four configurations are named. The
+    // frontend's `e2e` source set adds its own three lines, because that source set is the
+    // frontend's alone.
+    //
+    // The Lombok VERSION: every module that imports the Spring Boot BOM
+    // (io.spring.dependency-management) takes the Boot-managed one, and a module without it --
+    // keycloak-spi, which is deliberately no Boot module -- takes the catalog pin, which the
+    // catalog keeps equal to the Boot version because `lombok.config` is one shared file. Chosen
+    // through a provider so the decision is made once all of the module's plugins are applied,
+    // not at whatever point this block runs.
+    val lombok = provider {
+      if (pluginManager.hasPlugin("io.spring.dependency-management")) "org.projectlombok:lombok"
+      else "org.projectlombok:lombok:${libs.versions.lombok.get()}"
+    }
+    listOf("compileOnly", "annotationProcessor", "testCompileOnly", "testAnnotationProcessor")
+      .forEach { dependencies.addProvider(it, lombok) }
+    listOf("compileOnly", "testCompileOnly").forEach {
+      dependencies.add(it, libs.jetbrains.annotations)
+    }
+
+    // Mockito 5+ on JDK 24+ has to be attached as a Java agent: letting the inline mock-maker
+    // self-attach prints a warning today and is slated to fail outright. This is Mockito's own
+    // recipe -- a dedicated, non-transitive `mockitoAgent` configuration -- plus one change: the
+    // argument goes through a `CommandLineArgumentProvider` instead of `jvmArgs(...)`.
+    //
+    // Until audit item BLD-PERF-10 the jar was found with `classpath.find { … }` while CONFIGURING
+    // the task, which resolved the whole test runtime classpath of every module at configuration
+    // time, and its ABSOLUTE path went into `jvmArgs` -- an @Input, so the task's cache key changed
+    // with the Gradle user home and no CI entry could ever be reused by another machine or
+    // worktree. The provider below is not an input at all; the jar's CONTENT is still part of the
+    // key through the test runtime classpath, where the same mockito-core sits.
+    //
+    // A module declares the dependency in its own script (`mockitoAgent(...)`), because only it
+    // knows where its Mockito version comes from; a module that declares none (test-support) gets
+    // no agent. `-Xshare:off` avoids the AppCDS warning a -javaagent otherwise triggers.
+    val mockitoAgent =
+      configurations.register("mockitoAgent") {
+        isCanBeConsumed = false
+        isTransitive = false
+        description = "The mockito-core jar, attached to every Test JVM as a Java agent."
+      }
+    tasks.withType<Test>().configureEach {
+      val agent: FileCollection = mockitoAgent.get()
+      jvmArgumentProviders.add(
+        CommandLineArgumentProvider {
+          agent.files.singleOrNull()?.let { listOf("-Xshare:off", "-javaagent:${it.absolutePath}") }
+            ?: emptyList()
+        }
+      )
+    }
+
+    // No shipped jar may carry the `test` profile (audit item SEC-17). Until 2026-09-23 each
+    // application kept `application-test.yml` in `src/main/resources`, so every production jar and
+    // image carried it: a Testcontainers JDBC URL, disabled TLS, test passwords and a readiness
+    // group narrowed for tests, one `SPRING_PROFILES_ACTIVE=test` away from being live. The files
+    // now live in `src/test/resources`; this check makes the jar task itself fail if one comes
+    // back, so the guard runs wherever a jar is built -- CI, the release images, a laptop.
+    tasks
+      .withType<Jar>()
+      .matching { it.name == "jar" || it.name == "bootJar" }
+      .configureEach {
+        val archive = archiveFile
+        val forbidden =
+          setOf("application-test.yml", "application-test.yaml", "application-test.properties")
+        doLast {
+          val leaked =
+            java.util.zip.ZipFile(archive.get().asFile).use { zip ->
+              zip
+                .entries()
+                .asSequence()
+                .map { it.name }
+                .filter {
+                  it.substringAfterLast('/') in forbidden
+                }
+                .toList()
+            }
+          check(leaked.isEmpty()) {
+            "${archive.get().asFile.name} contains the test profile ($leaked). Test-only " +
+              "configuration belongs in src/test/resources, never in a shipped jar (SEC-17)."
+          }
+        }
+      }
+
     tasks.withType<Test>().configureEach {
       useJUnitPlatform()
       jvmArgs("--enable-native-access=ALL-UNNAMED")
@@ -282,21 +394,14 @@ subprojects {
         mapOf("backend" to "3072m", "frontend" to "2048m", "ingest" to "1024m")[project.name]
           ?: "1024m"
       systemProperty("spring.profiles.active", "test")
-      // Mockito 5+ on JDK 24+ insists on running as a Java agent. Attach it via
-      // -javaagent so the inline mock-maker can self-attach; -Xshare:off avoids
-      // the AppCDS warning under the Spring Boot DevTools class loader.
-      val mockitoCore = classpath.find { it.name.contains("mockito-core") }
-      if (mockitoCore != null) {
-        jvmArgs("-Xshare:off", "-javaagent:${mockitoCore.absolutePath}")
-      }
       // Deliberately NOT setting `maxParallelForks > 1` here even though the
       // M-1 audit recommended it. A trial run with (cores / 2) destabilised
       // `WebClientResilienceTest.timeLimiter_ShouldTimeoutSlowResponses` — the
       // test asserts that a slow upstream times out within ~2 s, and under
       // forked CPU contention the JVM scheduler delay alone ate the budget.
       // Cross-module parallel (`org.gradle.parallel=true` in gradle.properties)
-      // already runs backend and frontend test tasks concurrently, which is
-      // most of the win for a 2-module build; revisit per-module forking once
+      // already runs the modules' test tasks concurrently, which is most of
+      // the win; revisit per-module forking once
       // the timing-sensitive resilience tests get refactored onto virtual time
       // (e.g. StepVerifier.withVirtualTime) so they no longer race against
       // wall-clock GC pauses.
@@ -495,7 +600,7 @@ subprojects {
       // Build the same JVM-arg list the regular Test task uses, so Mockito 5+
       // can self-attach as a Java agent inside PIT's isolated minions and the
       // native-access warning is silenced. The mockito-core path is resolved
-      // lazily from the test runtime classpath.
+      // lazily from the module's `mockitoAgent` configuration.
       //
       // `-Dspring.profiles.active=test` too, for the same reason: it is the other half of what the
       // Test task sets (`systemProperty("spring.profiles.active", "test")` above), and PIT's
@@ -506,15 +611,16 @@ subprojects {
       // before 2026-09-22: "10 tests did not pass without mutation", PitHelpError, no
       // mutations.xml, and a job shown green by `continue-on-error` (audit item CI-03). They pass
       // under `./gradlew test` because the Test task supplies the profile.
-      val testClasspath = configurations.getByName("testRuntimeClasspath")
+      // The agent jar comes from the same `mockitoAgent` configuration the Test tasks use (see the
+      // `plugins.withId("java")` block above), resolved only when PIT actually asks for its args.
+      val mockitoAgent = configurations.named("mockitoAgent")
       jvmArgs.set(
         provider {
           val args =
             mutableListOf("--enable-native-access=ALL-UNNAMED", "-Dspring.profiles.active=test")
-          val mockitoCore = testClasspath.files.find { it.name.contains("mockito-core") }
-          if (mockitoCore != null) {
+          mockitoAgent.get().files.singleOrNull()?.let {
             args += "-Xshare:off"
-            args += "-javaagent:${mockitoCore.absolutePath}"
+            args += "-javaagent:${it.absolutePath}"
           }
           args
         }
@@ -574,6 +680,8 @@ subprojects {
   plugins.withId("com.diffplug.spotless") {
     extensions.configure<com.diffplug.gradle.spotless.SpotlessExtension>("spotless") {
       isEnforceCheck = true
+      // LF, stated rather than derived from .gitattributes -- the root Spotless block says why.
+      lineEndings = com.diffplug.spotless.LineEnding.UNIX
       java {
         // google-java-format is pinned to a version that supports JDK 25.
         // Older google-java-format (the default bundled by earlier Spotless
@@ -640,11 +748,70 @@ subprojects {
   // while an explicit `cyclonedxBom` / `cyclonedxDirectBom` invocation (release or
   // manual) re-enables them. `enabled` has a single writer here, so the guarantee
   // holds regardless of plugin/Gradle configuration order.
+  //
+  // The output convention is shared by all four shipped modules (backend, frontend, ingest,
+  // keycloak-spi): `<module>/docs/<module>-bom.{json,xml}`, committed, refreshed by
+  // release-prepare.yml and attached to the GitHub Release (REQ-OPS-025).
+  //
+  // The SBOM is restricted to the shipped runtime classpath so the signed BOM reflects only what
+  // actually ships in the bootJar / image / provider JAR -- not build- or test-scoped components
+  // (test, checkstyle, spotbugs, annotationProcessor, compileOnly), which otherwise inflate the BOM
+  // with tooling that never runs in production and produce false-positive CVE hits for downstream
+  // scanners. The dependency scan runs in `cyclonedxDirectBom` (cyclonedx-gradle 3.x), and
+  // `includeConfigs` is an allow-list of configuration-name regexes. For keycloak-spi that list is
+  // EMPTY by design -- every Keycloak SPI is `compileOnly` because Keycloak provides it -- and the
+  // empty BOM becomes a tripwire the day someone writes `implementation` there.
   plugins.withId("org.cyclonedx.bom") {
     val sbomExplicitlyRequested =
       gradle.startParameter.taskNames.any { it.substringAfterLast(':').startsWith("cyclonedx") }
-    tasks.named("cyclonedxDirectBom").configure { enabled = sbomExplicitlyRequested }
-    tasks.named("cyclonedxBom").configure { enabled = sbomExplicitlyRequested }
+    tasks.named<org.cyclonedx.gradle.CyclonedxDirectTask>("cyclonedxDirectBom") {
+      enabled = sbomExplicitlyRequested
+      includeConfigs.set(listOf("^runtimeClasspath$"))
+    }
+    tasks.named<org.cyclonedx.gradle.BaseCyclonedxTask>("cyclonedxBom") {
+      enabled = sbomExplicitlyRequested
+      schemaVersion.set(org.cyclonedx.Version.VERSION_16)
+      jsonOutput.set(file("docs/${project.name}-bom.json"))
+      xmlOutput.set(file("docs/${project.name}-bom.xml"))
+      includeBomSerialNumber.set(true)
+      includeLicenseText.set(true)
+      includeBuildSystem.set(true)
+    }
+  }
+
+  // SpotBugs + FindSecBugs on the main source set, identical in every shipped module. The `-base`
+  // variant of the plugin creates no tasks, so `spotbugsMain` is registered here and wired into
+  // `check`. BLOCKING (`ignoreFailures = false`): a HIGH-confidence finding (the FindSecBugs taint
+  // detectors for SQLi / path traversal / SSRF / weak crypto / XXE included) fails the build; this
+  // complements CodeQL with the same class of analysis on every local `check`. A module adds only
+  // what is its own -- the backend's JPA-entity exclude filter, for one.
+  //
+  // XML reporter ONLY -- do NOT also enable HTML. SpotBugs 4.9.8 has a multi-output ordering bug:
+  // with both reporters configured the plugin passes `-html` before `-xml`, and in that order
+  // SpotBugs writes a report with ZERO analysed classes, i.e. the gate silently scans nothing
+  // (verified: html+xml -> total_classes=0; xml-only -> total_classes=768). Re-add an HTML report
+  // only once SpotBugs fixes the ordering.
+  plugins.withId("com.github.spotbugs-base") {
+    dependencies.add("spotbugsPlugins", libs.findsecbugs.plugin)
+    val main = project.extensions.getByType<SourceSetContainer>().named("main")
+    val spotbugsMain =
+      tasks.register<com.github.spotbugs.snom.SpotBugsTask>("spotbugsMain") {
+        group = "verification"
+        description = "Runs SpotBugs analysis on the main source set."
+        sourceDirs.from(main.map { it.allSource.sourceDirectories })
+        classDirs.from(main.map { it.output.classesDirs })
+        auxClassPaths.from(main.map { it.compileClasspath })
+        pluginJarFiles.from(configurations.named("spotbugsPlugins"))
+        effort.set(com.github.spotbugs.snom.Effort.DEFAULT)
+        reportLevel.set(com.github.spotbugs.snom.Confidence.HIGH)
+        ignoreFailures = false
+        reports.create("xml") {
+          required.set(true)
+          outputLocation.set(layout.buildDirectory.file("reports/spotbugs/main.xml"))
+        }
+        dependsOn("classes")
+      }
+    tasks.named("check").configure { dependsOn(spotbugsMain) }
   }
 
   // The third-party licence gate (REQ-UI-021, ADR-0197), from the policy tables above. The plugin
@@ -672,17 +839,20 @@ subprojects {
     }
 
     val licenseeReport = tasks.named<app.cash.licensee.LicenseeTask>("licensee")
+    // A local, because `rename {}` runs at EXECUTION time, where `project` inside a task's
+    // configuration block is `Task.project` -- which the configuration cache refuses.
+    val moduleName = project.name
     val exportLicenseeReport =
       tasks.register<Copy>("exportLicenseeReport") {
         description = "Copies this module's Licensee report under the module's own name."
         from(licenseeReport.flatMap { it.jsonOutput })
         into(layout.buildDirectory.dir("licensee-export"))
-        rename { "${project.name}.json" }
+        rename { "$moduleName.json" }
       }
     configurations.consumable("ossLicenseReportElements") {
       attributes { attribute(Usage.USAGE_ATTRIBUTE, objects.named("oss-license-report")) }
       outgoing.artifact(
-        exportLicenseeReport.map { it.destinationDir.resolve("${project.name}.json") }
+        exportLicenseeReport.map { it.destinationDir.resolve("$moduleName.json") }
       ) {
         builtBy(exportLicenseeReport)
       }
@@ -725,17 +895,50 @@ tasks.register("generateTermsVersion") {
   // version leaves every existing acceptance valid instead of re-prompting the
   // whole squadron — which, with the gate also covering ingest, would otherwise
   // stop the desktop extractor for everyone until they log into the web UI.
-  val override = (project.findProperty("termsVersion") as String?)?.takeIf { it.isNotBlank() }
+  val override = providers.gradleProperty("termsVersion").filter { it.isNotBlank() }
+  val targetForLog = target.relativeTo(rootDir).path
   outputs.upToDateWhen { false }
+  // The digest is computed INSIDE the action, not in a script-level function the action calls
+  // (audit item BLD-PERF-04): a task action that calls back into the build script captures the
+  // script object, which the configuration cache cannot serialise.
+  //
+  // What it computes: every `terms.*` entry of the bundle, sorted, joined and SHA-256'd, truncated
+  // to 16 hex characters. `TermsVersionParityTest` re-derives exactly this in Java and fails the
+  // build when the committed file disagrees, so a change here must change that test with it.
   doLast {
-    val version = override ?: termsVersionDigest(bundle)
+    val version =
+      override.orNull
+        ?: run {
+          val clauses =
+            bundle
+              .readLines(Charsets.UTF_8)
+              .filter { it.startsWith("terms.") && it.contains('=') }
+              .sorted()
+              .joinToString(separator = "\n")
+          check(clauses.isNotEmpty()) { "No terms.* entries found in ${bundle.path}" }
+          // A `.properties` value may be continued onto the next line with a trailing backslash,
+          // and such a continuation line starts with neither `terms.` nor contains `=` — so the
+          // filter above would skip it and editing that part of a clause would NOT change the
+          // version. That silently defeats the one property this whole design exists for. No
+          // terms.* entry uses a continuation today, so this guard is a tripwire for the day
+          // someone wraps a long clause, not a fix for a live bug.
+          check(clauses.lines().none { it.endsWith("\\") }) {
+            "A terms.* entry in ${bundle.path} uses a backslash line continuation. The digest " +
+              "only sees the first line, so edits to the rest would not re-prompt anyone. Put " +
+              "the clause on one line."
+          }
+          java.security.MessageDigest.getInstance("SHA-256")
+            .digest(clauses.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+            .substring(0, 16)
+        }
     target.parentFile.mkdirs()
     // A literal LF, not System.lineSeparator(): Spotless normalises .properties to LF, so a CRLF
     // written here leaves every Windows run of this task with a red spotlessPropertiesCheck for a
     // file whose CONTENT is correct — a "format violation" reported against the one artifact
     // nobody edits by hand, and the build's only hint is to run a 25-minute spotlessApply.
     target.writeText("basetool.terms.version=" + version + "\n", Charsets.UTF_8)
-    logger.lifecycle("Terms-of-Use version: $version -> ${target.relativeTo(rootDir)}")
+    logger.lifecycle("Terms-of-Use version: $version -> $targetForLog")
   }
 }
 
@@ -822,32 +1025,4 @@ dependencyCheck {
     // instead of tens of minutes.
     nvd.delay = 16000
   }
-}
-
-/**
- * Derives the Terms-of-Use version from a message bundle: every `terms.*` entry, sorted, joined and
- * SHA-256'd, truncated to 16 hex characters. Kept as one function so the Gradle task and the parity
- * test cannot drift apart in how they compute it.
- */
-fun termsVersionDigest(bundle: File): String {
-  val clauses =
-    bundle
-      .readLines(Charsets.UTF_8)
-      .filter { it.startsWith("terms.") && it.contains('=') }
-      .sorted()
-      .joinToString(separator = "\n")
-  check(clauses.isNotEmpty()) { "No terms.* entries found in ${bundle.path}" }
-  // A `.properties` value may be continued onto the next line with a trailing backslash, and such a
-  // continuation line starts with neither `terms.` nor contains `=` — so the filter above would
-  // skip it and editing that part of a clause would NOT change the version. That silently defeats
-  // the one property this whole design exists for. No terms.* entry uses a continuation today, so
-  // this guard is a tripwire for the day someone wraps a long clause, not a fix for a live bug.
-  check(clauses.lines().none { it.endsWith("\\") }) {
-    "A terms.* entry in ${bundle.path} uses a backslash line continuation. The digest only sees " +
-      "the first line, so edits to the rest would not re-prompt anyone. Put the clause on one line."
-  }
-  return java.security.MessageDigest.getInstance("SHA-256")
-    .digest(clauses.toByteArray(Charsets.UTF_8))
-    .joinToString("") { "%02x".format(it) }
-    .substring(0, 16)
 }

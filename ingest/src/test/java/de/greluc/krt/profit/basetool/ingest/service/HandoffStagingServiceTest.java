@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.ingest.model.dto.HandoffKind;
 import de.greluc.krt.profit.basetool.ingest.model.dto.StagedHandoff;
 import de.greluc.krt.profit.basetool.ingest.support.LogCapture;
 import de.greluc.krt.profit.basetool.ingest.support.TestProperties;
+import de.greluc.krt.profit.basetool.testsupport.containers.TestImages;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,7 +52,7 @@ class HandoffStagingServiceTest {
 
   @Container
   static final GenericContainer<?> REDIS =
-      new GenericContainer<>(DockerImageName.parse("redis:7-alpine")).withExposedPorts(6379);
+      new GenericContainer<>(DockerImageName.parse(TestImages.REDIS)).withExposedPorts(6379);
 
   /**
    * The Redis key schema the frontend's {@code IngestHandoffService} consumes, spelled out as a
