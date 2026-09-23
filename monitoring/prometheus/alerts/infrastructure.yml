@@ -243,6 +243,29 @@ groups:
           summary: "Redis AOF writes are failing"
           description: "The last Redis AOF write failed (INFO aof_last_write_status:err) while AOF is enabled. AOF is the primary durability layer for the session store, so writes already acknowledged to the frontend are not reaching disk and a crash would log those members out. Check disk space and permissions on the /var/iri/redis bind mount and the redis log."
 
+      # (REQ-SEC-068 / ADR-0207) Redis refused an AUTH or a command under its ACL. With one ACL
+      # user per service, a refusal is one of exactly two things, and both need a human: a service
+      # whose password in .env does not match the rendered users.acl (the rollout's most likely
+      # mistake — that service then cannot reach its sessions, fan-out or handoff), or a rule in
+      # scripts/redis-users.acl.tmpl too narrow for something the service really does (a new
+      # channel or key prefix). A third is the reason the users exist: something that is not one
+      # of our services trying its luck. INFO's acl_access_denied_* counters, verified against the
+      # pinned redis_exporter on 2026-09-23. Held for five minutes so one stray probe cannot page,
+      # while a misconfigured service -- which fails on every connection attempt -- always will.
+      - alert: RedisAclDenials
+        expr: >-
+          (sum(increase(redis_acl_access_denied_auth_total[5m])) or vector(0))
+          + (sum(increase(redis_acl_access_denied_cmd_total[5m])) or vector(0))
+          + (sum(increase(redis_acl_access_denied_key_total[5m])) or vector(0))
+          + (sum(increase(redis_acl_access_denied_channel_total[5m])) or vector(0))
+          > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis is refusing authentication or commands under its ACL ({{ $value | printf \"%.0f\" }} in 5m)"
+          description: "Redis counted ACL refusals (INFO acl_access_denied_auth/cmd/key/channel). With one ACL user per service (REQ-SEC-068) that is a service whose REDIS_<SVC>_PASSWORD does not match the rendered /var/iri/redis/users.acl, a rule in scripts/redis-users.acl.tmpl too narrow for what the service does, or a client that is none of ours. Run `redis-cli ACL LOG 20` inside the redis container as the admin user and read the username, reason and context fields only — the object field can carry a session key, i.e. a session id. See docs/deployment.md, The Redis ACL."
+
       - alert: CertificateExpiringSoon
         expr: (probe_ssl_earliest_cert_expiry - time()) < 14 * 24 * 3600
         for: 1h

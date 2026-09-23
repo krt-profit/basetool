@@ -1,0 +1,54 @@
+# promtool unit tests for AppLiveSyncFramesDropped (BE-PERF-13, ADR-0143 amendment, REQ-OBS-011).
+#
+# The backend writes app live-sync frames off the publishing thread through a bounded per-stream
+# queue; a frame offered to a full queue is dropped and counted. The rule must stay silent for the
+# healthy zero and for a one-off stall, and fire for a sustained stream of drops.
+#
+# Run locally (no promtool on the host - use an ephemeral container, see monitoring/README.md):
+#   docker run --rm --entrypoint promtool -v "$PWD/monitoring/prometheus:/work" -w /work \
+#     prom/prometheus:v3.14.0 test rules tests/app_livesync_frames_dropped_test.yml
+
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  # Micrometer creates the counter on the first drop, so the healthy state has no series at all.
+  - name: silent - streams open, nothing ever dropped
+    interval: 1m
+    input_series:
+      - series: 'basetool_livesync_streams{job="basetool-backend"}'
+        values: "12x180"
+    alert_rule_test:
+      - eval_time: 120m
+        alertname: AppLiveSyncFramesDropped
+        exp_alerts: []
+
+  # One phone stalled on a busy room for a moment: two drops, then nothing.
+  - name: silent - a one-off stall drops two frames
+    interval: 1m
+    input_series:
+      - series: 'basetool_livesync_frames_dropped_total{job="basetool-backend", event="changed"}'
+        values: "0x30 2x150"
+    alert_rule_test:
+      - eval_time: 60m
+        alertname: AppLiveSyncFramesDropped
+        exp_alerts: []
+
+  # A subscriber population that keeps falling behind: one drop a minute for an hour and a half.
+  - name: fires - drops keep arriving
+    interval: 1m
+    input_series:
+      - series: 'basetool_livesync_frames_dropped_total{job="basetool-backend", event="changed"}'
+        values: "0+1x120"
+    alert_rule_test:
+      - eval_time: 40m
+        alertname: AppLiveSyncFramesDropped
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              event: changed
+            exp_annotations:
+              summary: "App live-sync dropping changed frames (full delivery queues)"
+              description: "The backend dropped more than 3 app live-sync `changed` frames in an hour because a stream's bounded delivery queue was full, sustained for 15m — some app subscribers are not reading their SSE stream fast enough, so their screens miss updates until the next frame or navigation. Check basetool_livesync_frames_queued (a standing value names stalled streams), basetool_livesync_send_failures_total, and the edge's proxy_read_timeout / buffering for /api/v1/live-sync/stream."

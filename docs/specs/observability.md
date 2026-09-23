@@ -1690,8 +1690,13 @@ streams, unlabelled — one per screen, so it reads as "members on a live surfac
 `basetool_livesync_streams_evicted_total`, `basetool_livesync_send_failures_total{event,cause}`
 (same bounded `cause` triple as the notification stream), `basetool_livesync_delivered_total`,
 `basetool_livesync_publish_{accepted,rejected}_total` (the client-published half, with `reason`
-separating a client bug from either bucket doing its job), and
-`basetool_livesync_redis_skipped_total{reason}`.
+separating a client bug from either bucket doing its job),
+`basetool_livesync_redis_skipped_total{reason}`, and — since frames are written off the publishing
+thread through a bounded per-stream queue (BE-PERF-13, 2026-09-23) —
+`basetool_livesync_frames_queued` (frames waiting, summed; hovers near zero) and
+`basetool_livesync_frames_dropped_total{event}` (frames refused by a full queue, `event` the
+bounded `subscribed`/`changed`/`heartbeat` triple). `AppLiveSyncFramesDropped` warns on >3 drops/h
+per `event` sustained 15m, the threshold shape of its web-side twin `LiveSyncRelayDropsSustained`.
 
 That last one is a distinction worth stating, because merging it would have been the easy mistake:
 the frontend's staff-only rooms ride the same Redis channel, so this backend sees a **steady**

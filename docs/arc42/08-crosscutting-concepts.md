@@ -24,6 +24,10 @@ Beyond roles there are three mechanisms that are easy to miss:
 - **The session store is not a trust boundary** — a session value names its own class, so the
   frontend reads only classes on `SessionTypeAllowList` (REQ-SEC-067, ADR-0206). Shipped in
   `report` mode, enforced in the E2E stack; production switches to `enforce` by one `.env` value.
+- **Each service reaches Redis as its own ACL user** — `basetool-frontend`, `-backend` and `-ingest`,
+  each confined to its own keys and channels, with `default` switched off at the end of the rollout
+  (REQ-SEC-068, ADR-0207). The ACL is rendered from a committed template with hashes, never
+  passwords, and the E2E stack runs against it.
 
 Authority: [`security-and-access.md`](../specs/security-and-access.md) (`REQ-SEC-*`),
 [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md), `ArchitectureTest`.

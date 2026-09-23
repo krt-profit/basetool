@@ -1647,3 +1647,19 @@ groups:
         annotations:
           summary: "Live-sync section-key skew on {{ $labels.topic_class }} (peers going stale)"
           description: "The live-sync relay has been filtering unknown section keys out of `changed` frames on topic class {{ $labels.topic_class }} for over 2 hours — a broadcast key is missing from the relay's accept-list, so peers' matching panels stay stale with no visible error (the REQ-FE-010 defect class). A section key must exist at all three mirror points at once: the acting page's seam map, LiveSyncTopicClass.allowedSections, and the receiving client's apply map. Check what the last frontend deploy changed on that surface and raise LiveSyncWebSocketHandler to DEBUG to see the rejected key (logged sanitised, never a metric tag)."
+
+      # (BE-PERF-13, ADR-0143 amendment, REQ-OBS-011) The backend's app live-sync streams are written
+      # off the publishing thread through a bounded per-stream queue (64 frames); a frame offered to
+      # a full queue is dropped and counted, never buffered. A queue only fills when a subscriber has
+      # stopped reading for several seconds while its room is busy, so the steady state is zero and
+      # an occasional single drop (one stalled phone on a flood) is not worth a page. More than 3 in
+      # an hour, sustained, means app members are systematically missing `changed` frames — the same
+      # threshold shape as LiveSyncRelayDropsSustained, its web-side twin.
+      - alert: AppLiveSyncFramesDropped
+        expr: sum by (event) (increase(basetool_livesync_frames_dropped_total{job="basetool-backend"}[1h])) > 3
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "App live-sync dropping {{ $labels.event }} frames (full delivery queues)"
+          description: "The backend dropped more than 3 app live-sync `{{ $labels.event }}` frames in an hour because a stream's bounded delivery queue was full, sustained for 15m — some app subscribers are not reading their SSE stream fast enough, so their screens miss updates until the next frame or navigation. Check basetool_livesync_frames_queued (a standing value names stalled streams), basetool_livesync_send_failures_total, and the edge's proxy_read_timeout / buffering for /api/v1/live-sync/stream."

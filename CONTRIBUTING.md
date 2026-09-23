@@ -262,6 +262,42 @@ is not configuration-cache compatible and is kept off every other build. The
 run annotates `gradle/libs.versions.toml` and recreates an empty, gitignored
 `versions.properties` — do not commit that file.
 
+<a id="dependency-verification"></a>**Dependency verification** ([ADR-0208](docs/adr/0208-gradle-verifies-every-dependency-against-a-committed-sha-256.md),
+REQ-OPS-034). Every jar, POM and Gradle module file the build resolves must
+match a SHA-256 in `gradle/verification-metadata.xml`; anything else fails the
+build with *Dependency verification failed*. So **the pull request that changes
+what Gradle resolves** — a catalog bump, a new or removed dependency, a plugin,
+a Gradle-managed tool version such as Checkstyle or google-java-format —
+**regenerates that file in the same commit**:
+
+```bash
+GRADLE_USER_HOME="$(mktemp -d)" ./gradlew --write-verification-metadata sha256 help build :frontend:compileE2eJava
+```
+
+Use an **empty Gradle user home**, as above: on a warm cache the writer never
+sees the parent POMs, BOMs and module files behind what the cache already
+holds, and CI on a cold cache then fails on them (30 components at
+introduction). It downloads everything once, about ten minutes. `help` makes
+the writer resolve every configuration of every project; `build` adds what
+tasks resolve only while running (Spotless's formatters, the Node.js archive). Review the diff for *which* coordinates were added — that is the
+trust you are extending. The command only adds entries; to drop stale ones,
+delete the `<components>` element first and regenerate (optional; an unused
+entry does no harm).
+
+- **The Node.js archive is per operating system.** The file carries the
+  `win-x64` and `linux-x64` entries. On another platform add yours once with
+  `./gradlew --write-verification-metadata sha256 :frontend:nodeSetup`; after a
+  Node bump regenerate both (the Linux entry from a Linux shell or container).
+- **If CI still fails verification on a coordinate your machine never
+  complained about**, the command ran on a warm cache somewhere; run it again as
+  written, or in a Linux container, and commit what it adds.
+- **Dependabot** only manages GitHub Actions, Docker images and the frontend's
+  npm packages here, none of which Gradle resolves. A Dependabot *security
+  update* for a Gradle dependency, should one ever be opened, fails verification
+  until a maintainer pushes the regenerated file to its branch.
+- `refresh-versions.yml` changes no version and needs nothing; the PR that
+  takes one of its proposals regenerates the file.
+
 The `main` ruleset makes five checks **required**: *Build, Test & Lint*
 ([`ci.yml`](.github/workflows/ci.yml)), the two CodeQL *Analyze* jobs
 ([`codeql.yml`](.github/workflows/codeql.yml)), *Verify Signed-off-by on
@@ -879,7 +915,7 @@ the PR — every box should be reasonably tickable.
 - [ ] For schema changes: a new `V<n>__<desc>.sql` migration, `ddl-auto=validate` still passes, destructive operations follow the two-phase rule.
 - [ ] For API changes: `openapi.json` updated, every endpoint carries SpringDoc annotations, write DTOs carry Jakarta validation annotations, list endpoints whitelist sort fields, all timestamps in UTC.
 - [ ] For UI changes: verified on at least one of each device class (Smartphone / Tablet / Desktop / Ultra-wide), every user-visible string in `messages.properties` (DE + EN + fallback), umlauts encoded `\uXXXX` in `.properties`, literal in Markdown.
-- [ ] For dependency upgrades: edited the version catalog `gradle/libs.versions.toml`, not `build.gradle.kts` directly (there is no `versions.properties`; the refreshVersions run recreates an empty, gitignored one).
+- [ ] For dependency upgrades: edited the version catalog `gradle/libs.versions.toml`, not `build.gradle.kts` directly (there is no `versions.properties`; the refreshVersions run recreates an empty, gitignored one), and regenerated `gradle/verification-metadata.xml` ([Dependency verification](#dependency-verification)).
 - [ ] For build-script changes: `./gradlew help --configuration-cache` twice (second run reuses the entry) and `./gradlew build -m --configuration-cache` are green.
 
 If you find yourself wanting to skip a checklist item "for now", that is

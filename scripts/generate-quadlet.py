@@ -399,10 +399,12 @@ VAR_REF_RE = re.compile(r"\$\{[A-Za-z_][A-Za-z0-9_]*(?:[:-][^{}]*)?\}")
 #: Names a Quadlet container receives that the compose service deliberately does NOT put in its
 #: ``environment:``.
 #:
-#: There is exactly one, and it exists because the two deployments need the value in different
-#: places. Compose expands ``${REDIS_PASSWORD:?}`` inside the healthcheck **on the host**, at
-#: file-load time, so the running container never needs the name. Quadlet's ``HealthCmd=`` is
-#: expanded by a shell **inside** the container, so it does.
+#: There is exactly one. It was introduced because the two deployments needed the value in
+#: different places: compose expanded ``${REDIS_PASSWORD:?}`` inside the healthcheck **on the
+#: host**, while Quadlet's ``HealthCmd=`` is expanded by a shell **inside** the container. Since
+#: REQ-SEC-068 the health probe is an unauthenticated ``PING`` and needs no password; the
+#: container keeps ``REDIS_PASSWORD`` because it is the operator's ``admin`` ACL user, used for
+#: ``ACL LOAD`` from inside the container so the value never reaches a host command line.
 #:
 #: Carrying it in compose's ``environment:`` to satisfy Quadlet put the password into the running
 #: Docker container's environment -- readable from ``/proc/1/environ`` and ``docker inspect`` --

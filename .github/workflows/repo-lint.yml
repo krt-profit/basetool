@@ -711,6 +711,12 @@ jobs:
           fi
           echo "none"
 
+      # The Redis ACL renderer (REQ-SEC-068, ADR-0207): hashes never passwords, all-or-nothing,
+      # a `default` line always -- and the committed template must render. Python only, no host.
+      - name: redis-acl / Self-test the Redis ACL renderer
+        if: ${{ !cancelled() }}
+        run: python3 scripts/render-redis-acl.py --selftest
+
   container-checks:
     name: Container checks
     runs-on: ubuntu-latest
