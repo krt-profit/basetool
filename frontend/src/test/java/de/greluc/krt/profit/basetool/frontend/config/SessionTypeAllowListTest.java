@@ -22,6 +22,14 @@ package de.greluc.krt.profit.basetool.frontend.config;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.nimbusds.jose.JOSEException;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.crypto.RSASSASigner;
+import com.nimbusds.jose.jwk.RSAKey;
+import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
 import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ImportIssueCode;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ImportIssueDto;
@@ -33,6 +41,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -60,6 +69,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
+import org.springframework.security.oauth2.client.oidc.authentication.OidcIdTokenDecoderFactory;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
@@ -71,6 +81,9 @@ import org.springframework.security.oauth2.core.oidc.OidcIdToken;
 import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUserAuthority;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.MappedJwtClaimSetConverter;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.csrf.DefaultCsrfToken;
 import org.springframework.security.web.savedrequest.DefaultSavedRequest;
 import org.springframework.validation.BeanPropertyBindingResult;
@@ -144,7 +157,26 @@ class SessionTypeAllowListTest {
             "syncedAuthorities",
             "activeOrgUnit",
             "welcomeMessageShown",
-            "wsBindingListener");
+            "wsBindingListener",
+            "sessionCreatedEventPayload");
+  }
+
+  @Test
+  void aRealOidcLoginsIdTokenIsReadUnderEnforce() {
+    // The 2026-09-23 defect in the first version of the list: an ID token decoded by Nimbus and
+    // converted by Spring's OIDC claim converter carries `iss` as java.net.URL, numeric claims as
+    // java.lang.Long and nested claims as Nimbus's shaded LinkedTreeMap. All three are written with
+    // a type id inside the claims map, and none was on the list, so ENFORCE would have made every
+    // signed-in member's security context unreadable. REPORT (the shipped default) would have
+    // named them; this case makes sure it never has to.
+    OidcIdToken token = decodedIdToken(Instant.parse("2026-09-23T10:00:00Z"));
+
+    Object back = enforcing.deserialize(enforcing.serialize(new ArrayList<>(List.of(token))));
+
+    OidcIdToken read = (OidcIdToken) ((List<?>) back).getFirst();
+    assertThat(read.getClaims().get("iss")).isInstanceOf(java.net.URL.class);
+    assertThat(read.getClaims().get("custom_numeric")).isEqualTo(5L);
+    assertThat(read.getClaims().get("realm_access")).isInstanceOf(Map.class);
   }
 
   @Test
@@ -208,6 +240,15 @@ class SessionTypeAllowListTest {
   @ParameterizedTest
   @CsvSource({
     "java.util.HashMap,true",
+    "java.lang.Long,true",
+    "java.lang.String,true",
+    "java.lang.ProcessBuilder,false",
+    "java.lang.Thread,false",
+    "java.net.URL,true",
+    "java.net.InetAddress,false",
+    "java.math.BigDecimal,true",
+    "com.nimbusds.jose.shaded.gson.internal.LinkedTreeMap,true",
+    "com.nimbusds.jose.shaded.gson.Gson,false",
     "java.util.Collections$UnmodifiableMap,true",
     "java.time.Instant,true",
     "java.util.logging.FileHandler,false",
@@ -221,6 +262,7 @@ class SessionTypeAllowListTest {
     boolean matched =
         SessionTypeAllowList.JDK_VALUE_TYPES.matcher(className).matches()
             || SessionTypeAllowList.VALIDATION_TYPES.matcher(className).matches()
+            || SessionTypeAllowList.JAVA_LANG_SCALARS.matcher(className).matches()
             || SessionTypeAllowList.ALLOWED_EXACT_NAMES.contains(className)
             || SessionTypeAllowList.ALLOWED_PREFIXES.stream().anyMatch(className::startsWith);
 
@@ -339,20 +381,58 @@ class SessionTypeAllowListTest {
   }
 
   /**
+   * An ID token exactly as a real login produces it: signed, decoded by Nimbus, and run through
+   * Spring's default OIDC claim-type conversion — so its claims carry the runtime types production
+   * stores ({@code URL}, {@code Instant}, {@code Long}, Nimbus's {@code LinkedTreeMap}), not the
+   * ones a hand-built map would.
+   *
+   * @param now the issue time.
+   * @return the decoded token.
+   */
+  private static OidcIdToken decodedIdToken(Instant now) {
+    try {
+      RSAKey key = new RSAKeyGenerator(2048).keyID("test").generate();
+      JWTClaimsSet claims =
+          new JWTClaimsSet.Builder()
+              .issuer("https://keycloak.example.test/auth/realms/iri")
+              .subject("member-subject")
+              .audience("basetool-frontend")
+              .issueTime(Date.from(now))
+              .expirationTime(Date.from(now.plusSeconds(300)))
+              .claim("auth_time", now.getEpochSecond())
+              .claim("azp", "basetool-frontend")
+              .claim("sid", "session-id")
+              .claim("email_verified", true)
+              .claim("preferred_username", "member")
+              .claim("realm_access", Map.of("roles", List.of("MEMBER")))
+              .claim("custom_numeric", 5L)
+              .build();
+      SignedJWT jwt =
+          new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("test").build(), claims);
+      jwt.sign(new RSASSASigner(key));
+      NimbusJwtDecoder decoder = NimbusJwtDecoder.withPublicKey(key.toRSAPublicKey()).build();
+      decoder.setClaimSetConverter(
+          new MappedJwtClaimSetConverter(
+              OidcIdTokenDecoderFactory.createDefaultClaimTypeConverters()));
+      Jwt decoded = decoder.decode(jwt.serialize());
+      return new OidcIdToken(
+          decoded.getTokenValue(),
+          decoded.getIssuedAt(),
+          decoded.getExpiresAt(),
+          decoded.getClaims());
+    } catch (JOSEException ex) {
+      throw new IllegalStateException(ex);
+    }
+  }
+
+  /**
    * One value of each kind a production session holds, keyed by a readable name.
    *
    * @return the sample, in insertion order.
    */
   private static Map<String, Object> realisticSession() {
     Instant now = Instant.parse("2026-09-23T10:00:00Z");
-    Map<String, Object> idClaims = new HashMap<>();
-    idClaims.put("sub", "member-subject");
-    idClaims.put("iss", "https://keycloak.example.test/realms/iri");
-    idClaims.put("aud", new ArrayList<>(List.of("basetool-frontend")));
-    idClaims.put("preferred_username", "member");
-    idClaims.put("iat", now);
-    idClaims.put("exp", now.plusSeconds(300));
-    OidcIdToken idToken = new OidcIdToken("id-token-value", now, now.plusSeconds(300), idClaims);
+    OidcIdToken idToken = decodedIdToken(now);
     OidcUserInfo userInfo =
         new OidcUserInfo(Map.of("sub", "member-subject", "email_verified", true));
     Set<GrantedAuthority> authorities = new HashSet<>();
@@ -432,6 +512,9 @@ class SessionTypeAllowListTest {
     flash.put("importRowIssues", rowIssues);
     flash.put("errorToast", "error.inventory.save");
     flash.put("showItemModal", true);
+    // AdminSyncReportsPageController flashes a count, which may be a Long: a final type in an
+    // Object slot, written as ["java.lang.Long", 3].
+    flash.put("deletedCount", 3L);
     flash.startExpirationPeriod(180);
     // A flash map carrying a form's BindingResult is unreadable under EVERY validator today:
     // BeanPropertyBindingResult has no creator Jackson can use (InvalidDefinitionException), so
@@ -453,6 +536,14 @@ class SessionTypeAllowListTest {
     session.put("flashMaps", new ArrayList<>(List.of(flash)));
     session.put("flashMapsWithErrors", new ArrayList<>(List.of(flashWithErrors)));
     session.put("rolesSyncedAt", now.toEpochMilli());
+    // Not an attribute but read through the same serializer: the payload Spring Session publishes
+    // on basetool:session:event:0:created:<id> and every frontend reads back to raise
+    // SessionCreatedEvent (the active-sessions gauge). Its timestamps are Longs inside a HashMap.
+    Map<String, Object> createdEvent = new HashMap<>();
+    createdEvent.put("creationTime", now.toEpochMilli());
+    createdEvent.put("lastAccessedTime", now.toEpochMilli());
+    createdEvent.put("maxInactiveInterval", 1800);
+    session.put("sessionCreatedEventPayload", createdEvent);
     session.put("syncedAuthorities", new ArrayList<>(List.of("ROLE_MEMBER", "ROLE_LOGISTICIAN")));
     session.put("approvalState", "APPROVED");
     session.put(

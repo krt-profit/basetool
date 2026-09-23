@@ -57,6 +57,15 @@ import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
  *   <li>{@code java.util.*} and {@code java.time.*} — the collections, dates and durations Spring
  *       Session, Spring Security and our own filters write. Direct members only: a subpackage such
  *       as {@code java.util.logging} or {@code java.util.concurrent} is <em>not</em> covered;
+ *   <li>the boxed scalars of {@code java.lang}, {@code java.math.BigDecimal} / {@code BigInteger}
+ *       and {@code java.net.URL} / {@code URI} by exact name. A final type sitting in an {@code
+ *       Object}-typed slot of a container is written with a type id after all, as a two-element
+ *       array of class name and value — and a real OIDC login puts exactly such values in the
+ *       session: the ID token's {@code iss} claim is a {@code URL}, a numeric claim a {@code Long},
+ *       and the {@code creationTime} of Spring Session's session-created event payload a {@code
+ *       Long} too;
+ *   <li>{@code com.nimbusds.jose.shaded.gson.internal.LinkedTreeMap} by exact name — the map Nimbus
+ *       decodes a nested JSON claim into ({@code realm_access}, {@code resource_access});
  *   <li>{@code org.springframework.security.*} — the security context, the OAuth2 login and
  *       authorized-client state, the CSRF token and the saved request. The Spring Security Jackson
  *       modules add their own exact types on top, and this prefix covers what they reach through
@@ -96,6 +105,14 @@ public final class SessionTypeAllowList {
   static final Pattern JDK_VALUE_TYPES = Pattern.compile("java\\.(?:util|time)\\.[\\w$]+");
 
   /**
+   * The boxed scalars of {@code java.lang}, matched exactly. Not the package: {@code java.lang}
+   * also holds {@code ProcessBuilder}, {@code Thread} and {@code ClassLoader}.
+   */
+  static final Pattern JAVA_LANG_SCALARS =
+      Pattern.compile(
+          "java\\.lang\\.(?:Boolean|Byte|Character|Double|Float|Integer|Long|Short|String)");
+
+  /**
    * Direct members of {@code org.springframework.validation}: the {@code BindingResult}
    * implementations and the {@code FieldError} / {@code ObjectError} values a failed form carries
    * across a redirect. The {@code beanvalidation} subpackage — factory beans with configuring
@@ -112,14 +129,27 @@ public final class SessionTypeAllowList {
       List.of("org.springframework.security.", "de.greluc.krt.profit.basetool.frontend.model.");
 
   /**
-   * Individually named classes: the redirect flash map and the multi-value map it keeps its target
-   * parameters in. Matched exactly, so a class sharing the prefix (for instance {@code
-   * FlashMapManager}) is not allowed by accident.
+   * Individually named classes, matched exactly, so a class sharing the prefix (for instance {@code
+   * FlashMapManager}) is not allowed by accident: the redirect flash map and the multi-value map it
+   * keeps its target parameters in; the arbitrary-precision numbers and the URL / URI a JSON claim
+   * or Spring's OIDC claim conversion can produce ({@code iss} becomes a {@code URL}); and the map
+   * Nimbus decodes a nested claim object into.
+   *
+   * <p>{@code java.net.URL} is the one entry with a side effect worth naming: its {@code hashCode}
+   * resolves the host, so a {@code URL} placed into a set makes the frontend send a DNS query. A
+   * writer able to plant that could already forge any member's security context in the same hash;
+   * the query is not the risk this list exists for, and refusing {@code URL} would refuse every
+   * signed-in member's ID token.
    */
   static final @Unmodifiable List<String> ALLOWED_EXACT_NAMES =
       List.of(
           "org.springframework.web.servlet.FlashMap",
-          "org.springframework.util.LinkedMultiValueMap");
+          "org.springframework.util.LinkedMultiValueMap",
+          "java.math.BigDecimal",
+          "java.math.BigInteger",
+          "java.net.URL",
+          "java.net.URI",
+          "com.nimbusds.jose.shaded.gson.internal.LinkedTreeMap");
 
   /**
    * Upper bound on the distinct refused class names that are each logged once at {@code WARN}. A
@@ -213,6 +243,7 @@ public final class SessionTypeAllowList {
     }
     AllowListBuilder builder = new AllowListBuilder(mode, listener);
     builder.allowIfSubType(JDK_VALUE_TYPES);
+    builder.allowIfSubType(JAVA_LANG_SCALARS);
     builder.allowIfSubType(VALIDATION_TYPES);
     for (String prefix : ALLOWED_PREFIXES) {
       builder.allowIfSubType(prefix);
