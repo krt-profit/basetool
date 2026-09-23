@@ -863,6 +863,15 @@ configuration. Its sibling `app.http.backend-protocol` (`H2` by default, `HTTP11
 ADR-0161 §8.1) picks the transport of the same hop and changes no byte of the payload; the SSE relay
 stays on HTTP/1.1 either way.
 
+> [!note] Corrected 2026-09-23 (BE-PERF-14, ADR-0161 amendment)
+> The paragraph below describes the configuration, not what the hop carries. Measured on a real
+> Tomcat 11: the ETagged `no-cache` families (missions, materials, the catalogue behind the 23x
+> figure) are **never** gzipped — Tomcat refuses compression for a strong ETag — and on the no-store
+> families, where it did happen, gzip made the internal request 1.6–3.2 ms slower for a byte saving
+> that is worth nothing on a single-host bridge. The frontend therefore no longer sends
+> `Accept-Encoding` on the backend hop; `server.compression` (CBOR included) stays for the callers
+> behind the edge that ask for it.
+
 **Compressed, like the JSON it stands beside.** `application/cbor` is on
 `server.compression.mime-types`. The first revision of this requirement left it off and argued that
 skipping gzip was the point — bytes for CPU on an internal hop. **That was wrong on the numbers.**

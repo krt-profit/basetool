@@ -21,17 +21,13 @@ package de.greluc.krt.profit.basetool.frontend;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.zip.GZIPOutputStream;
 import okhttp3.mockwebserver.Dispatcher;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
-import okio.Buffer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -47,22 +43,16 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
- * Verifies the gzip content-negotiation wired into the non-streaming backend connector by {@link
- * de.greluc.krt.profit.basetool.frontend.config.WebClientConfig}.
+ * Pins that neither backend connector of {@link
+ * de.greluc.krt.profit.basetool.frontend.config.WebClientConfig} asks the backend for gzip
+ * (BE-PERF-14, ADR-0161 §8.5 amendment 2026-09-23).
  *
- * <p>{@code HttpClient.compress(true)} is applied only on the regular request/response connector
- * ({@code connector(false)}), which backs both {@code webClient} and {@code termsDocumentClient}.
- * Two properties must hold:
- *
- * <ul>
- *   <li>the non-streaming client advertises {@code Accept-Encoding: gzip} and transparently
- *       decompresses a {@code Content-Encoding: gzip} response body — if compression were not
- *       enabled the gzipped bytes would reach the String decoder verbatim and the assertion on the
- *       decoded payload would fail;
- *   <li>the streaming client ({@code sseWebClient}, backed by {@code connector(true)}) does NOT
- *       advertise gzip — per-event gzip on an SSE relay would only buffer the stream, so the
- *       compression flag is deliberately omitted there.
- * </ul>
+ * <p>The frontend→backend hop is a container bridge on one host. Measured on the real embedded
+ * Tomcat, gzip on a 210 KB page cost about 1.6 ms of CPU per response across both ends and made the
+ * request 1.6–3.2 ms slower, while the byte saving it bought is worth nothing on that hop. So the
+ * regular connector ({@code webClient}, {@code termsDocumentClient}) sends no {@code
+ * Accept-Encoding}, exactly like the SSE relay connector ({@code sseWebClient}) always did — where
+ * per-event gzip would only buffer the stream. A backend that is not asked never compresses.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -75,13 +65,12 @@ import org.springframework.web.reactive.function.client.WebClient;
     })
 class WebClientCompressionTest {
 
-  private static final String GZIP_PATH = "/api/v1/compress-probe";
+  private static final String PLAIN_PATH = "/api/v1/compress-probe";
   private static final String SSE_PATH = "/api/v1/stream-probe";
   private static final String PAYLOAD = "{\"value\":\"the-quick-brown-fox-compresses-cleanly\"}";
 
   private static final Map<String, String> acceptEncodingByPath = new ConcurrentHashMap<>();
   private static MockWebServer server;
-  private static byte[] gzippedPayload;
 
   @Autowired private WebClient termsDocumentClient;
 
@@ -93,7 +82,6 @@ class WebClientCompressionTest {
 
   @BeforeAll
   static void startServer() throws IOException {
-    gzippedPayload = gzip(PAYLOAD);
     server = new MockWebServer();
     server.start(0);
 
@@ -104,12 +92,11 @@ class WebClientCompressionTest {
             String path = request.getPath();
             acceptEncodingByPath.put(
                 path == null ? "" : path, String.valueOf(request.getHeader("Accept-Encoding")));
-            if (GZIP_PATH.equals(path)) {
+            if (PLAIN_PATH.equals(path)) {
               return new MockResponse()
                   .setResponseCode(200)
                   .addHeader("Content-Type", "application/json")
-                  .addHeader("Content-Encoding", "gzip")
-                  .setBody(new Buffer().write(gzippedPayload));
+                  .setBody(PAYLOAD);
             }
             if (SSE_PATH.equals(path)) {
               return new MockResponse()
@@ -136,16 +123,18 @@ class WebClientCompressionTest {
   }
 
   @Test
-  void nonStreamingClient_AdvertisesGzip_AndDecompressesTransparently() {
+  void nonStreamingClient_DoesNotAdvertiseGzip() {
     String body =
-        termsDocumentClient.get().uri(GZIP_PATH).retrieve().bodyToMono(String.class).block();
+        termsDocumentClient.get().uri(PLAIN_PATH).retrieve().bodyToMono(String.class).block();
 
-    assertThat(body)
-        .as("gzipped response body must be transparently decompressed back to the original payload")
-        .isEqualTo(PAYLOAD);
-    assertThat(acceptEncodingByPath.get(GZIP_PATH))
-        .as("non-streaming client must advertise gzip so the backend can compress the response")
-        .contains("gzip");
+    assertThat(body).isEqualTo(PAYLOAD);
+    String acceptEncoding = acceptEncodingByPath.get(PLAIN_PATH);
+    assertThat(acceptEncoding == null || !acceptEncoding.contains("gzip"))
+        .as(
+            "the regular connector must not ask for gzip: on the internal hop it costs CPU at both"
+                + " ends and buys nothing (BE-PERF-14), and was sent as '%s'",
+            acceptEncoding)
+        .isTrue();
   }
 
   @Test
@@ -158,20 +147,5 @@ class WebClientCompressionTest {
             "SSE relay connector must not request gzip (per-event gzip would only buffer the"
                 + " stream)")
         .isTrue();
-  }
-
-  /**
-   * Gzip-compresses the given text into the wire bytes a compression-enabled backend would return.
-   *
-   * @param text the payload to compress
-   * @return the gzip-encoded bytes
-   * @throws IOException if the in-memory gzip stream fails (never, for a byte array)
-   */
-  private static byte[] gzip(String text) throws IOException {
-    ByteArrayOutputStream bos = new ByteArrayOutputStream();
-    try (GZIPOutputStream gos = new GZIPOutputStream(bos)) {
-      gos.write(text.getBytes(StandardCharsets.UTF_8));
-    }
-    return bos.toByteArray();
   }
 }
