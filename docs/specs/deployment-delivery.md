@@ -782,7 +782,9 @@ throwaway cache (Redis is session-store only, ADR-0074):
   defect here.
 
 Both command lines — the `redis-dev` template and the `redis` prod override (which additionally
-carries `--aclfile`) — stay in lockstep on these persistence/memory flags. The posture is
+carries `--aclfile`) — stay in lockstep on these persistence/memory flags, and both carry
+`--notify-keyspace-events Egx`, which Spring Session needs and the frontend's own ACL user may not
+set itself (REQ-SEC-068). The posture is
 **observable**: because `--maxmemory` is set (`redis_memory_max_bytes > 0`), the `RedisMemoryHigh`
 leading-indicator alert is functional (it self-guards on that being non-zero and was inert while
 maxmemory was unset), and `RedisEvictions` is a misconfiguration tripwire (any eviction under
@@ -800,7 +802,8 @@ posture has ever had on the **primary** durability layer.
 
 - [ ] Both redis command lines in `docker-compose.yml` set `--appendonly yes --appendfsync everysec`,
   `--save "60 1"`, `--maxmemory 384mb`, and `--maxmemory-policy noeviction`; the prod override keeps
-  `--aclfile` and the two lines carry identical persistence/memory flags.
+  `--aclfile` and the two lines carry identical persistence/memory flags and
+  `--notify-keyspace-events Egx`.
 - [ ] `--maxmemory` (384mb) is strictly below the container memory limit (512M) so a snapshot /
   AOF-rewrite fork has copy-on-write headroom.
 - [ ] The eviction policy is `noeviction`; no `allkeys-*` / `volatile-*` policy is configured.

@@ -44,6 +44,7 @@ import org.springframework.session.FlushMode;
 import org.springframework.session.Session;
 import org.springframework.session.config.SessionRepositoryCustomizer;
 import org.springframework.session.data.redis.RedisIndexedSessionRepository;
+import org.springframework.session.data.redis.config.ConfigureRedisAction;
 import org.springframework.session.data.redis.config.annotation.web.http.EnableRedisIndexedHttpSession;
 import org.springframework.session.security.SpringSessionBackedSessionRegistry;
 import org.springframework.validation.AbstractBindingResult;
@@ -507,6 +508,23 @@ public class RedisSessionConfig {
           flushModeValue);
       return FlushMode.IMMEDIATE;
     }
+  }
+
+  /**
+   * Replaces Spring Session's startup {@code CONFIG SET notify-keyspace-events} with a version that
+   * tolerates a Redis user that may not run {@code CONFIG} (REQ-SEC-068, ADR-0207).
+   *
+   * <p>{@code @EnableRedisIndexedHttpSession} picks up a {@link ConfigureRedisAction} bean in place
+   * of its default. Under the shared {@code default} user nothing changes: the delegate runs as it
+   * always did. Under the frontend's own ACL user the refusal is logged and the server's {@code
+   * --notify-keyspace-events Egx} is relied on instead.
+   *
+   * @return the tolerant action.
+   */
+  @NotNull
+  @Bean
+  public ConfigureRedisAction configureRedisAction() {
+    return new TolerantKeyspaceNotificationsAction();
   }
 
   /**

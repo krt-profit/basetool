@@ -58,6 +58,19 @@
     # the units into the repository, where they are drift-checked and committed; the host receives
     # the RESULT through the config bundle and has no business generating anything.
     - render-env-d.py
+    # The Redis ACL renderer (REQ-SEC-068, ADR-0207): one ACL user per service, rendered with
+    # SHA-256 hashes from the rules template installed beside it. Run by the OPERATOR, never by
+    # deploy.sh -- writing the ACL of a live session store is a decision, not a deploy step.
+    - render-redis-acl.py
+
+- name: Install the Redis ACL rules template
+  ansible.builtin.copy:
+    src: "{{ basetool_host_scripts_src }}/redis-users.acl.tmpl"
+    dest: "{{ basetool_host_root_dir }}/code/scripts/redis-users.acl.tmpl"
+    owner: root
+    group: root
+    # A template, not a program; it holds rules and placeholders, never a secret.
+    mode: "0644"
 
 # --- Retire the units this role used to install -------------------------------------------------
 #
