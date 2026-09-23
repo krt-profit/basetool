@@ -22,6 +22,9 @@ package de.greluc.krt.profit.basetool.backend.config;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Objects;
 import org.junit.jupiter.api.Test;
@@ -109,6 +112,40 @@ class JwkSetUriNamespaceTest {
     assertThat(propertyOf("application-prod.yml", APP_KEY))
         .as("prod must keep the internal-JWKS knob on %s", APP_KEY)
         .isEqualTo("${KEYCLOAK_JWK_SET_URI:}");
+  }
+
+  /**
+   * Production actually passes the knob to the backend (added 2026-09-23). {@code
+   * application-prod.yml} read {@code KEYCLOAK_JWK_SET_URI} from the start, but neither the compose
+   * file nor the Quadlet environment it generates ever set it, so REQ-SEC-024's internal JWKS could
+   * not be switched on in production at all. The default must stay empty: that keeps the
+   * issuer-location decoder exactly as before, so shipping the wiring changes nothing until the
+   * owner sets {@code IRI_BACKEND_KEYCLOAK_JWK_SET_URI}.
+   *
+   * @throws IOException if the environment template cannot be read.
+   */
+  @Test
+  void productionPassesTheKnobToTheBackendWithAnEmptyDefault() throws IOException {
+    Path template = repositoryRoot().resolve("quadlet/env.d/backend.env.tmpl");
+    assertThat(Files.readAllLines(template))
+        .as("the backend's Quadlet environment must pass KEYCLOAK_JWK_SET_URI, empty by default")
+        .contains("KEYCLOAK_JWK_SET_URI=${IRI_BACKEND_KEYCLOAK_JWK_SET_URI:-}");
+  }
+
+  /**
+   * Walks up from the working directory to the repository root, marked by {@code
+   * settings.gradle.kts}: Gradle runs this from {@code backend/}, an IDE may not.
+   *
+   * @return the repository root.
+   */
+  private static Path repositoryRoot() {
+    for (Path p = Paths.get("").toAbsolutePath(); p != null; p = p.getParent()) {
+      if (Files.exists(p.resolve("settings.gradle.kts"))) {
+        return p;
+      }
+    }
+    throw new IllegalStateException(
+        "repository root not found above " + Paths.get("").toAbsolutePath());
   }
 
   /**

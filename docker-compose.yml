@@ -644,6 +644,15 @@ x-backend: &backend-template
     # SILENTLY until the fetch-failure alert fires.
     KEYCLOAK_ADMIN_URL: https://keycloak:18443/auth
     KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:?KEYCLOAK_ADMIN_CLIENT_SECRET must be set in .env}
+    # Optional split-horizon JWKS (REQ-SEC-024, ADR-0073): fetch the token-signing keys from the
+    # INTERNAL Keycloak over net-backend-keycloak and the `keycloak-trust` bundle instead of through
+    # the public edge; `iss` is still checked against the public issuer. Empty (the default) keeps
+    # the issuer-location decoder exactly as before. application-prod.yml has read
+    # KEYCLOAK_JWK_SET_URI all along, but nothing passed it, so the documented knob could not be
+    # turned. The production value is
+    # https://keycloak:18443/auth/realms/iri/protocol/openid-connect/certs. Backend only: the ingest
+    # gateway reads the same property but sits on no network that reaches Keycloak.
+    KEYCLOAK_JWK_SET_URI: ${IRI_BACKEND_KEYCLOAK_JWK_SET_URI:-}
     # Cadence of the periodic Keycloak->local user sync (ADR-0085). Forwarded for the same reason
     # the retention sweeps below are: application.yml calls these "env-parameterised ... so the
     # cadence is tunable without a rebuild", and `.env.example` offers both to an operator -- but a

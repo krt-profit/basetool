@@ -1178,6 +1178,13 @@ from masquerading as an application outage (the failure mode that drove the fron
   confusion). Empty (the default) preserves the auto-configured, issuer-derived decoder
   byte-for-byte — the knob is off until an operator opts in, and the `test` profile's placeholder
   issuer is unaffected.
+  *(Corrected 2026-09-23: the backend's production environment never carried the variable —
+  neither `docker-compose.yml` nor the Quadlet `env.d` template passed it — so the opt-in could not
+  be taken in production. It now reaches the backend as `KEYCLOAK_JWK_SET_URI` from the host's
+  `IRI_BACKEND_KEYCLOAK_JWK_SET_URI`, empty by default; the runbook is
+  [`deployment.md` → *Internal JWKS for the backend*](../deployment.md#internal-jwks-for-the-backend).
+  The ingest gateway reads the same property but sits on no network that reaches Keycloak, so it is
+  not wired.)*
 - **The knob lives on `app.security.jwt.*` and MUST NOT be declared under Spring's
   `spring.security.oauth2.resourceserver.jwt.jwk-set-uri`.** The two keys look interchangeable and
   behave oppositely when blank. The application's own key is read by
@@ -1207,6 +1214,8 @@ from masquerading as an application outage (the failure mode that drove the fron
 - [ ] No profile declares `spring.security.oauth2.resourceserver.jwt.jwk-set-uri`; the override is
   only ever `app.security.jwt.jwk-set-uri`, so an unset `KEYCLOAK_JWK_SET_URI` leaves the
   auto-configured decoder in place instead of failing the context at boot.
+- [x] The backend's production environment passes `KEYCLOAK_JWK_SET_URI`, empty unless the host
+  sets `IRI_BACKEND_KEYCLOAK_JWK_SET_URI` (`JwkSetUriNamespaceTest`).
 - [ ] A JWKS timeout / 5xx / DNS failure yields `503` + `Retry-After` (not `500`), logged at WARN
   and counted on `basetool_http_error_total{code="SERVICE_UNAVAILABLE"}`.
 - [ ] An expired/invalid bearer token still yields `401`; a caller lacking the required role still
