@@ -1,6 +1,6 @@
 # ADR-0143 — The app's live sync: a backend SSE stream and a client-published `changed` relay
 
-- **Status:** Accepted
+- **Status:** Accepted — amended 2026-09-23 (frames written off the publishing thread, see the end)
 - **Date:** 2026-08-23
 - **Deciders:** @greluc
 - **Related:** ADR-0094 (the tool-wide topic-room relay this bridges into) · ADR-0126 (presence gossip, deliberately not bridged) · ADR-0031 (the mission relay both generalize) · ADR-0016 (notification SSE, whose Redis deferral ADR-0094 discharged) · REQ-FE-010 · REQ-API-009 · REQ-SEC-037 · REQ-OBS-011 · basetool-android phase 4
@@ -194,3 +194,47 @@ not solved with a compose `depends_on` gate: `depends_on` is not re-evaluated on
 restart, on `docker restart backend`, on `up -d --no-deps backend` (which `scripts/deploy.sh` itself
 runs on health recovery), or when redis is recreated under a running backend — which are exactly the
 paths this happened on.
+
+## Amendment — 2026-09-23: frames are written off the publishing thread
+
+*Improvement audit 2026-09, finding BE-PERF-13, approved by @greluc.*
+
+`LiveSyncStreamService.deliver` wrote a `changed` frame to every stream of the room **on the thread
+that published it** — the request thread of `POST /live-sync/changed`, or the Redis listener thread
+for a consumed frame. A subscriber whose socket buffer was full (a phone in a tunnel, a stalled NAT)
+blocked that write, and with it the publishing request and every subscriber after it in the loop.
+Rooms are small today, so this had not bitten; it grows with the room, which is why it was fixed
+before it did.
+
+**Decision.** Every write — `subscribed`, `changed`, `heartbeat` — goes into the stream's own bounded
+queue (**64 frames**) and one drain task per stream empties it on a **virtual-thread-per-task**
+executor:
+
+- **Order per stream is kept.** A one-shot `draining` flag allows one drain per stream at a time, and
+  the drain takes frames in queue order. The `subscribed` event is queued before the stream joins any
+  room, so it is always the first frame — a guarantee the synchronous version only had by timing.
+- **Back-pressure drops; it never grows.** A frame offered to a full queue is dropped and counted in
+  `basetool_livesync_frames_dropped_total{event}`. Sixty-four frames is several seconds of a room at
+  the per-topic bucket's 100 frames/s ceiling, so a full queue means the subscriber stopped reading;
+  buffering for it without bound would hold memory for the whole 30-minute emitter life. A lost
+  `changed` costs a stale panel until the next frame or navigation — the app re-fetches through its
+  own reads — which is the same "degrade to a bounded refresh rate, never to data loss" the buckets
+  above already accept.
+- **Threads are bounded by streams, not by frames.** One drain per stream, at most four streams per
+  member (the existing cap), so a blocked write parks one virtual thread and delays no one else. No
+  platform thread is added, so the `pids` envelope ADR-0094 sized is untouched.
+- A failed write still retires the stream, now from the drain; the retire path is unchanged.
+
+**Observability.** `basetool_livesync_frames_queued` (gauge) and
+`basetool_livesync_frames_dropped_total{event}` join the backend-only live-sync series; the
+*App live-sync streams* panel shows both, and `AppLiveSyncFramesDropped` warns on >3 drops/h per
+event sustained 15m (promtool-tested).
+
+**Guards.** `LiveSyncStreamServiceTest`: a subscriber whose write blocks does not hold `deliver`
+(which must return within 2 s) nor a healthy peer, and gets its frames in order once it reads again;
+forty frames published back to back arrive in order; a full queue drops exactly the overflow, counts
+it, and the queued gauge follows. The existing cases run over a direct executor and are unchanged.
+
+ADR-0094 is unaffected: the frontend's `/ws/sync` relay already wrote through Spring's
+concurrent-send decorator with its own buffer bound; this brings the backend's app bridge to the same
+posture.

@@ -36,6 +36,11 @@
 
 ### Changed
 
+- **App-Live-Sync: ein hängendes Handy bremst niemanden mehr aus.** Das Backend schreibt
+  Änderungsmeldungen an die App jetzt pro Verbindung im Hintergrund statt im Request dessen, der die
+  Änderung gemacht hat. Eine Verbindung, die nicht mehr liest, verliert höchstens eigene Meldungen
+  (gezählt und überwacht), statt Speicher zu belegen (ADR-0143).
+
 - **Edge: Stylesheets, Skripte und JSON-Antworten werden jetzt komprimiert ausgeliefert.** Bisher
   hat der Edge-Proxy nur HTML gepackt; CSS, JavaScript und API-Antworten gingen unkomprimiert
   raus. Seiten übertragen dadurch weniger Daten.
