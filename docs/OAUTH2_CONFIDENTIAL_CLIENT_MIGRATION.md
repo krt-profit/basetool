@@ -1,365 +1,133 @@
 # OAuth2 confidential-client migration (audit finding M-6)
 
-> **Doc type:** Implementation runbook for [ADR-0001](adr/0001-frontend-confidential-oauth2-client.md).
-> The *decision* and its rationale live in the ADR; this document is the step-by-step *how*.
-> Registered in [`docs/specs/INDEX.md`](specs/INDEX.md). Last reviewed: 2026-09-22 — every file,
-> class and setting named below re-checked against the repository; commands rewritten for the
-> rootless-Podman production host.
+> **Doc type:** Implementation runbook for [ADR-0001](adr/0001-frontend-confidential-oauth2-client.md)
+> and REQ-SEC-069. The *decision* and its rationale live in the ADR; this document is the
+> step-by-step *how*. Registered in [`docs/specs/INDEX.md`](specs/INDEX.md). Rewritten 2026-09-23 when
+> the code part shipped (improvement audit finding APPSEC-07).
 
-**Status:** open — neither the code part nor the Keycloak part has been carried out. On 2026-09-22
-`frontend/src/main/resources/application.yml` still registers `basetool-frontend` with
-`client-authentication-method: none`, the realm reference still has `publicClient: true`, and
-ADR-0001 is *Accepted — implementation pending*.
-**Audit finding:** M-6 (security audit 2026-05-20).
-**Severity:** Medium (defence in depth — no directly exploitable vector).
+**Status:** the **code part is done** and inert; the **production rollout is open** and needs the
+owner's yes for each write below. Until then production's `basetool-frontend` is a public client
+(PKCE `S256`, hardening step 6) and the frontend runs without `KEYCLOAK_FRONTEND_CLIENT_SECRET`.
+**Audit findings:** M-6 (security audit 2026-05-20), APPSEC-07 (improvement audit 2026-09-22).
 
-## What this is about
-
-The frontend Spring Boot server is currently registered with Keycloak as a **public OAuth2 client**:
-
-```yaml
-# frontend/src/main/resources/application.yml
-spring:
-  security:
-    oauth2:
-      client:
-        registration:
-          keycloak:
-            client-id: basetool-frontend
-            client-authentication-method: none   # ← public client, PKCE only
-            scope: openid, profile, email, roles
-            authorization-grant-type: authorization_code
-            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
-```
-
-"Public" means that at the token endpoint the frontend sends only the authorization code and the
-PKCE verifier — **no client secret**. That is RFC-conformant (RFC 8252, RFC 9700 BCP) and the norm
-for SPAs and mobile apps, which cannot keep a secret.
-
-This frontend is not an SPA: it is a server-side Thymeleaf application, i.e. a **confidential**
-component that can hold a secret in a server environment variable. Not doing so is a missed
-defence-in-depth opportunity.
-
-> [!note] What is already in place — Keycloak requires PKCE `S256`
-> Since the Keycloak hardening run (step 6, applied by 2026-09-09 —
-> [`KEYCLOAK_HARDENING_RUNBOOK.md`](KEYCLOAK_HARDENING_RUNBOOK.md)) the realm **requires** `S256`
-> on `basetool-frontend`, so an authorization request without a PKCE challenge is refused. That
-> closes the PKCE downgrade; it does not add the second factor at the token endpoint this migration
-> is about, so **M-6 stays open** until the steps below are done.
+> [!warning] Corrected 2026-09-23 — the migration is no longer a maintenance window
+> Earlier revisions of this runbook said logins fail between flipping the Keycloak client and
+> deploying the secret, and planned 5–10 minutes of downtime. That was true of the design it
+> described (Keycloak first, then the frontend). Two facts remove the window: Keycloak accepts a
+> client secret from a client it still considers public (it ignores it — measured on Keycloak 26.7,
+> 2026-09-23), and the frontend now derives its client type from whether the secret is set. So the
+> frontend goes first, Keycloak second, and there is no moment in which either side refuses the
+> other. The old Parts A–C are replaced by the sequence below.
 
 ## What the secret adds
 
-With PKCE alone: whoever captures the authorization code **and** holds the PKCE verifier can redeem
-it. The code comes back as a `?code=…` query parameter on `/login/oauth2/code/keycloak`, so it is
-briefly visible in the path of a TLS-terminated request.
+With PKCE alone, whoever captures the authorization code **and** the PKCE verifier can redeem it;
+the code travels as `?code=…` on `/login/oauth2/code/keycloak`, through the TLS-terminating edge.
+With a client secret as well, a captured code cannot be redeemed without the secret, which only the
+frontend's environment holds. PKCE stays on: the pattern is **PKCE + client secret**.
 
-Realistic interception vectors:
+## What shipped (code, REQ-SEC-069)
 
-- **A compromised TLS-terminating reverse proxy** (the edge nginx on the host). Whoever has access
-  there sees the code in clear text.
-- **Server-side request forgery** in a neighbouring application that can reach the edge's access
-  logs.
-- **A misconfigured open redirect** in the frontend that sends the authorization response to an
-  attacker's host.
-- **Browser-side malware** reading the redirect parameter.
+- **One variable decides.** `KEYCLOAK_FRONTEND_CLIENT_SECRET` set → the `keycloak` registration is
+  `client_secret_basic` + PKCE; unset or blank → `none` + PKCE, exactly as before
+  (`FrontendClientAuthenticationConfig`). The method and the secret cannot disagree.
+- **PKCE in both modes.** Spring Security 7's `ClientSettings.requireProofKey` defaults to `true`;
+  `FrontendClientAuthenticationConfigTest` pins it, because Keycloak requires `S256` and a
+  confidential client that stopped sending PKCE would fail every login.
+- **Existing sessions follow the switch.** `CurrentRegistrationAuthorizedClientRepository` stores
+  the authorized client **without** the secret and gives it the **current** registration on every
+  read. A session created while the frontend was public therefore refreshes as the confidential
+  client at once — nobody is signed out — and the secret never lands in Redis.
+- **The provisioner changes the type only when told.** `provision-keycloak-realm.py` leaves the
+  frontend client's type as it is unless `--frontend-client public|confidential` is passed; with
+  `confidential` it sets Keycloak's secret from `$KEYCLOAK_FRONTEND_CLIENT_SECRET` (stdin to kcadm,
+  never printed) in the same update that flips the client, and refuses without the variable
+  (ADR-0202 amendment 2).
+- **E2E proves it.** The E2E realm's `basetool-frontend` is confidential with a throwaway secret, the
+  E2E frontend receives it, and every Playwright login goes through the confidential client.
+- `compose` passes `KEYCLOAK_FRONTEND_CLIENT_SECRET` with an **empty default** (`:-`, not `:?`), so a
+  release carrying this renders and starts on a host whose `.env` lacks it.
 
-With a client secret as well: **even a captured code cannot be redeemed** — the token endpoint
-also demands the secret, which only the real frontend server knows. An attacker would additionally
-need the production `.env`, and at that point they have bigger levers anyway.
+## Rollout (production — every step is a write that needs the owner's yes)
 
-PKCE stays active in the new mode: the pattern is **PKCE + client secret**, not one instead of the
-other. That is the defence-in-depth gain — a single compromised layer is no longer enough.
+As root, from `/`, with the [shell conventions](deployment.md#shell-conventions-used-below)
+(`UCTL`, `UPOD`). The release carrying the code must be deployed first.
 
-## Why it did not ship with the audit-fix PR
-
-The migration cannot be done atomically in one commit:
-
-1. **Code change in the repository** (`application.yml`, `docker-compose.yml` and the Quadlet
-   environment template generated from it, `.env.example`) — arrives by PR.
-2. **Keycloak Admin Console changes** — switch the client from public to confidential, generate a
-   secret. Cannot be done by PR.
-3. **Update the production `.env`** with the new secret — operator work, outside the repository.
-4. **Roll out the release** carrying the code change.
-
-Between steps 2 and 4 new logins fail. That needs a maintenance window or a carefully sequenced
-rollout, which is why the finding was left as a Medium follow-up rather than folded into the
-2026-05-20 audit fix.
-
----
-
-## Work list
-
-### Part A — code (repository PR)
-
-**A.1 — `frontend/src/main/resources/application.yml`**
-
-In `spring.security.oauth2.client.registration.keycloak`:
-
-```diff
- keycloak:
-   client-id: basetool-frontend
--  client-authentication-method: none
-+  client-authentication-method: client_secret_basic
-+  client-secret: ${KEYCLOAK_FRONTEND_CLIENT_SECRET}
-   scope: openid, profile, email, roles
-   authorization-grant-type: authorization_code
-   redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
-```
-
-`client_secret_basic` sends the secret in an HTTP Basic `Authorization` header to the token
-endpoint and is Keycloak's default; `client_secret_post` (secret in the body) works too.
-
-**PKCE keeps working without further configuration.** Spring Security 7 (the version Spring Boot
-4.1 brings) applies PKCE to every client whose `ClientRegistration.ClientSettings.requireProofKey`
-is true, and that setting **defaults to true** — read from `spring-security-oauth2-client` 7.1.1
-on 2026-09-22. (Earlier revisions of this runbook said Spring sends PKCE only for public clients;
-that was Spring Security 6 behaviour and is no longer the case.) Keycloak already requires `S256`,
-so a frontend that stopped sending PKCE would fail every login loudly rather than silently losing
-the factor.
-
-**A.2 — `docker-compose.yml`, then the generated Quadlet template**
-
-In the `x-frontend: &frontend-template` definition's `environment:` map (like
-`KEYCLOAK_ADMIN_CLIENT_SECRET` in `x-backend`), add:
-
-```yaml
-environment:
-  # ... existing vars ...
-  KEYCLOAK_FRONTEND_CLIENT_SECRET: ${KEYCLOAK_FRONTEND_CLIENT_SECRET:?KEYCLOAK_FRONTEND_CLIENT_SECRET must be set in .env}
-```
-
-The `:?…` syntax makes Compose abort with a clear message when the secret is missing from `.env` —
-the same pattern as the other secrets. Then regenerate the production units, which are derived
-from the compose file and drift-checked in CI (`repo-lint.yml`):
+**1. Generate the secret on the host and give it to the frontend** (Keycloak still public):
 
 ```bash
-python scripts/generate-quadlet.py          # writes quadlet/env.d/frontend.env.tmpl
-python scripts/generate-quadlet.py --check  # must report no drift
+cd /
+cp -p /var/iri/code/.env /var/iri/code/.env.backup-$(date +%Y%m%d-%H%M%S)
+grep -q '^KEYCLOAK_FRONTEND_CLIENT_SECRET=' /var/iri/code/.env || \
+  printf 'KEYCLOAK_FRONTEND_CLIENT_SECRET=%s\n' "$(openssl rand -base64 48 | tr -d '/+=\n')" >> /var/iri/code/.env
+sudo -u deploy /var/iri/code/scripts/render-env-d.py \
+  --env /var/iri/code/.env --templates /var/iri/code/quadlet/env.d --out /var/iri/code/env.d
+grep -c '^KEYCLOAK_FRONTEND_CLIENT_SECRET=.' /var/iri/code/env.d/frontend.env    # 1 (counts, never prints)
+${UCTL} restart frontend.service
+${UPOD} logs --since 5m frontend 2>&1 | grep "OAuth2 client 'keycloak' is"       # ... is CONFIDENTIAL
 ```
 
-On the production host `render-env-d.py` applies the same `:?` rule: it refuses to render
-`env.d/frontend.env` while `.env` lacks the variable, so the release must not be promoted before
-the secret is on the host (Part C).
+The frontend now sends the secret; Keycloak, still public, ignores it. Log in once in a private
+window — it must work exactly as before. Nobody is signed out.
 
-**A.3 — `.env.example`**
-
-A new entry with rotation instructions, next to `KEYCLOAK_ADMIN_CLIENT_SECRET`:
+**2. Switch Keycloak, with the same secret, in one update** (the provisioner session of
+[`INGEST_KEYCLOAK_SETUP.md` → *New or out-of-date realm*](INGEST_KEYCLOAK_SETUP.md#new-or-out-of-date-realm-run-the-provisioner),
+steps 1–3, for `kc`/`KCADM` and the rollback basis):
 
 ```bash
-# Keycloak basetool-frontend OAuth2 client secret (Spring OAuth2 client login).
-# Generate / rotate in the Keycloak admin console:
-#   Realm "iri" -> Clients -> basetool-frontend -> Credentials -> Regenerate Secret.
-KEYCLOAK_FRONTEND_CLIENT_SECRET=CHANGE_ME
+S="$(sed -n 's/^KEYCLOAK_FRONTEND_CLIENT_SECRET=//p' /var/iri/code/.env | tail -1)"
+KEYCLOAK_FRONTEND_CLIENT_SECRET="$S" python3 /root/kc-realm/provision-keycloak-realm.py --realm iri \
+  --public-origin https://profit-base.online --kcadm-command "$KCADM" --frontend-client confidential
+#   dry run: expect "~ publicClient: true -> false", "~ clientAuthenticatorType: …" and
+#   "~ secret: set from $KEYCLOAK_FRONTEND_CLIENT_SECRET (the value is not printed)"
+KEYCLOAK_FRONTEND_CLIENT_SECRET="$S" python3 /root/kc-realm/provision-keycloak-realm.py --realm iri \
+  --public-origin https://profit-base.online --kcadm-command "$KCADM" --frontend-client confidential --apply
+unset S
 ```
 
-**A.4 — `frontend/src/test/resources/application-test.yml`** (in `src/main` until 2026-09-23)
+A dry run that plans anything beyond the frontend's client type is a realm that has drifted — stop
+and read it before applying. Keycloak now demands the secret, and the frontend already sends it.
 
-The `@SpringBootTest` contexts boot the OAuth2 client. Once `client-secret:
-${KEYCLOAK_FRONTEND_CLIENT_SECRET}` has no fallback, the context fails to start without a
-placeholder. The test profile already overrides the registration (`client-id: test-client`,
-issuer `http://keycloak.example.com/realms/test`); add the secret beside it:
+**3. Verify:**
 
-```yaml
-spring:
-  security:
-    oauth2:
-      client:
-        registration:
-          keycloak:
-            client-id: test-client
-            client-secret: test-client-secret
-            authorization-grant-type: authorization_code
-```
+- A private-window login completes; an open tab of an existing session keeps working across its
+  next token refresh (≤ 5 minutes).
+- Keycloak → *Events* → the latest `CODE_TO_TOKEN` for `basetool-frontend` names the client-secret
+  authenticator; no `invalid_client` / `CODE_TO_TOKEN_ERROR` in the last 15 minutes.
+- `FrontendLoginBroken` and `KeycloakLoginErrorSpike` stay silent — a secret mismatch is exactly what
+  they fire on (`invalid_client` at the token endpoint is `reason="provider_error"` on
+  `basetool_login_total`).
+- Keycloak → `basetool-frontend` → *Advanced*: *PKCE Method* is still `S256`.
 
-The test issuer is never called (the OAuth2 login flows run against mocks); the secret only has to
-resolve as a property.
+**Rollback**, from either step:
 
-**A.5 — no default in `application.yml`; a dev override instead**
+- After step 2: `python3 … --frontend-client public --apply` (no secret is sent), then keep going
+  with the step-1 rollback if wanted. Keycloak ignores the secret the frontend still sends.
+- After step 1: delete the `KEYCLOAK_FRONTEND_CLIENT_SECRET` line (or leave it), render `env.d`,
+  `${UCTL} restart frontend.service` — the frontend is the public client again.
 
-A fallback such as `${KEYCLOAK_FRONTEND_CLIENT_SECRET:dev-secret-placeholder}` in `application.yml`
-would make `./gradlew :frontend:bootRun` convenient but would also mask a missing production value.
-Keep `application.yml` strict (like `SERVER_SSL_KEY_STORE_PASSWORD`) and put the fallback into
-`frontend/src/main/resources/application-dev.yml` only, overriding just that one property:
+**Rotation** cannot simply repeat step 1: a confidential client refuses the old secret the moment
+Keycloak holds the new one, and the frontend cannot switch at that same instant. So rotate through
+the public state, which accepts both: `--frontend-client public --apply`, then a new value into
+`.env` (replace the line) with the rest of step 1, then step 2 again. Existing sessions survive every
+step, because they refresh with the registration the frontend runs with now.
 
-```yaml
-spring:
-  security:
-    oauth2:
-      client:
-        registration:
-          keycloak:
-            client-secret: ${KEYCLOAK_FRONTEND_CLIENT_SECRET:dev-secret-placeholder}
-```
-
-The realm a local stack imports (`keycloak-dev` runs `start-dev --import-realm` against the
-gitignored `realm-export.json` at the repository root) must then carry `basetool-frontend` as a
-confidential client with a matching synthetic secret, or local logins fail. The committed E2E realm
-(`frontend/src/e2e/resources/realm-export.e2e.json`) and the E2E stack's frontend environment need
-the same change in the PR.
-
-**A.6 — Tests**
-
-- `frontend/src/test/java/de/greluc/krt/profit/basetool/frontend/config/SecurityConfigTest.java` —
-  adjust any assertion that expects `client-authentication-method: none` or the absence of a
-  `client-secret`.
-- `frontend/src/test/java/de/greluc/krt/profit/basetool/frontend/config/RoleHierarchyTest.java` —
-  loads a context; should pass unchanged with the placeholder from A.4, verify.
-- Add a pinning test (e.g. beside `frontend/src/test/java/de/greluc/krt/profit/basetool/frontend/SecurityHeadersTest.java`,
-  or a new `OAuth2ClientConfigurationTest`) asserting through the `ClientRegistrationRepository`
-  that the `keycloak` registration uses `CLIENT_SECRET_BASIC`, has a non-empty secret and
-  `requireProofKey == true` — so a regression to the public-client path, or losing PKCE, breaks the
-  build.
-
-**A.7 — Documentation in the same PR**
-
-`CHANGELOG.md` (a short entry under `## [Unreleased]`), the new variable in `README.md`'s env-var
-section, ADR-0001's status line (*Accepted* once shipped), `docs/keycloak/README.md`'s client
-table, and the knowledge vault.
-
-### Part B — Keycloak (operator)
-
-**B.1 — Open the Keycloak Admin Console**
-
-Production: `https://profit-base.online/auth/admin/` (moved 2026-09-13, ADR-0166). Sign in with an
-admin account of the `master` realm.
-
-**B.2 — Switch `basetool-frontend` to confidential**
-
-Realm dropdown → **`iri`** → **Clients** → **basetool-frontend** → **Settings**:
-
-- **Client authentication**: `Off` → `On`.
-- **Authorization** stays `Off` (Keycloak Authorization Services are not used).
-- **Authentication flow** unchanged: *Standard flow* `On`, *Direct access grants* `Off`,
-  *Implicit flow* `Off`, *Service accounts roles* `Off`.
-- **Save**. A **Credentials** tab appears.
-
-**New logins fail from this moment until C.4 completes.**
-
-**B.3 — Generate the client secret**
-
-**Credentials** tab: *Client Authenticator* stays **Client ID and Secret**; **Regenerate** next to
-the secret field, confirm, and copy the value — it is `KEYCLOAK_FRONTEND_CLIENT_SECRET`. Put it
-straight into the production `.env` (C.3) and a password manager; never into a chat, a ticket or a
-screenshot.
-
-**B.4 — PKCE: nothing to do**
-
-*Require PKCE* / *PKCE Method* `S256` is already set on this client (hardening step 6). Verify it
-is still there after B.2; the switch to confidential does not touch it.
-
-**B.5 — The host's `realm-export.json`**
-
-Production Keycloak runs `start` **without** `--import-realm` (`quadlet/systemd/keycloak.container`),
-so the mounted `/var/iri/code/realm-export.json` is never re-imported and cannot flip the client
-back: the Keycloak database is the source of truth, and a disaster restore uses `keycloak.dump`
-([`docs/backup.md`](backup.md)). Still update the host file's `basetool-frontend` entry
-(`"publicClient": false`, `"clientAuthenticatorType": "client-secret"`) so a realm rebuilt from it
-does not quietly reintroduce a public client — the secret itself need not go into it. Afterwards
-regenerate the sanitized reference ([`docs/keycloak/README.md`](keycloak/README.md)).
-
-### Part C — rollout sequence
-
-The production host is pull-based: a promoted release is applied by `deploy.sh` on its timer
-([`docs/deployment.md`](deployment.md#promoting-to-production)). Merge Part A, but **do not promote
-it** before the window.
-
-**C.1 — Announce a maintenance window.** Plan 5–10 minutes of login downtime; existing sessions
-keep working.
-
-**C.2 — Switch Keycloak** (B.2–B.3).
-
-**C.3 — Put the secret on the host:**
-
-```bash
-sudo cp -p /var/iri/code/.env /var/iri/code/.env.backup-$(date +%Y%m%d-%H%M%S)
-sudo -u deploy "${EDITOR:-vi}" /var/iri/code/.env    # add KEYCLOAK_FRONTEND_CLIENT_SECRET=<value from B.3>
-```
-
-**C.4 — Promote the release and apply it now** rather than waiting for the next tick:
-
-```bash
-gh workflow run promote.yml -f version=<the release carrying Part A>
-sudo systemctl start iri-deploy.service      # on the host, once the promotion has finished
-tail -n 50 /var/log/iri-deploy.log
-```
-
-The deploy renders `env.d/frontend.env` from `.env` (it refuses, naming the variable, if C.3 was
-missed) and recreates the frontend. An `invalid_client` / *Invalid client credentials* in the
-frontend's log (`sudo -u iri podman logs frontend`) means the secret in `.env` does not match
-Keycloak's.
-
-**C.5 — Smoke test**
-
-- Private browser window → `https://profit-base.online` → log in → back on the start page with a
-  valid session.
-- Keycloak Admin Console → realm `iri` → **Events** → the latest `CODE_TO_TOKEN` event for
-  `basetool-frontend`: its `client_auth_method` detail names the client-secret authenticator. (User
-  events are stored since hardening step 4, so this check works.)
-
-**C.6 — Rollback**
-
-1. Keycloak: `basetool-frontend` → Settings → **Client authentication** `Off` → Save.
-2. Re-promote the previous release (`promote.yml`), and start `iri-deploy.service` again.
-3. Leave `KEYCLOAK_FRONTEND_CLIENT_SECRET` in `.env`; the previous release's template does not
-   reference it, and it is needed again for the next attempt.
-
-That returns the system to public client + PKCE, functionally identical to the pre-migration state.
-
----
-
-## Validation after a successful rollout
-
-- [ ] `sudo grep -c '^KEYCLOAK_FRONTEND_CLIENT_SECRET=' /var/iri/code/env.d/frontend.env` prints
-  `1` (counts, never prints the value).
-- [ ] Keycloak → `basetool-frontend` → Settings → *Client authentication* `On`; *PKCE Method*
-  still `S256`.
-- [ ] The latest `CODE_TO_TOKEN` event shows client-secret authentication.
-- [ ] A private-window login completes.
-- [ ] No `CODE_TO_TOKEN_ERROR` / `LOGIN_ERROR` with `invalid_client` in the last 15 minutes.
-- [ ] `backend-service` (the client behind `KEYCLOAK_ADMIN_CLIENT_SECRET`) is untouched and still
-  works — only `basetool-frontend` changed.
-- [ ] Existing sessions were not invalidated.
+**After the rollout**, make `--frontend-client confidential` part of every documented provisioner
+run, and update the host's `/var/iri/code/realm-export.json` seed (`"publicClient": false`,
+`"clientAuthenticatorType": "client-secret"`, no secret) so a realm rebuilt from it is not public.
 
 ## Risks & caveats
 
-- **Another secret to guard.** It lives in `/var/iri/code/.env` (`deploy:deploy 0640`, gitignored,
-  excluded from the config bundle) and in the rendered `env.d/frontend.env` (`0640`), and it rides
-  in every backup's `config/dotenv`. It joins the rotation list in
-  [`docs/backup.md`](backup.md#rotate-secrets-after-a-compromise-driven-restore).
-- **Test contexts.** Every `@SpringBootTest` without the placeholder from A.4 fails at context
-  start — CI catches a forgotten A.4 immediately.
-- **Local and E2E realms** (A.5) must switch together with the code, or local and E2E logins fail.
-
----
-
-## Prompt for an AI agent
-
-Self-contained; hand it to a new session with repository access.
-
-```
-Implement audit finding M-6 (ADR-0001) in the basetool repository: switch the frontend's OAuth2
-client registration with Keycloak from public (PKCE only) to confidential (client secret + PKCE).
-
-Do Part A of docs/OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md exactly (A.1-A.7), including the
-regenerated Quadlet template and the local/E2E realm changes. Do NOT touch any production realm,
-the production .env or any production host. Test placeholders must be obviously synthetic
-(`test-client-secret`), never production-like.
-
-Verify with ./gradlew spotlessApply, the frontend lint tasks and ./gradlew :frontend:test, then
-./gradlew check. Return a summary of the code changes; Parts B and C are run by the owner from the
-runbook itself.
-```
-
----
+- **Another secret to guard.** It lives in `/var/iri/code/.env` and the rendered
+  `env.d/frontend.env` (`0640`), rides in every backup's `config/dotenv`, and joins the rotation list
+  in [`docs/backup.md`](backup.md#rotate-secrets-after-a-compromise-driven-restore). It does **not**
+  reach Redis: the stored authorized client carries an empty secret.
+- **Local stacks.** The dev and test stacks keep a public client unless their `.env.test` sets the
+  variable; the E2E stack is confidential by design.
 
 ## Related documents
 
 - [ADR-0001](adr/0001-frontend-confidential-oauth2-client.md) — the decision.
-- [`KEYCLOAK_HARDENING_RUNBOOK.md`](KEYCLOAK_HARDENING_RUNBOOK.md) — step 6 (PKCE `S256`, the
-  interim state) and why it does not close M-6.
-- [`docs/archive/MULTI_SQUADRON_PLAN.md`](archive/MULTI_SQUADRON_PLAN.md) — referenced for pattern
-  conventions.
-- [`README.md`](../README.md) — env vars and the local test stack.
-- [`CHANGELOG.md`](../CHANGELOG.md) — audit findings 2026-05-20, `### Security` block.
-- [`frontend/src/main/resources/application.yml`](../frontend/src/main/resources/application.yml) —
-  the starting configuration.
+- [ADR-0202](adr/0202-a-realm-is-brought-to-the-production-shape-by-a-provisioner-that-never-deletes.md) — the provisioner, amendment 2.
+- [`KEYCLOAK_HARDENING_RUNBOOK.md`](KEYCLOAK_HARDENING_RUNBOOK.md) — step 6 (PKCE `S256`).
+- [`CHANGELOG.md`](../CHANGELOG.md)

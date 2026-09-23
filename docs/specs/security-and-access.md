@@ -19,7 +19,7 @@ read/write is isolated to the calling user unless the caller is privileged.
 > linking of a registration). The mission finance-entry scope below shared `REQ-SEC-019` with the
 > Discord-link indicator until 2026-09-22, when it was renumbered to **REQ-SEC-065** on the owner's
 > decision (see the renumbering table in [`INDEX.md`](INDEX.md)). **REQ-SEC-054** was never
-> allocated. The next free id is **REQ-SEC-069** — re-check `origin/main` and open PRs before
+> allocated. The next free id is **REQ-SEC-070** — re-check `origin/main` and open PRs before
 > claiming it. Requirements are grouped by subject, not strictly by number.
 
 ### REQ-SEC-001 — OIDC topology
@@ -4687,6 +4687,50 @@ its service does:
 `spring.data.redis.username` · **Monitoring:** `RedisAclDenials` · **Runbook:**
 [`deployment.md` → *The Redis ACL*](../deployment.md#the-redis-acl) · **ADR:** [ADR-0207](../adr/0207-each-service-reaches-redis-as-its-own-acl-user.md) ·
 **Related:** REQ-SEC-025, REQ-OPS-018
+
+### REQ-SEC-069 — The frontend is a confidential OAuth2 client whenever it holds a secret
+
+The frontend is a server-side application and can keep a secret, so a captured authorization code
+must not be redeemable without one (ADR-0001, audit findings M-6 and APPSEC-07). PKCE stays on: the
+pattern is **PKCE + client secret**, never one instead of the other.
+
+- **The secret decides the client type.** With `KEYCLOAK_FRONTEND_CLIENT_SECRET` set, the `keycloak`
+  registration authenticates with `client_secret_basic`; without it (unset or blank) with `none`.
+  Nothing else configures the method, so the two cannot disagree.
+- **PKCE in both modes** (`ClientSettings.requireProofKey`), because Keycloak requires `S256` on
+  `basetool-frontend`.
+- **The switch signs nobody out.** A stored authorized client is refreshed with the registration the
+  frontend runs with **now**, not the one it was stored under.
+- **The secret never reaches the session store.** The stored authorized client carries an empty
+  secret; the current one is put back on read.
+- **The realm changes only on purpose.** The provisioner converges `basetool-frontend`'s client type
+  only when `--frontend-client` names it, and when it switches the client to confidential it sets
+  Keycloak's secret to the operator's value in the same update, never printing it.
+
+**Acceptance**
+
+- [ ] With a secret, the registration is `client_secret_basic` with that secret and PKCE required;
+  without one, or with a blank one, it is `none` with PKCE required.
+- [ ] A client stored under the public registration loads with the current confidential one, keeping
+  its principal and tokens.
+- [ ] The serialized session attribute holding the authorized client does not contain the secret.
+- [ ] A provisioner run without `--frontend-client` changes neither type; `confidential` without the
+  variable is refused and writes nothing; `confidential` with it switches once and never rewrites the
+  secret; `public` switches back without sending one.
+- [ ] Every E2E login goes through the confidential client.
+
+**Enforced by:** `FrontendClientAuthenticationConfigTest` (Boot's real OAuth2 client
+auto-configuration, both modes, blank secret) · `CurrentRegistrationAuthorizedClientRepositoryTest`
+(the swap, the stripped secret, the serialized attribute) · `scripts/provision-keycloak-realm.test.sh`
+cases 9–12 · the E2E suite (`realm-export.e2e.json`, `E2eStackExtension`, `BackendSeeder`) · **Code:**
+`FrontendClientAuthenticationConfig`, `CurrentRegistrationAuthorizedClientRepository`,
+`RedisSessionConfig#authorizedClientRepository`, `scripts/provision-keycloak-realm.py` ·
+**Monitoring:** `FrontendLoginBroken` (`basetool_login_total{reason="provider_error"}` —
+`invalid_client` at the token endpoint lands there) and `KeycloakLoginErrorSpike` catch a secret
+mismatch · **Runbook:** [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md)
+· **ADR:** [ADR-0001](../adr/0001-frontend-confidential-oauth2-client.md),
+[ADR-0202](../adr/0202-a-realm-is-brought-to-the-production-shape-by-a-provisioner-that-never-deletes.md)
+amendment 2 · **Related:** REQ-SEC-001, REQ-SEC-012
 
 ## Out of scope
 

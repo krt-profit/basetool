@@ -37,6 +37,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.serializer.GenericJacksonJsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.security.jackson.SecurityJacksonModules;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.web.HttpSessionOAuth2AuthorizedClientRepository;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
 import org.springframework.session.FindByIndexNameSessionRepository;
@@ -540,12 +541,20 @@ public class RedisSessionConfig {
    * → {@code authorizedClientManager} → {@code OAuth2AuthorizedClientRepository} → {@code
    * SecurityConfig}.
    *
+   * <p>Wrapped in {@link CurrentRegistrationAuthorizedClientRepository} (REQ-SEC-069, ADR-0001):
+   * the stored client never carries the client secret, and a stored session always refreshes with
+   * the registration the frontend runs with now — so switching the client from public to
+   * confidential, or rotating its secret, reaches existing sessions without signing anybody out.
+   *
+   * @param clientRegistrationRepository the registrations the application runs with now.
    * @return the session-backed {@link OAuth2AuthorizedClientRepository}
    */
   @NotNull
   @Bean
-  public OAuth2AuthorizedClientRepository authorizedClientRepository() {
-    return new HttpSessionOAuth2AuthorizedClientRepository();
+  public OAuth2AuthorizedClientRepository authorizedClientRepository(
+      ClientRegistrationRepository clientRegistrationRepository) {
+    return new CurrentRegistrationAuthorizedClientRepository(
+        new HttpSessionOAuth2AuthorizedClientRepository(), clientRegistrationRepository);
   }
 
   /**

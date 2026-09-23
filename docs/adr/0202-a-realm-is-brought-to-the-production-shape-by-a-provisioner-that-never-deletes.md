@@ -111,3 +111,16 @@ Removing the Android client's scopes is a sub-resource write on the client the D
 so the provisioner detaches the policy before it and re-attaches it afterwards (decision 5); the
 self-test pins that order and that the plan against the old production shape removes exactly these
 entries.
+
+## Amendment 2 — 2026-09-23: the frontend's client type is an explicit choice
+
+ADR-0001 makes `basetool-frontend` confidential through an owner rollout. Encoding either type as
+the target shape would have let an ordinary run flip production — to confidential before the
+frontend holds a secret, or back to public after the rollout. So the type is converged only when
+`--frontend-client public|confidential` says which; without it `publicClient` and
+`clientAuthenticatorType` of an existing client are left as they are (a new client is created
+public). `confidential` sets the secret from `$KEYCLOAK_FRONTEND_CLIENT_SECRET` in the same update
+that flips the client — over kcadm's stdin, never printed, refused when the variable is unset — the
+one secret this script ever sends, and only on the switch; a later run never rewrites it.
+`public` is the rollback and sends none. Pinned by cases 9–12 of
+`scripts/provision-keycloak-realm.test.sh`.

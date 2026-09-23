@@ -62,7 +62,20 @@
 #   never touched. Their differences between two realms are Keycloak-version artefacts.
 # * Client secrets are never printed, logged or sent back. A confidential client this run creates
 #   gets a secret Keycloak generates; the script says where the operator reads it and which `.env`
-#   variables need it.
+#   variables need it. One deliberate exception, and it is a WRITE, never a read: switching
+#   `basetool-frontend` to confidential (`--frontend-client confidential`, ADR-0001) sends the
+#   secret from $KEYCLOAK_FRONTEND_CLIENT_SECRET in this process's environment, over kcadm's stdin,
+#   so Keycloak and the frontend share the value the operator generated on the host. It is refused
+#   when the variable is unset, and never printed.
+#
+# THE FRONTEND'S CLIENT TYPE IS AN EXPLICIT CHOICE
+# ------------------------------------------------
+# ADR-0001 makes `basetool-frontend` confidential, and the switch is an owner rollout. Until and
+# after it, a run must neither undo it nor anticipate it by accident, so the type is managed only
+# when `--frontend-client public|confidential` says which; without the flag `publicClient` and
+# `clientAuthenticatorType` of an existing frontend client are left exactly as they are (a new one
+# is created public, production's shape before the rollout). Everything else about the client is
+# converged either way.
 #
 # THE ORDER IS LOAD-BEARING FOR ONE CLIENT
 # ----------------------------------------
@@ -103,6 +116,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import os
 import re
 import shlex
 import sys
@@ -240,6 +254,11 @@ class ClientSpec:
     env_vars_to_fill: list[str] = field(default_factory=list)
     env_doc_hint: str = ""
     frozen_by_dpop_policy: bool = False
+    # Fields written when the client is created but never compared or converged afterwards.
+    unmanaged_fields: set[str] = field(default_factory=set)
+    # The environment variable whose value becomes the client secret when this run switches an
+    # existing public client to confidential (or creates it). Read at write time, never printed.
+    secret_env: str | None = None
 
 
 def _flags(*, public: bool, standard: bool, service_accounts: bool, full_scope: bool,
@@ -310,18 +329,35 @@ def validate_origin(value: str, flag: str) -> str:
     return value
 
 
-def client_specs(realm: str, public_origin: str, grafana_origin: str | None) -> list[ClientSpec]:
+def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
+                 frontend_client: str | None = None) -> list[ClientSpec]:
     """Every Basetool client in its production shape, with the environment's origins filled in.
 
     The Android client is not the last entry by accident: it is the only one the DPoP policy
     freezes, and `plan` writes it inside the detached window.
+
+    `frontend_client` is `public`, `confidential` or None: None leaves an existing frontend
+    client's type as it is (ADR-0001's rollout is the owner's, not a side effect of a run).
     """
+    frontend_confidential = frontend_client == "confidential"
+    if frontend_client is None:
+        frontend_kind = "authorization code + PKCE S256 (the web login; client type left as it is)"
+    elif frontend_confidential:
+        frontend_kind = "confidential, authorization code + client secret + PKCE S256 (the web login)"
+    else:
+        frontend_kind = "public, authorization code + PKCE S256 (the web login)"
     specs = [
         ClientSpec(
             client_id="basetool-frontend",
-            kind="public, authorization code + PKCE S256 (the web login)",
-            fields=_flags(public=True, standard=True, service_accounts=False, full_scope=True,
-                          frontchannel_logout=False),
+            kind=frontend_kind,
+            fields=_flags(public=not frontend_confidential, standard=True,
+                          service_accounts=False, full_scope=True, frontchannel_logout=False),
+            unmanaged_fields=(set() if frontend_client
+                              else {"publicClient", "clientAuthenticatorType"}),
+            secret_env="KEYCLOAK_FRONTEND_CLIENT_SECRET" if frontend_confidential else None,
+            env_vars_to_fill=(["KEYCLOAK_FRONTEND_CLIENT_SECRET"] if frontend_confidential
+                              else []),
+            env_doc_hint=" (the frontend's confidential login, ADR-0001)",
             create_only={"name": "IRIDIUM Basetool Frontend",
                          "description": "Frontend Application for IRIDIUM Basetool"},
             attributes={
@@ -826,7 +862,22 @@ class Planner:
             return changes
 
         uuid = live["id"]
-        field_diff = {k: v for k, v in spec.fields.items() if not _equal(v, live.get(k))}
+        field_diff = {k: v for k, v in spec.fields.items()
+                      if k not in spec.unmanaged_fields and not _equal(v, live.get(k))}
+        if spec.secret_env and "publicClient" in field_diff and _normalise(
+                live.get("publicClient")) == "true":
+            # The switch to confidential: Keycloak must hold the secret the frontend already sends.
+            if not os.environ.get(spec.secret_env):
+                self.problems.append(
+                    f"{spec.client_id}: switching it to confidential needs ${spec.secret_env} in "
+                    f"this process's environment -- the value the frontend has in the host .env "
+                    f"-- or Keycloak and the frontend would hold different secrets. Nothing about "
+                    f"this client is written.")
+            else:
+                self.followup_notes.append(
+                    f"'{spec.client_id}' becomes confidential with the secret from "
+                    f"${spec.secret_env} (not printed). The frontend must already send that value "
+                    f"(docs/OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md).")
         attributes = live.get("attributes") or {}
         attribute_diff = {k: v for k, v in spec.attributes.items()
                           if not _equal(v, attributes.get(k))}
@@ -840,6 +891,9 @@ class Planner:
         for key, value in field_diff.items():
             changes.append(Change(f"~ {key}: {_normalise(live.get(key)) or '<absent>'} -> "
                                   f"{_normalise(value)}", lambda: None, frozen))
+        if spec.secret_env and "publicClient" in field_diff:
+            changes.append(Change(f"~ secret: set from ${spec.secret_env} (the value is not "
+                                  f"printed)", lambda: None, frozen))
         for key, value in attribute_diff.items():
             changes.append(Change(f"~ attribute {key}: {attributes.get(key, '<absent>')} -> "
                                   f"{value!r}", lambda: None, frozen))
@@ -934,15 +988,20 @@ class Planner:
                    "webOrigins": list(spec.web_origins),
                    "defaultClientScopes": list(spec.default_scopes),
                    "optionalClientScopes": list(spec.optional_scopes)}
+        if spec.secret_env and os.environ.get(spec.secret_env):
+            payload["secret"] = os.environ[spec.secret_env]
         self.kc.write("create", "clients", payload, f"client '{spec.client_id}' created")
-        if spec.env_vars_to_fill:
+        if spec.env_vars_to_fill and not (spec.secret_env and os.environ.get(spec.secret_env)):
             print(f"  NOTE: {self._confidential_client_note(spec)}")
 
     def _update_client(self, spec: ClientSpec, planned_live: dict) -> None:
         # Re-read: an earlier change in this run may have touched the client.
         live = self.find_client(spec.client_id) or planned_live
+        switching_to_confidential = (spec.secret_env is not None
+                                     and _normalise(live.get("publicClient")) == "true"
+                                     and not spec.fields.get("publicClient", True))
         payload = dict(live)
-        payload.update(spec.fields)
+        payload.update({k: v for k, v in spec.fields.items() if k not in spec.unmanaged_fields})
         payload["attributes"] = {**(live.get("attributes") or {}), **spec.attributes}
         # Union with what the realm has (a target-only entry stays), minus the withheld entries.
         payload["redirectUris"] = [
@@ -953,7 +1012,11 @@ class Planner:
             o for o in list(live.get("webOrigins") or []) + [
                 o for o in spec.web_origins if o not in (live.get("webOrigins") or [])]
             if o not in spec.withheld_web_origins]
-        self.kc.write("update", f"clients/{live['id']}", _redact(payload),
+        payload = _redact(payload)
+        if switching_to_confidential:
+            # The one secret this script ever sends, and only on the switch (header, ADR-0001).
+            payload["secret"] = os.environ[spec.secret_env]
+        self.kc.write("update", f"clients/{live['id']}", payload,
                       f"client '{spec.client_id}' updated")
 
     def _assigned_scopes(self, uuid: str) -> tuple[dict[str, str], dict[str, str]]:
@@ -1274,6 +1337,11 @@ def main() -> int:
     parser.add_argument("--grafana-origin",
                         help="Grafana's origin; when given, the `grafana` OAuth client is "
                              "managed too, otherwise it is left alone")
+    parser.add_argument("--frontend-client", choices=("public", "confidential"),
+                        help="converge basetool-frontend's client type (ADR-0001); without it the "
+                             "type of an existing client is left as it is. `confidential` needs "
+                             "KEYCLOAK_FRONTEND_CLIENT_SECRET in the environment when it switches "
+                             "a public client")
     parser.add_argument("--apply", action="store_true",
                         help="write the planned changes (default: dry run, writes nothing)")
     parser.add_argument("--container", default="keycloak",
@@ -1289,7 +1357,7 @@ def main() -> int:
     prefix = (shlex.split(args.kcadm_command) if args.kcadm_command
               else ["docker", "exec", "-i", args.container, "/opt/keycloak/bin/kcadm.sh"])
     kc = RealmKcadm(prefix, args.realm, dry_run=False)
-    specs = client_specs(args.realm, public_origin, grafana_origin)
+    specs = client_specs(args.realm, public_origin, grafana_origin, args.frontend_client)
 
     mode = "APPLY" if args.apply else "DRY RUN — nothing is written"
     print(f"Keycloak realm '{args.realm}' -> production shape, public origin {public_origin} "

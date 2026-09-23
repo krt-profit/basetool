@@ -736,6 +736,12 @@ lines. The procedure, and the `.env` values a newly created confidential client 
 [`INGEST_KEYCLOAK_SETUP.md` → *New or out-of-date realm*](INGEST_KEYCLOAK_SETUP.md#new-or-out-of-date-realm-run-the-provisioner).
 On production an `--apply` is a gated write like any other.
 
+**The frontend's client type** (public or confidential, ADR-0001) is changed only by
+`--frontend-client public|confidential`; a run without it leaves the type as it is. The switch to
+confidential is a two-step owner rollout with no login window — the frontend receives
+`KEYCLOAK_FRONTEND_CLIENT_SECRET` first, then the provisioner flips Keycloak with the same value:
+[`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md).
+
 The backend refuses to start under `prod` without `IRI_BACKEND_EXPECTED_AUDIENCES`, and the
 frontend's token carries that audience only once the realm is in shape — so on a host whose realm
 was never provisioned, **provision first, then set the variable**.
