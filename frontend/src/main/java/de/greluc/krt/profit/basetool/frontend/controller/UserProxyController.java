@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.support.PickerSearch;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -43,8 +44,8 @@ import org.springframework.web.bind.annotation.RestController;
  * BackendApiClient}. That backend endpoint projects each hit to a slim {@code UserReferenceDto}
  * (id, username, display name, effective name, rank) in SQL, which is all the pickers read; the
  * full-DTO {@code /api/v1/users/search} it replaced here hydrated every matching user with its
- * roles and three membership lookups per keystroke (BE-PERF-06). The page size is 1000, sorted by
- * username, as before the switch — see {@link #forwardSearch} for why it was not lowered.
+ * roles and three membership lookups per keystroke (BE-PERF-06). The page size is {@link
+ * PickerSearch#PAGE_SIZE}, sorted by username — see {@link #forwardSearch}.
  */
 @RestController
 @RequestMapping("/users")
@@ -124,12 +125,13 @@ public class UserProxyController {
    * match-all filter, so opening the picker without typing returns the scoped roster instead of
    * failing.
    *
-   * <p><b>Why the page size stays 1000.</b> The combobox renders {@code PickerSearch.RENDER_CAP}
-   * rows and would be served by {@code PickerSearch.PAGE_SIZE}, but the two free-text autocompletes
-   * on the mission page (participant and party lead, {@code mission-detail.js}) read the same proxy
-   * and render every row they receive with no overflow hint, so a smaller page would cap them
-   * silently — what REQ-FE-016 forbids. The slim projection already removes almost all of the cost;
-   * lowering the page size waits for those two autocompletes to announce an overflow.
+   * <p><b>Page size.</b> {@link PickerSearch#PAGE_SIZE} rows (51), sorted by username: one more
+   * than every consumer renders, as the REQ-FE-016 overflow sentinel. The combobox pickers render
+   * {@link PickerSearch#RENDER_CAP} rows and show their "keep typing" hint on the extra one; the
+   * two free-text autocompletes on the mission page (participant and party lead, {@code
+   * mission-detail.js}) render the same cap and show the same hint since 2026-09-23. Before that
+   * they rendered every row they received, so the page size stayed at 1000 to keep them from
+   * capping silently.
    *
    * @param backendPath the backend search endpoint path to forward to
    * @param query the free-text query to forward, or {@code null}/blank to match all
@@ -145,7 +147,7 @@ public class UserProxyController {
     // to the empty match-all filter, still forwarded so browse mode returns the scoped roster.
     String uri =
         org.springframework.web.util.UriComponentsBuilder.fromPath(backendPath)
-            .queryParam("size", 1000)
+            .queryParam("size", PickerSearch.PAGE_SIZE)
             .queryParam("sort", "username,asc")
             .toUriString();
     PageResponse<Map<String, Object>> response =

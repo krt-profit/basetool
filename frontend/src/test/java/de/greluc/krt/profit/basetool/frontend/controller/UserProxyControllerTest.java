@@ -20,22 +20,26 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.support.PickerSearch;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class UserProxyControllerTest {
 
@@ -48,7 +52,7 @@ class UserProxyControllerTest {
     PageResponse<Map<String, Object>> mockPageResponse =
         new PageResponse<>(Collections.emptyList(), 0, 1000, 0, 0, Collections.emptyList());
     when(backendApiClient.get(
-            eq("/api/v1/users/search/references?size=1000&sort=username,asc&query={query}"),
+            eq("/api/v1/users/search/references?size=51&sort=username,asc&query={query}"),
             anyTypeRef(),
             eq("query")))
         .thenReturn(mockPageResponse);
@@ -60,7 +64,7 @@ class UserProxyControllerTest {
     assertNotNull(result);
     verify(backendApiClient)
         .get(
-            eq("/api/v1/users/search/references?size=1000&sort=username,asc&query={query}"),
+            eq("/api/v1/users/search/references?size=51&sort=username,asc&query={query}"),
             anyTypeRef(),
             eq("query"));
   }
@@ -77,7 +81,7 @@ class UserProxyControllerTest {
     PageResponse<Map<String, Object>> mockPageResponse =
         new PageResponse<>(Collections.emptyList(), 0, 1000, 0, 0, Collections.emptyList());
     when(backendApiClient.get(
-            eq("/api/v1/users/search/references?size=1000&sort=username,asc&query={query}"),
+            eq("/api/v1/users/search/references?size=51&sort=username,asc&query={query}"),
             anyTypeRef(),
             eq("John Doe")))
         .thenReturn(mockPageResponse);
@@ -87,7 +91,7 @@ class UserProxyControllerTest {
     assertNotNull(result);
     verify(backendApiClient)
         .get(
-            eq("/api/v1/users/search/references?size=1000&sort=username,asc&query={query}"),
+            eq("/api/v1/users/search/references?size=51&sort=username,asc&query={query}"),
             anyTypeRef(),
             eq("John Doe"));
   }
@@ -104,7 +108,7 @@ class UserProxyControllerTest {
     PageResponse<Map<String, Object>> mockPageResponse =
         new PageResponse<>(Collections.emptyList(), 0, 1000, 0, 0, Collections.emptyList());
     when(backendApiClient.get(
-            eq("/api/v1/users/search/references?size=1000&sort=username,asc&query={query}"),
+            eq("/api/v1/users/search/references?size=51&sort=username,asc&query={query}"),
             anyTypeRef(),
             eq("")))
         .thenReturn(mockPageResponse);
@@ -114,7 +118,7 @@ class UserProxyControllerTest {
     assertNotNull(result);
     verify(backendApiClient)
         .get(
-            eq("/api/v1/users/search/references?size=1000&sort=username,asc&query={query}"),
+            eq("/api/v1/users/search/references?size=51&sort=username,asc&query={query}"),
             anyTypeRef(),
             eq(""));
   }
@@ -129,7 +133,7 @@ class UserProxyControllerTest {
     PageResponse<Map<String, Object>> mockPageResponse =
         new PageResponse<>(Collections.emptyList(), 0, 1000, 0, 0, Collections.emptyList());
     when(backendApiClient.get(
-            eq("/api/v1/users/search-bank/references?size=1000&sort=username,asc&query={query}"),
+            eq("/api/v1/users/search-bank/references?size=51&sort=username,asc&query={query}"),
             anyTypeRef(),
             eq("query")))
         .thenReturn(mockPageResponse);
@@ -139,9 +143,30 @@ class UserProxyControllerTest {
     assertNotNull(result);
     verify(backendApiClient)
         .get(
-            eq("/api/v1/users/search-bank/references?size=1000&sort=username,asc&query={query}"),
+            eq("/api/v1/users/search-bank/references?size=51&sort=username,asc&query={query}"),
             anyTypeRef(),
             eq("query"));
+  }
+
+  // REQ-FE-016: both user searches fetch exactly one row past the render cap. Fewer and the
+  // overflow hint in the comboboxes and the mission autocompletes can never render; the old 1000
+  // shipped every matching user to a list that shows 50.
+  @Test
+  void bothUserSearches_fetchOneRowPastTheRenderCap() {
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    UserProxyController controller = new UserProxyController(backendApiClient);
+
+    controller.searchUsers("a");
+    controller.searchUsersForBank("a");
+
+    ArgumentCaptor<String> uri = ArgumentCaptor.forClass(String.class);
+    verify(backendApiClient, times(2)).get(uri.capture(), anyTypeRef(), eq("a"));
+    assertEquals(PickerSearch.RENDER_CAP + 1, PickerSearch.PAGE_SIZE);
+    for (String captured : uri.getAllValues()) {
+      assertTrue(
+          captured.contains("?size=" + PickerSearch.PAGE_SIZE + "&"),
+          "page size must be PickerSearch.PAGE_SIZE: " + captured);
+    }
   }
 
   // The Umbuchen owner pickers (inventory-my.js / inventory-admin.js) and the bank counterparty

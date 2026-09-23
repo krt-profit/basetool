@@ -38,6 +38,10 @@
   
 ### Added
 
+- **Einsätze: die Mitglieder-Suche bei Teilnehmer und Partyleiter sagt, wenn es mehr Treffer gibt.**
+  Beide Listen zeigen höchstens 50 Namen und darunter „Weiter tippen, um die Liste einzugrenzen…",
+  statt still alle Treffer zu laden.
+
 - **App: Einsatzleitung kann wieder Mitglieder zu einem Einsatz hinzufügen.** Dafür gibt es einen
   eigenen, nur für Verwalter freigegebenen Weg, der ein Mitglied ausschließlich per ID einträgt
   (`POST …/participants/by-id/slim`); die allgemeinen Anmelde-Wege bleiben für die App gesperrt.

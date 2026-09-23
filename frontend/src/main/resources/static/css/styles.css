@@ -4473,6 +4473,15 @@ details.hud-details[open] > summary::after {
     color: var(--color-primary);
 }
 
+/* Non-selectable "keep typing" row under a capped user list (REQ-FE-016). */
+.autocomplete-items div.autocomplete-notice,
+.autocomplete-items div.autocomplete-notice:hover {
+    cursor: default;
+    background-color: var(--color-bg-dark-gray);
+    color: var(--color-gray-2-text);
+    font-style: italic;
+}
+
 .autocomplete-active {
     background-color: var(--color-primary) !important;
     color: var(--color-bg-black) !important;

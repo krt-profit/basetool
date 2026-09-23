@@ -56,6 +56,13 @@ class PickerSearchLimitsParityTest {
   /** The fragment carrying the per-kind {@code krtComboboxI18n.kinds} overrides. */
   private static final String HEAD_FRAGMENT = "/templates/fragments/head.html";
 
+  /** The mission page module carrying the user autocompletes' render cap. */
+  private static final String MISSION_MODULE = "/static/js/mission-detail.js";
+
+  /** Matches the {@code USER_SEARCH_RENDER_CAP} declaration in the mission page module. */
+  private static final Pattern MISSION_USER_CAP =
+      Pattern.compile("const\\s+USER_SEARCH_RENDER_CAP\\s*=\\s*(\\d+)\\s*;");
+
   /**
    * Matches the render-cap default in {@code krtSearchableSelect}: the quoted fallback of the
    * {@code opts.maxResults || data.comboboxMax || '<n>'} chain. Anchoring on the whole chain keeps
@@ -99,6 +106,21 @@ class PickerSearchLimitsParityTest {
     assertThat(extract(LOCATION_KIND_MAX, HEAD_FRAGMENT, "remote-locations maxResults"))
         .as("PickerSearch.LOCATION_RENDER_CAP vs the kinds override in %s", HEAD_FRAGMENT)
         .isEqualTo(PickerSearch.LOCATION_RENDER_CAP);
+  }
+
+  /**
+   * Pins the mission page's two user autocompletes (participant add, party lead) to {@link
+   * PickerSearch#RENDER_CAP}: they render at most that many rows of the {@code /users/search}
+   * relay, which fetches {@link PickerSearch#PAGE_SIZE}, and show the overflow hint on the extra
+   * row. A drift either way would hide users behind a list that looks complete.
+   *
+   * @throws IOException if the mission module cannot be read from the classpath
+   */
+  @Test
+  void missionUserAutocompleteCap_matchesTheRenderCap() throws IOException {
+    assertThat(extract(MISSION_USER_CAP, MISSION_MODULE, "USER_SEARCH_RENDER_CAP"))
+        .as("PickerSearch.RENDER_CAP vs USER_SEARCH_RENDER_CAP in %s", MISSION_MODULE)
+        .isEqualTo(PickerSearch.RENDER_CAP);
   }
 
   /**

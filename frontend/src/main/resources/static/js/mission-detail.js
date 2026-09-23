@@ -2098,6 +2098,32 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     })();
 
+    // REQ-FE-016: the /users/search relay fetches one row more than these two autocompletes render
+    // (PickerSearch.PAGE_SIZE = 51 against this cap), so a 51st match means there are more and the
+    // list says so instead of looking complete. PickerSearchLimitsParityTest pins this value.
+    const USER_SEARCH_RENDER_CAP = 50;
+
+    /**
+     * Appends the non-selectable "keep typing to narrow the list" row when the relay returned more
+     * users than the list renders.
+     *
+     * @param {HTMLElement} container the autocomplete list the rows went into
+     * @param {number} received how many users the relay returned
+     */
+    function appendUserSearchOverflowHint(container, received) {
+        if (received <= USER_SEARCH_RENDER_CAP) {
+            return;
+        }
+        const hint = document.createElement('div');
+        hint.className = 'autocomplete-notice';
+        hint.setAttribute('aria-disabled', 'true');
+        hint.textContent = window.krtI18nText(
+            (window.krtComboboxI18n || {}).hint,
+            'krtComboboxI18n.hint',
+        );
+        container.appendChild(hint);
+    }
+
     // Autocomplete Logic (participant add modal)
     const searchInput = document.getElementById('participant-search-input');
     const userIdInput = document.getElementById('participant-user-id');
@@ -2135,7 +2161,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         closeAllLists();
                         if (!users || users.length === 0) return;
 
-                        users.forEach((user) => {
+                        users.slice(0, USER_SEARCH_RENDER_CAP).forEach((user) => {
                             const div = document.createElement('div');
                             const regex = new RegExp(
                                 '(' + val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')',
@@ -2168,6 +2194,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             });
                             resultsDiv.appendChild(div);
                         });
+                        appendUserSearchOverflowHint(resultsDiv, users.length);
                     })
                     .catch((err) => console.error('Error fetching users:', err));
             }, 300);
@@ -2234,7 +2261,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 .then((users) => {
                     partyLeadCloseLists();
                     if (!users || users.length === 0) return;
-                    users.forEach((user) => {
+                    users.slice(0, USER_SEARCH_RENDER_CAP).forEach((user) => {
                         const div = document.createElement('div');
                         const regex = new RegExp(
                             '(' + val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')',
@@ -2257,6 +2284,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         });
                         results.appendChild(div);
                     });
+                    appendUserSearchOverflowHint(results, users.length);
                 })
                 .catch((err) => console.error('Error fetching users:', err));
         }, 300);
