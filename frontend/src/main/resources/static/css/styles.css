@@ -6154,14 +6154,10 @@
         border-bottom: var(--border-hairline);
         flex-shrink: 0;
     }
-    /* The shell's title is an <h2> in hand-written markup and an <h3> in the
-   `modal-wrapper :: modal(...)` fragment, so both must carry the head style.
-   Until now only `h2` did: an <h3> title fell through to the global heading
-   rule and rendered orange at the browser's default h3 size instead of white
-   at 0.85rem, which is why the fragment-rendered modals never matched the
-   hand-written ones. */
-    .krt-modal-head h2,
-    .krt-modal-head h3 {
+    /* The shell's title. Every dialog is rendered by `modal-wrapper :: modal`, whose title is
+   an <h2> (REQ-UI-013); the <h3> variant this rule used to carry went with the last
+   <h3> title on 2026-09-23. */
+    .krt-modal-head h2 {
         font-family: var(--font-headline);
         font-weight: var(--fw-bold);
         font-size: 0.85rem;
@@ -6170,8 +6166,7 @@
         letter-spacing: 0.06em;
         margin: 0;
     }
-    .krt-modal--danger .krt-modal-head h2,
-    .krt-modal--danger .krt-modal-head h3 {
+    .krt-modal--danger .krt-modal-head h2 {
         color: var(--color-danger-text);
     }
     .krt-modal-body {
