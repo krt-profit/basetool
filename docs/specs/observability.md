@@ -1461,7 +1461,7 @@ the boot run carries the last run's values over and re-reads only the reboot fla
   `03-spring-apps.json`: per-pool heap, GC pause max by action/cause, thread states, open FDs vs max,
   per-app CPU.
 - Request concurrency (FE-PERF-07, 2026-09-22): the `03-spring-apps.json` "In-flight Requests"
-  panel plots `sum by (application) (http_server_requests_active_seconds_gcount)` — the active count
+  panel plots `sum by (application) (http_server_requests_active_seconds_count)` — the active count
   of Spring MVC's `http.server.requests` long-task timer. It replaced "Tomcat Busy Threads": all
   three apps run Tomcat on virtual threads (`spring.threads.virtual.enabled`), which gives the
   connector an external `VirtualThreadExecutor`, so `tomcat_threads_*` read a constant `-1` and
@@ -1469,6 +1469,15 @@ the boot run carries the last run's values over and re-reads only the reboot fla
   (`server.tomcat.mbeanregistry.enabled`, enabled only to feed that panel) are gone;
   `accept-count` / `max-connections` act before the executor and stay. `ManagementPortIsolationTest`
   (backend and frontend) pins the executor type and the gauge's presence.
+  **No histogram on the in-flight timers** (owner decision 2026-09-23): the
+  `percentiles-histogram[http.server.requests]` key matched the derived `.active` long-task timer
+  by prefix and exported about fifty `_bucket` series per label set that nothing read. A
+  more specific `[http.server.requests.active]: false` (backend, frontend, ingest; the frontend also
+  `[http.client.requests.active]: false`) switches it off for those timers alone; without a
+  histogram the timer is a summary whose `_count` is the number of in-flight requests, which is the
+  series the panel reads. The latency histograms are unchanged. `ManagementPortIsolationTest`
+  asserts no `http_server_requests_active_seconds_bucket` while `http_server_requests_seconds_bucket`
+  is still exported.
 - `basetool_http_error_total{code}` counter at the `GlobalExceptionHandler` 409/401/403 methods
   (`OPTIMISTIC_LOCK` = optimistic-locking regression indicator, `PESSIMISTIC_LOCK`,
   `UNAUTHENTICATED`, `ACCESS_DENIED`) plus two filter-level codes that bypass the advice and are

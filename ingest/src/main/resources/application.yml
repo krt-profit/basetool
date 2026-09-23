@@ -1,7 +1,7 @@
 server:
   # No Tomcat MBean registry (FE-PERF-07, 2026-09-22). It was enabled only so TomcatMetrics could
   # publish tomcat_threads_* for the "Spring Boot apps" dashboard (epic #936), but under virtual
-  # threads those gauges are always -1; the panel reads http_server_requests_active_seconds_gcount.
+  # threads those gauges are always -1; the panel reads http_server_requests_active_seconds_count.
   port: 11262
   # Behind nginx-proxy-manager (TLS terminated at the proxy). `native` routes X-Forwarded-* through
   # Tomcat's RemoteIpValve, which only honours the header from a TRUSTED internal proxy (its default
@@ -227,6 +227,12 @@ management:
       # default). Bounded to 5ms..10s to keep the per-URI bucket cardinality in check (epic #936).
       percentiles-histogram:
         "[http.server.requests]": true
+        # The in-flight long-task timers Micrometer derives from each observation
+        # (`<name>.active`) inherit the histogram by prefix, which exported ~50 bucket series per
+        # label set that nothing reads: the In-flight Requests panel reads only `_count`.
+        # Switched off for the `.active` timers alone; the latency histograms stay
+        # (ManagementPortIsolationTest).
+        "[http.server.requests.active]": false
       minimum-expected-value:
         "[http.server.requests]": 5ms
       maximum-expected-value:
