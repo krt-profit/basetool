@@ -1,6 +1,6 @@
 # ADR-0210 — A main push that changes no image input re-tags the previous build
 
-- **Status:** Accepted
+- **Status:** Accepted — amended 2026-09-23 (Amendment 1: per-module reuse, owner decision)
 - **Date:** 2026-09-23
 - **Deciders:** @greluc (CI-07 approved with the improvement audit of 2026-09-22: "amends ADR-0137 —
   needs your approval", given)
@@ -86,10 +86,8 @@ architectures and this workflow's main-branch signature, and hand exactly that d
 
 ## Alternatives considered
 
-- **Per-module reuse** (rebuild only the images whose own inputs changed). Measured on the same
-  replay it would save 82 of 180 build jobs over the last 30 commits (backend 10, frontend 14, ingest 17 re-tags) and 312 of 600 over the last 100, against 42 and 228 for the all-or-nothing rule — but the `build` matrix would have to be computed from the plan,
-  `merge` would mix reused and fresh digests, and the three images would stop being one build of one
-  commit, which ADR-0180 and the release notes both assume. Left for the owner to decide separately.
+- **Per-module reuse** (rebuild only the images whose own inputs changed). Deferred here, adopted by
+  Amendment 1 below on the owner's decision the same day.
 - **Hash the build context instead of diffing paths** (e.g. a digest of every `COPY` source). Exact,
   but it needs the hash recorded somewhere the next run can read — a label on the image, i.e. one
   more thing to trust from the registry — for no difference in the answer.
@@ -100,3 +98,57 @@ architectures and this workflow's main-branch signature, and hand exactly that d
   packages.
 - **Reuse on `workflow_dispatch`.** Rejected for the same reason ADR-0137 gives: "Run workflow" is
   the manual rebuild.
+
+## Amendment 1 (2026-09-23) — per module: rebuild only the images whose inputs changed
+
+**Owner decision (2026-09-23):** build only the images whose own inputs changed and re-tag the others.
+Decision 6 ("all three images or none") is replaced; everything else above stands.
+
+1. **Own and shared inputs.** `image_reuse_plan.py` splits the inputs of decision 2. A module's
+   **own** inputs are the `COPY` sources written with `${MODULE}` (today `<module>/src/main`) plus the
+   explicitly listed `frontend/oss-bundled-components.json` (copied for every module, read only by
+   the frontend's `generateOssLicenses`; a self-test fails when the entry stops being a `COPY`
+   source). **Every other input is shared** and rebuilds all three — including all six module build
+   scripts: Gradle configures every project for every build, and the frontend jar embeds the Licensee
+   reports of the backend, ingest and keycloak-spi runtime classpaths, so a dependency change in
+   `backend/build.gradle.kts` really does change the frontend image. `logging-support/src/main` is
+   shared because all three ship it; test-support is no longer copied (ADR-0209).
+2. **Gates per image.** The registry gates of decision 5 (resolves, both architectures, main-branch
+   signature, at most 7 days old) run for each image the script would re-tag; an image that fails
+   one is **built**, the others stay re-tagged. The tag path stays all three or a full build — a
+   release is never assembled from a mix — and a release commit and `workflow_dispatch` still rebuild
+   all three.
+3. **A dynamic build matrix.** `plan` emits `reused_modules`, their verified `digests` and a
+   `build_matrix` of only the (module, platform) cells to build (the platform → native runner
+   mapping moved into `plan`); `build` and `scan` run that matrix, `merge` keeps one cell per image and
+   re-tags or assembles per image. A failed build cell stops `merge` for **all three**, so a commit's
+   `:sha-<short>` exists for every image or for none — the next push's lookup depends on it.
+4. **Provenance is per image, and what read it as shared was changed.** A re-tagged image's revision
+   label, buildx provenance and (frontend) version chip name the commit that built it, so the three
+   images of one `main` tag can name three different commits. Checked against every consumer:
+   - `promote.yml` `sync-testing` read the **backend** image's revision as the representative of all
+     five modules. With per-module reuse that is unsound — a testing tag placed ahead with no backend
+     change since stable reads the same backend revision as stable, `--is-ancestor X X` says "behind",
+     and testing would be moved back. It now reads the **`basetool-config`** bundle's revision, which
+     every run rebuilds and never re-tags from another commit, so it always names the published
+     commit. `release-images.yml`'s `build-config` job says so, so the bundle does not quietly acquire
+     a reuse path of its own.
+   - `scripts/deploy.sh` resolves and cosign-verifies each image's digest independently and compares
+     nothing across images — no change.
+   - The frontend's version chip (`app_version.py`) names the frontend's building commit; documented
+     there. Releases are unaffected (point 2).
+   - The release notes and ADR-0180's "the three images ship as one release" concern releases, which
+     stay one build of one commit.
+5. **Measured.** `image_reuse_plan.py --dry-run` over `main` on 2026-09-23 (each commit against its
+   first parent, the pre-ADR-0209 per-module Dockerfiles counted as own inputs and test-support /
+   `versions.properties` as shared):
+
+   | Window | Module builds | Re-tagged per module | Build jobs saved | All-three rule, for comparison |
+   |---|---|---|---|---|
+   | last 30 commits | 90 | **36** (backend 9, frontend 11, ingest 16) | **72 of 180** | 4 commits, 24 of 180 |
+   | last 100 commits | 300 | **156** (backend 46, frontend 47, ingest 63) | **312 of 600** | 37 commits, 222 of 600 |
+
+   The 30-commit window moved since this ADR's first count (it now ends with the three image and
+   release-workflow changes, all shared inputs), which is why the all-three figure reads 4 rather than
+   7 here. Per-module reuse roughly triples the saving on a code-heavy window and adds ~40 % on the
+   longer one.

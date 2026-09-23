@@ -20,6 +20,13 @@ whole of ADR-0137's saving, and it breaks the guarantee that ``:1.8.4`` and
 content. The release version is knowable *without* the tag: the release commit
 carries it in the CHANGELOG, which ``release-prepare.yml`` wrote there.
 
+The string names the commit that BUILT the frontend image, and since ADR-0210 that is not always
+the commit whose tag points at it: a main push that leaves the frontend's inputs alone re-tags the
+previous frontend image, chip included, while it rebuilds the backend or ingest. So on ``:edge`` and
+``:sha-<short>`` the chip can name an earlier commit than the tag -- the code it describes is the
+same, which is the reuse condition. A release commit always rebuilds all three images, so a release's
+chip is always the release (rule 2 below).
+
 So:
 
 1. A tag build resolves to the tag, verbatim — unchanged, and still the

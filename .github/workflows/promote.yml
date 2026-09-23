@@ -431,15 +431,24 @@ jobs:
       - name: Decide whether testing is behind
         id: decide
         env:
-          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-backend
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-config
           VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
 
-          # ONE decision for all five modules. They are built from a single commit
-          # in lock-step by release-images.yml and promoted in lock-step above, so
-          # asking five times could only surface a disagreement that would mean the
-          # promotion was already broken. `backend` is the arbitrary representative.
+          # ONE decision for all five modules — they are promoted in lock-step above —
+          # asked of the `basetool-config` bundle, deliberately NOT of an app image.
+          # Since ADR-0210's per-module reuse the three app images of one tag need
+          # not share a build: an image whose inputs a push did not change is
+          # re-tagged from an earlier main run and keeps THAT run's revision label.
+          # `backend` (the representative until 2026-09-23) can therefore name an
+          # older commit than the tag, and on a testing tag placed ahead with no
+          # backend change since stable, both sides would read the same backend
+          # revision, `--is-ancestor X X` would answer "behind", and this job would
+          # move a deliberately-ahead testing BACK — the one thing it must never do.
+          # The config bundle is rebuilt by every release-images.yml run and never
+          # re-tagged from another commit, so its revision label is always the commit
+          # the tag was published for.
           #
           # The ordering signal is the SOURCE COMMIT, read from the image's
           # `org.opencontainers.image.revision` label, and NOT the image's creation
