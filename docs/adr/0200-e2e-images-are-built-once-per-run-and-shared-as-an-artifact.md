@@ -53,6 +53,12 @@ store were evicted before the next run could read them.
   prebuilt check catches the rest at runtime.
 - A matrix cell can no longer be re-run on its own after the one-day retention if the artifact is
   gone; re-run the whole workflow instead.
+- **A Firefox or WebKit cell has no Chromium** (added 2026-09-23). Every Playwright class must
+  therefore launch its browser through `E2eSupport.launchBrowser`, which reads `e2e.browser`. The
+  four ad-hoc mockup harnesses still called `playwright.chromium()` and failed with a
+  `DriverException` in all ten non-Chromium cells from this change on; they now skip through a JUnit
+  assumption before any launch and use the seam when enabled, and `E2eBrowserLaunchSeamTest`
+  (frontend unit tests) rejects a direct engine launch outside `E2eSupport`.
 
 ## Alternatives considered
 

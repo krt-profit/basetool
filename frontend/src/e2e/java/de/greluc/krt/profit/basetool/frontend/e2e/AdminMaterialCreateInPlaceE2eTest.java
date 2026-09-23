@@ -135,9 +135,15 @@ class AdminMaterialCreateInPlaceE2eTest {
 
         // The in-place refresh re-renders the table from a fresh GET of the page; the new row
         // arriving is the signal that the whole round-trip — write and re-render — has finished.
+        // Match the row by its NAME cell only: every row also carries a per-row material <select>
+        // whose options list the whole catalog, so a row-wide hasText matches all of them.
         Locator newRow =
             page.locator("#materialsTable tbody tr")
-                .filter(new Locator.FilterOptions().setHasText(materialName));
+                .filter(
+                    new Locator.FilterOptions()
+                        .setHas(
+                            page.locator("td:first-child")
+                                .filter(new Locator.FilterOptions().setHasText(materialName))));
         assertThat(newRow).hasCount(1, new LocatorAssertions.HasCountOptions().setTimeout(15_000));
 
         assertEquals(

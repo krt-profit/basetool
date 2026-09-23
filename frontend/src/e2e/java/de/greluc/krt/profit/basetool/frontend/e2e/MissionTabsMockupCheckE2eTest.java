@@ -19,9 +19,10 @@
 
 package de.greluc.krt.profit.basetool.frontend.e2e;
 
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
+
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
-import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
@@ -37,7 +38,7 @@ import org.junit.jupiter.api.Test;
  * walks all four tabs, captures full-page screenshots under {@code build/e2e/}, dumps console
  * errors, probes the chip-select computed styles, and performs two board drag&drops (pool→unit, and
  * unit→empty-space which returns the participant to the pool). Not part of CI — it requires a
- * pre-seeded mission id.
+ * pre-seeded mission id, and without {@code MISSION_ID} the whole class is reported as skipped.
  */
 @Tag("e2e")
 class MissionTabsMockupCheckE2eTest {
@@ -45,11 +46,20 @@ class MissionTabsMockupCheckE2eTest {
   private static Playwright playwright;
   private static Browser browser;
 
-  /** Boots a headless Chromium for the walk-through. */
+  /**
+   * Skips the class unless {@code MISSION_ID} names the mission to walk, then boots the headless
+   * browser of the configured engine ({@code -Pe2e.browser}) through {@link
+   * E2eSupport#launchBrowser}. The assumption runs <em>before</em> any browser launch: a CI matrix
+   * cell installs only its own engine, so an unconditional launch of a hard-coded one fails the
+   * whole class with a {@code DriverException} instead of skipping it.
+   */
   @BeforeAll
   static void setUp() {
+    assumeTrue(
+        System.getenv("MISSION_ID") != null && !System.getenv("MISSION_ID").isBlank(),
+        "ad-hoc harness: set MISSION_ID to a mission of an already running local stack");
     playwright = Playwright.create();
-    browser = playwright.chromium().launch(new BrowserType.LaunchOptions().setHeadless(true));
+    browser = E2eSupport.launchBrowser(playwright, false);
   }
 
   /** Releases the browser and driver process. */
@@ -68,10 +78,6 @@ class MissionTabsMockupCheckE2eTest {
   void walkTabsAndCaptureEvidence() {
     String baseUrl = System.getenv().getOrDefault("E2E_BASE_URL", "https://localhost:18081");
     String missionId = System.getenv("MISSION_ID");
-    if (missionId == null || missionId.isBlank()) {
-      System.out.println("[mockup-check] MISSION_ID env missing - skipping");
-      return;
-    }
     try (BrowserContext context =
         browser.newContext(new Browser.NewContextOptions().setIgnoreHTTPSErrors(true))) {
       Page page = context.newPage();
