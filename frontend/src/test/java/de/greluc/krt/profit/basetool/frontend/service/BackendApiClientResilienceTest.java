@@ -51,9 +51,9 @@ import reactor.core.publisher.Mono;
  * Resilience-error classification tests for {@link BackendApiClient}.
  *
  * <p>The existing {@code BackendApiClientProblemJsonTest} covers Problem+JSON decoding via
- * MockWebServer. This sibling exercises the {@code catch (Exception)} branch in {@code executeGet}
- * / {@code executePost} etc., which is the seam through which Resilience4j failures (CircuitBreaker
- * open, Bulkhead saturated, Timeout, ConnectException) are translated to {@link
+ * MockWebServer. This sibling exercises the {@code catch (Exception)} branch in the shared {@code
+ * exchange} helper every verb goes through, which is the seam through which Resilience4j failures
+ * (CircuitBreaker open, Bulkhead saturated, Timeout, ConnectException) are translated to {@link
  * BackendServiceException}s. A regression here silently degrades every page in the frontend.
  *
  * <p>The fluent WebClient chain is mocked explicitly (not via deep-stubs) because the production

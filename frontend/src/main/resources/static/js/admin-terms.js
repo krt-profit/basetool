@@ -32,7 +32,7 @@
      * @param {string} url the overview URL carrying the wanted filter and page
      */
     function swapResults(url) {
-        window.krtFetch.swap({ url: url, container: results, history: true });
+        window.krtFetch.swap({ url, container: results, history: true });
     }
 
     if (filterForm) {

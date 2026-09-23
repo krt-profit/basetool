@@ -89,8 +89,13 @@ class ClientErrorReportControllerTest {
   private static final Pattern BEACON_KIND_DECLARATION =
       Pattern.compile("const KIND_[A-Z_]+ = '([a-z_]+)';");
 
-  /** Matches one {@code name:} property key inside the captured object literal. */
-  private static final Pattern OBJECT_KEY = Pattern.compile("(\\w+)\\s*:");
+  /**
+   * Matches one property key inside the captured object literal, in both spellings: {@code name:
+   * value} and the shorthand {@code name,} that ESLint's {@code object-shorthand} rule requires
+   * since FE-MOD-03. Prettier puts every property of the multi-line literal on its own line, so the
+   * key is the identifier a line starts with.
+   */
+  private static final Pattern OBJECT_KEY = Pattern.compile("(?m)^\\s*(\\w+)\\s*(?::|,|$)");
 
   private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
   private final ClientErrorReportController controller =

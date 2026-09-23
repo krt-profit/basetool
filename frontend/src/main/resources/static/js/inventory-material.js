@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', function () {
             topic: 'inventory',
             sections: INVENTORY_MATERIAL_SECTIONS,
             coalesceMs: 1500,
-            refresh: function () {
+            refresh() {
                 window.krtFetch.swap({
                     url: window.location.pathname + window.location.search,
                     container: '#inventory-material-results',

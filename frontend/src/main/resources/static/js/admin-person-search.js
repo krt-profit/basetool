@@ -51,7 +51,7 @@
         const action = form.getAttribute('action') || '/admin/person-search';
         const url = action + (term ? '?q=' + encodeURIComponent(term) : '');
         if (window.krtFetch) {
-            window.krtFetch.swap({ url: url, container: '#' + RESULTS_ID, history: true });
+            window.krtFetch.swap({ url, container: '#' + RESULTS_ID, history: true });
         } else {
             window.location.assign(url);
         }

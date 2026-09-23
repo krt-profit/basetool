@@ -77,17 +77,17 @@ async function collectionTransfer(inventoryId, target, successMessage) {
         method: 'POST',
         url: '/inventory/' + inventoryId + '/transfer',
         payload: {
-            amount: amount,
+            amount,
             targetUserId: target.targetUserId || null,
             targetLocationId: target.targetLocationId || null,
             type: 'TRANSFER',
             terminal: null,
             sellAmount: null,
-            version: version,
+            version,
         },
         toast: false,
         errorMessage: MSG_ERROR_GENERIC,
-        onSuccess: function (body) {
+        onSuccess(body) {
             window.showFrontendSuccessToast(successMessage);
             // The backend always deletes the full-amount source item and appends a brand-new
             // target item (its own id + version), returning that target DTO (never 204). The
@@ -165,7 +165,7 @@ async function onDeliveredToggle(cb) {
         containerSelector: 'tr[data-inventory-id="' + inventoryId + '"]',
         toast: false,
         errorMessage: MSG_ERROR_GENERIC,
-        onSuccess: function () {
+        onSuccess() {
             window.showFrontendSuccessToast(MSG_DELIVERED_UPDATED);
             broadcastCollectionChanged();
         },
@@ -196,7 +196,7 @@ document.addEventListener('DOMContentLoaded', function () {
             topic: 'order:' + window.orderId,
             sections: MATERIAL_COLLECTION_SECTIONS,
             coalesceMs: 1500,
-            refresh: function () {
+            refresh() {
                 window.krtFetch.swap({
                     url: '/orders/' + window.orderId + '/material-collection',
                     container: '#material-collection-results',

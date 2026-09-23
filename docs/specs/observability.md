@@ -1460,6 +1460,15 @@ the boot run carries the last run's values over and re-reads only the reboot fla
   `JvmHeapHigh`'s 90% trips). No metaspace rule (nonheap max is often -1 → NaN). Deepened
   `03-spring-apps.json`: per-pool heap, GC pause max by action/cause, thread states, open FDs vs max,
   per-app CPU.
+- Request concurrency (FE-PERF-07, 2026-09-22): the `03-spring-apps.json` "In-flight Requests"
+  panel plots `sum by (application) (http_server_requests_active_seconds_gcount)` — the active count
+  of Spring MVC's `http.server.requests` long-task timer. It replaced "Tomcat Busy Threads": all
+  three apps run Tomcat on virtual threads (`spring.threads.virtual.enabled`), which gives the
+  connector an external `VirtualThreadExecutor`, so `tomcat_threads_*` read a constant `-1` and
+  `server.tomcat.threads.max` / `min-spare` had no effect. Those keys and the Tomcat MBean registry
+  (`server.tomcat.mbeanregistry.enabled`, enabled only to feed that panel) are gone;
+  `accept-count` / `max-connections` act before the executor and stay. `ManagementPortIsolationTest`
+  (backend and frontend) pins the executor type and the gauge's presence.
 - `basetool_http_error_total{code}` counter at the `GlobalExceptionHandler` 409/401/403 methods
   (`OPTIMISTIC_LOCK` = optimistic-locking regression indicator, `PESSIMISTIC_LOCK`,
   `UNAUTHENTICATED`, `ACCESS_DENIED`) plus two filter-level codes that bypass the advice and are

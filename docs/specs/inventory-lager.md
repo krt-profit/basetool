@@ -131,8 +131,8 @@ the tree the user was working in.
 · **Code:** `InventoryAggregationService#buildGroupedFromStacks`,
 `InventoryItemRepository#findUserStacks` / `#findGlobalStacks`, `InventoryStackAggregate`,
 `InventoryStackDto`, `GroupedInventoryDto`, `inventory-my.html`, `inventory-admin.html`,
-`static/js/inventory-my.js`, `static/js/inventory-admin.js` (tree expand/collapse persistence) ·
-**Issues:** #466
+`static/js/inventory-common.js` (tree expand/collapse persistence, shared by `inventory-my.js` and
+`inventory-admin.js` since FE-SIMP-03) · **Issues:** #466
 
 ### REQ-INV-044 — Actions operate per entry
 
@@ -625,7 +625,8 @@ already-allocated order edits its slice instead of posting a duplicate) ·
 `InventoryItemService#createInventoryItem`, `InventoryCheckoutService` (book-out / merge / SELL),
 `InventoryAggregationService#getMaterialCollection`, `InventoryItemMapper`,
 `V217__add_inventory_allocation_tables.sql`, `V218__drop_inventory_scalar_associations.sql`,
-`fragments/inventory-stack-entries.html`, `inventory-my.js` / `inventory-admin.js`,
+`fragments/inventory-stack-entries.html`, `inventory-common.js` (the allocation chips both Lager
+pages share), `inventory-my.js` / `inventory-admin.js`,
 `inventory-herkunft.js` (deduct-from picker), `inventory-input.html` / `inventory-input.js`,
 `InventoryWriteController#toAllocationInputs` (single-target shorthand) ·
 **Issues:** #1182 · **ADR:** ADR-0098

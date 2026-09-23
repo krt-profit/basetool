@@ -262,9 +262,9 @@
         }
 
         return {
-            subscribe: function (topic, handlers) {
+            subscribe(topic, handlers) {
                 if (!topic) {
-                    return { unsubscribe: function () {} };
+                    return { unsubscribe() {} };
                 }
                 const entry =
                     topics[topic] ||
@@ -273,15 +273,15 @@
                 ensureSocket();
                 if (isOpen()) {
                     entry.state = 'pending';
-                    rawSend({ type: 'subscribe', topic: topic });
+                    rawSend({ type: 'subscribe', topic });
                 }
                 return {
-                    unsubscribe: function () {
+                    unsubscribe() {
                         delete topics[topic];
                     },
                 };
             },
-            sendChanged: function (topic, sections) {
+            sendChanged(topic, sections) {
                 // A terminally refused socket will never reopen, so buffering the publish would
                 // only grow a queue that can never flush; the local mutation itself is unaffected.
                 if (!topic || stopped) {
@@ -289,8 +289,8 @@
                 }
                 const secs = Array.isArray(sections) ? sections : [sections];
                 ensureSocket();
-                if (!rawSend({ type: 'changed', topic: topic, sections: secs })) {
-                    publishBuffer.push({ topic: topic, sections: secs });
+                if (!rawSend({ type: 'changed', topic, sections: secs })) {
+                    publishBuffer.push({ topic, sections: secs });
                 }
             },
             // Publishes an editor-presence control frame (`focus` / `heartbeat` / `blur`) for a
@@ -300,12 +300,12 @@
             // re-announced on the next subscribe ack (see onSubscribed). The server drops a presence
             // frame for a topic this socket has not subscribed to, so a frame that races ahead of the
             // subscribe ack is harmlessly ignored and re-sent by that same onSubscribed re-announce.
-            sendPresence: function (topic, type, sectionKey) {
+            sendPresence(topic, type, sectionKey) {
                 if (!topic || !type) {
                     return;
                 }
                 ensureSocket();
-                rawSend({ type: type, topic: topic, sectionKey: sectionKey });
+                rawSend({ type, topic, sectionKey });
             },
             // Test-support only: the canonical topics this tab has an acknowledged (`subscribed`)
             // subscription for. The two-context live-sync e2e tests poll this to wait deterministically
@@ -313,7 +313,7 @@
             // the /ws/sync analogue of the mission adapter's `missionPresence.socket.readyState === 1`
             // (a subscribe, unlike a mission legacy socket, is only registered once its async server
             // authorization has acked). Not used by application code.
-            subscribedTopics: function () {
+            subscribedTopics() {
                 return Object.keys(topics).filter(function (t) {
                     return topics[t].state === 'subscribed';
                 });
@@ -519,10 +519,10 @@
         // and bank use this.
         if (cfg && cfg.topic) {
             syncSocket.subscribe(cfg.topic, {
-                onChanged: function (sections) {
+                onChanged(sections) {
                     apply(sections);
                 },
-                onResync: function () {
+                onResync() {
                     apply(null);
                 },
                 // M7: a denied subscribe stops this tab receiving peer changes for the room — for
@@ -539,18 +539,18 @@
                 // the manual refresh, re-raising the pill on a timer would nag without adding
                 // information; a retry that then succeeds simply restores live updates from that
                 // point on, and any change missed in between is what the pill already covers.
-                onDenied: function () {
+                onDenied() {
                     deferAllVisibleSections();
                 },
             });
         }
 
         // Expose apply() so a caller can drive the receiver directly if needed.
-        return { apply: apply };
+        return { apply };
     }
 
     window.krtLiveSync = {
-        createReceiver: createReceiver,
+        createReceiver,
         subscribe: syncSocket.subscribe,
         sendChanged: syncSocket.sendChanged,
         sendPresence: syncSocket.sendPresence,

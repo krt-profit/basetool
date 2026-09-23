@@ -69,7 +69,7 @@
                     reloadQuestion: i18n.conflictQuestion,
                     reloadDetailFallback: i18n.conflictDetail,
                 },
-                onSuccess: function (body) {
+                onSuccess(body) {
                     if (body) {
                         syncAllVersions(body.version);
                     }
@@ -82,21 +82,21 @@
         return {
             description: form.querySelector('#description').value,
             displayName: form.querySelector('#displayName').value,
-            version: version,
+            version,
         };
     });
     bindInPlaceSave('profile-payout-form', function (form, version) {
         const select = form.querySelector('select[name="defaultPayoutPreference"]');
         return {
             defaultPayoutPreference: select ? select.value : null,
-            version: version,
+            version,
         };
     });
     bindInPlaceSave('profile-blueprint-sharing-form', function (form, version) {
         const checkbox = form.querySelector('input[name="shareBlueprintsGlobally"]');
         return {
             shareBlueprintsGlobally: checkbox ? checkbox.checked : false,
-            version: version,
+            version,
         };
     });
 
@@ -142,7 +142,7 @@
                 payload: { eraseHistory: eraseHistory ? eraseHistory.checked : false },
                 successMessage: i18n.deletionRequested,
                 errorMessage: i18n.deletionError,
-                onSuccess: function () {
+                onSuccess() {
                     // The documented close is the two classes, not an inline style: an inline
                     // display:none wins over any stylesheet rule and leaves the overlay in a state
                     // the shared open/close contract does not describe. It happens to reopen today

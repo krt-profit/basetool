@@ -210,7 +210,7 @@
         if (!isFinite(sellAmount) || sellAmount <= 0) {
             return null;
         }
-        return { sellAmount: sellAmount };
+        return { sellAmount };
     }
 
     /**
@@ -237,15 +237,15 @@
             const allocated = parseFloat(chip.getAttribute('data-amount')) || 0;
             const nameEl = chip.querySelector('span:not(.assoc-chip__amt)');
             const name = nameEl ? nameEl.textContent.trim() : targetId;
-            tags.push({ targetId: targetId, allocated: allocated, name: name });
+            tags.push({ targetId, allocated, name });
             sumAllocated += allocated;
         });
         return {
-            field: field,
-            entryAmount: entryAmount,
-            isPiece: isPiece,
+            field,
+            entryAmount,
+            isPiece,
             sumAllocated: roundAmount(sumAllocated, isPiece),
-            tags: tags,
+            tags,
         };
     }
 
@@ -441,16 +441,16 @@
         const valid = !hasDeducted || (!tagOver && !overAssigned && !underAssigned);
 
         return {
-            restDim: restDim,
-            assigned: assigned,
-            fromRest: fromRest,
-            minRequired: minRequired,
-            tagOver: tagOver,
-            overAssigned: overAssigned,
-            underAssigned: underAssigned,
-            valid: valid,
-            hasDeducted: hasDeducted,
-            target: target,
+            restDim,
+            assigned,
+            fromRest,
+            minRequired,
+            tagOver,
+            overAssigned,
+            underAssigned,
+            valid,
+            hasDeducted,
+            target,
         };
     }
 
@@ -624,7 +624,7 @@
                 }
             });
         }
-        registry[prefix] = { itemId: itemId, dims: dims };
+        registry[prefix] = { itemId, dims };
         if (dims.length === 0) {
             section.classList.add('krtm-hidden');
             recompute(prefix);
@@ -681,16 +681,16 @@
     }
 
     window.krtHerkunft = {
-        populate: populate,
-        recompute: recompute,
-        collect: collect,
+        populate,
+        recompute,
+        collect,
         /**
          * Recomputes and reports whether the picker's plan is currently submittable.
          *
          * @param {string} prefix the modal prefix
          * @returns {boolean} true when the plan is valid (or the picker does not apply)
          */
-        isValid: function (prefix) {
+        isValid(prefix) {
             return recompute(prefix);
         },
         /**
@@ -698,7 +698,7 @@
          *
          * @param {string} prefix the modal prefix
          */
-        reset: function (prefix) {
+        reset(prefix) {
             delete registry[prefix];
             const section = sectionOf(prefix);
             if (section) {

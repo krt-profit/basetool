@@ -68,7 +68,7 @@ async function persistOrderReorder(orderId, targetPriority) {
     } else if (container && window.krtFetch && window.krtFetch.swap) {
         await window.krtFetch.swap({
             url: window.location.pathname + window.location.search,
-            container: container,
+            container,
             fragmentValue: 'results',
             history: false,
             preserveScroll: true,

@@ -36,7 +36,7 @@
     // handlers cannot lose its registration to a load-order race — even if this
     // script is deferred, slowed by the network or blocked by a stale browser cache.
     // See the comment in `fragments/head.html` for why the stub exists.
-    let pendingQueue =
+    const pendingQueue =
         (window.krtEvents &&
             window.krtEvents._isBootstrapStub &&
             window.krtEvents._queuedRegistrations) ||
@@ -51,21 +51,21 @@
      */
     function on(eventType, actionName, handler) {
         if (typeof handler !== 'function') return;
-        let selector = '[data-trigger="' + actionName + '"]';
+        const selector = '[data-trigger="' + actionName + '"]';
         document.addEventListener(eventType, function (event) {
             // event.target is an EventTarget: it is only an Element for events
             // originating in the document tree, which is why the closest() probe
             // below is a capability check rather than a formality.
-            let target = /** @type {Element | null} */ (event.target);
+            const target = /** @type {Element | null} */ (event.target);
             if (!target || typeof target.closest !== 'function') return;
-            let matched = /** @type {HTMLElement | null} */ (target.closest(selector));
+            const matched = /** @type {HTMLElement | null} */ (target.closest(selector));
             if (!matched) return;
             if (/** @type {HTMLInputElement} */ (matched).disabled) return;
             handler(matched, event);
         });
     }
 
-    window.krtEvents = { on: on };
+    window.krtEvents = { on };
 
     // Drain everything that was queued before this script ran. Order is preserved so
     // a template that registered handler A then handler B for the same event sees A
@@ -82,7 +82,7 @@
     // reporting "the dropdown does nothing" a fourth time. No-op once `on` is installed.
     if (typeof window.setTimeout === 'function') {
         window.setTimeout(function () {
-            let stub = window.krtEvents;
+            const stub = window.krtEvents;
             if (stub && stub._isBootstrapStub) {
                 if (typeof console !== 'undefined' && typeof console.error === 'function') {
                     console.error(

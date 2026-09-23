@@ -46,6 +46,11 @@ export default [
     },
     rules: {
       "no-var": "error",
+      // FE-MOD-03: a binding that is never reassigned is `const`, and an object literal spells a
+      // same-named property / function-valued member in its short form. Both are autofixable
+      // (`eslint --fix`), and both were applied across static/js when the rules were added.
+      "prefer-const": "error",
+      "object-shorthand": ["error", "always"],
       eqeqeq: ["error", "smart"],
       // Honour the codebase's "_"-prefix convention for intentionally unused
       // bindings: unused function args and caught errors named `_e` / `_ignored`
@@ -106,6 +111,8 @@ export default [
     },
     rules: {
       "no-var": "error",
+      "prefer-const": "error",
+      "object-shorthand": ["error", "always"],
       eqeqeq: ["error", "smart"],
       "no-unused-vars": [
         "warn",

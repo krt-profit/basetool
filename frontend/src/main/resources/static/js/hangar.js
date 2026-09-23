@@ -158,7 +158,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     successMessage: hangarI18n.deleteSuccess,
                     errorMessage: hangarI18n.deleteError,
                     conflict: hangarConflict,
-                    onSuccess: function () {
+                    onSuccess() {
                         if (deleteModal) deleteModal.style.display = 'none';
                         closeModal();
                         reswapHangar();
@@ -290,21 +290,21 @@ document.addEventListener('DOMContentLoaded', function () {
                 window.krtFetch.submitForm({
                     url: '/hangar/import/ships',
                     method: 'POST',
-                    formData: formData,
+                    formData,
                     submitter: importBtn,
                     toast: false,
-                    onSuccess: function (data) {
+                    onSuccess(data) {
                         hideStatus();
                         fileInput.value = '';
                         openResultModal(data);
                     },
                     // Every failure is reported in the status line under the button, with the
                     // server's localized problem detail (e.g. the 413 size message) in brackets.
-                    onError: function (status, body) {
+                    onError(status, body) {
                         showFailure(body && body.detail ? body.detail : String(status));
                         return true;
                     },
-                    onNetworkError: function () {
+                    onNetworkError() {
                         showFailure('');
                         return true;
                     },
@@ -349,7 +349,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     toast: false,
                     errorMessage: deleteAllBtn.getAttribute('data-error-failed'),
                     conflict: hangarConflict,
-                    onSuccess: function () {
+                    onSuccess() {
                         deleteAllModal.style.display = 'none';
                         reswapHangar();
                         if (window.showFrontendSuccessToast) {
@@ -422,11 +422,11 @@ document.addEventListener('DOMContentLoaded', function () {
                             homeForm.getAttribute('action'),
                             homeForm.action,
                         ),
-                        payload: { locationId: locationId },
+                        payload: { locationId },
                         successMessage: hangarI18n.homeSuccess,
                         errorMessage: hangarI18n.homeError,
                         conflict: hangarConflict,
-                        onSuccess: function () {
+                        onSuccess() {
                             closeHome();
                             reswapHangar();
                         },
@@ -463,11 +463,11 @@ document.addEventListener('DOMContentLoaded', function () {
             .write({
                 method: 'POST',
                 url: window.safeSameOriginUrl(action, action),
-                payload: payload,
+                payload,
                 successMessage: isUpdate ? hangarI18n.updateSuccess : hangarI18n.addSuccess,
                 errorMessage: isUpdate ? hangarI18n.updateError : hangarI18n.addError,
                 conflict: hangarConflict,
-                onSuccess: function () {
+                onSuccess() {
                     closeModal();
                     reswapHangar();
                 },

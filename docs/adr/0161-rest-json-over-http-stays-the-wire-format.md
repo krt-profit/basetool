@@ -104,6 +104,19 @@ preserve every contract above. In priority order, each as its own change with it
    Removing it would be a regression. §8.3 spells the difference out, because "remove the ETag filter"
    is exactly the instruction a reader would carry out on the wrong bean.
 
+   > [!note] Amended 2026-09-22 (FE-PERF-03): the frontend filter is **narrowed**, not removed
+   > The sentence above holds for the routes a browser can actually revalidate, and only for those.
+   > Spring Security's default cache-control writer puts `no-store` on every frontend response that
+   > sets no `Cache-Control` of its own, and `isEligibleForEtag` refuses an ETag on `no-store` — so on
+   > every page, fragment, AJAX write and the notification SSE relay the `/*` registration buffered
+   > the whole body and never emitted an ETag. `EtagConfig` now registers the filter only on
+   > `EtagConfig.ETAG_URL_PATTERNS`: the asset trees `WebMvcConfig` serves (`immutable`, one year),
+   > `/manifest.webmanifest` (one hour) and `/.well-known/assetlinks.json` (one day) — the routes
+   > whose own `Cache-Control` makes an ETag, and a `304` on `If-None-Match`, possible. Those 304s are
+   > unchanged (`StaticResourcesCachingTest`, now against the application's own registration);
+   > `StaticResourceHandlerMappingTest` fails when an asset tree lacks its prefix, and the frontend's
+   > `SseDeliveryThroughFilterChainTest` reads a stream's first frame off a real socket.
+
 4. **Add an `openapi.json` schema diff against the previous release tag in CI**, closing the gap
    ADR-0136 documents about itself (`ExternalContractTest` *"does not compare types, nullability or enum
    values"*). This is the evolution discipline protobuf field numbers would have provided, as a test

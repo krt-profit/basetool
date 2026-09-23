@@ -16,7 +16,7 @@
 (function () {
     'use strict';
 
-    let state = {
+    const state = {
         yieldByMaterialId: {},
         helpText: '',
     };
@@ -36,7 +36,7 @@
      * (treated as "no UEX data for this material at this refinery").
      */
     function setBadge(rowIndex, bonus) {
-        let label = document.querySelector('label[for="outputQuantity_' + rowIndex + '"]');
+        const label = document.querySelector('label[for="outputQuantity_' + rowIndex + '"]');
         if (!label) return;
         let badge = label.querySelector('#yieldBonus_' + rowIndex);
         if (bonus === undefined || bonus === null) {
@@ -70,11 +70,11 @@
      */
     function refreshFor(inputMaterialSelect) {
         if (!inputMaterialSelect || !inputMaterialSelect.id) return;
-        let indexMatch = inputMaterialSelect.id.match(/_(\d+)$/);
+        const indexMatch = inputMaterialSelect.id.match(/_(\d+)$/);
         if (!indexMatch) return;
-        let rowIndex = indexMatch[1];
-        let materialId = inputMaterialSelect.value;
-        let bonus =
+        const rowIndex = indexMatch[1];
+        const materialId = inputMaterialSelect.value;
+        const bonus =
             materialId && state.yieldByMaterialId ? state.yieldByMaterialId[materialId] : undefined;
         setBadge(rowIndex, bonus);
     }
@@ -96,7 +96,7 @@
      * form stays usable when UEX or the backend is misbehaving.
      */
     function onLocationChange(selectElement) {
-        let locationId = selectElement && selectElement.value;
+        const locationId = selectElement && selectElement.value;
         if (!locationId) {
             state.yieldByMaterialId = {};
             refreshAll();
@@ -119,10 +119,10 @@
     }
 
     window.krtRefineryYield = {
-        init: init,
-        setBadge: setBadge,
-        refreshFor: refreshFor,
-        refreshAll: refreshAll,
-        onLocationChange: onLocationChange,
+        init,
+        setBadge,
+        refreshFor,
+        refreshAll,
+        onLocationChange,
     };
 })();

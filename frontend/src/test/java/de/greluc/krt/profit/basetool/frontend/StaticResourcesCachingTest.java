@@ -30,6 +30,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -45,6 +46,9 @@ class StaticResourcesCachingTest {
 
   @Autowired private WebApplicationContext context;
 
+  /** The ETag filter registration {@code EtagConfig} contributes, applied with its own scope. */
+  @Autowired private FilterRegistrationBean<ShallowEtagHeaderFilter> shallowEtagHeaderFilter;
+
   @MockitoBean private WebClient webClient;
 
   @MockitoBean private WebClient termsDocumentClient;
@@ -57,7 +61,11 @@ class StaticResourcesCachingTest {
   void setup() {
     mockMvc =
         MockMvcBuilders.webAppContextSetup(context)
-            .addFilter(new ShallowEtagHeaderFilter(), "/*")
+            // The application's own registration, with its own URL patterns — not a hand-added
+            // filter on /*, which would pass however EtagConfig were scoped (FE-PERF-03).
+            .addFilter(
+                shallowEtagHeaderFilter.getFilter(),
+                shallowEtagHeaderFilter.getUrlPatterns().toArray(String[]::new))
             .apply(springSecurity())
             .build();
   }
@@ -79,5 +87,44 @@ class StaticResourcesCachingTest {
     mockMvc
         .perform(get(resource).header("If-None-Match", etag))
         .andExpect(status().isNotModified());
+  }
+
+  /**
+   * The web app manifest keeps its ETag: it is publicly cacheable for an hour, so a browser that
+   * re-reads it afterwards revalidates with {@code If-None-Match} and gets a body-less {@code 304}.
+   *
+   * @throws Exception if the MockMvc request fails
+   */
+  @Test
+  void manifest_ShouldSendEtag_AndReturn304OnMatch() throws Exception {
+    String etag =
+        mockMvc
+            .perform(get("/manifest.webmanifest"))
+            .andExpect(status().isOk())
+            .andExpect(header().string("ETag", notNullValue()))
+            .andReturn()
+            .getResponse()
+            .getHeader("ETag");
+
+    mockMvc
+        .perform(get("/manifest.webmanifest").header("If-None-Match", etag))
+        .andExpect(status().isNotModified());
+  }
+
+  /**
+   * A page outside the filter's scope is not buffered by it (FE-PERF-03). The filter's buffer
+   * announces itself: copying the cached body out sets {@code Content-Length}, which a streamed
+   * Thymeleaf render never does. Under the former {@code /*} registration this page carried one,
+   * and never an ETag, because Spring Security marks it {@code no-store}.
+   *
+   * @throws Exception if the MockMvc request fails
+   */
+  @Test
+  void pageOutsideTheEtagScope_ShouldNotBeBuffered() throws Exception {
+    mockMvc
+        .perform(get("/impressum"))
+        .andExpect(status().isOk())
+        .andExpect(header().doesNotExist("ETag"))
+        .andExpect(header().doesNotExist("Content-Length"));
   }
 }

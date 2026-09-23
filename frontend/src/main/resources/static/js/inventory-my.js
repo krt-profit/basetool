@@ -1,3 +1,4 @@
+// @ts-check
 /*
  * Profit Basetool - squadron-management web app.
  * Copyright (C) 2026 Lucas Greuloch
@@ -21,40 +22,82 @@
  * Page module for the personal inventory ("Mein Lager") page (templates/inventory-my.html),
  * extracted verbatim from the former end-of-body inline script (#924 Part 2).
  *
- * Covers: bulk checkout (modal + POST /inventory/bulk-checkout via krtFetch), the note modal
- * (PUT /inventory/{id}/note with CSRF retry-on-403 and DOM version sync), the multi-select
- * filter dropdowns + AJAX fragment refresh of #myInventoryTableContainer (outerHTML swap),
- * tree group/stack expand-collapse with localStorage persistence and lazy stack-entry
- * pagination (REQ-INV-002), the book-out (ausbuchen) modal incl. terminal lookup for SELL,
- * the Umbuchen (rebooking/transfer) modal (REQ-INV-007), association select updates, and the
- * delegated krtEvents bindings plus the two direct submit listeners on the stable modal forms.
+ * Covers: bulk checkout and Massen-Umbuchen (modals + krtFetch writes), the note-modal bindings,
+ * the multi-select filter dropdowns + AJAX fragment refresh of #myInventoryTableContainer
+ * (outerHTML swap), the Umbuchen (rebooking/transfer) modal with its personal <-> shared mode
+ * (REQ-INV-007), the personal Lager's live-sync room, and the page's delegated krtEvents bindings
+ * plus the direct submit listeners on the stable modal forms. The tree, the book-out modal, the
+ * allocation chips and the cross-room live-sync pokes are the Lager behaviour this page shares
+ * with inventory-admin.js; they live in inventory-common.js (FE-SIMP-03) and are wired below
+ * through myLager.
  *
  * Localized strings come from the small th:inline bootstrap block that precedes this script's
  * loader tag in inventory-my.html; this file must load as a classic synchronous script at the
- * same end-of-body position (after the modals and the toast fragment), never with defer.
+ * same end-of-body position (after the modals, the toast fragment and inventory-common.js), never
+ * with defer.
  */
 
-/* global stackEntriesI18n, bulkI18n, bulkRebookI18n, inventoryConflictI18n, bookOutI18n, umbuchenI18n, assocI18n, showInventoryToast, openNoteModal, closeNoteModal, updateNoteCounter, saveNote, removeNote */
+/* global bulkI18n, bulkRebookI18n, inventoryConflictI18n, umbuchenI18n, assocI18n, showInventoryToast, openNoteModal, closeNoteModal, updateNoteCounter, saveNote, removeNote */
 
-// Which Lager view is active (REQ-INV-030): the Material <-> Items switch is server-rendered
-// navigation, so the authoritative state is the page URL's view= parameter — which every filter
-// re-swap also carries (history.replaceState keeps the address bar in sync).
-function lagerIsItemsView() {
-    try {
-        return new URLSearchParams(window.location.search).get('view') === 'items';
-    } catch {
-        return false;
-    }
+// The Lager behaviour shared with the global page (inventory-common.js). Named `myLager`, not a
+// name inventory-admin.js also declares: both are classic scripts sharing one global lexical
+// environment (ADR-0069), and the type checker reports a cross-file redeclaration (TS6200).
+// inventory-common.js loads ahead of this script (see the header), so the module is installed.
+const myLager = /** @type {KrtInventoryApi} */ (window.krtInventory).createLager({
+    triggerPrefix: 'inv-my',
+    basePath: '/inventory/my',
+    stackPerOwner: false,
+    stackPersonalFlag: true,
+    refreshTable() {
+        filterMyInventory();
+    },
+    notifyInventoryChanged() {
+        broadcastInventoryChanged();
+    },
+    // Reflect the current bulk selection on the freshly injected checkboxes (REQ-INV-034): a stack
+    // expanded after "Alle markieren" (or after ticking others) must come up already checked, and
+    // the count/group state must stay consistent.
+    onStackEntriesLoaded(content) {
+        applyBulkSelectionToLoaded(content);
+        updateBulkCheckoutState();
+    },
+});
+
+/**
+ * The value of one of this page's form controls, or '' when the page does not render it.
+ *
+ * @param {string} id the element id
+ * @returns {string} the control's value
+ */
+function myFieldValue(id) {
+    const el = /** @type {HTMLInputElement | null} */ (document.getElementById(id));
+    return el ? el.value : '';
 }
 
-// The grouping key of a tree group / bulk select-all control: material rows carry
-// data-material-id, game-item rows data-game-item-id (REQ-INV-030). Exactly one is present.
-function groupKeyOf(el) {
-    return el.getAttribute('data-material-id') || el.getAttribute('data-game-item-id');
+/**
+ * Writes one of this page's form controls, when the page renders it.
+ *
+ * @param {string} id the element id
+ * @param {unknown} value the value, written as its string form ('' for null / undefined)
+ */
+function setMyFieldValue(id, value) {
+    const el = /** @type {HTMLInputElement | null} */ (document.getElementById(id));
+    if (el) el.value = value == null ? '' : String(value);
+}
+
+/**
+ * Sets an element's inline display (a modal's `flex` / `none`), when the page renders it.
+ *
+ * @param {string} id the element id
+ * @param {string} display the CSS display value
+ */
+function setMyDisplay(id, display) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = display;
 }
 
 // Attribute selector matching the leaf checkboxes belonging to a group select-all control —
-// keyed on whichever catalog attribute the control carries (see groupKeyOf).
+// keyed on whichever catalog attribute the control carries (see groupKeyOf in inventory-common.js).
 function bulkGroupSelector(groupCb) {
     const materialId = groupCb.getAttribute('data-material-id');
     if (materialId) {
@@ -82,7 +125,9 @@ function getCheckedItemIds() {
 // Reflects the current selection onto the checkboxes inside `root` (the whole document, or a freshly
 // injected stack fragment): a box is checked exactly when its entry id is in the selection set.
 function applyBulkSelectionToLoaded(root) {
-    (root || document).querySelectorAll('.inventory-item-checkbox').forEach(function (cb) {
+    /** @type {NodeListOf<HTMLInputElement>} */ (
+        (root || document).querySelectorAll('.inventory-item-checkbox')
+    ).forEach(function (cb) {
         const id = cb.getAttribute('data-id');
         cb.checked = !!id && bulkSelectedIds.has(id);
     });
@@ -90,8 +135,12 @@ function applyBulkSelectionToLoaded(root) {
 
 function updateBulkCheckoutState() {
     const count = bulkSelectedIds.size;
-    const btn = document.getElementById('bulkCheckoutBtn');
-    const rebookBtn = document.getElementById('bulkRebookBtn');
+    const btn = /** @type {HTMLButtonElement | null} */ (
+        document.getElementById('bulkCheckoutBtn')
+    );
+    const rebookBtn = /** @type {HTMLButtonElement | null} */ (
+        document.getElementById('bulkRebookBtn')
+    );
     const countSpan = document.getElementById('bulkCheckoutCount');
     if (btn) btn.disabled = count === 0;
     // Massen-Umbuchen (REQ-INV-036) acts on the same selection, so it shares the enabled state.
@@ -100,8 +149,12 @@ function updateBulkCheckoutState() {
     // Update group-select-all checkboxes — they mirror only their currently-loaded leaf boxes (a
     // collapsed group has none loaded, so it stays unchecked even under a view-wide select-all; the
     // authoritative total is the count span).
-    document.querySelectorAll('.group-select-all').forEach(function (groupCb) {
-        const groupBoxes = document.querySelectorAll(bulkGroupSelector(groupCb));
+    /** @type {NodeListOf<HTMLInputElement>} */ (
+        document.querySelectorAll('.group-select-all')
+    ).forEach(function (groupCb) {
+        const groupBoxes = /** @type {NodeListOf<HTMLInputElement>} */ (
+            document.querySelectorAll(bulkGroupSelector(groupCb))
+        );
         let allChecked = groupBoxes.length > 0;
         groupBoxes.forEach(function (cb) {
             if (!cb.checked) allChecked = false;
@@ -127,7 +180,9 @@ function onEntryCheckboxToggle(cb) {
 }
 
 function toggleGroupCheckboxes(groupCb) {
-    const groupBoxes = document.querySelectorAll(bulkGroupSelector(groupCb));
+    const groupBoxes = /** @type {NodeListOf<HTMLInputElement>} */ (
+        document.querySelectorAll(bulkGroupSelector(groupCb))
+    );
     groupBoxes.forEach(function (cb) {
         cb.checked = groupCb.checked;
         const id = cb.getAttribute('data-id');
@@ -150,7 +205,9 @@ let bulkSelectAllInFlight = false;
 
 // Swaps the toggle button between its "select all" and "clear selection" labels + data-state.
 function setSelectAllButtonState(on) {
-    const btn = document.getElementById('bulkSelectAllBtn');
+    const btn = /** @type {HTMLButtonElement | null} */ (
+        document.getElementById('bulkSelectAllBtn')
+    );
     if (!btn) return;
     btn.setAttribute('data-state', on ? 'on' : 'off');
     const label = btn.getAttribute(on ? 'data-text-clear' : 'data-text-select');
@@ -175,13 +232,15 @@ function clearBulkSelection() {
 // as filterMyInventory builds the table fragment URL, so the returned id set matches what the table
 // shows. Resolves to the array of matching entry ids.
 function fetchAllMatchingEntryIds() {
-    const itemsView = lagerIsItemsView();
+    const itemsView = myLager.lagerIsItemsView();
     const activeMaterials = collectMyChecked('matCheck');
     const activeGameItems = collectMyChecked('gameItemCheck');
     const activeLocations = collectMyChecked('locCheck');
     const activeJobOrders = collectMyChecked('jobOrderCheck');
     const activeMissions = collectMyChecked('missionCheck');
-    const minQualitySelect = document.getElementById('minQuality');
+    const minQualitySelect = /** @type {HTMLSelectElement | null} */ (
+        document.getElementById('minQuality')
+    );
     const minQuality = minQualitySelect ? minQualitySelect.value : '';
     const personalOnly = personalFlagChecked('personalOnly', 'itemPersonalOnly');
     const nonPersonalOnly = personalFlagChecked('nonPersonalOnly', 'itemNonPersonalOnly');
@@ -208,7 +267,9 @@ function fetchAllMatchingEntryIds() {
 }
 
 async function toggleSelectAllInView() {
-    const btn = document.getElementById('bulkSelectAllBtn');
+    const btn = /** @type {HTMLButtonElement | null} */ (
+        document.getElementById('bulkSelectAllBtn')
+    );
     // Already selected → this click clears the selection instead.
     if (btn && btn.getAttribute('data-state') === 'on') {
         clearBulkSelection();
@@ -243,14 +304,14 @@ function openBulkCheckoutModal() {
         showInventoryToast('error', bulkI18n.errorEmpty);
         return;
     }
-    const msg = bulkI18n.modalMessage.replace('{0}', ids.length);
+    const msg = bulkI18n.modalMessage.replace('{0}', String(ids.length));
     const msgEl = document.getElementById('bulkCheckoutModalMessage');
     if (msgEl) msgEl.textContent = msg;
-    document.getElementById('bulkCheckoutModal').style.display = 'flex';
+    setMyDisplay('bulkCheckoutModal', 'flex');
 }
 
 function closeBulkCheckoutModal() {
-    document.getElementById('bulkCheckoutModal').style.display = 'none';
+    setMyDisplay('bulkCheckoutModal', 'none');
 }
 
 async function executeBulkCheckout() {
@@ -268,7 +329,7 @@ async function executeBulkCheckout() {
     // book-out zeroes their order slices), deduped, so those order collections refresh too.
     const affectedOrderIds = [];
     ids.forEach(function (itemId) {
-        collectLeafOrderIds(itemId).forEach(function (orderId) {
+        myLager.collectLeafOrderIds(itemId).forEach(function (orderId) {
             if (affectedOrderIds.indexOf(orderId) < 0) affectedOrderIds.push(orderId);
         });
     });
@@ -284,19 +345,21 @@ async function executeBulkCheckout() {
         toast: false,
         errorMessage: bulkI18n.errorFailed,
         conflict: inventoryConflictI18n,
-        onSuccess: function () {
+        onSuccess() {
             // Use the working global toast (the page-local showInventoryToast targets a #toast
             // element that does not exist) so the count-substituted confirmation actually shows —
             // the single book-out + the krtFetch error path already use this same toast.
             if (typeof window.showFrontendSuccessToast === 'function') {
-                window.showFrontendSuccessToast(bulkI18n.success.replace('{0}', ids.length));
+                window.showFrontendSuccessToast(
+                    bulkI18n.success.replace('{0}', String(ids.length)),
+                );
             }
             // filterMyInventory() re-swaps the table and clears the bulk selection (set, count,
             // button + toggle label) at its start, so no manual reset is needed here.
             filterMyInventory();
             broadcastInventoryChanged();
-            broadcastOrdersChanged(affectedOrderIds);
-            broadcastBoardChanged();
+            myLager.broadcastOrdersChanged(affectedOrderIds);
+            myLager.broadcastBoardChanged();
         },
     });
 }
@@ -321,7 +384,9 @@ let bulkRebookInFlight = false;
 
 // The mode radio's current value; LOCATION is both the default and the fallback.
 function bulkRebookMode() {
-    const checked = document.querySelector('input[name="bulkRebookMode"]:checked');
+    const checked = /** @type {HTMLInputElement | null} */ (
+        document.querySelector('input[name="bulkRebookMode"]:checked')
+    );
     return checked ? checked.value : 'LOCATION';
 }
 
@@ -346,13 +411,17 @@ function currentInventoryUserId() {
 // pool to pick — a personalized row keeps its source stamp — so the picker stays hidden there.
 function refreshBulkRebookOrgUnitPicker() {
     const wrapper = document.getElementById('bulkRebookOrgUnitWrapper');
-    const select = document.getElementById('bulkRebookOrgUnitId');
+    const select = /** @type {HTMLSelectElement | null} */ (
+        document.getElementById('bulkRebookOrgUnitId')
+    );
     if (!wrapper || !select) return;
     const mode = bulkRebookMode();
     select.innerHTML = '';
     wrapper.style.display = 'none';
     if (mode === 'PERSONALIZE') return;
-    const userSelect = document.getElementById('bulkRebookTargetUserId');
+    const userSelect = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('bulkRebookTargetUserId')
+    );
     const ownerId =
         mode === 'LOCATION' && userSelect && userSelect.value
             ? userSelect.value
@@ -404,32 +473,40 @@ function openBulkRebookModal() {
         return;
     }
     const msgEl = document.getElementById('bulkRebookModalMessage');
-    if (msgEl) msgEl.textContent = bulkRebookI18n.modalMessage.replace('{0}', ids.length);
+    if (msgEl) msgEl.textContent = bulkRebookI18n.modalMessage.replace('{0}', String(ids.length));
 
     // Reset on every open so a previous run's mode and target cannot leak into the next one.
-    const locationRadio = document.querySelector('input[name="bulkRebookMode"][value="LOCATION"]');
+    const locationRadio = /** @type {HTMLInputElement | null} */ (
+        document.querySelector('input[name="bulkRebookMode"][value="LOCATION"]')
+    );
     if (locationRadio) locationRadio.checked = true;
-    const mergeCheckbox = document.getElementById('bulkRebookMergeStock');
+    const mergeCheckbox = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('bulkRebookMergeStock')
+    );
     if (mergeCheckbox) mergeCheckbox.checked = false;
     // The destination location opens EMPTY. Unlike the single-row modal there is no current location
     // to seed — the selection can span many — and an empty picker keeps the user from moving stock to
     // a location they never consciously chose.
-    const tl = document.getElementById('bulkRebookTargetLocationId');
+    const tl = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('bulkRebookTargetLocationId')
+    );
     if (tl && tl.krtCombobox) tl.krtCombobox.setValue('');
     else if (tl) tl.value = '';
     // Default the destination owner to the caller: a bulk move usually only relocates own stock.
-    const tu = document.getElementById('bulkRebookTargetUserId');
+    const tu = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('bulkRebookTargetUserId')
+    );
     const me = currentInventoryUserId();
     if (tu && me) tu.value = me;
 
     toggleBulkRebookMode();
     // `.modal` centres its content via display:flex; opening with inline `flex` (not `block`)
     // preserves that centring (matches the canonical .krtm-modal-open = flex, #1328).
-    document.getElementById('bulkRebookModal').style.display = 'flex';
+    setMyDisplay('bulkRebookModal', 'flex');
 }
 
 function closeBulkRebookModal() {
-    document.getElementById('bulkRebookModal').style.display = 'none';
+    setMyDisplay('bulkRebookModal', 'none');
 }
 
 // Reports the moved/skipped split honestly: a run that only skipped rows (everything already sat at
@@ -443,8 +520,10 @@ function reportBulkRebookOutcome(body) {
     }
     const message =
         skipped > 0
-            ? bulkRebookI18n.successPartial.replace('{0}', rebooked).replace('{1}', skipped)
-            : bulkRebookI18n.success.replace('{0}', rebooked);
+            ? bulkRebookI18n.successPartial
+                  .replace('{0}', String(rebooked))
+                  .replace('{1}', String(skipped))
+            : bulkRebookI18n.success.replace('{0}', String(rebooked));
     if (typeof window.showFrontendSuccessToast === 'function') {
         window.showFrontendSuccessToast(message);
     }
@@ -461,11 +540,13 @@ function submitBulkRebook(event) {
     }
     const mode = bulkRebookMode();
 
+    /** @type {string | null} */
     let targetUserId = null;
+    /** @type {string | null} */
     let targetLocationId = null;
     if (mode === 'LOCATION') {
-        targetUserId = document.getElementById('bulkRebookTargetUserId').value || null;
-        targetLocationId = document.getElementById('bulkRebookTargetLocationId').value || null;
+        targetUserId = myFieldValue('bulkRebookTargetUserId') || null;
+        targetLocationId = myFieldValue('bulkRebookTargetLocationId') || null;
         // The backend rejects a target-less transfer (REQ-INV-025 parity). Catch it here so the user
         // gets a precise message instead of a generic failure toast.
         if (!targetUserId && !targetLocationId) {
@@ -477,23 +558,29 @@ function submitBulkRebook(event) {
     // The picker is populated asynchronously, so read it only while it is actually shown; otherwise
     // send null and let the backend resolve the destination owner's default pool.
     const orgWrapper = document.getElementById('bulkRebookOrgUnitWrapper');
-    const orgSelect = document.getElementById('bulkRebookOrgUnitId');
+    const orgSelect = /** @type {HTMLSelectElement | null} */ (
+        document.getElementById('bulkRebookOrgUnitId')
+    );
     const orgUnitId =
         orgWrapper && window.getComputedStyle(orgWrapper).display !== 'none' && orgSelect
             ? orgSelect.value || null
             : null;
-    const mergeCheckbox = document.getElementById('bulkRebookMergeStock');
+    const mergeCheckbox = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('bulkRebookMergeStock')
+    );
 
     // Collect every earmarked order across the marked entries before the write: a LOCATION move
     // carries the order slices onto the moved rows, so those order collections must refresh too.
     const affectedOrderIds = [];
     ids.forEach(function (itemId) {
-        collectLeafOrderIds(itemId).forEach(function (orderId) {
+        myLager.collectLeafOrderIds(itemId).forEach(function (orderId) {
             if (affectedOrderIds.indexOf(orderId) < 0) affectedOrderIds.push(orderId);
         });
     });
 
-    const submitBtn = document.getElementById('bulkRebookSubmitBtn');
+    const submitBtn = /** @type {HTMLButtonElement | null} */ (
+        document.getElementById('bulkRebookSubmitBtn')
+    );
     bulkRebookInFlight = true;
     if (submitBtn) submitBtn.disabled = true;
     window.krtFetch
@@ -502,24 +589,24 @@ function submitBulkRebook(event) {
             url: '/inventory/bulk-rebook',
             payload: {
                 itemIds: ids,
-                mode: mode,
-                targetUserId: targetUserId,
-                targetLocationId: targetLocationId,
+                mode,
+                targetUserId,
+                targetLocationId,
                 targetOwningOrgUnitId: orgUnitId,
                 mergeStock: !!(mergeCheckbox && mergeCheckbox.checked),
             },
             toast: false,
             errorMessage: bulkRebookI18n.errorFailed,
             conflict: inventoryConflictI18n,
-            onSuccess: function (body) {
+            onSuccess(body) {
                 closeBulkRebookModal();
                 reportBulkRebookOutcome(body);
                 // filterMyInventory() re-swaps the grouped table and clears the bulk selection (set,
                 // count, buttons + toggle label) at its start, so no manual reset is needed here.
                 filterMyInventory();
                 broadcastInventoryChanged();
-                broadcastOrdersChanged(affectedOrderIds);
-                broadcastBoardChanged();
+                myLager.broadcastOrdersChanged(affectedOrderIds);
+                myLager.broadcastBoardChanged();
             },
         })
         .then(function () {
@@ -528,8 +615,13 @@ function submitBulkRebook(event) {
         });
 }
 
+/**
+ * Opens one multi-select filter dropdown and closes every other one; a second click closes it.
+ *
+ * @param {string | null} id the dropdown's element id
+ */
 function toggleMultiSelect(id) {
-    const el = document.getElementById(id);
+    const el = id ? document.getElementById(id) : null;
     if (!el) return;
     const isOpened = el.classList.contains('open');
     document.querySelectorAll('.multi-select-options').forEach(function (opt) {
@@ -538,23 +630,58 @@ function toggleMultiSelect(id) {
     if (!isOpened) el.classList.add('open');
 }
 
+/**
+ * The localized "all" / "n selected" labels a multi-select header carries as data attributes.
+ *
+ * @param {string | null} headerId the dropdown header's element id
+ * @returns {{ allText: string, selectedTextStr: string }} the labels
+ */
 function getMsTranslations(headerId) {
-    const header = document.getElementById(headerId);
+    const header = headerId ? document.getElementById(headerId) : null;
     return {
         allText: header ? header.getAttribute('data-all') || 'Alle' : 'Alle',
         selectedTextStr: header ? header.getAttribute('data-selected') || 'gewählt' : 'gewählt',
     };
 }
 
+/**
+ * A checkbox of this page by id (the select-all box of a multi-select family, a personal flag).
+ *
+ * @param {string | null} id the element id
+ * @returns {HTMLInputElement | null} the checkbox, or null when absent
+ */
+function myCheckbox(id) {
+    return id ? /** @type {HTMLInputElement | null} */ (document.getElementById(id)) : null;
+}
+
+/**
+ * Applies a family's select-all box to every checkbox of the family.
+ *
+ * @param {string | null} allId the select-all checkbox id
+ * @param {string} checkClass the family's checkbox class
+ * @param {string | null} headerId the dropdown header id
+ */
 function toggleSelectAll(allId, checkClass, headerId) {
-    const isAllChecked = document.getElementById(allId).checked;
-    const checkboxes = document.getElementsByClassName(checkClass);
+    const allBox = myCheckbox(allId);
+    const isAllChecked = !!(allBox && allBox.checked);
+    const checkboxes = /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
+        document.getElementsByClassName(checkClass)
+    );
     for (let i = 0; i < checkboxes.length; i++) checkboxes[i].checked = isAllChecked;
     updateMsSelectedText(checkboxes, headerId);
 }
 
+/**
+ * Re-syncs a family's select-all box and header text with its checkboxes.
+ *
+ * @param {string | null} allId the select-all checkbox id
+ * @param {string} checkClass the family's checkbox class
+ * @param {string | null} headerId the dropdown header id
+ */
 function updateSelectState(allId, checkClass, headerId) {
-    const checkboxes = document.getElementsByClassName(checkClass);
+    const checkboxes = /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
+        document.getElementsByClassName(checkClass)
+    );
     let allChecked = checkboxes.length > 0;
     for (let i = 0; i < checkboxes.length; i++) {
         if (!checkboxes[i].checked) {
@@ -562,39 +689,62 @@ function updateSelectState(allId, checkClass, headerId) {
             break;
         }
     }
-    const allEl = document.getElementById(allId);
+    const allEl = myCheckbox(allId);
     if (allEl) allEl.checked = allChecked;
     updateMsSelectedText(checkboxes, headerId);
 }
 
+/**
+ * Writes a multi-select header's summary: "all" when none is checked, the one checked label, or
+ * "n selected".
+ *
+ * @param {HTMLCollectionOf<HTMLInputElement>} checkboxes the family's checkboxes
+ * @param {string | null} headerId the dropdown header id
+ */
 function updateMsSelectedText(checkboxes, headerId) {
     const translations = getMsTranslations(headerId);
     let count = 0;
+    /** @type {string | null} */
     let firstChecked = null;
     for (let i = 0; i < checkboxes.length; i++) {
         if (checkboxes[i].checked) {
             count++;
-            if (!firstChecked && checkboxes[i].previousElementSibling) {
-                firstChecked = checkboxes[i].previousElementSibling.innerText;
+            const label = /** @type {HTMLElement | null} */ (checkboxes[i].previousElementSibling);
+            if (!firstChecked && label) {
+                firstChecked = label.innerText;
             }
         }
     }
-    const headerSpan = document.getElementById(headerId).querySelector('.selected-text');
+    const header = headerId ? document.getElementById(headerId) : null;
+    const headerSpan = /** @type {HTMLElement | null} */ (
+        header ? header.querySelector('.selected-text') : null
+    );
+    if (!headerSpan) return;
     if (count === 0) headerSpan.innerText = translations.allText;
-    else if (count === 1) headerSpan.innerText = firstChecked;
+    else if (count === 1) headerSpan.innerText = firstChecked || '';
     else headerSpan.innerText = count + ' ' + translations.selectedTextStr;
 }
 
 document.addEventListener('click', function (e) {
-    if (!e.target.closest('.multi-select-container')) {
+    const target = /** @type {Element} */ (e.target);
+    if (!target.closest('.multi-select-container')) {
         document.querySelectorAll('.multi-select-options').forEach(function (opt) {
             if (opt.classList.contains('open')) opt.classList.remove('open');
         });
     }
 });
 
+/**
+ * The values of a family's checked boxes.
+ *
+ * @param {string} className the family's checkbox class
+ * @returns {string[]} the checked values
+ */
 function collectMyChecked(className) {
-    const boxes = document.getElementsByClassName(className);
+    const boxes = /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
+        document.getElementsByClassName(className)
+    );
+    /** @type {string[]} */
     const values = [];
     for (let i = 0; i < boxes.length; i++) {
         if (boxes[i].checked) values.push(boxes[i].value);
@@ -607,15 +757,22 @@ function collectMyChecked(className) {
 // .checked programmatically does not fire another change event, so this never re-enters itself.
 // The items view renders its own item-prefixed pair (unique ids in the template source), so the
 // counterpart is looked up per id.
+/**
+ * Clears the counterpart of a checked personal-flag filter and re-runs the filter.
+ *
+ * @param {HTMLElement} el the toggled checkbox
+ */
 function togglePersonalFilter(el) {
-    if (el && el.checked) {
+    const box = /** @type {HTMLInputElement} */ (el);
+    if (box && box.checked) {
+        /** @type {Record<string, string>} */
         const counterparts = {
             personalOnly: 'nonPersonalOnly',
             nonPersonalOnly: 'personalOnly',
             itemPersonalOnly: 'itemNonPersonalOnly',
             itemNonPersonalOnly: 'itemPersonalOnly',
         };
-        const other = document.getElementById(counterparts[el.id]);
+        const other = myCheckbox(counterparts[box.id]);
         if (other) other.checked = false;
     }
     filterMyInventory();
@@ -623,8 +780,15 @@ function togglePersonalFilter(el) {
 
 // Reads the personal-flag checkbox shared by both filter forms: the material form renders
 // personalOnly/nonPersonalOnly, the items view its item-prefixed pair — only one exists per view.
+/**
+ * Whether the personal-flag checkbox of the active view is checked.
+ *
+ * @param {string} materialId the material view's checkbox id
+ * @param {string} itemId the items view's checkbox id
+ * @returns {boolean} the flag
+ */
 function personalFlagChecked(materialId, itemId) {
-    const el = document.getElementById(materialId) || document.getElementById(itemId);
+    const el = myCheckbox(materialId) || myCheckbox(itemId);
     return el ? el.checked : false;
 }
 
@@ -676,7 +840,10 @@ function writeMyInventoryFilterPref(value) {
 // filter"). Storing null — not the full option list — keeps catalog options added later
 // included automatically.
 function myInventoryFilterSelection(className) {
-    const boxes = document.getElementsByClassName(className);
+    const boxes = /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
+        document.getElementsByClassName(className)
+    );
+    /** @type {string[]} */
     const picked = [];
     for (let i = 0; i < boxes.length; i++) {
         if (boxes[i].checked) picked.push(boxes[i].value);
@@ -687,7 +854,7 @@ function myInventoryFilterSelection(className) {
 // Snapshot of the ACTIVE view's widget state — only that view's filter form exists in the DOM
 // (REQ-INV-030), so the other view's slot is never touched by a persist.
 function snapshotMyInventoryFilters() {
-    if (lagerIsItemsView()) {
+    if (myLager.lagerIsItemsView()) {
         return {
             gameItems: myInventoryFilterSelection('gameItemCheck'),
             locations: myInventoryFilterSelection('locCheck'),
@@ -696,7 +863,9 @@ function snapshotMyInventoryFilters() {
             nonPersonalOnly: personalFlagChecked('nonPersonalOnly', 'itemNonPersonalOnly'),
         };
     }
-    const minQualitySelect = document.getElementById('minQuality');
+    const minQualitySelect = /** @type {HTMLSelectElement | null} */ (
+        document.getElementById('minQuality')
+    );
     return {
         materials: myInventoryFilterSelection('matCheck'),
         locations: myInventoryFilterSelection('locCheck'),
@@ -714,7 +883,7 @@ function snapshotMyInventoryFilters() {
 // rewrites the same snapshot.
 function persistMyInventoryFilters() {
     const stored = readMyInventoryFilterPref() || {};
-    stored[lagerIsItemsView() ? 'items' : 'material'] = snapshotMyInventoryFilters();
+    stored[myLager.lagerIsItemsView() ? 'items' : 'material'] = snapshotMyInventoryFilters();
     writeMyInventoryFilterPref(stored);
 }
 
@@ -725,7 +894,9 @@ function persistMyInventoryFilters() {
 // differs from the bare-URL rendered default).
 function applyMySavedSelection(saved, checkClass, allId, headerId) {
     if (!Array.isArray(saved) || saved.length === 0) return false;
-    const boxes = document.getElementsByClassName(checkClass);
+    const boxes = /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
+        document.getElementsByClassName(checkClass)
+    );
     if (boxes.length === 0) return false;
     let any = false;
     for (let i = 0; i < boxes.length; i++) {
@@ -753,13 +924,13 @@ function restoreMyInventoryFilters() {
         return false;
     }
     const stored = readMyInventoryFilterPref();
-    const saved = stored ? stored[lagerIsItemsView() ? 'items' : 'material'] : null;
+    const saved = stored ? stored[myLager.lagerIsItemsView() ? 'items' : 'material'] : null;
     if (!saved || typeof saved !== 'object') return false;
     let changed = false;
     // [saved subset, checkbox class, select-all id, header id] per multi-select family of the
     // active view (the jobOrder family renders item-prefixed all/header ids in the items view).
     let families;
-    if (lagerIsItemsView()) {
+    if (myLager.lagerIsItemsView()) {
         families = [
             [saved.gameItems, 'gameItemCheck', 'gameItemAll', 'gameItemHeader'],
             [saved.locations, 'locCheck', 'itemLocAll', 'itemLocationHeader'],
@@ -772,7 +943,9 @@ function restoreMyInventoryFilters() {
             [saved.jobOrders, 'jobOrderCheck', 'jobOrderAll', 'jobOrderHeader'],
             [saved.missions, 'missionCheck', 'missionAll', 'missionHeader'],
         ];
-        const minQualitySelect = document.getElementById('minQuality');
+        const minQualitySelect = /** @type {HTMLSelectElement | null} */ (
+            document.getElementById('minQuality')
+        );
         if (minQualitySelect && typeof saved.minQuality === 'string' && saved.minQuality !== '') {
             minQualitySelect.value = saved.minQuality;
             // A stale quality (no matching option) resets the select to '' — keep the default.
@@ -785,10 +958,11 @@ function restoreMyInventoryFilters() {
     // The personal flags are mutually exclusive (see togglePersonalFilter); on a corrupt
     // both-true state personalOnly wins so the pair never intersects to an empty result.
     const personalBox =
-        document.getElementById('personalOnly') || document.getElementById('itemPersonalOnly');
+        /** @type {HTMLInputElement | null} */ (document.getElementById('personalOnly')) ||
+        /** @type {HTMLInputElement | null} */ (document.getElementById('itemPersonalOnly'));
     const nonPersonalBox =
-        document.getElementById('nonPersonalOnly') ||
-        document.getElementById('itemNonPersonalOnly');
+        /** @type {HTMLInputElement | null} */ (document.getElementById('nonPersonalOnly')) ||
+        /** @type {HTMLInputElement | null} */ (document.getElementById('itemNonPersonalOnly'));
     if (personalBox && saved.personalOnly === true) {
         personalBox.checked = true;
         changed = true;
@@ -851,13 +1025,15 @@ function filterMyInventory() {
     // Same funnel, same reason: the count on the (possibly collapsed) toggle must track the
     // widgets, or a collapsed panel starts hiding an active filter.
     if (window.krtFilterPanel) window.krtFilterPanel.refresh('myFilterPanel');
-    const itemsView = lagerIsItemsView();
+    const itemsView = myLager.lagerIsItemsView();
     const activeMaterials = collectMyChecked('matCheck');
     const activeGameItems = collectMyChecked('gameItemCheck');
     const activeLocations = collectMyChecked('locCheck');
     const activeJobOrders = collectMyChecked('jobOrderCheck');
     const activeMissions = collectMyChecked('missionCheck');
-    const minQualitySelect = document.getElementById('minQuality');
+    const minQualitySelect = /** @type {HTMLSelectElement | null} */ (
+        document.getElementById('minQuality')
+    );
     const minQuality = minQualitySelect ? minQualitySelect.value : '';
     const personalOnly = personalFlagChecked('personalOnly', 'itemPersonalOnly');
     const nonPersonalOnly = personalFlagChecked('nonPersonalOnly', 'itemNonPersonalOnly');
@@ -902,7 +1078,7 @@ function filterMyInventory() {
             // A fragment swap does not re-fire DOMContentLoaded, so re-apply the persisted tree
             // expansion (REQ-INV-002) — otherwise a filter change or a modal write collapses every
             // row the user had opened.
-            restoreExpandedTree();
+            myLager.restoreExpandedTree();
         })
         .catch((error) => {
             console.error('Error fetching filtered personal inventory:', error);
@@ -914,7 +1090,9 @@ function filterMyInventory() {
 function resetMyInventoryFilter() {
     ['matCheck', 'gameItemCheck', 'locCheck', 'jobOrderCheck', 'missionCheck'].forEach(
         function (cls) {
-            const boxes = document.getElementsByClassName(cls);
+            const boxes = /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
+                document.getElementsByClassName(cls)
+            );
             for (let i = 0; i < boxes.length; i++) boxes[i].checked = false;
         },
     );
@@ -927,14 +1105,16 @@ function resetMyInventoryFilter() {
         'itemJobOrderAll',
         'missionAll',
     ].forEach(function (id) {
-        const el = document.getElementById(id);
+        const el = myCheckbox(id);
         if (el) el.checked = false;
     });
-    const minQualitySelect = document.getElementById('minQuality');
+    const minQualitySelect = /** @type {HTMLSelectElement | null} */ (
+        document.getElementById('minQuality')
+    );
     if (minQualitySelect) minQualitySelect.value = '';
     ['personalOnly', 'nonPersonalOnly', 'itemPersonalOnly', 'itemNonPersonalOnly'].forEach(
         function (id) {
-            const el = document.getElementById(id);
+            const el = myCheckbox(id);
             if (el) el.checked = false;
         },
     );
@@ -973,53 +1153,6 @@ function broadcastInventoryChanged() {
 }
 window.krtNotifyInventoryChanged = broadcastInventoryChanged;
 
-// Cross-feature live-sync (#1309): an inventory write also changes surfaces in OTHER rooms.
-// broadcastOrdersChanged tells each affected job order's detail viewers to re-pull their material
-// collection (its stock column tracks the earmark roll-up) and — for item rows — the order-detail
-// Item-Bestand panel (`item-stock`, REQ-ORDERS-028), and broadcastBoardChanged tells the
-// Materialbörse to re-pull its board after a stock-reducing write (the backend clamps an offer down
-// to the remaining stock). The actor is not in those rooms, so there is no self-refresh; a section
-// whose container the page does not render is a harmless no-op.
-function broadcastOrdersChanged(orderIds) {
-    if (!window.krtLiveSync || typeof window.krtLiveSync.sendChanged !== 'function') return;
-    let touchedAnyOrder = false;
-    (orderIds || []).forEach(function (orderId) {
-        if (orderId) {
-            touchedAnyOrder = true;
-            window.krtLiveSync.sendChanged('order:' + orderId, [
-                'materials',
-                'aggregated',
-                'item-stock',
-            ]);
-        }
-    });
-    // The cross-order material-demand overview (REQ-ORDERS-034) reads the same earmarked stock as
-    // the per-order material list, so a write that changes an order's linked stock also changes the
-    // aggregated `Bestand` column. It lives in the global `orders` room, hence one extra publish
-    // rather than one per order.
-    if (touchedAnyOrder) {
-        window.krtLiveSync.sendChanged('orders', ['demand']);
-    }
-}
-function broadcastBoardChanged() {
-    if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
-        window.krtLiveSync.sendChanged('materialboard', ['board']);
-    }
-}
-// The job-order target-ids currently earmarked on an entry's leaf row (read before a stock write).
-function collectLeafOrderIds(itemId) {
-    const leaf = document.querySelector('.tree-row--leaf[data-item-id="' + itemId + '"]');
-    if (!leaf) return [];
-    const ids = [];
-    leaf.querySelectorAll(
-        '.assoc-split[data-assoc-field="JOB_ORDER"] [data-assoc-chip][data-target-id]',
-    ).forEach(function (chip) {
-        const id = chip.getAttribute('data-target-id');
-        if (id && ids.indexOf(id) < 0) ids.push(id);
-    });
-    return ids;
-}
-
 // Inbound peer changes: re-fetch this viewer's own filtered owned table in place (filterMyInventory
 // preserves the filter + tree expansion; a collapsed stack re-fetches its chips on next expand).
 if (
@@ -1031,7 +1164,7 @@ if (
         topic: 'inventory',
         sections: INVENTORY_MY_SECTIONS,
         coalesceMs: 1500,
-        refresh: function () {
+        refresh() {
             filterMyInventory();
         },
     });
@@ -1060,7 +1193,7 @@ if (
         topic: 'orders',
         sections: INVENTORY_MY_ORDER_SECTIONS,
         coalesceMs: 1500,
-        refresh: function () {
+        refresh() {
             filterMyInventory();
         },
     });
@@ -1071,13 +1204,25 @@ document.addEventListener('DOMContentLoaded', function () {
     // saved selection is applied to the widgets, and — only when it differs from the rendered
     // default — the existing fragment re-fetch runs exactly once at the end of this handler.
     const filtersRestored = restoreMyInventoryFilters();
-    if (document.getElementsByClassName('matCheck').length > 0) {
+    if (
+        /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
+            document.getElementsByClassName('matCheck')
+        ).length > 0
+    ) {
         updateSelectState('matAll', 'matCheck', 'materialHeader');
     }
-    if (document.getElementsByClassName('gameItemCheck').length > 0) {
+    if (
+        /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
+            document.getElementsByClassName('gameItemCheck')
+        ).length > 0
+    ) {
         updateSelectState('gameItemAll', 'gameItemCheck', 'gameItemHeader');
     }
-    if (document.getElementsByClassName('locCheck').length > 0) {
+    if (
+        /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
+            document.getElementsByClassName('locCheck')
+        ).length > 0
+    ) {
         // Same shared-class / per-view-ids shape as jobOrderCheck below: the location filter
         // renders in both views, with item-prefixed ids in the items view.
         if (document.getElementById('itemLocationHeader')) {
@@ -1086,7 +1231,11 @@ document.addEventListener('DOMContentLoaded', function () {
             updateSelectState('locAll', 'locCheck', 'locationHeader');
         }
     }
-    if (document.getElementsByClassName('jobOrderCheck').length > 0) {
+    if (
+        /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
+            document.getElementsByClassName('jobOrderCheck')
+        ).length > 0
+    ) {
         // The material and the items view render different header/all ids for the shared
         // jobOrderCheck class (unique ids in the template source); exactly one pair exists.
         if (document.getElementById('itemJobOrderHeader')) {
@@ -1095,7 +1244,11 @@ document.addEventListener('DOMContentLoaded', function () {
             updateSelectState('jobOrderAll', 'jobOrderCheck', 'jobOrderHeader');
         }
     }
-    if (document.getElementsByClassName('missionCheck').length > 0) {
+    if (
+        /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
+            document.getElementsByClassName('missionCheck')
+        ).length > 0
+    ) {
         updateSelectState('missionAll', 'missionCheck', 'missionHeader');
     }
     // After the restore, so the count reflects the widgets the user will actually see rather than
@@ -1108,421 +1261,14 @@ document.addEventListener('DOMContentLoaded', function () {
     if (filtersRestored) filterMyInventory();
 });
 
-// ===================== Lager tree expand/collapse view-state persistence (REQ-INV-002) =========
-// The grouped tree (material group -> location stack -> lazy leaf entries) is re-rendered in place
-// on every grouped-table re-swap: a filter change AND — the bug this guards — every modal write
-// (book-out, Umbuchen and bulk-checkout all call filterMyInventory in their onSuccess). Because a
-// fragment swap replaces #inventoryTable wholesale and does NOT re-fire DOMContentLoaded, the
-// expanded state must be re-applied explicitly after each swap; otherwise closing a modal collapses
-// every row the user had opened. Both the material-group expansion (persisted as
-// expanded_rows_lager_*) and the location-stack expansion (persisted as expanded_stacks_lager_*)
-// live in localStorage, keyed per user, and are re-applied by restoreExpandedTree().
-
-// The per-user localStorage suffix taken from the tree's data-user-id, or null when the table is
-// absent / anonymous (nothing is then persisted).
-function lagerUserId() {
-    const table = document.getElementById('inventoryTable');
-    const userId = table ? table.getAttribute('data-user-id') : null;
-    return userId && userId !== 'unknown' ? userId : null;
-}
-
-// localStorage key holding the array of expanded group ids. View-scoped (REQ-INV-030): the
-// items view persists under expanded_rows_lager_items_* so the Material and the Items tree
-// remember their expansion state independently.
-function groupStorageKey() {
-    const userId = lagerUserId();
-    if (!userId) return null;
-    return (lagerIsItemsView() ? 'expanded_rows_lager_items_' : 'expanded_rows_lager_') + userId;
-}
-
-// localStorage key holding the array of expanded stack ids (view-scoped like groupStorageKey).
-function stackStorageKey() {
-    const userId = lagerUserId();
-    if (!userId) return null;
-    return (
-        (lagerIsItemsView() ? 'expanded_stacks_lager_items_' : 'expanded_stacks_lager_') + userId
-    );
-}
-
-// A stack's identity is exactly the page-less stack-entries URL its data-attributes build, so the
-// same stack maps to the same key across re-renders and a /my stack can never collide with a /all
-// one (they carry a different path prefix).
-function stackKey(headerRow) {
-    return buildStackEntriesUrl(headerRow, null);
-}
-
-// Reads a persisted expansion array, tolerating absent / corrupt storage.
-function readExpanded(key) {
-    if (!key) return [];
-    try {
-        return JSON.parse(localStorage.getItem(key) || '[]');
-    } catch (e) {
-        console.warn('LocalStorage error', e);
-        return [];
-    }
-}
-
-// Persists an expansion array, tolerating a storage write failure (quota / privacy mode).
-function writeExpanded(key, values) {
-    if (!key) return;
-    try {
-        localStorage.setItem(key, JSON.stringify(values));
-    } catch (e) {
-        console.warn('LocalStorage error', e);
-    }
-}
-
-// Re-applies the persisted group expansion (material or game-item groups — see groupKeyOf) to
-// the freshly rendered tree.
-function restoreExpandedGroups() {
-    const expandedRows = readExpanded(groupStorageKey());
-    if (expandedRows.length === 0) return;
-    document.querySelectorAll('.tree-row--group').forEach(function (row) {
-        const groupKey = groupKeyOf(row);
-        if (groupKey && expandedRows.includes(groupKey)) {
-            const nextRow = row.nextElementSibling;
-            const icon = row.querySelector('.toggle-icon');
-            if (nextRow && nextRow.classList.contains('tree-group-items')) {
-                nextRow.style.display = 'block';
-                if (icon) icon.textContent = '▼';
-            }
-        }
-    });
-}
-
-// Re-applies the persisted location-stack expansion and re-triggers the lazy entry load for each
-// restored stack (the re-rendered header comes back with data-stack-loaded="false", so the leaf
-// rows — carrying the fresh post-write amounts — are fetched again).
-function restoreExpandedStacks() {
-    const expandedStacks = readExpanded(stackStorageKey());
-    if (expandedStacks.length === 0) return;
-    document.querySelectorAll('.stack-header').forEach(function (row) {
-        if (!expandedStacks.includes(stackKey(row))) return;
-        const nextRow = row.nextElementSibling;
-        const icon = row.querySelector('.toggle-icon');
-        if (nextRow && nextRow.classList.contains('tree-stack-entries')) {
-            nextRow.style.display = 'block';
-            if (icon) icon.textContent = '▼';
-            if (row.getAttribute('data-stack-loaded') !== 'true') {
-                loadStackEntries(row, 0);
-            }
-        }
-    });
-}
-
-// Restores the whole tree (groups first, then their stacks) — run on initial load and after every
-// in-place grouped-table re-swap.
-function restoreExpandedTree() {
-    restoreExpandedGroups();
-    restoreExpandedStacks();
-}
-
-function toggleGroup(row) {
-    const nextRow = row.nextElementSibling;
-    const icon = row.querySelector('.toggle-icon');
-    const groupKey = groupKeyOf(row);
-    if (!nextRow || !nextRow.classList.contains('tree-group-items')) return;
-
-    const key = groupStorageKey();
-    const expandedRows = readExpanded(key);
-    if (window.getComputedStyle(nextRow).display === 'none') {
-        nextRow.style.display = 'block';
-        if (icon) icon.textContent = '▼';
-        if (groupKey && !expandedRows.includes(groupKey)) {
-            expandedRows.push(groupKey);
-            writeExpanded(key, expandedRows);
-        }
-    } else {
-        nextRow.style.display = 'none';
-        if (icon) icon.textContent = '▶';
-        if (groupKey) {
-            writeExpanded(
-                key,
-                expandedRows.filter((id) => id !== groupKey),
-            );
-        }
-    }
-}
-
-function toggleStack(row) {
-    const nextRow = row.nextElementSibling;
-    const icon = row.querySelector('.toggle-icon');
-    if (!nextRow || !nextRow.classList.contains('tree-stack-entries')) return;
-    const key = stackStorageKey();
-    const expandedStacks = readExpanded(key);
-    const id = stackKey(row);
-    if (window.getComputedStyle(nextRow).display === 'none') {
-        nextRow.style.display = 'block';
-        if (icon) icon.textContent = '▼';
-        // Persist so a later in-place re-swap (filter change or modal write) re-opens this stack.
-        if (id && !expandedStacks.includes(id)) {
-            expandedStacks.push(id);
-            writeExpanded(key, expandedStacks);
-        }
-        // Append-only Lager: a stack's entries are not inlined. Fetch them on first
-        // expand from /inventory/my/stack/entries (ADR-0003, REQ-INV-002); subsequent
-        // toggles just reveal the already-loaded rows.
-        if (row.getAttribute('data-stack-loaded') !== 'true') {
-            loadStackEntries(row, 0);
-        }
-    } else {
-        nextRow.style.display = 'none';
-        if (icon) icon.textContent = '▶';
-        if (id) {
-            writeExpanded(
-                key,
-                expandedStacks.filter((k) => k !== id),
-            );
-        }
-    }
-}
-
-// Builds the lazy stack-entries fetch URL from the stack-key data-attributes the
-// server stamped on the stack-header row. A null/absent dimension is omitted so the
-// backend's null-safe match selects the rows where that association is itself absent.
-// A game-item stack (REQ-INV-030) is addressed by gameItemId with no quality key and
-// goes to the item sibling endpoint; the material branch stays byte-identical (its
-// param order is also the persisted stack identity — see stackKey).
-function buildStackEntriesUrl(headerRow, page) {
-    const params = new URLSearchParams();
-    const gameItemId = headerRow.getAttribute('data-game-item-id');
-    if (gameItemId) {
-        params.set('gameItemId', gameItemId);
-        params.set('locationId', headerRow.getAttribute('data-location-id'));
-    } else {
-        params.set('materialId', headerRow.getAttribute('data-material-id'));
-        params.set('locationId', headerRow.getAttribute('data-location-id'));
-        const quality = headerRow.getAttribute('data-quality');
-        if (quality !== null && quality !== '') params.set('quality', quality);
-    }
-    params.set('personal', headerRow.getAttribute('data-personal') || 'false');
-    const owningOrgUnitId = headerRow.getAttribute('data-owning-org-unit-id');
-    if (owningOrgUnitId) params.set('owningOrgUnitId', owningOrgUnitId);
-    if (page != null) params.set('page', page);
-    const path = gameItemId
-        ? '/inventory/my/game-item-stack/entries?'
-        : '/inventory/my/stack/entries?';
-    return path + params.toString();
-}
-
-// Replaces a stack's entries container with a single status line (loading / error),
-// built via textContent so the i18n string is never interpreted as HTML.
-function setStackEntriesStatus(content, message, isError) {
-    content.innerHTML = '';
-    const div = document.createElement('div');
-    div.className = 'stack-entries-status';
-    if (isError) div.classList.add('hud-box-error');
-    div.style.padding = '1rem 2.5rem';
-    div.style.color = 'var(--color-gray-2)';
-    div.textContent = message;
-    content.appendChild(div);
-}
-
-// Fetches one page of a stack's entries and injects the server-rendered fragment.
-// The injected rows carry the same data-trigger hooks as before, so the page's
-// delegated krtEvents handlers (book-out, note, association, bulk-select) keep working
-// without re-binding.
-function loadStackEntries(headerRow, page) {
-    const entriesRow = headerRow.nextElementSibling;
-    if (!entriesRow) return;
-    const content = entriesRow.querySelector('.stack-entries-content');
-    if (!content) return;
-    setStackEntriesStatus(content, stackEntriesI18n.loading, false);
-    fetch(buildStackEntriesUrl(headerRow, page), {
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
-    })
-        .then(function (r) {
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            return r.text();
-        })
-        .then(function (html) {
-            window.krtFetch.setTrustedHtml(content, html);
-            headerRow.setAttribute('data-stack-loaded', 'true');
-            // The entries are injected via innerHTML (not krtFetch.swap), so no krt:swapped fires —
-            // enhance the Variante-C allocation "+ Zuordnen" <select data-krt-combobox> popovers by
-            // hand (REQ-INV-027), else they stay raw native selects instead of the HUD combobox and
-            // the add-open reset (hidden.krtCombobox.setValue / input focus) has nothing to target.
-            if (typeof window.krtEnhanceComboboxes === 'function') {
-                window.krtEnhanceComboboxes(content);
-            }
-            // Reflect the current bulk selection on the freshly injected checkboxes (REQ-INV-034):
-            // a stack expanded after "Alle markieren" (or after ticking others) must come up already
-            // checked, and the count/group state must stay consistent.
-            applyBulkSelectionToLoaded(content);
-            updateBulkCheckoutState();
-        })
-        .catch(function (e) {
-            console.error('Failed to load stack entries', e);
-            setStackEntriesStatus(content, stackEntriesI18n.error, true);
-        });
-}
-
-// Pagination handler: re-fetches the target page for the stack owning the clicked
-// button and replaces the entries container in place.
-function goToStackEntriesPage(btn) {
-    const entriesRow = btn.closest('.tree-stack-entries');
-    if (!entriesRow) return;
-    const headerRow = entriesRow.previousElementSibling;
-    if (!headerRow) return;
-    const page = parseInt(btn.getAttribute('data-page'), 10);
-    loadStackEntries(headerRow, isNaN(page) ? 0 : page);
-}
-
-// Restore the persisted tree expansion on initial load (the same restore runs after each in-place
-// grouped-table re-swap — see filterMyInventory).
-document.addEventListener('DOMContentLoaded', restoreExpandedTree);
-
-function updateAmountFromTarget() {
-    const targetAmountInput = document.getElementById('targetAmount');
-    const amountInput = document.getElementById('amount');
-    const maxAmountInput = document.getElementById('maxAmount');
-
-    if (targetAmountInput && amountInput && maxAmountInput) {
-        const target = window.krtScuInput.parse(targetAmountInput.value);
-        const max = parseFloat(maxAmountInput.value) || 0;
-
-        if (!isNaN(target)) {
-            const diff = Math.max(0, max - target);
-            amountInput.value = Number(diff.toFixed(3));
-        }
-    }
-}
-
-function updateTargetFromAmount() {
-    const targetAmountInput = document.getElementById('targetAmount');
-    const amountInput = document.getElementById('amount');
-    const maxAmountInput = document.getElementById('maxAmount');
-
-    if (targetAmountInput && amountInput && maxAmountInput) {
-        const amount = window.krtScuInput.parse(amountInput.value);
-        const max = parseFloat(maxAmountInput.value) || 0;
-
-        if (!isNaN(amount)) {
-            const diff = Math.max(0, max - amount);
-            targetAmountInput.value = Number(diff.toFixed(3));
-        }
-    }
-}
-
-function toggleBookOutTypeFields() {
-    const typeSell = document.querySelector('input[name="type"][value="SELL"]').checked;
-
-    const sellFields = document.getElementById('sellFields');
-    const terminal = document.getElementById('terminal');
-    const sellAmount = document.getElementById('sellAmount');
-
-    if (typeSell) {
-        sellFields.style.display = 'block';
-        terminal.required = true;
-        sellAmount.required = true;
-    } else {
-        sellFields.style.display = 'none';
-        terminal.required = false;
-        sellAmount.required = false;
-    }
-
-    const submitBtn = document.getElementById('bookOutSubmitBtn');
-    if (submitBtn) {
-        submitBtn.textContent = submitBtn.getAttribute(
-            typeSell ? 'data-text-sell' : 'data-text-discard',
-        );
-    }
-}
-
 // ===================== Umbuchen (rebooking) modal — REQ-INV-007 =====================
 // The item the open Umbuchen modal targets, plus an in-flight guard mirroring the book-out one.
 let umbuchenItemId = null;
 // #1328: the row's current owning org-unit id, used to preset both Umbuchen org-unit pickers so a
 // submit that does not touch the picker keeps the stock in its current unit (null = ownerless row).
+// The personal picker reads it here; the transfer picker is shared and gets it via myLager.
 let umbuchenCurrentOwningOrgUnitId = null;
 let umbuchenInFlight = false;
-
-function updateUmbuchenAmountFromTarget() {
-    const targetEl = document.getElementById('umbuchenTargetAmount');
-    const amountEl = document.getElementById('umbuchenAmount');
-    const maxEl = document.getElementById('umbuchenMaxAmount');
-    if (targetEl && amountEl && maxEl) {
-        const target = window.krtScuInput.parse(targetEl.value);
-        const max = parseFloat(maxEl.value) || 0;
-        if (!isNaN(target)) {
-            amountEl.value = Number(Math.max(0, max - target).toFixed(3));
-        }
-    }
-}
-
-function updateUmbuchenTargetFromAmount() {
-    const targetEl = document.getElementById('umbuchenTargetAmount');
-    const amountEl = document.getElementById('umbuchenAmount');
-    const maxEl = document.getElementById('umbuchenMaxAmount');
-    if (targetEl && amountEl && maxEl) {
-        const amount = window.krtScuInput.parse(amountEl.value);
-        const max = parseFloat(maxEl.value) || 0;
-        if (!isNaN(amount)) {
-            targetEl.value = Number(Math.max(0, max - amount).toFixed(3));
-        }
-    }
-}
-
-/**
- * LOCATION-mode picker: re-populate the target-OrgUnit picker when the destination user changes
- * (the relocated book-out transfer picker). Offers the destination user's direct memberships across
- * all four org-unit kinds (Staffel + SK + Bereich + OL), preset to the row's current owning org unit
- * (or the target's primary unit otherwise). Shown whenever the destination user has at least one
- * membership; hidden only for a membershipless target (the moved row is then ownerless).
- */
-function refreshUmbuchenTransferOrgUnitPicker() {
-    const wrapper = document.getElementById('umbuchenTargetOwningOrgUnitWrapper');
-    const select = document.getElementById('umbuchenTargetOwningOrgUnitId');
-    const userSelect = document.getElementById('umbuchenTargetUserId');
-    if (!wrapper || !select || !userSelect) return;
-    const targetUserId = userSelect.value;
-    select.innerHTML = '';
-    if (!targetUserId) {
-        wrapper.style.display = 'none';
-        return;
-    }
-    // #1328: ?allKinds=true surfaces the target user's Bereich/OL memberships too (not just
-    // Staffel/SK — the endpoint default), mirroring the bank counterparty picker (REQ-BANK-044).
-    // The backend resolver already accepts a Bereich/OL owner. The fetch goes through the
-    // frontend's /users/{id}/memberships proxy (UserProxyController) — the frontend origin maps
-    // no /api/v1/users/** route, so the backend path 404s here and silently hides the picker.
-    fetch('/users/' + encodeURIComponent(targetUserId) + '/memberships?allKinds=true', {
-        headers: { Accept: 'application/json' },
-        credentials: 'same-origin',
-    })
-        .then(function (r) {
-            return r.ok ? r.json() : [];
-        })
-        .then(function (memberships) {
-            // #1328: always show the picker when the target has at least one membership and preset
-            // it to the row's current owning org unit (or the target's primary when that unit is not
-            // one of the target's memberships — e.g. a cross-user transfer), so submitting without
-            // changing it keeps the stock in its current unit. Hidden only for a membershipless
-            // target: the row is then ownerless and there is nothing to pick.
-            if (!Array.isArray(memberships) || memberships.length < 1) {
-                wrapper.style.display = 'none';
-                return;
-            }
-            memberships.forEach(function (opt) {
-                const o = document.createElement('option');
-                o.value = opt.orgUnitId;
-                o.textContent = opt.orgUnitName;
-                select.appendChild(o);
-            });
-            if (
-                umbuchenCurrentOwningOrgUnitId &&
-                memberships.some(function (m) {
-                    return m.orgUnitId === umbuchenCurrentOwningOrgUnitId;
-                })
-            ) {
-                select.value = umbuchenCurrentOwningOrgUnitId;
-            }
-            wrapper.style.display = 'block';
-        })
-        .catch(function () {
-            wrapper.style.display = 'none';
-        });
-}
 
 /**
  * PERSONAL de-personalize picker: populate the org-unit picker with the row owner's memberships
@@ -1532,7 +1278,9 @@ function refreshUmbuchenTransferOrgUnitPicker() {
  */
 function refreshUmbuchenPersonalOrgUnitPicker(ownerId) {
     const wrapper = document.getElementById('umbuchenPersonalOrgUnitWrapper');
-    const select = document.getElementById('umbuchenPersonalOrgUnitId');
+    const select = /** @type {HTMLSelectElement | null} */ (
+        document.getElementById('umbuchenPersonalOrgUnitId')
+    );
     if (!wrapper || !select) return;
     select.innerHTML = '';
     wrapper.style.display = 'none';
@@ -1540,7 +1288,7 @@ function refreshUmbuchenPersonalOrgUnitPicker(ownerId) {
     // #1328: ?allKinds=true so a Bereich/OL-member owner can de-personalize into their Bereich/OL
     // pool, not only Staffel/SK (the endpoint default). Mirrors the bank counterparty picker
     // (REQ-BANK-044). Fetched via the frontend's /users/{id}/memberships proxy — see the
-    // transfer picker above.
+    // transfer picker in inventory-common.js.
     fetch('/users/' + encodeURIComponent(ownerId) + '/memberships?allKinds=true', {
         headers: { Accept: 'application/json' },
         credentials: 'same-origin',
@@ -1575,12 +1323,19 @@ function refreshUmbuchenPersonalOrgUnitPicker(ownerId) {
 }
 
 function toggleUmbuchenMode() {
-    const modeInput = document.querySelector('input[name="umbuchenMode"]:checked');
+    const modeInput = /** @type {HTMLInputElement | null} */ (
+        document.querySelector('input[name="umbuchenMode"]:checked')
+    );
     const mode = modeInput ? modeInput.value : 'LOCATION';
     const transferFields = document.getElementById('umbuchenTransferFields');
     const personalFields = document.getElementById('umbuchenPersonalFields');
-    const targetUser = document.getElementById('umbuchenTargetUserId');
-    const targetLocation = document.getElementById('umbuchenTargetLocationId');
+    const targetUser = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('umbuchenTargetUserId')
+    );
+    const targetLocation = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('umbuchenTargetLocationId')
+    );
+    if (!transferFields || !personalFields || !targetUser || !targetLocation) return;
     if (mode === 'PERSONAL') {
         transferFields.style.display = 'none';
         personalFields.style.display = 'block';
@@ -1617,9 +1372,15 @@ function openUmbuchenModal(
 ) {
     umbuchenItemId = id;
     umbuchenCurrentOwningOrgUnitId = owningOrgUnitId || null;
+    myLager.setUmbuchenCurrentOwningOrgUnit(umbuchenCurrentOwningOrgUnitId);
     const isScu = quantityType !== 'PIECE';
-    const amountEl = document.getElementById('umbuchenAmount');
-    const targetEl = document.getElementById('umbuchenTargetAmount');
+    const amountEl = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('umbuchenAmount')
+    );
+    const targetEl = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('umbuchenTargetAmount')
+    );
+    if (!amountEl || !targetEl) return;
     amountEl.setAttribute('step', isScu ? '0.001' : '1');
     targetEl.setAttribute('step', isScu ? '0.001' : '1');
     const targetHint = document.getElementById('umbuchen-target-scu-hint');
@@ -1630,33 +1391,42 @@ function openUmbuchenModal(
     // REQ-INV-026: the per-action stock-merge opt-in is offered only for an SCU material (a PIECE
     // rebooking/transfer always merges server-side). Reset it on every open.
     const mergeRow = document.getElementById('umbuchenMergeRow');
-    const mergeCheckbox = document.getElementById('umbuchenMergeStock');
+    const mergeCheckbox = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('umbuchenMergeStock')
+    );
     if (mergeCheckbox) mergeCheckbox.checked = false;
     if (mergeRow) mergeRow.classList.toggle('krtm-hidden', !isScu);
 
-    amountEl.value = amount;
-    amountEl.max = amount;
-    targetEl.value = 0;
-    document.getElementById('umbuchenMaxAmount').value = amount;
-    document.getElementById('umbuchenVersion').value = version;
-    document.getElementById('umbuchenSourcePersonal').value = personal ? 'true' : 'false';
+    amountEl.value = amount ?? '';
+    amountEl.max = amount ?? '';
+    targetEl.value = '0';
+    setMyFieldValue('umbuchenMaxAmount', amount);
+    setMyFieldValue('umbuchenVersion', version);
+    setMyFieldValue('umbuchenSourcePersonal', personal ? 'true' : 'false');
     const amountOf = document.getElementById('umbuchenAmountOfText');
     if (amountOf)
-        amountOf.textContent = amountOf.getAttribute('data-template').replace('{0}', amount);
+        amountOf.textContent = (amountOf.getAttribute('data-template') ?? '').replace(
+            '{0}',
+            amount ?? '',
+        );
 
     // LOCATION (transfer) defaults: pre-select the row's own user/location. The location picker
     // is a REMOTE searchable combobox (remote-locations, REQ-FE-016): the catalog is fetched per
     // query, so the row's location is outside the loaded set — setValue() must carry the label
     // with the id (a bare id would clear the selection, a bare .value write the visible text).
-    const tu = document.getElementById('umbuchenTargetUserId');
-    const tl = document.getElementById('umbuchenTargetLocationId');
+    const tu = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('umbuchenTargetUserId')
+    );
+    const tl = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('umbuchenTargetLocationId')
+    );
     if (tu) tu.value = userId;
     if (tl && tl.krtCombobox) {
         tl.krtCombobox.setValue(locationId, locationName);
     } else if (tl) {
         tl.value = locationId;
     }
-    refreshUmbuchenTransferOrgUnitPicker();
+    myLager.refreshUmbuchenTransferOrgUnitPicker();
 
     // PERSONAL mode direction is the opposite of the source row's personal flag.
     const personalizing = !personal; // shared -> personal
@@ -1683,12 +1453,15 @@ function openUmbuchenModal(
         if (w) w.style.display = 'none';
     }
 
-    document.querySelector('input[name="umbuchenMode"][value="LOCATION"]').checked = true;
+    const locationMode = /** @type {HTMLInputElement | null} */ (
+        document.querySelector('input[name="umbuchenMode"][value="LOCATION"]')
+    );
+    if (locationMode) locationMode.checked = true;
     toggleUmbuchenMode();
     // `.modal` centres its content via `display:flex`; opening with inline `flex` (not `block`)
     // preserves that centring — inline `block` would override the stylesheet flex and pin the
     // dialog to the top of the viewport (matches the canonical .krtm-modal-open = flex, #1328).
-    document.getElementById('umbuchenModal').style.display = 'flex';
+    setMyDisplay('umbuchenModal', 'flex');
     // Variante C (REQ-INV-027): build the transfer "Herkunft" picker (the moved row inherits the
     // reduced tags). It lives inside the LOCATION-only transfer fields, so it self-hides in PERSONAL
     // mode; populate after the modal is shown so its initial validity gates the submit button.
@@ -1697,46 +1470,46 @@ function openUmbuchenModal(
     }
 }
 
-function closeUmbuchenModal() {
-    if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
-    if (window.krtHerkunft) {
-        window.krtHerkunft.reset('umbuchen');
-    }
-    document.getElementById('umbuchenModal').style.display = 'none';
-}
-
 function submitUmbuchen(event) {
     // scu-decimal-input.js canonicalises + validates the amount fields in the capture phase
     // first; respect a block it already issued, then prevent the native (action-less) submit.
     if (event && event.defaultPrevented) return;
     if (event) event.preventDefault();
     if (umbuchenInFlight || !window.krtFetch || !umbuchenItemId) return;
-    const modeInput = document.querySelector('input[name="umbuchenMode"]:checked');
+    const modeInput = /** @type {HTMLInputElement | null} */ (
+        document.querySelector('input[name="umbuchenMode"]:checked')
+    );
     const mode = modeInput ? modeInput.value : 'LOCATION';
-    const amountEl = document.getElementById('umbuchenAmount');
+    const amountValue = myFieldValue('umbuchenAmount');
     const amount = window.krtScuInput
-        ? window.krtScuInput.parse(amountEl.value)
-        : parseFloat(amountEl.value);
-    const version = parseInt(document.getElementById('umbuchenVersion').value, 10);
-    const submitBtn = document.getElementById('umbuchenSubmitBtn');
+        ? window.krtScuInput.parse(amountValue)
+        : parseFloat(amountValue);
+    const version = parseInt(myFieldValue('umbuchenVersion'), 10);
+    const submitBtn = /** @type {HTMLButtonElement | null} */ (
+        document.getElementById('umbuchenSubmitBtn')
+    );
     // REQ-INV-026: per-action stock-merge opt-in (only rendered for SCU; PIECE always merges).
-    const mergeCheckbox = document.getElementById('umbuchenMergeStock');
+    const mergeCheckbox = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('umbuchenMergeStock')
+    );
     const mergeStock = !!(mergeCheckbox && mergeCheckbox.checked);
 
     let url, payload;
     if (mode === 'PERSONAL') {
         url = '/inventory/' + umbuchenItemId + '/personal-rebook';
         const orgWrapper = document.getElementById('umbuchenPersonalOrgUnitWrapper');
-        const orgSelect = document.getElementById('umbuchenPersonalOrgUnitId');
+        const orgSelect = /** @type {HTMLSelectElement | null} */ (
+            document.getElementById('umbuchenPersonalOrgUnitId')
+        );
         const orgUnitId =
             orgWrapper && window.getComputedStyle(orgWrapper).display !== 'none' && orgSelect
                 ? orgSelect.value || null
                 : null;
         payload = {
-            amount: amount,
-            version: version,
+            amount,
+            version,
             targetOwningOrgUnitId: orgUnitId,
-            mergeStock: mergeStock,
+            mergeStock,
         };
     } else {
         // Variante C (REQ-INV-027): a transfer carries its reduced tags onto the moved row. An
@@ -1752,14 +1525,13 @@ function submitUmbuchen(event) {
             : { jobOrderReductions: null, missionReductions: null };
         url = '/inventory/' + umbuchenItemId + '/transfer';
         payload = {
-            amount: amount,
+            amount,
             type: 'TRANSFER',
-            targetUserId: document.getElementById('umbuchenTargetUserId').value || null,
-            targetLocationId: document.getElementById('umbuchenTargetLocationId').value || null,
-            targetOwningOrgUnitId:
-                document.getElementById('umbuchenTargetOwningOrgUnitId').value || null,
-            version: version,
-            mergeStock: mergeStock,
+            targetUserId: myFieldValue('umbuchenTargetUserId') || null,
+            targetLocationId: myFieldValue('umbuchenTargetLocationId') || null,
+            targetOwningOrgUnitId: myFieldValue('umbuchenTargetOwningOrgUnitId') || null,
+            version,
+            mergeStock,
             jobOrderReductions: reductions.jobOrderReductions,
             missionReductions: reductions.missionReductions,
         };
@@ -1767,495 +1539,29 @@ function submitUmbuchen(event) {
 
     // Read the earmarked orders before the write. Only a LOCATION transfer touches order slices; the
     // PERSONAL rebook is refused on an allocated row, so it only clamps offers (board), not orders.
-    const affectedOrderIds = mode === 'PERSONAL' ? [] : collectLeafOrderIds(umbuchenItemId);
+    const affectedOrderIds = mode === 'PERSONAL' ? [] : myLager.collectLeafOrderIds(umbuchenItemId);
     umbuchenInFlight = true;
     if (submitBtn) submitBtn.disabled = true;
     window.krtFetch
         .write({
             method: 'POST',
-            url: url,
-            payload: payload,
+            url,
+            payload,
             successMessage: umbuchenI18n.success,
             errorMessage: umbuchenI18n.error,
             conflict: inventoryConflictI18n,
-            onSuccess: function () {
-                closeUmbuchenModal();
+            onSuccess() {
+                myLager.closeUmbuchenModal();
                 filterMyInventory();
                 broadcastInventoryChanged();
-                broadcastOrdersChanged(affectedOrderIds);
-                broadcastBoardChanged();
+                myLager.broadcastOrdersChanged(affectedOrderIds);
+                myLager.broadcastBoardChanged();
             },
         })
         .then(function () {
             umbuchenInFlight = false;
             if (submitBtn) submitBtn.disabled = false;
         });
-}
-
-// The item id the open book-out modal targets; set when the modal opens, read by submitBookOut.
-let bookOutItemId = null;
-// Guards against a second submit (Enter / rapid click) landing while the first write is in
-// flight — a duplicate book-out on the same version would otherwise 409.
-let bookOutInFlight = false;
-
-// #577 part 2: submit the book-out in place via the shared krtFetch/krtCsrf foundation, reusing
-// the existing POST /inventory/{id}/transfer proxy (the backend book-out endpoint, equivalent
-// for DISCARD / TRANSFER / SELL). On success the grouped table is re-swapped (the server
-// regroups) instead of the page reloading; the classic POST stays the no-JS fallback.
-function submitBookOut(event) {
-    // scu-decimal-input.js canonicalises + validates the amount fields in the capture phase
-    // first; if it found an invalid amount it already blocked the submit (preventDefault +
-    // reportValidity). Respect that and do not fire the AJAX write.
-    if (event.defaultPrevented) {
-        return;
-    }
-    event.preventDefault();
-    if (bookOutInFlight || !window.krtFetch || !bookOutItemId) {
-        return;
-    }
-    const typeInput = document.querySelector('input[name="type"]:checked');
-    const type = typeInput ? typeInput.value : 'DISCARD';
-    const amountEl = document.getElementById('amount');
-    const amount = window.krtScuInput
-        ? window.krtScuInput.parse(amountEl.value)
-        : parseFloat(amountEl.value);
-    const sellAmountEl = document.getElementById('sellAmount');
-    // Ausbuchen now only discards or sells — the TRANSFER (Umbuchung) mode moved to the
-    // dedicated Umbuchen modal. The backend book-out endpoint still receives the same DTO shape;
-    // the transfer-only fields stay null.
-    // Variante C (REQ-INV-027): the "Herkunft" picker chooses which order/mission slices (or the
-    // rest) the deduction comes from and, for a SELL, which missions get the coupled proceeds. An
-    // invalid plan already disables the submit button; guard the Enter-key path too. A null list
-    // means "take it from the rest" (SELL → that portion is personal).
-    if (window.krtHerkunft && !window.krtHerkunft.isValid('bookout')) {
-        if (typeof window.showFrontendErrorToast === 'function') {
-            window.showFrontendErrorToast(assocI18n.overallocated);
-        }
-        return;
-    }
-    const reductions = window.krtHerkunft
-        ? window.krtHerkunft.collect('bookout')
-        : { jobOrderReductions: null, missionReductions: null };
-    const payload = {
-        amount: amount,
-        type: type,
-        terminal: type === 'SELL' ? document.getElementById('terminal').value || null : null,
-        sellAmount:
-            type === 'SELL' && sellAmountEl.value !== '' ? Number(sellAmountEl.value) : null,
-        version: parseInt(document.getElementById('version').value, 10),
-        jobOrderReductions: reductions.jobOrderReductions,
-        missionReductions: reductions.missionReductions,
-    };
-    const submitBtn = document.getElementById('bookOutSubmitBtn');
-    // Read the earmarked orders before the write (the leaf is replaced on the post-write re-swap).
-    const affectedOrderIds = collectLeafOrderIds(bookOutItemId);
-    bookOutInFlight = true;
-    if (submitBtn) {
-        submitBtn.disabled = true;
-    }
-    window.krtFetch
-        .write({
-            method: 'POST',
-            url: '/inventory/' + bookOutItemId + '/transfer',
-            payload: payload,
-            successMessage: bookOutI18n.success,
-            errorMessage: bookOutI18n.error,
-            conflict: inventoryConflictI18n,
-            onSuccess: function () {
-                closeBookOutModal();
-                filterMyInventory();
-                broadcastInventoryChanged();
-                broadcastOrdersChanged(affectedOrderIds);
-                broadcastBoardChanged();
-            },
-        })
-        .then(function () {
-            bookOutInFlight = false;
-            if (submitBtn) {
-                submitBtn.disabled = false;
-            }
-        });
-}
-
-function openBookOutModal(id, amount, version, materialId, userId, locationId, quantityType) {
-    bookOutItemId = id;
-    const bookOutForm = document.getElementById('bookOutForm');
-    bookOutForm.action = window.safeSameOriginUrl(
-        '/inventory/' + id + '/book-out',
-        bookOutForm.action,
-    );
-
-    const amountInput = document.getElementById('amount');
-    const targetAmountInput = document.getElementById('targetAmount');
-    const isScu = quantityType !== 'PIECE';
-    if (quantityType === 'PIECE') {
-        amountInput.setAttribute('step', '1');
-        targetAmountInput.setAttribute('step', '1');
-    } else {
-        amountInput.setAttribute('step', '0.001');
-        targetAmountInput.setAttribute('step', '0.001');
-    }
-    const targetScuHint = document.getElementById('bookout-target-scu-hint');
-    const amountScuHint = document.getElementById('bookout-amount-scu-hint');
-    if (targetScuHint) targetScuHint.classList.toggle('krtm-hidden', !isScu);
-    if (amountScuHint) amountScuHint.classList.toggle('krtm-hidden', !isScu);
-
-    amountInput.value = amount;
-    document.getElementById('amount').max = amount;
-    document.getElementById('targetAmount').value = 0;
-    document.getElementById('maxAmount').value = amount;
-    const amountOfSpan = document.getElementById('amountOfText');
-    if (amountOfSpan) {
-        amountOfSpan.textContent = amountOfSpan
-            .getAttribute('data-template')
-            .replace('{0}', amount);
-    }
-    document.getElementById('version').value = version;
-    document.querySelector('input[name="type"][value="DISCARD"]').checked = true;
-    toggleBookOutTypeFields();
-
-    const typeSellRadio = document.querySelector('input[name="type"][value="SELL"]');
-    const sellNotPossibleReason = document.getElementById('sellNotPossibleReason');
-    typeSellRadio.disabled = true;
-    if (sellNotPossibleReason) sellNotPossibleReason.style.display = 'none';
-
-    const terminalSelect = document.getElementById('terminal');
-    terminalSelect.innerHTML = '<option value="" disabled selected>...laden...</option>';
-    if (materialId) {
-        fetch('/api/proxy/materials/' + materialId + '/terminals')
-            .then((r) => {
-                if (!r.ok) throw new Error('Network response was not ok');
-                return r.json();
-            })
-            .then((data) => {
-                terminalSelect.innerHTML =
-                    '<option value="" disabled selected>...wählen...</option>';
-                if (data && data.length > 0) {
-                    typeSellRadio.disabled = false;
-                    data.forEach((terminal) => {
-                        const opt = document.createElement('option');
-                        opt.value = terminal.terminalName;
-                        if (terminal.priceSell && terminal.priceSell > 0) {
-                            opt.textContent =
-                                terminal.terminalName + ' (' + terminal.priceSell + ' aUEC)';
-                        } else {
-                            opt.textContent = terminal.terminalName;
-                        }
-                        terminalSelect.appendChild(opt);
-                    });
-                } else {
-                    terminalSelect.innerHTML =
-                        '<option value="" disabled selected>Keine Terminals gefunden</option>';
-                    typeSellRadio.disabled = true;
-                    if (typeSellRadio.checked) {
-                        document.querySelector('input[name="type"][value="DISCARD"]').checked =
-                            true;
-                        toggleBookOutTypeFields();
-                    }
-                    if (sellNotPossibleReason) sellNotPossibleReason.style.display = 'inline';
-                }
-            })
-            .catch((e) => {
-                console.error('Error loading terminals:', e);
-                terminalSelect.innerHTML =
-                    '<option value="" disabled selected>Fehler beim Laden</option>';
-                typeSellRadio.disabled = true;
-                if (typeSellRadio.checked) {
-                    document.querySelector('input[name="type"][value="DISCARD"]').checked = true;
-                    toggleBookOutTypeFields();
-                }
-                if (sellNotPossibleReason) sellNotPossibleReason.style.display = 'inline';
-            });
-    } else {
-        terminalSelect.innerHTML =
-            '<option value="" disabled selected>Kein Material gewählt</option>';
-        typeSellRadio.disabled = true;
-        if (sellNotPossibleReason) sellNotPossibleReason.style.display = 'inline';
-    }
-
-    // Inline `flex` (not `block`) so `.modal`'s flex centring is preserved (see openUmbuchenModal).
-    document.getElementById('bookOutModal').style.display = 'flex';
-    // Variante C (REQ-INV-027): build the "Herkunft" (deduct-from) picker from this entry's chips
-    // now that the modal is shown, so its initial validity gates the submit button.
-    if (window.krtHerkunft) {
-        window.krtHerkunft.populate('bookout', id);
-    }
-}
-
-function closeBookOutModal() {
-    if (typeof window.resetUnsavedChanges === 'function') {
-        window.resetUnsavedChanges();
-    }
-    if (window.krtHerkunft) {
-        window.krtHerkunft.reset('bookout');
-    }
-    document.getElementById('bookOutModal').style.display = 'none';
-}
-
-window.onclick = function (event) {
-    const modal = document.getElementById('bookOutModal');
-    if (event.target === modal) {
-        modal.style.display = 'none';
-    }
-};
-
-// ── Variante C allocation chips (REQ-INV-027) ──────────────────────────────
-// Each .assoc-split (one per dimension per entry) renders its job-order / mission
-// allocations as chips + a trailing rest chip, plus a "+ Zuordnen" combobox
-// popover. Add / edit / remove call the per-allocation endpoints
-// (POST/PATCH/DELETE /inventory/{id}/allocation) and update the split in place
-// from the returned InventoryItemDto (chips + rest + version), so the drilled-down
-// stack stays expanded and no full-page reload is needed (REQ-FE-001).
-const ASSOC_EPS = 0.0005;
-
-// Formats an amount for a chip / rest label: whole for PIECE, three decimals for SCU.
-function assocFormatAmount(amount, isPiece) {
-    const n = typeof amount === 'number' ? amount : parseFloat(amount);
-    if (isNaN(n)) return '0';
-    return isPiece ? String(Math.round(n)) : n.toFixed(3);
-}
-
-// Hides every open allocation popover except `except` (the one being opened).
-function assocCloseAllPops(except) {
-    document.querySelectorAll('[data-assoc-pop]').forEach(function (p) {
-        if (p !== except) p.classList.add('krtm-hidden');
-    });
-}
-
-// Anchors a `position: fixed` allocation popover to its trigger in viewport space. The
-// popover is fixed (not absolute) so the horizontally-scrolling ancestors
-// (#tableContainer.overflow-x-auto + .table-responsive) can't crop it at their bottom edge;
-// fixed positioning drops the stylesheet's top/left, so they are recomputed here from the
-// trigger wrap's rect (mirrors the old `top: calc(100% + 5px); left: 0`). When the trigger sits
-// near the viewport bottom there is no room to drop the popover downward — and a fixed box can't
-// be scrolled into view — so it flips above the trigger (bottom-anchored, so a later switch to
-// the taller/shorter amount section stays glued to the trigger). Mirrors krt-searchable-select's
-// positionListbox (REQ-UI-011). Runs while the popover is visible so offsetHeight is measurable.
-function assocPositionPop(pop) {
-    const wrap = pop.closest('.assoc-add-wrap');
-    if (!wrap) return;
-    const rect = wrap.getBoundingClientRect();
-    const gap = 5;
-    const popHeight = pop.offsetHeight;
-    const below = window.innerHeight - rect.bottom;
-    const above = rect.top;
-    // Flip up only when the popover ACTUALLY fits above. The old test was `above > below` —
-    // "more room above" — which happily flips a popover taller than the space above it and
-    // leaves its upper end (in pick mode: the combobox) hanging over the viewport top. A
-    // `position: fixed` box cannot be scrolled into view, so that part is unreachable, not
-    // merely clipped (REQ-UI-011).
-    const flipUp = below < popHeight + gap && above >= popHeight + gap;
-    // Highest top the popover can take and still end fully inside the viewport. The max() keeps
-    // it sane when the popover is taller than the viewport itself — it then starts at the edge.
-    const maxTop = Math.max(gap, window.innerHeight - popHeight - gap);
-    const wantedTop = flipUp ? rect.top - gap - popHeight : rect.bottom + gap;
-    const top = Math.max(gap, Math.min(wantedTop, maxTop));
-    pop.style.left = rect.left + 'px';
-    if (flipUp) {
-        // Bottom-anchored (derived from the clamped top) so a later switch to the taller/shorter
-        // amount section keeps the popover's lower edge glued to the trigger.
-        pop.style.top = 'auto';
-        pop.style.bottom = window.innerHeight - top - popHeight + 'px';
-    } else {
-        pop.style.bottom = 'auto';
-        pop.style.top = top + 'px';
-    }
-}
-
-// Keeps the currently-open popover glued to its trigger as the window or the table's own
-// scroll container moves (capture catches inner-container scrolls, which do not bubble).
-// Only one popover is open at a time (assocCloseAllPops), so the first visible one wins.
-function assocRepositionOpenPop() {
-    const pop = document.querySelector('[data-assoc-pop]:not(.krtm-hidden)');
-    if (pop) assocPositionPop(pop);
-}
-
-// Switches a popover to its combobox (pick) section.
-function assocShowPickSection(pop) {
-    const pick = pop.querySelector('[data-assoc-pop-pick]');
-    const amount = pop.querySelector('[data-assoc-pop-amount]');
-    if (pick) pick.classList.remove('krtm-hidden');
-    if (amount) amount.classList.add('krtm-hidden');
-}
-
-// Switches a popover to its amount-editor section; `showRemove` reveals Entfernen (edit mode).
-function assocShowAmountSection(pop, showRemove) {
-    const pick = pop.querySelector('[data-assoc-pop-pick]');
-    const amount = pop.querySelector('[data-assoc-pop-amount]');
-    if (pick) pick.classList.add('krtm-hidden');
-    if (amount) amount.classList.remove('krtm-hidden');
-    const removeBtn = pop.querySelector('[data-trigger="inv-my-assoc-remove"]');
-    if (removeBtn) removeBtn.classList.toggle('krtm-hidden', !showRemove);
-}
-
-// Builds one allocation chip element from a returned allocation DTO.
-function assocBuildChip(field, alloc, isPiece) {
-    const isOrder = field === 'JOB_ORDER';
-    const chip = document.createElement('span');
-    chip.className = 'assoc-chip ' + (isOrder ? 'assoc-chip--order' : 'assoc-chip--mission');
-    chip.setAttribute('role', 'button');
-    chip.setAttribute('tabindex', '0');
-    chip.setAttribute('data-trigger', 'inv-my-assoc-edit');
-    chip.setAttribute('data-assoc-chip', isOrder ? 'jobOrder' : 'mission');
-    chip.setAttribute('data-target-id', isOrder ? alloc.jobOrderId : alloc.missionId);
-    chip.setAttribute('data-amount', alloc.amount);
-    const label = isOrder ? '#' + alloc.jobOrderDisplayId : alloc.missionName;
-    chip.appendChild(document.createTextNode(label + ' · '));
-    const amt = document.createElement('span');
-    amt.className = 'assoc-chip__amt';
-    amt.textContent = assocFormatAmount(alloc.amount, isPiece);
-    chip.appendChild(amt);
-    return chip;
-}
-
-// Recomputes a rest chip's tone + label: 0 -> success, unassigned remainder -> muted "frei",
-// over-allocation (negative) -> danger. isPiece formats the amount whole (no decimals) for a
-// PIECE material, three decimals for SCU.
-function assocUpdateRestChip(el, rest, isPiece) {
-    if (!el) return;
-    el.classList.remove('chip--success', 'chip--muted', 'chip--danger');
-    if (rest == null || Math.abs(rest) <= ASSOC_EPS) {
-        el.classList.add('chip--success');
-        el.textContent = assocI18n.restZero;
-    } else if (rest < 0) {
-        el.classList.add('chip--danger');
-        el.textContent = assocI18n.restOver.replace('{0}', assocFormatAmount(-rest, isPiece));
-    } else {
-        el.classList.add('chip--muted');
-        el.textContent = assocI18n.restFree.replace('{0}', assocFormatAmount(rest, isPiece));
-    }
-}
-
-// Re-renders a split's chips + rest from the returned entry DTO and propagates the fresh
-// entry version to every data-version control in the leaf row (both dimensions share the token).
-function assocRerender(split, dto) {
-    const field = split.getAttribute('data-assoc-field');
-    const isPiece = split.getAttribute('data-piece') === 'true';
-    const isOrder = field === 'JOB_ORDER';
-    const allocs = (isOrder ? dto.jobOrderAllocations : dto.missionAllocations) || [];
-    const rest = isOrder ? dto.jobOrderRest : dto.missionRest;
-    split.querySelectorAll('[data-assoc-chip]').forEach(function (c) {
-        c.remove();
-    });
-    const addWrap = split.querySelector('.assoc-add-wrap');
-    allocs.forEach(function (a) {
-        split.insertBefore(assocBuildChip(field, a, isPiece), addWrap);
-    });
-    assocUpdateRestChip(split.querySelector('[data-assoc-rest]'), rest, isPiece);
-    if (
-        dto.version != null &&
-        window.krtFetch &&
-        typeof window.krtFetch.syncVersion === 'function'
-    ) {
-        const leaf = split.closest('.tree-row--leaf');
-        if (leaf) window.krtFetch.syncVersion(leaf, dto.version);
-    }
-}
-
-// The chip for `targetId` in this split, or null. The chips are re-rendered from each write's own
-// response (assocRerender), so they — unlike the picker's server-rendered <option> list — always
-// reflect what is currently allocated on the entry.
-function assocFindChip(split, targetId) {
-    if (!split || !targetId) return null;
-    const chips = split.querySelectorAll('[data-assoc-chip][data-target-id]');
-    for (let i = 0; i < chips.length; i++) {
-        if (chips[i].getAttribute('data-target-id') === targetId) return chips[i];
-    }
-    return null;
-}
-
-// Sends the allocation write, serialized per entry so a rapid second edit of the same row waits
-// for the fresh version (REQ-INV-026 / REQ-FE-003 avoid a self-inflicted 409).
-function assocSubmit(split, pop, method) {
-    const entryId = split.getAttribute('data-entry-id');
-    const field = split.getAttribute('data-assoc-field');
-    const targetId = pop.getAttribute('data-assoc-target');
-    const isPiece = split.getAttribute('data-piece') === 'true';
-    let amount = null;
-    if (method !== 'DELETE') {
-        const input = pop.querySelector('[data-assoc-amount-input]');
-        amount = parseFloat(input ? input.value : '');
-        if (isNaN(amount) || amount <= 0 || (isPiece && amount % 1 !== 0)) {
-            if (typeof window.showFrontendErrorToast === 'function') {
-                window.showFrontendErrorToast(assocI18n.amountRequired);
-            }
-            return;
-        }
-        amount = Math.round(amount * 1000) / 1000;
-    }
-    // REQ-FE-001: this write guards double-submit ITSELF — krtFetch.write's automatic
-    // submitter capture only sees form submits, and this is a popover click. Disable
-    // NOW, synchronously, before serialize() defers the send: `targetId` above was read at CLICK
-    // time, so a second click would enqueue a task still carrying the first click's target and
-    // re-POST the slice the first one just created — a 400 duplicate. Enter auto-repeat in the
-    // amount input reaches the same handler, so the guard covers the keyboard path too.
-    const buttons = pop.querySelectorAll('button');
-    buttons.forEach(function (b) {
-        b.disabled = true;
-    });
-    const release = function () {
-        buttons.forEach(function (b) {
-            b.disabled = false;
-        });
-    };
-    const run = function () {
-        // Read the entry version at SEND time, not click time (REQ-FE-003): both chip dimensions
-        // share the entry @Version and the inv-assoc key, so a rapid 2nd edit of the same entry is
-        // queued behind the 1st — which force-increments the version and syncs it onto data-version
-        // via assocRerender. Reading data-version here (inside the serialized task) picks up that
-        // fresh value, avoiding a self-inflicted 409.
-        const version = parseInt(split.getAttribute('data-version'), 10);
-        const body = { field: field, targetId: targetId, amount: amount, version: version };
-        return assocSend(entryId, method, body, split, pop);
-    };
-    if (window.krtFetch && typeof window.krtFetch.serialize === 'function') {
-        return window.krtFetch.serialize('inv-assoc:' + entryId, run).finally(release);
-    }
-    return Promise.resolve().then(run).finally(release);
-}
-
-async function assocSend(entryId, method, body, split, pop) {
-    // krtFetch.write (REQ-FE-002): CSRF, the bare-403 refresh-and-retry and the re-auth redirect
-    // come from the shared seam. The DELETE mapping reads the same body (dimension, target,
-    // version), hence bodyOnDelete. A 409 OPTIMISTIC_LOCK gets krtFetch's reload-confirm — the one
-    // sanctioned reload — instead of the former unconditional timed reload (REQ-FE-001/003).
-    if (!window.krtFetch) return;
-    await window.krtFetch.write({
-        method: method,
-        url: '/inventory/' + encodeURIComponent(entryId) + '/allocation',
-        payload: body,
-        bodyOnDelete: true,
-        successMessage: assocI18n.saved,
-        errorMessage: assocI18n.failed,
-        conflict: Object.assign({}, inventoryConflictI18n, {
-            reloadDetailFallback: assocI18n.conflict,
-        }),
-        onSuccess: function (dto) {
-            if (dto && typeof dto === 'object') assocRerender(split, dto);
-            pop.classList.add('krtm-hidden');
-            broadcastInventoryChanged();
-            // A job-order earmark change shifts that order's material collection.
-            if (body && body.field === 'JOB_ORDER') {
-                broadcastOrdersChanged([body.targetId]);
-            }
-        },
-        onError: function (status) {
-            // Over-allocation (REQ-INV-027 R5): a toast, not a reload — the pop stays open so the
-            // user can lower the amount.
-            if (status === 422) {
-                if (typeof window.showFrontendErrorToast === 'function') {
-                    window.showFrontendErrorToast(assocI18n.overallocated);
-                }
-                return true;
-            }
-            // Anything else falls through to krtFetch: a 409 gets the conflict confirm, and every
-            // other refusal toasts the backend's RFC 7807 detail — localized at the throw site
-            // (GlobalExceptionHandler#resolveDetail) and relayed verbatim by the proxy — so the
-            // user sees WHY (e.g. a target a peer allocated a moment ago), falling back to the
-            // generic assocI18n.failed. The popover stays open so they can correct it.
-            return false;
-        },
-    });
 }
 
 // CSP-safe delegated bindings (replaces the 34 inline on*= handlers across this template).
@@ -2283,15 +1589,6 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('change', 'inv-my-personal-filter', togglePersonalFilter);
     window.krtEvents.on('click', 'inv-my-reset-filter', resetMyInventoryFilter);
     window.krtEvents.on('click', 'inv-my-open-bulk', openBulkCheckoutModal);
-    window.krtEvents.on('click', 'inv-my-toggle-group', function (el) {
-        toggleGroup(el);
-    });
-    window.krtEvents.on('click', 'inv-my-toggle-stack', function (el) {
-        toggleStack(el);
-    });
-    window.krtEvents.on('click', 'inv-my-stack-page', function (el) {
-        goToStackEntriesPage(el);
-    });
     window.krtEvents.on('change', 'inv-my-toggle-group-cb', function (el) {
         toggleGroupCheckboxes(el);
     });
@@ -2299,117 +1596,6 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         onEntryCheckboxToggle(el);
     });
     window.krtEvents.on('click', 'inv-my-select-all', toggleSelectAllInView);
-    // Variante C allocation chips (REQ-INV-027).
-    window.krtEvents.on('click', 'inv-my-assoc-add-open', function (el) {
-        const split = el.closest('.assoc-split');
-        const pop = split ? split.querySelector('[data-assoc-pop]') : null;
-        if (!pop) return;
-        const wasHidden = pop.classList.contains('krtm-hidden');
-        assocCloseAllPops(pop);
-        if (wasHidden) {
-            pop.removeAttribute('data-assoc-target');
-            assocShowPickSection(pop);
-            const hidden = pop.querySelector('input[type="hidden"]');
-            if (hidden && hidden.krtCombobox) hidden.krtCombobox.setValue('');
-            pop.classList.remove('krtm-hidden');
-            assocPositionPop(pop);
-            const cbInput = pop.querySelector('.krt-combobox__input');
-            if (cbInput) cbInput.focus();
-        } else {
-            pop.classList.add('krtm-hidden');
-        }
-    });
-    window.krtEvents.on('change', 'inv-my-assoc-pick', function (el) {
-        const value = el.value;
-        if (!value) return;
-        const pop = el.closest('[data-assoc-pop]');
-        if (!pop) return;
-        // The <option> list drops already-allocated targets in Thymeleaf, at fragment-RENDER time
-        // only: assocRerender rewrites the chips and not the picker, and the actor is excluded from
-        // their own live-sync room, so a target THIS viewer allocated since the render is still on
-        // list. Picking it used to POST a duplicate and take a 400 shown as a generic failure.
-        // The chips are current, so resolve the pick against them and open the existing slice in
-        // edit mode — which is what a user reaching for a target already on the entry wants anyway.
-        const existing = assocFindChip(pop.closest('.assoc-split'), value);
-        pop.setAttribute('data-assoc-target', value);
-        pop.setAttribute('data-assoc-mode', existing ? 'edit' : 'add');
-        assocShowAmountSection(pop, !!existing);
-        const input = pop.querySelector('[data-assoc-amount-input]');
-        if (input) {
-            input.value = existing ? existing.getAttribute('data-amount') : '';
-            input.focus();
-        }
-    });
-    window.krtEvents.on('click', 'inv-my-assoc-edit', function (el) {
-        const split = el.closest('.assoc-split');
-        const pop = split ? split.querySelector('[data-assoc-pop]') : null;
-        if (!pop) return;
-        assocCloseAllPops(pop);
-        pop.setAttribute('data-assoc-target', el.getAttribute('data-target-id'));
-        pop.setAttribute('data-assoc-mode', 'edit');
-        assocShowAmountSection(pop, true);
-        const input = pop.querySelector('[data-assoc-amount-input]');
-        if (input) input.value = el.getAttribute('data-amount');
-        pop.classList.remove('krtm-hidden');
-        assocPositionPop(pop);
-        if (input) input.focus();
-    });
-    window.krtEvents.on('click', 'inv-my-assoc-save', function (el) {
-        const pop = el.closest('[data-assoc-pop]');
-        const split = el.closest('.assoc-split');
-        if (!pop || !split) return;
-        assocSubmit(split, pop, pop.getAttribute('data-assoc-mode') === 'edit' ? 'PATCH' : 'POST');
-    });
-    window.krtEvents.on('click', 'inv-my-assoc-remove', function (el) {
-        const pop = el.closest('[data-assoc-pop]');
-        const split = el.closest('.assoc-split');
-        if (!pop || !split) return;
-        assocSubmit(split, pop, 'DELETE');
-    });
-    // Keep the fixed popover anchored to its trigger while the page or the table's own
-    // horizontal scroll container moves (capture reaches inner-container scrolls that don't bubble).
-    window.addEventListener('scroll', assocRepositionOpenPop, true);
-    window.addEventListener('resize', assocRepositionOpenPop);
-    // Close popovers on an outside click; keyboard: Enter saves the amount, Enter/Space opens a
-    // chip's editor (the chips are role=button but a <span> gets no synthetic click on key press).
-    document.addEventListener('click', function (e) {
-        if (
-            !e.target.closest('[data-assoc-pop]') &&
-            !e.target.closest('.assoc-add') &&
-            !e.target.closest('[data-assoc-chip]')
-        ) {
-            assocCloseAllPops(null);
-        }
-    });
-    document.addEventListener('keydown', function (e) {
-        if (!e.target || typeof e.target.matches !== 'function') return;
-        if (e.key === 'Enter' && e.target.matches('[data-assoc-amount-input]')) {
-            e.preventDefault();
-            const pop = e.target.closest('[data-assoc-pop]');
-            const split = e.target.closest('.assoc-split');
-            if (pop && split) {
-                assocSubmit(
-                    split,
-                    pop,
-                    pop.getAttribute('data-assoc-mode') === 'edit' ? 'PATCH' : 'POST',
-                );
-            }
-        } else if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-assoc-chip]')) {
-            e.preventDefault();
-            e.target.click();
-        }
-    });
-    window.krtEvents.on('click', 'inv-my-bookout', function (el) {
-        openBookOutModal(
-            el.getAttribute('data-id'),
-            el.getAttribute('data-amount'),
-            el.getAttribute('data-version'),
-            el.getAttribute('data-material-id'),
-            el.getAttribute('data-user-id'),
-            el.getAttribute('data-location-id'),
-            el.getAttribute('data-quantity-type'),
-        );
-    });
     window.krtEvents.on('click', 'inv-my-umbuchen', function (el) {
         openUmbuchenModal(
             el.getAttribute('data-id'),
@@ -2428,27 +1614,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('click', 'inv-my-open-note', function (el) {
         openNoteModal(el);
     });
-    window.krtEvents.on('click', 'inv-my-close-bookout', closeBookOutModal);
-    window.krtEvents.on('input', 'inv-my-amount-from-target', updateAmountFromTarget);
-    window.krtEvents.on('input', 'inv-my-target-from-amount', updateTargetFromAmount);
-    window.krtEvents.on('change', 'inv-my-toggle-bookout-type', toggleBookOutTypeFields);
-    window.krtEvents.on('click', 'inv-my-close-umbuchen', closeUmbuchenModal);
-    window.krtEvents.on(
-        'input',
-        'inv-my-umbuchen-amount-from-target',
-        updateUmbuchenAmountFromTarget,
-    );
-    window.krtEvents.on(
-        'input',
-        'inv-my-umbuchen-target-from-amount',
-        updateUmbuchenTargetFromAmount,
-    );
     window.krtEvents.on('change', 'inv-my-toggle-umbuchen-mode', toggleUmbuchenMode);
-    window.krtEvents.on(
-        'change',
-        'inv-my-umbuchen-target-user-changed',
-        refreshUmbuchenTransferOrgUnitPicker,
-    );
     window.krtEvents.on('click', 'inv-my-close-note', closeNoteModal);
     window.krtEvents.on('input', 'inv-my-update-note-counter', updateNoteCounter);
     window.krtEvents.on('click', 'inv-my-save-note', saveNote);
@@ -2466,22 +1632,19 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     );
 }
 
-// The book-out form is a stable top-level element (outside the swapped table container), so a
-// direct submit listener bound once survives the grouped-table re-swaps.
-let bookOutFormEl = document.getElementById('bookOutForm');
-if (bookOutFormEl) {
-    bookOutFormEl.addEventListener('submit', submitBookOut);
-}
-// The Umbuchen form is likewise a stable top-level element; its submit listener (bound once)
-// survives the grouped-table re-swaps and runs after scu-decimal-input.js canonicalises/validates
-// the amount fields in the capture phase.
-let umbuchenFormEl = document.getElementById('umbuchenForm');
+// The Umbuchen form is a stable top-level element (outside the swapped table container); its submit
+// listener (bound once) survives the grouped-table re-swaps and runs after scu-decimal-input.js
+// canonicalises/validates the amount fields in the capture phase.
+const umbuchenFormEl = document.getElementById('umbuchenForm');
 if (umbuchenFormEl) {
     umbuchenFormEl.addEventListener('submit', submitUmbuchen);
 }
 // The Massen-Umbuchen form is a stable top-level element too, so one bound submit listener survives
 // the grouped-table re-swaps. It carries no amount input, so no scu-decimal capture phase applies.
-let bulkRebookFormEl = document.getElementById('bulkRebookForm');
+const bulkRebookFormEl = document.getElementById('bulkRebookForm');
 if (bulkRebookFormEl) {
     bulkRebookFormEl.addEventListener('submit', submitBulkRebook);
 }
+
+// The tree, allocation-chip, book-out and shared Umbuchen handlers (inventory-common.js).
+myLager.bind();

@@ -168,7 +168,7 @@
             window.location.assign(url);
             return;
         }
-        window.krtFetch.swap({ url: url, container: '#' + RESULTS_ID, history: true });
+        window.krtFetch.swap({ url, container: '#' + RESULTS_ID, history: true });
     }
 
     function wireFilter() {

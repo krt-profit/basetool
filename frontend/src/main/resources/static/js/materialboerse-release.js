@@ -13,16 +13,16 @@
 (function () {
     'use strict';
 
-    let i18n = window.materialboerseI18n || {};
-    let modal = document.getElementById('mb-modal');
+    const i18n = window.materialboerseI18n || {};
+    const modal = document.getElementById('mb-modal');
     if (!modal || !window.krtFetch) {
         return;
     }
 
-    let SERIALIZE_KEY = 'materialboerse';
+    const SERIALIZE_KEY = 'materialboerse';
     // REQ-FE-015 (ADR-0094): the global live-sync room a release/edit publishes to over the shared
     // multiplexed /ws/sync socket (window.krtLiveSync), so board viewers re-pull the list.
-    let MATERIALBOARD_TOPIC = 'materialboard';
+    const MATERIALBOARD_TOPIC = 'materialboard';
     let state = {
         mode: null,
         itemId: null,
@@ -46,7 +46,7 @@
     let pickerSearchTimer = null;
     let itemPickerSeq = 0;
     let itemPickerSearchTimer = null;
-    let PICKER_SEARCH_DEBOUNCE_MS = 200;
+    const PICKER_SEARCH_DEBOUNCE_MS = 200;
     // The two picker dropdowns start CLOSED and open only on an explicit user gesture (clicking into
     // or typing in the combobox), so the floating, absolutely-positioned listbox never covers the
     // fields below it the moment the modal opens — the modal auto-focuses the picker input, and a
@@ -81,14 +81,14 @@
     }
 
     function setText(sel, text) {
-        let el = q(sel);
+        const el = q(sel);
         if (el) {
             el.textContent = text;
         }
     }
 
     function toggle(sel, on) {
-        let el = q(sel);
+        const el = q(sel);
         if (el) {
             el.hidden = !on;
         }
@@ -101,7 +101,7 @@
      * window.materialboerseI18n (localized), with ASCII fallbacks only if the bootstrap is absent.
      */
     function formatAmount(amount, quantityType) {
-        let n = Number(amount);
+        const n = Number(amount);
         if (isNaN(n)) {
             return String(amount);
         }
@@ -134,11 +134,11 @@
      * @param max the item's current stock as the ceiling, or null for "unknown / disabled".
      */
     function setAmountField(value, max) {
-        let input = q('[data-mb-amount]');
-        let hint = q('[data-mb-amount-hint]');
-        let unit = q('[data-mb-amount-unit]');
-        let isPiece = state.quantityType === 'PIECE';
-        let maxNum = max == null || max === '' ? NaN : Number(max);
+        const input = q('[data-mb-amount]');
+        const hint = q('[data-mb-amount-hint]');
+        const unit = q('[data-mb-amount-unit]');
+        const isPiece = state.quantityType === 'PIECE';
+        const maxNum = max == null || max === '' ? NaN : Number(max);
         state.available = isNaN(maxNum) ? null : maxNum;
         if (unit) {
             unit.textContent = isPiece ? i18n.unitPiece || 'Stück' : i18n.unitScu || 'SCU';
@@ -152,7 +152,7 @@
                 input.removeAttribute('max');
                 input.disabled = true;
             }
-            let valNum = value == null || value === '' ? NaN : Number(value);
+            const valNum = value == null || value === '' ? NaN : Number(value);
             input.value = isNaN(valNum) ? '' : String(valNum);
         }
         if (hint) {
@@ -168,7 +168,7 @@
 
     /** Reads the offered amount from the field as a Number (NaN when empty/invalid). */
     function readOfferedAmount() {
-        let input = q('[data-mb-amount]');
+        const input = q('[data-mb-amount]');
         return input ? Number(input.value) : NaN;
     }
 
@@ -177,7 +177,7 @@
      * error toast and returns null; on success it returns the numeric amount.
      */
     function validateOfferedAmount() {
-        let amount = readOfferedAmount();
+        const amount = readOfferedAmount();
         if (isNaN(amount) || amount <= 0) {
             showError(i18n.amountInvalid);
             return null;
@@ -198,8 +198,8 @@
     }
 
     function updateCharCount() {
-        let ta = q('[data-mb-remark]');
-        let counter = q('[data-mb-charcount]');
+        const ta = q('[data-mb-remark]');
+        const counter = q('[data-mb-charcount]');
         if (ta && counter) {
             counter.textContent = fmt(
                 i18n.charCounter || '{0} / 20.000',
@@ -229,22 +229,22 @@
             onCancel = doneOrOpts.onCancel || null;
         }
         state = {
-            mode: mode,
+            mode,
             itemId: ctx.itemId || null,
             productKey: null,
             offerId: ctx.offerId || null,
             version: ctx.version || null,
             available: null,
             quantityType: ctx.quantityType || null,
-            onDone: onDone,
-            onCancel: onCancel,
+            onDone,
+            onCancel,
         };
         // Every open starts with both picker dropdowns closed; the user opens the relevant one.
         pickerListOpen = false;
         itemPickerListOpen = false;
-        let isNew = mode === 'new';
-        let isEdit = mode === 'edit';
-        let isItem = mode === 'item';
+        const isNew = mode === 'new';
+        const isEdit = mode === 'edit';
+        const isItem = mode === 'item';
         setText(
             '[data-mb-modal-title]',
             isEdit ? i18n.editTitle : isItem ? i18n.itemTitle : i18n.releaseTitle,
@@ -259,7 +259,7 @@
         toggle('[data-mb-amount-block]', !isItem);
         toggle('[data-mb-qty-block]', isItem);
         toggle('[data-mb-qty-error]', false);
-        let qtyInput = q('[data-mb-item-qty]');
+        const qtyInput = q('[data-mb-item-qty]');
         if (qtyInput) {
             qtyInput.value = '';
         }
@@ -269,7 +269,7 @@
             // whole-unit item quantity (ctx.quantityType === 'PIECE', ctx.available = the backing
             // row's stock) and there is no quality — the facts show the item name only. A material
             // row (ctx.kind absent) keeps its quality fact.
-            let isStockItem = ctx.kind === 'ITEM';
+            const isStockItem = ctx.kind === 'ITEM';
             setFacts(ctx.material, isStockItem ? null : ctx.quality);
             toggleQualityFact(!isStockItem);
             if (isNew) {
@@ -279,25 +279,25 @@
             } else {
                 // 'edit': value = current offered amount/quantity, ceiling = item's total stock
                 // (ctx.available). 'lager': value = ceiling = the item's stock (whole row by default).
-                let max = isEdit ? ctx.available : ctx.amount;
+                const max = isEdit ? ctx.available : ctx.amount;
                 setAmountField(ctx.amount, max);
             }
         }
 
-        let ta = q('[data-mb-remark]');
+        const ta = q('[data-mb-remark]');
         ta.value = ctx.remark || '';
         updateCharCount();
 
         if (isNew) {
             // Reset the Material/Item radio to Material and prefetch that kind (the user re-picks).
             pickerKind = 'MATERIAL';
-            let materialRadio = modal.querySelector('[data-mb-kind-radio][value="MATERIAL"]');
+            const materialRadio = modal.querySelector('[data-mb-kind-radio][value="MATERIAL"]');
             if (materialRadio) {
                 materialRadio.checked = true;
             }
             loadPicker('');
         } else if (isItem) {
-            let itemInput = q('[data-mb-item-picker-input]');
+            const itemInput = q('[data-mb-item-picker-input]');
             if (itemInput) {
                 itemInput.value = '';
             }
@@ -311,7 +311,7 @@
         // app-wide contract is the krtm-modal-open / krtm-hidden class pair (ADR-0093); the
         // inline style here works because it outranks the stylesheet default.
         modal.style.display = 'flex';
-        let first = isNew
+        const first = isNew
             ? q('[data-mb-picker-input]')
             : isItem
               ? q('[data-mb-item-picker-input]')
@@ -330,7 +330,7 @@
 
     /** Dismiss without submitting — fires the onCancel hook (e.g. to revert a Lager checkbox). */
     function cancel() {
-        let onCancel = state.onCancel;
+        const onCancel = state.onCancel;
         hide();
         resetState();
         if (onCancel) {
@@ -340,7 +340,7 @@
 
     /** Close after a successful submit — fires the onDone hook with the response body. */
     function finish(body) {
-        let onDone = state.onDone;
+        const onDone = state.onDone;
         hide();
         resetState();
         if (onDone) {
@@ -363,8 +363,8 @@
     }
 
     function loadPicker(query) {
-        let seq = ++pickerSeq;
-        let url =
+        const seq = ++pickerSeq;
+        const url =
             '/materialboerse/releasable-items?kind=' +
             encodeURIComponent(pickerKind) +
             (query ? '&q=' + encodeURIComponent(query) : '');
@@ -408,7 +408,7 @@
      */
     function openPickerList() {
         pickerListOpen = true;
-        let list = q('[data-mb-picker-list]');
+        const list = q('[data-mb-picker-list]');
         if (list) {
             list.hidden = false;
         }
@@ -417,7 +417,7 @@
     /** Closes the material picker dropdown so it stops covering the fields beneath it. */
     function closePickerList() {
         pickerListOpen = false;
-        let list = q('[data-mb-picker-list]');
+        const list = q('[data-mb-picker-list]');
         if (list) {
             list.hidden = true;
         }
@@ -434,7 +434,7 @@
         pickerKind = kind === 'ITEM' ? 'ITEM' : 'MATERIAL';
         state.itemId = null;
         state.quantityType = null;
-        let input = q('[data-mb-picker-input]');
+        const input = q('[data-mb-picker-input]');
         if (input) {
             input.value = '';
         }
@@ -446,7 +446,7 @@
     }
 
     function renderPicker() {
-        let list = q('[data-mb-picker-list]');
+        const list = q('[data-mb-picker-list]');
         if (!list) {
             return;
         }
@@ -463,7 +463,7 @@
             // The picker carries both material rows and game-item rows (stock-backed item
             // offers, REQ-MARKET-014). An item row has no quality — omit the "Q x ·" prefix and
             // render a blank data-quality so picking it hides the quality fact.
-            let isItem = it.kind === 'ITEM';
+            const isItem = it.kind === 'ITEM';
             let meta = escapeHtml(
                 (isItem ? '' : 'Q ' + it.quality + ' · ') +
                     formatAmount(it.amount, it.quantityType),
@@ -505,8 +505,8 @@
     function pickItem(li) {
         state.itemId = li.getAttribute('data-item-id');
         state.quantityType = li.getAttribute('data-quantity-type');
-        let isItem = li.getAttribute('data-kind') === 'ITEM';
-        let amount = li.getAttribute('data-amount');
+        const isItem = li.getAttribute('data-kind') === 'ITEM';
+        const amount = li.getAttribute('data-amount');
         // An item row has no quality; a material row shows it. Releasing an item row posts the same
         // /offers/ajax payload — the backend detects the game-item row and creates a stock-backed
         // item offer (REQ-MARKET-014).
@@ -515,7 +515,7 @@
         // Offer the whole picked row by default; its stock is the ceiling. setAmountField reads
         // state.quantityType (just set) to render the SCU/PIECE unit + step (PIECE for item rows).
         setAmountField(amount, amount);
-        let input = q('[data-mb-picker-input]');
+        const input = q('[data-mb-picker-input]');
         if (input) {
             input.value = li.getAttribute('data-material');
         }
@@ -525,8 +525,8 @@
     // -------- item (blueprint-product) picker (item offers, REQ-MARKET-012) --------
 
     function loadItemPicker(query) {
-        let seq = ++itemPickerSeq;
-        let url =
+        const seq = ++itemPickerSeq;
+        const url =
             '/materialboerse/offerable-products' + (query ? '?q=' + encodeURIComponent(query) : '');
         fetch(url, {
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
@@ -564,7 +564,7 @@
     /** Opens the item (blueprint-product) picker dropdown on an explicit user gesture. */
     function openItemPickerList() {
         itemPickerListOpen = true;
-        let list = q('[data-mb-item-picker-list]');
+        const list = q('[data-mb-item-picker-list]');
         if (list) {
             list.hidden = false;
         }
@@ -573,14 +573,14 @@
     /** Closes the item picker dropdown so it stops covering the fields beneath it. */
     function closeItemPickerList() {
         itemPickerListOpen = false;
-        let list = q('[data-mb-item-picker-list]');
+        const list = q('[data-mb-item-picker-list]');
         if (list) {
             list.hidden = true;
         }
     }
 
     function renderItemPicker() {
-        let list = q('[data-mb-item-picker-list]');
+        const list = q('[data-mb-item-picker-list]');
         if (!list) {
             return;
         }
@@ -614,7 +614,7 @@
 
     function pickProduct(li) {
         state.productKey = li.getAttribute('data-product-key');
-        let input = q('[data-mb-item-picker-input]');
+        const input = q('[data-mb-item-picker-input]');
         if (input) {
             input.value = li.getAttribute('data-name');
         }
@@ -622,9 +622,9 @@
     }
 
     function submit() {
-        let remark = q('[data-mb-remark]').value;
+        const remark = q('[data-mb-remark]').value;
         if (state.mode === 'edit') {
-            let offeredAmount = validateOfferedAmount();
+            const offeredAmount = validateOfferedAmount();
             if (offeredAmount === null) {
                 return;
             }
@@ -632,15 +632,15 @@
                 method: 'PUT',
                 url: '/materialboerse/offers/' + state.offerId + '/remark/ajax',
                 payload: {
-                    offeredAmount: offeredAmount,
-                    remark: remark,
+                    offeredAmount,
+                    remark,
                     version: Number(state.version),
                 },
                 successMessage: i18n.remarkSaved,
                 errorMessage: i18n.error,
                 conflict: i18n.conflict,
                 serialize: SERIALIZE_KEY,
-                onSuccess: function (body) {
+                onSuccess(body) {
                     notifyPeers();
                     return finish(body);
                 },
@@ -655,7 +655,7 @@
         if (!state.itemId) {
             return;
         }
-        let offeredAmount = validateOfferedAmount();
+        const offeredAmount = validateOfferedAmount();
         if (offeredAmount === null) {
             return;
         }
@@ -664,13 +664,13 @@
             url: '/materialboerse/offers/ajax',
             payload: {
                 inventoryItemId: state.itemId,
-                offeredAmount: offeredAmount,
-                remark: remark,
+                offeredAmount,
+                remark,
             },
             successMessage: i18n.released,
             errorMessage: i18n.error,
             serialize: SERIALIZE_KEY,
-            onSuccess: function (body) {
+            onSuccess(body) {
                 notifyPeers();
                 return finish(body);
             },
@@ -686,8 +686,8 @@
         if (!state.productKey) {
             return;
         }
-        let qtyInput = q('[data-mb-item-qty]');
-        let quantity = qtyInput ? parseInt(qtyInput.value, 10) : NaN;
+        const qtyInput = q('[data-mb-item-qty]');
+        const quantity = qtyInput ? parseInt(qtyInput.value, 10) : NaN;
         if (isNaN(quantity) || quantity < 1) {
             toggle('[data-mb-qty-error]', true);
             if (qtyInput) {
@@ -699,11 +699,11 @@
         window.krtFetch.write({
             method: 'POST',
             url: '/materialboerse/item-offers/ajax',
-            payload: { productKey: state.productKey, quantity: quantity, remark: remark },
+            payload: { productKey: state.productKey, quantity, remark },
             successMessage: i18n.itemReleased || i18n.released,
             errorMessage: i18n.error,
             serialize: SERIALIZE_KEY,
-            onSuccess: function (body) {
+            onSuccess(body) {
                 notifyPeers();
                 return finish(body);
             },
@@ -749,7 +749,7 @@
         if (e.target.closest('[data-mb-amount-max]')) {
             // "Alles": fill the offered amount with the item's full available stock.
             if (state.available != null) {
-                let input = q('[data-mb-amount]');
+                const input = q('[data-mb-amount]');
                 if (input) {
                     input.value = String(state.available);
                 }
@@ -766,12 +766,12 @@
             openItemPickerList();
             return;
         }
-        let li = e.target.closest('[data-mb-picker-list] .krt-combobox__option');
+        const li = e.target.closest('[data-mb-picker-list] .krt-combobox__option');
         if (li) {
             pickItem(li);
             return;
         }
-        let pli = e.target.closest('[data-mb-item-picker-list] .krt-combobox__option');
+        const pli = e.target.closest('[data-mb-item-picker-list] .krt-combobox__option');
         if (pli) {
             pickProduct(pli);
         }
@@ -817,17 +817,17 @@
     });
 
     function trapFocus(e) {
-        let focusable = modal.querySelectorAll(
+        const focusable = modal.querySelectorAll(
             'button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])',
         );
-        let visible = Array.prototype.filter.call(focusable, function (el) {
+        const visible = Array.prototype.filter.call(focusable, function (el) {
             return el.offsetParent !== null && !el.hidden;
         });
         if (!visible.length) {
             return;
         }
-        let first = visible[0];
-        let last = visible[visible.length - 1];
+        const first = visible[0];
+        const last = visible[visible.length - 1];
         if (e.shiftKey && document.activeElement === first) {
             e.preventDefault();
             last.focus();
@@ -837,5 +837,5 @@
         }
     }
 
-    window.krtMaterialRelease = { open: open, close: cancel };
+    window.krtMaterialRelease = { open, close: cancel };
 })();

@@ -13,7 +13,7 @@
  * template literal genuinely needs to mix markup with dynamic strings.
  */
 (function (root) {
-    let ENTITY = {
+    const ENTITY = {
         '&': '&amp;',
         '<': '&lt;',
         '>': '&gt;',

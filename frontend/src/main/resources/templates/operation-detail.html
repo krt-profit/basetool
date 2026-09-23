@@ -64,7 +64,7 @@
             .sum .sv { font-family: var(--font-headline); font-weight: var(--fw-bold); font-size: 1.15rem; color: var(--color-white); font-variant-numeric: tabular-nums; margin-top: 2px; }
             .sum .sv.pos { color: var(--color-success); }
             .sum .sv.neg { color: var(--color-danger-text); }
-            .sum .sv.donate { color: var(--color-dept-profit, #239E33); }
+            .sum .sv.donate { color: var(--color-dept-profit); }
             .sum .sd { font-size: 0.66rem; color: var(--color-gray-2-text); margin-top: 2px; }
 
             /* "Ergebnis je Einsatz" proportional result bars (Übersicht). */
@@ -98,25 +98,25 @@
             .payout-table td.payout-preference-cell { text-align: left; white-space: nowrap; }
             .payout-preference-badge { display: inline-block; padding: 0.18rem 0.65rem; border: 1px solid currentColor; border-radius: 999px; font-size: 0.78em; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; line-height: 1.4; }
             .payout-preference-badge--payout { color: var(--color-primary); background-color: rgba(231, 126, 35, 0.12); }
-            .payout-preference-badge--donate { color: var(--color-dept-marine, #7A5E96); background-color: rgba(122, 94, 150, 0.14); }
+            .payout-preference-badge--donate { color: var(--color-dept-marine); background-color: rgba(122, 94, 150, 0.14); }
             .payout-table th.payout-amount-col,
             .payout-table td.payout-amount-cell { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; min-width: 11em; }
             .payout-table .payout-amount-value { display: block; font-weight: 600; color: var(--color-gray-1); }
             .payout-table .payout-amount-reimbursement,
             .payout-table .payout-amount-transferfee,
             .payout-table .payout-amount-donation { display: block; font-size: 0.78em; color: var(--color-gray-2-text); font-style: italic; margin-top: 0.2rem; }
-            .payout-donation-total { margin: 1rem 0 0; text-align: right; font-family: 'Lato', sans-serif; font-weight: 700; color: var(--color-dept-profit, #239E33); }
+            .payout-donation-total { margin: 1rem 0 0; text-align: right; font-family: 'Lato', sans-serif; font-weight: 700; color: var(--color-dept-profit); }
             .payout-table th.payout-paid-col,
             .payout-table td.payout-paid-cell { text-align: center; white-space: nowrap; min-width: 9em; }
             .payout-table .payout-paid-label { display: inline-flex; align-items: center; justify-content: center; gap: 0.55rem; cursor: pointer; margin: 0; font-weight: normal; color: inherit; }
             .payout-table .payout-paid-checkbox { width: 20px; height: 20px; cursor: pointer; accent-color: var(--color-primary); flex: 0 0 auto; margin: 0; }
             .payout-table .payout-paid-status { font-size: 0.78em; color: var(--color-gray-2-text); line-height: 1.2; }
-            .payout-table .payout-paid-yes { color: var(--color-dept-profit, #239E33); font-weight: 600; }
+            .payout-table .payout-paid-yes { color: var(--color-dept-profit); font-weight: 600; }
             .payout-table .payout-paid-no { color: var(--color-gray-2-text); }
             .payout-table tbody tr:has(.payout-paid-checkbox:checked),
             .payout-table tbody tr:has(.payout-paid-yes) { background-color: rgba(35, 158, 51, 0.06); }
             .payout-table tbody tr:has(.payout-paid-checkbox:checked) td.payout-paid-cell,
-            .payout-table tbody tr:has(.payout-paid-yes) td.payout-paid-cell { box-shadow: inset 3px 0 0 var(--color-dept-profit, #239E33); }
+            .payout-table tbody tr:has(.payout-paid-yes) td.payout-paid-cell { box-shadow: inset 3px 0 0 var(--color-dept-profit); }
             @media (width <= 768px) { .payout-table th, .payout-table td { padding: 0.75rem 0.6rem; } }
 
             .footacts { display: flex; gap: 8px; justify-content: flex-end; align-items: center; flex-wrap: wrap; border-top: var(--border-hairline); padding-top: 12px; }

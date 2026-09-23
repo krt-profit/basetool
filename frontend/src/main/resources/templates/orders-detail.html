@@ -1708,6 +1708,17 @@
     const MSG_BP_COUNTING_SUCCESS = /*[[#{orders.detail.blueprintOwners.countVariants.success}]]*/ 'Z\u00e4hlweise aktualisiert.';
     const MSG_BP_COUNTING_ERROR = /*[[#{orders.detail.blueprintOwners.countVariants.error}]]*/ 'Z\u00e4hlweise konnte nicht ge\u00e4ndert werden.';
 
+    // Handover strings the page module used to spell out in German (FE-SIMP-03): the inventory-row
+    // picker of the handover modal, the downloaded protocol's file name ({0} order number, {1} date,
+    // {2} time) and the refusal to remove an order's last material line.
+    const ORDER_HANDOVER_I18N = {
+        choose: /*[[#{orders.handover.row.choose}]]*/ '-- Lagereintrag w\u00e4hlen --',
+        option: /*[[#{orders.handover.row.option}]]*/ '{0} (Qual. {1}) - {2} {3} von {4}',
+        entry: /*[[#{orders.handover.row.entry}]]*/ 'Lagereintrag',
+        remove: /*[[#{orders.handover.row.remove}]]*/ 'Entfernen',
+        reportFilename: /*[[#{orders.handover.report.filename}]]*/ '\u00dcbergabe Auftrag #{0} {1} {2}.pdf',
+        keepOneMaterial: /*[[#{error.joborder.material.lastRow}]]*/ 'Es muss mindestens ein Material im Auftrag verbleiben.'
+    };
     const MSG_HANDOVER_REPORT_ERROR = /*[[#{orders.handover.report.error}]]*/ 'Fehler beim Generieren des \u00dcbergabeprotokolls.';
     const MSG_HANDOVER_REPORT_VALIDATION_DATE = /*[[#{orders.handover.report.validation.date}]]*/ 'Bitte Datum der \u00dcbergabe ausf\u00fcllen.';
     const MSG_HANDOVER_REPORT_VALIDATION_TIME = /*[[#{orders.handover.report.validation.time}]]*/ 'Bitte Uhrzeit der \u00dcbergabe ausf\u00fcllen.';

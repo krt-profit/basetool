@@ -459,7 +459,7 @@ function orderNeedFor(orderId, materialId) {
             floor = bucket.qualityFloor;
         }
     });
-    return matched ? { outstanding: outstanding, floor: floor } : null;
+    return matched ? { outstanding, floor } : null;
 }
 
 // The item-mode sibling. Deliberately not the same function with another key: an item order's need
@@ -635,11 +635,11 @@ function syncPersonalAllocations() {
     form.addEventListener('submit', function (event) {
         event.preventDefault();
         window.krtFetch.submitForm({
-            form: form,
+            form,
             submitter: form.querySelector('button[type="submit"]'),
             toast: false,
             errorMessage: INV_ADD_MSG.failed,
-            onError: function (status, problem) {
+            onError(status, problem) {
                 let msg = INV_ADD_MSG.failed;
                 // The owner-picker branch comes first and is shared rather than re-derived: this
                 // handler returns true, so krtFetch's own handleProblem never runs and the
@@ -657,7 +657,7 @@ function syncPersonalAllocations() {
                 if (window.showFrontendErrorToast) window.showFrontendErrorToast(msg);
                 return true;
             },
-            onSuccess: function (body) {
+            onSuccess(body) {
                 // Navigate to the source listing carrying a success signal the destination's
                 // toast fragment renders — a pre-navigation toast would be torn down by the load.
                 const target = body && body.targetUrl ? body.targetUrl : '/inventory';

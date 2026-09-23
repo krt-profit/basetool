@@ -84,7 +84,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 successMessage: ANNOUNCE_MSG.saveSuccess,
                 errorMessage: ANNOUNCE_MSG.saveError,
                 conflict: ANNOUNCE_CONFLICT,
-                onSuccess: function (body) {
+                onSuccess(body) {
                     if (versionInput && body && body.version != null) {
                         versionInput.value = body.version;
                     }
@@ -109,7 +109,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 successMessage: ANNOUNCE_MSG.deleteSuccess,
                 errorMessage: ANNOUNCE_MSG.deleteError,
                 conflict: ANNOUNCE_CONFLICT,
-                onSuccess: function () {
+                onSuccess() {
                     if (updateForm) {
                         const versionInput = updateForm.querySelector('input[name="version"]');
                         const contentInput = updateForm.querySelector('textarea[name="content"]');

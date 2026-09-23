@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.CityDto;
@@ -53,7 +53,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -331,35 +330,32 @@ public class AdminUexPageController {
       headers = "X-Requested-With=XMLHttpRequest")
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Object> toggleTerminalVisibilityAjax(@PathVariable @NotNull UUID id) {
-    try {
-      TerminalDto current = backendApiClient.get("/api/v1/terminals/" + id, TerminalDto.class);
-      TerminalDto body =
-          new TerminalDto(
-              id,
-              current.name(),
-              current.nickname(),
-              current.starSystemName(),
-              current.planetName(),
-              current.cityName(),
-              current.spaceStationName(),
-              current.hasLoadingDock(),
-              current.isAutoLoad(),
-              current.hasLoadingDockOverridden(),
-              current.isAutoLoadOverridden(),
-              current.uexHasLoadingDock(),
-              current.uexIsAutoLoad(),
-              current.uexSyncedAt(),
-              !current.hidden());
-      backendApiClient.put("/api/v1/terminals/" + id, body, Void.class);
-      backendApiClient.evict(CacheDomain.TERMINAL);
-      return ResponseEntity.ok().build();
-    } catch (BackendServiceException e) {
-      log.debug("Toggle terminal visibility (ajax) failed", e);
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Toggle terminal visibility (ajax) failed", e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+    return relay(
+        log,
+        "toggle terminal visibility (ajax)",
+        () -> {
+          TerminalDto current = backendApiClient.get("/api/v1/terminals/" + id, TerminalDto.class);
+          TerminalDto body =
+              new TerminalDto(
+                  id,
+                  current.name(),
+                  current.nickname(),
+                  current.starSystemName(),
+                  current.planetName(),
+                  current.cityName(),
+                  current.spaceStationName(),
+                  current.hasLoadingDock(),
+                  current.isAutoLoad(),
+                  current.hasLoadingDockOverridden(),
+                  current.isAutoLoadOverridden(),
+                  current.uexHasLoadingDock(),
+                  current.uexIsAutoLoad(),
+                  current.uexSyncedAt(),
+                  !current.hidden());
+          backendApiClient.put("/api/v1/terminals/" + id, body, Void.class);
+          backendApiClient.evict(CacheDomain.TERMINAL);
+          return ResponseEntity.ok().build();
+        });
   }
 
   /**
@@ -376,25 +372,22 @@ public class AdminUexPageController {
    */
   private ResponseEntity<Object> dispatchOverrideAjax(
       String baseUri, String action, String setPath, String clearPath) {
-    try {
-      switch (action) {
-        case "uex" -> backendApiClient.delete(baseUri + "/" + clearPath, Void.class);
-        case "yes" ->
-            backendApiClient.patch(baseUri + "/" + setPath + "?value=true", null, Void.class);
-        case "no" ->
-            backendApiClient.patch(baseUri + "/" + setPath + "?value=false", null, Void.class);
-        default -> {
-          return ResponseEntity.badRequest().build();
-        }
-      }
-      return ResponseEntity.ok().build();
-    } catch (BackendServiceException e) {
-      log.debug("Override update (ajax) failed", e);
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Override update (ajax) failed", e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+    return relay(
+        log,
+        "override update (ajax)",
+        () -> {
+          switch (action) {
+            case "uex" -> backendApiClient.delete(baseUri + "/" + clearPath, Void.class);
+            case "yes" ->
+                backendApiClient.patch(baseUri + "/" + setPath + "?value=true", null, Void.class);
+            case "no" ->
+                backendApiClient.patch(baseUri + "/" + setPath + "?value=false", null, Void.class);
+            default -> {
+              return ResponseEntity.badRequest().build();
+            }
+          }
+          return ResponseEntity.ok().build();
+        });
   }
 
   /**

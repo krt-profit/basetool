@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LocationDto;
@@ -38,7 +38,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -228,26 +227,24 @@ public class AdminLocationsPageController {
   @PostMapping(value = "/{id}/toggle-visibility", headers = "X-Requested-With=XMLHttpRequest")
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Object> toggleLocationVisibilityAjax(@PathVariable @NotNull UUID id) {
-    try {
-      LocationDto current = backendApiClient.get("/api/v1/locations/" + id, LocationDto.class);
-      LocationDto body =
-          new LocationDto(
-              id,
-              current.name(),
-              current.description(),
-              !current.hidden(),
-              current.homeLocation(),
-              current.version());
-      backendApiClient.put("/api/v1/locations/" + id, body, Void.class);
-      backendApiClient.evict(CacheDomain.LOCATION);
-      return ResponseEntity.ok(backendApiClient.get("/api/v1/locations/" + id, LocationDto.class));
-    } catch (BackendServiceException e) {
-      log.debug("Toggle location visibility (ajax) failed", e);
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Toggle location visibility (ajax) failed", e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+    return relay(
+        log,
+        "toggle location visibility (ajax)",
+        () -> {
+          LocationDto current = backendApiClient.get("/api/v1/locations/" + id, LocationDto.class);
+          LocationDto body =
+              new LocationDto(
+                  id,
+                  current.name(),
+                  current.description(),
+                  !current.hidden(),
+                  current.homeLocation(),
+                  current.version());
+          backendApiClient.put("/api/v1/locations/" + id, body, Void.class);
+          backendApiClient.evict(CacheDomain.LOCATION);
+          return ResponseEntity.ok(
+              backendApiClient.get("/api/v1/locations/" + id, LocationDto.class));
+        });
   }
 
   /**
@@ -263,25 +260,23 @@ public class AdminLocationsPageController {
   @PostMapping(value = "/{id}/toggle-home-location", headers = "X-Requested-With=XMLHttpRequest")
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Object> toggleHomeLocationAjax(@PathVariable @NotNull UUID id) {
-    try {
-      LocationDto current = backendApiClient.get("/api/v1/locations/" + id, LocationDto.class);
-      LocationDto body =
-          new LocationDto(
-              id,
-              current.name(),
-              current.description(),
-              current.hidden(),
-              !current.homeLocation(),
-              current.version());
-      backendApiClient.put("/api/v1/locations/" + id, body, Void.class);
-      backendApiClient.evict(CacheDomain.LOCATION);
-      return ResponseEntity.ok(backendApiClient.get("/api/v1/locations/" + id, LocationDto.class));
-    } catch (BackendServiceException e) {
-      log.debug("Toggle home-location (ajax) failed", e);
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Toggle home-location (ajax) failed", e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+    return relay(
+        log,
+        "toggle home-location (ajax)",
+        () -> {
+          LocationDto current = backendApiClient.get("/api/v1/locations/" + id, LocationDto.class);
+          LocationDto body =
+              new LocationDto(
+                  id,
+                  current.name(),
+                  current.description(),
+                  current.hidden(),
+                  !current.homeLocation(),
+                  current.version());
+          backendApiClient.put("/api/v1/locations/" + id, body, Void.class);
+          backendApiClient.evict(CacheDomain.LOCATION);
+          return ResponseEntity.ok(
+              backendApiClient.get("/api/v1/locations/" + id, LocationDto.class));
+        });
   }
 }

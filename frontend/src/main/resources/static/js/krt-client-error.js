@@ -141,12 +141,12 @@
      */
     function takeToken() {
         const at = Date.now();
-        const budget = readBudget() || { tokens: BUDGET_CAPACITY, at: at };
+        const budget = readBudget() || { tokens: BUDGET_CAPACITY, at };
         const gained = Math.floor(Math.max(0, at - budget.at) / BUDGET_REFILL_MS);
         const tokens = Math.min(BUDGET_CAPACITY, budget.tokens + gained);
         const anchor = tokens >= BUDGET_CAPACITY ? at : budget.at + gained * BUDGET_REFILL_MS;
         if (tokens < 1) {
-            writeBudget({ tokens: tokens, at: anchor });
+            writeBudget({ tokens, at: anchor });
             return false;
         }
         writeBudget({ tokens: tokens - 1, at: anchor });
@@ -250,7 +250,7 @@
         try {
             const init = {
                 method: 'POST',
-                headers: headers,
+                headers,
                 credentials: 'same-origin',
                 // A dead or anonymous session answers with a 302 to the OIDC entry point.
                 // Following it cross-origin would trip the CSP `default-src 'self'` and turn this
@@ -293,7 +293,7 @@
             return;
         }
         const payload = {
-            kind: kind,
+            kind,
             message: field(message),
             source: scriptUrl(source),
             line: number(line),

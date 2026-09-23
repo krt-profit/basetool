@@ -29,9 +29,12 @@ import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.MDC;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
@@ -42,6 +45,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import reactor.core.publisher.Mono;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -65,7 +69,7 @@ import tools.jackson.databind.json.JsonMapper;
  * io.github.resilience4j.timelimiter.TimeLimiter}, which only the filter carries. Removing them
  * also makes a circuit-breaker-open on a write surface as a clean {@code 503} (the filter throws
  * {@link io.github.resilience4j.circuitbreaker.CallNotPermittedException} inside the reactive
- * chain, where {@code executePost} et al. map it) instead of escaping the AOP proxy unmapped.
+ * chain, where {@link #exchange} maps it) instead of escaping the AOP proxy unmapped.
  *
  * <p>Page controllers should call into this client and let {@link
  * de.greluc.krt.profit.basetool.frontend.exception.GlobalExceptionHandler} surface failures — do
@@ -184,7 +188,11 @@ public class BackendApiClient {
    */
   public <T> T get(
       String uriTemplate, ParameterizedTypeReference<T> responseType, Object... uriVariables) {
-    return executeGet(webClient, uriTemplate, responseType, uriVariables);
+    return exchange(
+        HttpMethod.GET,
+        uriTemplate,
+        () -> webClient.get().uri(uriTemplate, uriVariables),
+        spec -> spec.bodyToMono(responseType));
   }
 
   /** GET overload for simple (non-generic) return types. */
@@ -322,85 +330,64 @@ public class BackendApiClient {
     evictAllCatalogues();
   }
 
+  /**
+   * GET against {@code client}, decoded via a {@link ParameterizedTypeReference}; the shared body
+   * of the authenticated {@code get}/{@code getCached} overloads and the page walk.
+   *
+   * @param client the WebClient to send through (the authenticated one, or the bearer-less terms
+   *     client)
+   * @param uri the backend path, sent as-is
+   * @param responseType the decoded response type
+   * @param <T> the response body type
+   * @return the decoded response body, or {@code null} when the backend returned none
+   */
   private <T> T executeGet(
       WebClient client, String uri, ParameterizedTypeReference<T> responseType) {
-    try {
-      return client.get().uri(uri).retrieve().bodyToMono(responseType).block();
-    } catch (WebClientResponseException e) {
-      return handleWebClientException(e, "GET", uri);
-    } catch (Exception e) {
-      return handleException(e, "GET", uri);
-    }
+    return exchange(
+        HttpMethod.GET, uri, () -> client.get().uri(uri), spec -> spec.bodyToMono(responseType));
   }
 
-  private <T> T executeGet(
-      WebClient client,
-      String uriTemplate,
-      ParameterizedTypeReference<T> responseType,
-      Object... uriVariables) {
-    try {
-      return client
-          .get()
-          .uri(uriTemplate, uriVariables)
-          .retrieve()
-          .bodyToMono(responseType)
-          .block();
-    } catch (WebClientResponseException e) {
-      return handleWebClientException(e, "GET", uriTemplate);
-    } catch (Exception e) {
-      return handleException(e, "GET", uriTemplate);
-    }
-  }
-
+  /**
+   * Class-typed twin of {@link #executeGet(WebClient, String, ParameterizedTypeReference)}.
+   *
+   * @param client the WebClient to send through
+   * @param uri the backend path, sent as-is
+   * @param responseType the decoded response class
+   * @param <T> the response body type
+   * @return the decoded response body, or {@code null} when the backend returned none
+   */
   private <T> T executeGet(WebClient client, String uri, Class<T> responseType) {
-    try {
-      return client.get().uri(uri).retrieve().bodyToMono(responseType).block();
-    } catch (WebClientResponseException e) {
-      return handleWebClientException(e, "GET", uri);
-    } catch (Exception e) {
-      return handleException(e, "GET", uri);
-    }
+    return exchange(
+        HttpMethod.GET, uri, () -> client.get().uri(uri), spec -> spec.bodyToMono(responseType));
   }
 
   /**
    * POST against the authenticated backend; {@code body} may be {@code null} for empty payloads.
    */
   public <T, R> R post(String uri, T body, Class<R> responseType) {
-    return executePost(webClient, uri, body, responseType);
-  }
-
-  private <T, R> R executePost(WebClient client, String uri, T body, Class<R> responseType) {
-    try {
-      WebClient.RequestBodySpec spec = client.post().uri(uri);
-      WebClient.RequestHeadersSpec<?> headersSpec = (body != null) ? spec.bodyValue(body) : spec;
-      return headersSpec.retrieve().bodyToMono(responseType).block();
-    } catch (WebClientResponseException e) {
-      return handleWebClientException(e, "POST", uri);
-    } catch (Exception e) {
-      return handleException(e, "POST", uri);
-    }
+    return exchange(
+        HttpMethod.POST,
+        uri,
+        () -> withOptionalBody(webClient.post().uri(uri), body),
+        spec -> spec.bodyToMono(responseType));
   }
 
   /** PUT against the authenticated backend; {@code body} may be {@code null} for empty payloads. */
   public <T, R> R put(String uri, T body, Class<R> responseType) {
-    return executePut(webClient, uri, body, responseType);
-  }
-
-  private <T, R> R executePut(WebClient client, String uri, T body, Class<R> responseType) {
-    try {
-      WebClient.RequestBodySpec spec = client.put().uri(uri);
-      WebClient.RequestHeadersSpec<?> headersSpec = (body != null) ? spec.bodyValue(body) : spec;
-      return headersSpec.retrieve().bodyToMono(responseType).block();
-    } catch (WebClientResponseException e) {
-      return handleWebClientException(e, "PUT", uri);
-    } catch (Exception e) {
-      return handleException(e, "PUT", uri);
-    }
+    return exchange(
+        HttpMethod.PUT,
+        uri,
+        () -> withOptionalBody(webClient.put().uri(uri), body),
+        spec -> spec.bodyToMono(responseType));
   }
 
   /** DELETE against the authenticated backend; pass {@code Void.class} for 204 responses. */
   public <R> R delete(String uri, Class<R> responseType) {
-    return executeDelete(webClient, uri, responseType);
+    return exchange(
+        HttpMethod.DELETE,
+        uri,
+        () -> webClient.delete().uri(uri),
+        spec -> spec.bodyToMono(responseType));
   }
 
   /**
@@ -418,48 +405,71 @@ public class BackendApiClient {
    * @return the deserialized response body.
    */
   public <T, R> R delete(String uri, T body, Class<R> responseType) {
-    try {
-      return webClient
-          .method(HttpMethod.DELETE)
-          .uri(uri)
-          .bodyValue(body)
-          .retrieve()
-          .bodyToMono(responseType)
-          .block();
-    } catch (WebClientResponseException e) {
-      return handleWebClientException(e, "DELETE", uri);
-    } catch (Exception e) {
-      return handleException(e, "DELETE", uri);
-    }
-  }
-
-  private <R> R executeDelete(WebClient client, String uri, Class<R> responseType) {
-    try {
-      return client.delete().uri(uri).retrieve().bodyToMono(responseType).block();
-    } catch (WebClientResponseException e) {
-      return handleWebClientException(e, "DELETE", uri);
-    } catch (Exception e) {
-      return handleException(e, "DELETE", uri);
-    }
+    return exchange(
+        HttpMethod.DELETE,
+        uri,
+        () -> webClient.method(HttpMethod.DELETE).uri(uri).bodyValue(body),
+        spec -> spec.bodyToMono(responseType));
   }
 
   /**
    * PATCH against the authenticated backend; {@code body} may be {@code null} for empty payloads.
    */
   public <T, R> R patch(String uri, T body, Class<R> responseType) {
-    return executePatch(webClient, uri, body, responseType);
+    return exchange(
+        HttpMethod.PATCH,
+        uri,
+        () -> withOptionalBody(webClient.patch().uri(uri), body),
+        spec -> spec.bodyToMono(responseType));
   }
 
-  private <T, R> R executePatch(WebClient client, String uri, T body, Class<R> responseType) {
+  /**
+   * The single backend exchange every verb goes through: build the request, retrieve, decode, block
+   * — and map every failure the same way. A {@link WebClientResponseException} is handed to {@link
+   * #handleWebClientException} (RFC 7807 parsing, logging, the error counter); anything else —
+   * including a Resilience4j refusal the {@code WebClientConfig} filter raised inside the reactive
+   * chain, and a malformed URI template — to {@link #handleException}. Both always throw, so the
+   * method either returns the decoded body or fails with a {@link BackendServiceException} or
+   * {@link ReauthenticationRequiredException}.
+   *
+   * <p>It replaced eight per-verb copies of the same {@code try}/{@code catch} (FE-SIMP-02). The
+   * request is built <em>inside</em> the {@code try} on purpose, exactly as those copies did: a URI
+   * the WebClient cannot expand fails the same way a transport fault does rather than escaping
+   * unmapped.
+   *
+   * @param method the HTTP verb, used only as the log field and the {@code method} metric label
+   * @param uri the path or URI template, used only in log lines and exception messages
+   * @param request builds the request up to (not including) {@code retrieve()}
+   * @param decode turns the {@code retrieve()} spec into the body {@link Mono}
+   * @param <R> the response body type
+   * @return the decoded response body, or {@code null} when the backend returned none
+   */
+  private <R> R exchange(
+      @NotNull HttpMethod method,
+      @NotNull String uri,
+      @NotNull Supplier<WebClient.RequestHeadersSpec<?>> request,
+      @NotNull Function<WebClient.ResponseSpec, Mono<R>> decode) {
     try {
-      WebClient.RequestBodySpec spec = client.patch().uri(uri);
-      WebClient.RequestHeadersSpec<?> headersSpec = (body != null) ? spec.bodyValue(body) : spec;
-      return headersSpec.retrieve().bodyToMono(responseType).block();
+      return decode.apply(request.get().retrieve()).block();
     } catch (WebClientResponseException e) {
-      return handleWebClientException(e, "PATCH", uri);
+      return handleWebClientException(e, method.name(), uri);
     } catch (Exception e) {
-      return handleException(e, "PATCH", uri);
+      return handleException(e, method.name(), uri);
     }
+  }
+
+  /**
+   * Attaches {@code body} to a write request, or leaves the request body-less when it is {@code
+   * null} — the POST/PUT/PATCH "empty payload" convention.
+   *
+   * @param spec the request after {@code uri(...)}
+   * @param body the payload, or {@code null} for none
+   * @return the request ready for {@code retrieve()}
+   */
+  @NotNull
+  private static WebClient.RequestHeadersSpec<?> withOptionalBody(
+      @NotNull WebClient.RequestBodySpec spec, @Nullable Object body) {
+    return body != null ? spec.bodyValue(body) : spec;
   }
 
   private <T> T handleWebClientException(WebClientResponseException e, String method, String uri) {

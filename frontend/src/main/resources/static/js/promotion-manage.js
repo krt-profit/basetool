@@ -59,10 +59,10 @@ function pmPutEvaluation(url, payload) {
     return window.krtFetch
         .write({
             method: 'PUT',
-            url: url,
-            payload: payload,
+            url,
+            payload,
             toast: false,
-            onError: function (status) {
+            onError(status) {
                 if (status === 409) {
                     toastError(MSG_CONFLICT);
                     pmSaveQueue = [];
@@ -73,7 +73,7 @@ function pmPutEvaluation(url, payload) {
                 }
                 return true;
             },
-            onNetworkError: function () {
+            onNetworkError() {
                 toastError(MSG_ERROR);
                 return true;
             },
@@ -175,7 +175,7 @@ function pmEnqueueSave(select) {
     pmSaveQueue = pmSaveQueue.filter(function (job) {
         return job.key !== key;
     });
-    pmSaveQueue.push({ key: key, select: select });
+    pmSaveQueue.push({ key, select });
     select.classList.add('pm-pending');
     pmUpdateQueueIndicator();
     if (!pmInFlightKey) pmProcessNextSave();
@@ -207,7 +207,7 @@ function pmProcessNextSave() {
             encodeURIComponent(userId) +
             '/category/' +
             encodeURIComponent(categoryId),
-        { version: version, assignedLevel: assignedLevel },
+        { version, assignedLevel },
     )
         .then(function (data) {
             if (data) {

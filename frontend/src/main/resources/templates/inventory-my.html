@@ -74,7 +74,7 @@
             margin-top: 0.6rem;
             padding: 0.5rem 0.75rem;
             background-color: #141414;
-            border-left: 3px solid var(--color-primary, #E77E23);
+            border-left: 3px solid var(--color-primary);
             color: var(--color-gray-1);
             font-family: 'Lato', sans-serif;
             font-weight: 300;
@@ -92,7 +92,7 @@
             font-size: 0.7rem;
             letter-spacing: 0.12em;
             text-transform: uppercase;
-            color: var(--color-primary, #E77E23);
+            color: var(--color-primary);
             margin-bottom: 0.25rem;
         }
         .inventory-note-preview .inventory-note-text {
@@ -892,9 +892,18 @@
         dismissLabel: /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schlie\u00dfen',
         reloadQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?'
     };
+    // The book-out modal's strings, read by the shared inventory-common.js: the write toasts plus
+    // the terminal picker's placeholders (loading / choose / none / error / no material) and the
+    // "{0} ({1} aUEC)" price label of a terminal that buys the material.
     var bookOutI18n = {
         success: /*[[#{success.inventory.bookout}]]*/ 'Eintrag erfolgreich ausgebucht',
-        error: /*[[#{error.inventory.bookout.failed}]]*/ 'Fehler beim Ausbuchen des Eintrags'
+        error: /*[[#{error.inventory.bookout.failed}]]*/ 'Fehler beim Ausbuchen des Eintrags',
+        terminalLoading: /*[[#{inventory.bookout.terminal.loading}]]*/ '...laden...',
+        terminalChoose: /*[[#{inventory.bookout.terminal.choose}]]*/ '...w\u00e4hlen...',
+        terminalNone: /*[[#{inventory.bookout.terminal.none}]]*/ 'Keine Terminals gefunden',
+        terminalError: /*[[#{inventory.bookout.terminal.error}]]*/ 'Fehler beim Laden',
+        terminalNoMaterial: /*[[#{inventory.bookout.terminal.noMaterial}]]*/ 'Kein Material gew\u00e4hlt',
+        terminalPrice: /*[[#{inventory.bookout.terminal.price}]]*/ '{0} ({1} aUEC)'
     };
     // REQ-INV-007 personal-rebooking (Umbuchung) modal strings.
     var umbuchenI18n = {
@@ -963,6 +972,7 @@
 </script>
 <script th:src="@{/js/inventory-note-modal.js}" th:attr="nonce=${cspNonce}"></script>
 <script th:src="@{/js/inventory-herkunft.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/inventory-common.js}" th:attr="nonce=${cspNonce}"></script>
 <script th:src="@{/js/inventory-my.js}" th:attr="nonce=${cspNonce}"></script>
 <script th:src="@{/js/inventory-materialboerse.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>

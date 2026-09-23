@@ -189,7 +189,7 @@ document.addEventListener('DOMContentLoaded', function () {
             payload: { version: version == null ? null : Number(version) },
             toast: false,
             errorMessage: DISCORD_MSG.approveError,
-            onSuccess: function () {
+            onSuccess() {
                 if (window.showFrontendSuccessToast) {
                     window.showFrontendSuccessToast(DISCORD_MSG.approved);
                 }
@@ -309,7 +309,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 },
                 toast: false,
                 errorMessage: DISCORD_MSG.rejectError,
-                onSuccess: function () {
+                onSuccess() {
                     if (window.showFrontendSuccessToast) {
                         window.showFrontendSuccessToast(DISCORD_MSG.rejected);
                     }
@@ -345,12 +345,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 method: 'POST',
                 url: '/admin/discord-registrations/' + encodeURIComponent(id) + '/link',
                 payload: {
-                    targetUserId: targetUserId,
+                    targetUserId,
                     version: version == null ? null : Number(version),
                 },
                 toast: false,
                 errorMessage: DISCORD_MSG.linkError,
-                onSuccess: function () {
+                onSuccess() {
                     if (window.showFrontendSuccessToast) {
                         window.showFrontendSuccessToast(DISCORD_MSG.linked);
                     }
@@ -387,12 +387,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 method: 'POST',
                 url: '/admin/discord-registrations/' + encodeURIComponent(id) + '/merge',
                 payload: {
-                    sourceUserId: sourceUserId,
+                    sourceUserId,
                     version: version == null ? null : Number(version),
                 },
                 toast: false,
                 errorMessage: DISCORD_MSG.mergeError,
-                onSuccess: function (data) {
+                onSuccess(data) {
                     if (window.showFrontendSuccessToast) {
                         window.showFrontendSuccessToast(DISCORD_MSG.merged);
                     }
@@ -431,7 +431,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 },
                 toast: false,
                 errorMessage: DISCORD_MSG.reopenError,
-                onSuccess: function (data) {
+                onSuccess(data) {
                     if (window.showFrontendSuccessToast) {
                         window.showFrontendSuccessToast(DISCORD_MSG.reopened);
                     }

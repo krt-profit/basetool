@@ -84,7 +84,7 @@
             const query = params.toString();
             if (query) url += '?' + query;
         }
-        window.krtFetch.swap({ url: url, container: resultsContainer, history: true });
+        window.krtFetch.swap({ url, container: resultsContainer, history: true });
     };
 
     // ---------------------------------------------------------------------------
@@ -182,7 +182,7 @@
         }
         let response;
         try {
-            response = await fetch(url, { method: 'GET', headers: headers });
+            response = await fetch(url, { method: 'GET', headers });
         } catch {
             response = null;
         }
@@ -287,12 +287,12 @@
         const url = endpoint + '?before=' + encodeURIComponent(before.value);
         const successTemplate = frm.getAttribute('data-success-template') || '';
         window.krtFetch.write({
-            url: url,
+            url,
             method: 'DELETE',
             submitter: event.submitter,
             toast: false,
             errorMessage: deleteError,
-            onSuccess: function (body) {
+            onSuccess(body) {
                 const count = body && typeof body.deletedCount === 'number' ? body.deletedCount : 0;
                 if (successSlot) {
                     successSlot.textContent = successTemplate

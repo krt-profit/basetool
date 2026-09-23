@@ -41,9 +41,16 @@ components in `krt-components.css`.
 
 - [ ] No hard-coded colour/font/spacing values that duplicate an existing token.
 - [ ] New components reuse the skill's component CSS rather than re-styling from scratch.
+- [x] A token is referenced as `var(--token)`, never `var(--token, #hex)`: every token is defined
+  on `:root` in `styles.css`, so a hex fallback never applies — it only hides a token that was
+  renamed or dropped, painting the stale colour instead of failing visibly. 97 such fallbacks
+  (84 in `personal-inventory.css`) were removed on 2026-09-22 (FE-MOD-01); every one named a token
+  that resolves, so none of them changed a rendered colour.
 
-**Enforced by:** design review. The web-asset linters (`:frontend:lintCss` / `lintJs` /
-`lintHtml`) gate syntax and style only; no rule checks that a value uses a token.
+**Enforced by:** design review, plus one lint rule: `declaration-property-value-disallowed-list`
+in `frontend/.stylelintrc.json` and `.stylelintrc.templates.json` fails `:frontend:lintCss` /
+`:frontend:lintCssInline` on a hex fallback inside `var()` (2026-09-22). Otherwise the web-asset
+linters gate syntax and style only; no rule checks that a value uses a token.
 
 ### REQ-UI-002 — Brand colour & logo
 

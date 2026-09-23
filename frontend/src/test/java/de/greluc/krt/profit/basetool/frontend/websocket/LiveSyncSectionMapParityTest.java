@@ -118,9 +118,9 @@ class LiveSyncSectionMapParityTest {
     // REQ-ORDERS-034: the demand overview's `Bestand` column is the order-linked inventory, so an
     // inventory write that touches an earmarked row must poke `orders`/`demand` as well as the
     // per-order rooms it already publishes to. Without it a peer's gathering list keeps showing
-    // stock that has already been booked elsewhere.
-    for (String module :
-        new String[] {"/static/js/inventory-my.js", "/static/js/inventory-admin.js"}) {
+    // stock that has already been booked elsewhere. Both Lager pages (inventory-my.js,
+    // inventory-admin.js) publish through the module they share since FE-SIMP-03.
+    for (String module : new String[] {"/static/js/inventory-common.js"}) {
       String js = readResource(module);
       assertSendChangedKeysWhitelisted(
           js, "'orders'", LiveSyncTopicClass.ORDERS_QUEUE.allowedSections());
@@ -492,8 +492,8 @@ class LiveSyncSectionMapParityTest {
             "/static/js/materialgesuch-modal.js",
             "/static/js/inventory-materialboerse.js",
             // #1309: a stock-reducing inventory write clamps offers, so it pokes the board too.
-            "/static/js/inventory-admin.js",
-            "/static/js/inventory-my.js")) {
+            // Both Lager pages send that poke through their shared module (FE-SIMP-03).
+            "/static/js/inventory-common.js")) {
       Matcher matcher = sendChanged.matcher(readResource(module));
       while (matcher.find()) {
         callsSeen++;

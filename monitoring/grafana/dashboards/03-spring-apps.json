@@ -277,7 +277,8 @@
     {
       "id": 8,
       "type": "timeseries",
-      "title": "Tomcat Busy Threads",
+      "title": "In-flight Requests",
+      "description": "HTTP requests currently being handled, per application (http_server_requests_active_seconds_gcount, the active count of Spring MVC's http.server.requests long-task timer). Replaced 'Tomcat Busy Threads' on 2026-09-22 (FE-PERF-07): all three apps run Tomcat on virtual threads, where tomcat_threads_busy_threads is always -1 and server.tomcat.threads.* has no effect. A request parked on a slow backend call counts here, so a climb without matching throughput is requests waiting, not work.",
       "gridPos": {
         "h": 8,
         "w": 8,
@@ -290,7 +291,7 @@
       },
       "targets": [
         {
-          "expr": "tomcat_threads_busy_threads{application=~\"$application\"}",
+          "expr": "sum by (application) (http_server_requests_active_seconds_gcount{application=~\"$application\"})",
           "legendFormat": "{{application}}",
           "refId": "A",
           "datasource": {

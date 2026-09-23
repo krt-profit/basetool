@@ -19,18 +19,16 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -117,19 +115,14 @@ public class DeletionRequestProxyController {
     Object eraseHistory = request.get("eraseHistory");
     Map<String, Object> body = new LinkedHashMap<>();
     body.put("eraseHistory", Boolean.TRUE.equals(eraseHistory));
-    try {
-      Object created =
-          backendApiClient.post("/api/v1/users/me/deletion-request", body, Object.class);
-      return ResponseEntity.ok(created);
-    } catch (BackendServiceException e) {
-      log.debug("Raising an account-deletion request (ajax) failed", e);
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      // No id and no handle in the log line: the fact that THIS member asked to be erased is
-      // itself personal data, and an error log is not where it belongs.
-      log.error("Raising an account-deletion request (ajax) failed unexpectedly", e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+    return relay(
+        log,
+        "raising an account-deletion request (ajax)",
+        () -> {
+          Object created =
+              backendApiClient.post("/api/v1/users/me/deletion-request", body, Object.class);
+          return ResponseEntity.ok(created);
+        });
   }
 
   /**
@@ -141,15 +134,12 @@ public class DeletionRequestProxyController {
   @DeleteMapping(headers = "X-Requested-With=XMLHttpRequest")
   @PreAuthorize("isAuthenticated()")
   public ResponseEntity<Object> withdraw() {
-    try {
-      backendApiClient.delete("/api/v1/users/me/deletion-request", Void.class);
-      return ResponseEntity.noContent().build();
-    } catch (BackendServiceException e) {
-      log.debug("Withdrawing an account-deletion request (ajax) failed", e);
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Withdrawing an account-deletion request (ajax) failed unexpectedly", e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+    return relay(
+        log,
+        "withdrawing an account-deletion request (ajax)",
+        () -> {
+          backendApiClient.delete("/api/v1/users/me/deletion-request", Void.class);
+          return ResponseEntity.noContent().build();
+        });
   }
 }

@@ -34,7 +34,7 @@
  * synchronous script at the same end-of-body position, never with defer.
  */
 
-/* global MSG_HANDOVER_SUCCESS, MSG_HANDOVER_FAILED, MSG_HANDOVER_NOITEMS, labelPiece, labelScu, scuHintText, labelMenge, ORDER_AGE_YELLOW, ORDER_AGE_RED, MSG_UNIT_SCU, MSG_UNIT_PIECE, MSG_STATUS_SUCCESS, MSG_STATUS_ERROR, ORDER_CONFLICT, MSG_DELETE_TITLE, MSG_DELETE_MESSAGE, MSG_DELETE_CONFIRM, MSG_DELETE_CANCEL, MSG_DELETE_ERROR, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_MATERIAL_INVALID, MSG_CLAIM_TITLE_ADD, MSG_CLAIM_TITLE_EDIT, MSG_CLAIM_MAX_HINT, MSG_QUALITY_GOOD, MSG_QUALITY_NONE, MSG_CLAIM_SUCCESS, MSG_CLAIM_WITHDRAW_SUCCESS, MSG_CLAIM_ERROR, MSG_CLAIM_VALIDATION_SQUADRON, MSG_CLAIM_VALIDATION_AMOUNT, MSG_CLAIM_VALIDATION_OVERCLAIM, MSG_BP_COUNTING_SUCCESS, MSG_BP_COUNTING_ERROR, MSG_HANDOVER_REPORT_ERROR, MSG_HANDOVER_REPORT_VALIDATION_DATE, MSG_HANDOVER_REPORT_VALIDATION_TIME, MSG_HANDOVER_REPORT_VALIDATION_HANDLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, MSG_HANDOVER_REPORT_VALIDATION_AMOUNT, MSG_HANDOVER_MISSION_HERKUNFT, MSG_HANDOVER_MISSION_REST, MSG_HANDOVER_MISSION_MIN, MSG_OWNER, MSG_LOCATION, MSG_QUALITY, MSG_QUANTITY, MSG_SQUADRON, MSG_LOADING_INVENTORY, MSG_EMPTY_INVENTORY, MSG_INVENTORY_UNLINK_TOOLTIP, MSG_INVENTORY_UNLINK_SUCCESS, MSG_INVENTORY_UNLINK_ERROR, IS_LOGISTICIAN, ORDER_REQUESTING_SQUADRON_ID, I18N_ADDED, I18N_REMOVED, I18N_NOTE_SAVED, I18N_NOTE_DELETED, I18N_ADD_ERROR, I18N_REMOVE_ERROR, I18N_NOTE_ERROR, I18N_NOTE_CONFLICT, I18N_NOTE_FORBIDDEN, I18N_NOTE_FOR, showFrontendErrorToast, showFrontendSuccessToast, KRT_ORDER_LIVESYNC_UPDATES, KRT_ORDER_SECTION_REFRESH_ERROR, PRODUCTION_I18N */
+/* global MSG_HANDOVER_SUCCESS, MSG_HANDOVER_FAILED, MSG_HANDOVER_NOITEMS, labelPiece, labelScu, scuHintText, labelMenge, ORDER_AGE_YELLOW, ORDER_AGE_RED, MSG_UNIT_SCU, MSG_UNIT_PIECE, MSG_STATUS_SUCCESS, MSG_STATUS_ERROR, ORDER_CONFLICT, MSG_DELETE_TITLE, MSG_DELETE_MESSAGE, MSG_DELETE_CONFIRM, MSG_DELETE_CANCEL, MSG_DELETE_ERROR, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_MATERIAL_INVALID, MSG_CLAIM_TITLE_ADD, MSG_CLAIM_TITLE_EDIT, MSG_CLAIM_MAX_HINT, MSG_QUALITY_GOOD, MSG_QUALITY_NONE, MSG_CLAIM_SUCCESS, MSG_CLAIM_WITHDRAW_SUCCESS, MSG_CLAIM_ERROR, MSG_CLAIM_VALIDATION_SQUADRON, MSG_CLAIM_VALIDATION_AMOUNT, MSG_CLAIM_VALIDATION_OVERCLAIM, MSG_BP_COUNTING_SUCCESS, MSG_BP_COUNTING_ERROR, MSG_HANDOVER_REPORT_ERROR, MSG_HANDOVER_REPORT_VALIDATION_DATE, MSG_HANDOVER_REPORT_VALIDATION_TIME, MSG_HANDOVER_REPORT_VALIDATION_HANDLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, MSG_HANDOVER_REPORT_VALIDATION_AMOUNT, MSG_HANDOVER_MISSION_HERKUNFT, MSG_HANDOVER_MISSION_REST, MSG_HANDOVER_MISSION_MIN, MSG_OWNER, MSG_LOCATION, MSG_QUALITY, MSG_QUANTITY, MSG_SQUADRON, MSG_LOADING_INVENTORY, MSG_EMPTY_INVENTORY, MSG_INVENTORY_UNLINK_TOOLTIP, MSG_INVENTORY_UNLINK_SUCCESS, MSG_INVENTORY_UNLINK_ERROR, IS_LOGISTICIAN, ORDER_REQUESTING_SQUADRON_ID, I18N_ADDED, I18N_REMOVED, I18N_NOTE_SAVED, I18N_NOTE_DELETED, I18N_ADD_ERROR, I18N_REMOVE_ERROR, I18N_NOTE_ERROR, I18N_NOTE_CONFLICT, I18N_NOTE_FORBIDDEN, I18N_NOTE_FOR, showFrontendErrorToast, showFrontendSuccessToast, KRT_ORDER_LIVESYNC_UPDATES, KRT_ORDER_SECTION_REFRESH_ERROR, PRODUCTION_I18N, ORDER_HANDOVER_I18N */
 
 let cachedInventoryItems = [];
 let isInventoryCached = false;
@@ -79,7 +79,7 @@ const ORDER_SECTIONS = {
         return; // no-JS / no-foundation: the classic forms + the bespoke swaps below run unchanged.
     }
     const orderSeam = window.krtFetch.sectionWrite({
-        dict: function () {
+        dict() {
             return {
                 'orders.section.refresh.error':
                     typeof KRT_ORDER_SECTION_REFRESH_ERROR !== 'undefined'
@@ -89,11 +89,11 @@ const ORDER_SECTIONS = {
         },
         keys: { refreshErrorKey: 'orders.section.refresh.error' },
         sections: ORDER_SECTIONS,
-        pageUrl: function () {
+        pageUrl() {
             return window.orderId ? '/orders/' + window.orderId : null;
         },
         // Tell other users viewing THIS order that these sections changed (REQ-FE-015).
-        broadcast: function (keys) {
+        broadcast(keys) {
             if (
                 window.orderId &&
                 window.krtLiveSync &&
@@ -118,13 +118,13 @@ const ORDER_SECTIONS = {
         window.krtLiveSync.createReceiver({
             topic: 'order:' + window.orderId,
             sections: ORDER_SECTIONS,
-            refresh: function (keys) {
+            refresh(keys) {
                 if (window.krtRefreshOrderSection) {
                     window.krtRefreshOrderSection(keys, { broadcast: false });
                 }
             },
             pill: {
-                label: function () {
+                label() {
                     return typeof KRT_ORDER_LIVESYNC_UPDATES !== 'undefined'
                         ? KRT_ORDER_LIVESYNC_UPDATES
                         : undefined;
@@ -165,8 +165,8 @@ function _serializeHandoverForm() {
                       : NaN;
             if (!inventoryItemId || !(amount > 0)) return;
             items.push({
-                inventoryItemId: inventoryItemId,
-                amount: amount,
+                inventoryItemId,
+                amount,
                 missionReductions: _collectHandoverMissionReductions(row),
             });
         });
@@ -174,7 +174,7 @@ function _serializeHandoverForm() {
         handoverTime: (document.getElementById('handoverTime') || {}).value || '',
         recipientHandle: (document.getElementById('recipientHandle') || {}).value || '',
         recipientSquadron: (document.getElementById('recipientSquadron') || {}).value || '',
-        items: items,
+        items,
     };
 }
 
@@ -187,12 +187,12 @@ function _serializeItemHandoverForm() {
         const jobOrderItemId = idInput ? idInput.value : '';
         const amount = amtInput ? parseInt(amtInput.value, 10) : NaN;
         if (!jobOrderItemId || !(amount > 0)) return;
-        entries.push({ jobOrderItemId: jobOrderItemId, amount: amount });
+        entries.push({ jobOrderItemId, amount });
     });
     return {
         handoverTime: (document.getElementById('itemHandoverTime') || {}).value || '',
         recipientHandle: (document.getElementById('itemRecipientHandle') || {}).value || '',
-        entries: entries,
+        entries,
     };
 }
 
@@ -223,7 +223,7 @@ async function openHandoverModal() {
     if (!isInventoryCached) {
         try {
             const materials = document.querySelectorAll('.material-row[data-material-id]');
-            let promises = Array.from(materials).map((row) => {
+            const promises = Array.from(materials).map((row) => {
                 const orderId = row.dataset.orderId;
                 const matId = row.dataset.materialId;
                 if (orderId && matId) {
@@ -246,6 +246,20 @@ async function openHandoverModal() {
     }
 }
 
+/**
+ * Substitutes `{0}`, `{1}`, … in a localized template with the given values, in order — the
+ * bundle strings of ORDER_HANDOVER_I18N carry their placeholders MessageFormat-style.
+ *
+ * @param {string} template the localized template
+ * @param {Array<unknown>} values the values for {0}, {1}, …
+ * @returns {string} the filled-in text
+ */
+function fillPlaceholders(template, values) {
+    return values.reduce(function (text, value, i) {
+        return text.split('{' + i + '}').join(value == null ? '' : String(value));
+    }, template);
+}
+
 function addHandoverItemRow() {
     const container = document.getElementById('handover-items-container');
     const index = container.children.length;
@@ -261,19 +275,26 @@ function addHandoverItemRow() {
     row.style.padding = '1rem';
     row.style.border = '1px solid var(--color-gray-3)';
 
-    let options = '<option value="" disabled selected>-- Lagereintrag wählen --</option>';
+    let options = `<option value="" disabled selected>${escapeHtml(ORDER_HANDOVER_I18N.choose)}</option>`;
     cachedInventoryItems.forEach((inv) => {
         const isPiece = inv.material && inv.material.quantityType === 'PIECE';
         const qtyLabel = isPiece ? labelPiece : labelScu;
         const formattedAmount = isPiece ? inv.amount.toFixed(0) : inv.amount.toFixed(3);
         const matName = (inv.material && inv.material.name) || '';
         const userName = (inv.user && inv.user.effectiveName) || '';
-        options += `<option value="${escapeAttr(inv.id)}">${escapeHtml(matName)} (Qual. ${escapeHtml(inv.quality)}) - ${escapeHtml(formattedAmount)} ${escapeHtml(qtyLabel)} von ${escapeHtml(userName)}</option>`;
+        const optionLabel = fillPlaceholders(ORDER_HANDOVER_I18N.option, [
+            matName,
+            inv.quality,
+            formattedAmount,
+            qtyLabel,
+            userName,
+        ]);
+        options += `<option value="${escapeAttr(inv.id)}">${escapeHtml(optionLabel)}</option>`;
     });
 
     row.innerHTML = `
             <div>
-                <label class="form-label-sm">Lagereintrag</label>
+                <label class="form-label-sm">${escapeHtml(ORDER_HANDOVER_I18N.entry)}</label>
                 <select name="items[${escapeAttr(index)}].inventoryItemId" required class="w-full">
                     ${options}
                 </select>
@@ -283,7 +304,7 @@ function addHandoverItemRow() {
                 <input type="text" inputmode="decimal" data-scu-decimal step="0.001" name="items[${escapeAttr(index)}].amount" min="0.001" required class="w-full">
             </div>
             <div>
-                <button type="button" class="btn btn-quiet-danger btn-icon od-remove-btn" data-trigger="od-remove-handover-row" title="Entfernen" aria-label="Entfernen"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                <button type="button" class="btn btn-quiet-danger btn-icon od-remove-btn" data-trigger="od-remove-handover-row" title="${escapeAttr(ORDER_HANDOVER_I18N.remove)}" aria-label="${escapeAttr(ORDER_HANDOVER_I18N.remove)}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
             </div>
         `;
     const sel = row.querySelector('select');
@@ -536,10 +557,10 @@ document.addEventListener('DOMContentLoaded', () => {
             await krtOrderWrite({
                 method: 'POST',
                 url: '/orders/' + orderId + '/handovers',
-                payload: payload,
+                payload,
                 toast: false,
                 errorMessage: MSG_HANDOVER_FAILED,
-                onSuccess: function (order) {
+                onSuccess(order) {
                     // Patch the edit-modal @Version (the handover may auto-complete + bump it);
                     // the status select gets its fresh version from the header swap below.
                     const editVer = document.querySelector('#edit-modal input[name="version"]');
@@ -586,10 +607,10 @@ document.addEventListener('DOMContentLoaded', () => {
             await krtOrderWrite({
                 method: 'POST',
                 url: '/orders/' + orderId + '/item-handovers',
-                payload: payload,
+                payload,
                 toast: false,
                 errorMessage: MSG_HANDOVER_FAILED,
-                onSuccess: function (order) {
+                onSuccess(order) {
                     const editVer = document.querySelector('#edit-modal input[name="version"]');
                     if (editVer && order && order.version != null) editVer.value = order.version;
                     const modal = document.getElementById('item-handover-modal');
@@ -767,9 +788,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     document.getElementById('material-delete-confirm-modal').style.display = 'flex';
                     window.materialRowToDelete = row;
                 } else {
-                    showFrontendErrorToast(
-                        'Es muss mindestens ein Material im Auftrag verbleiben.',
-                    );
+                    showFrontendErrorToast(ORDER_HANDOVER_I18N.keepOneMaterial);
                 }
             }
         });
@@ -884,9 +903,9 @@ function _serializeEditForm() {
                   : NaN;
         if (!materialId || !(amount > 0)) return;
         materials.push({
-            materialId: materialId,
+            materialId,
             minQuality: qualSel && qualSel.value ? parseInt(qualSel.value, 10) : null,
-            amount: amount,
+            amount,
         });
     });
     const versionInput = document.querySelector('#edit-modal input[name="version"]');
@@ -895,7 +914,7 @@ function _serializeEditForm() {
         handle: (document.getElementById('handle') || {}).value || '',
         comment: (document.getElementById('edit-comment') || {}).value || '',
         version: versionInput ? parseInt(versionInput.value, 10) : null,
-        materials: materials,
+        materials,
     };
 }
 (function () {
@@ -922,10 +941,10 @@ function _serializeEditForm() {
         await krtOrderWrite({
             method: 'POST',
             url: updateUrl,
-            payload: payload,
+            payload,
             toast: false,
             errorMessage: MSG_UPDATE_ERROR,
-            onSuccess: function (dto) {
+            onSuccess(dto) {
                 const editVer = document.querySelector('#edit-modal input[name="version"]');
                 if (editVer && dto && dto.version != null) editVer.value = dto.version;
                 const modal = document.getElementById('edit-modal');
@@ -967,7 +986,7 @@ function _refreshMaterialsSection(orderId, broadcastOpts) {
         return Promise.resolve(false);
     return window.krtFetch.swap({
         url: '/orders/' + orderId,
-        container: container,
+        container,
         fragmentValue: mat ? 'materials' : 'aggregated',
         history: false,
         preserveScroll: true,
@@ -989,7 +1008,7 @@ function _swapOrderSection(orderId, containerId, fragmentValue, broadcastOpts) {
     return window.krtFetch.swap({
         url: '/orders/' + orderId,
         container: c,
-        fragmentValue: fragmentValue,
+        fragmentValue,
         history: false,
         preserveScroll: true,
     });
@@ -1008,7 +1027,7 @@ async function unlinkInventoryItem(btn) {
         url: '/orders/' + orderId + '/inventory/' + invId + '/unlink/ajax',
         toast: false,
         errorMessage: MSG_INVENTORY_UNLINK_ERROR,
-        onSuccess: function (data) {
+        onSuccess(data) {
             if (data && data.version != null) {
                 const sel = document.getElementById('status-select');
                 if (sel) sel.dataset.version = data.version;
@@ -1102,14 +1121,14 @@ function submitClaim() {
         method: 'POST',
         url: '/orders/' + orderId + '/claims',
         payload: {
-            materialId: materialId,
+            materialId,
             qualityRequirement: quality,
             claimingOrgUnitId: squadronId,
-            amount: amount,
+            amount,
         },
         toast: false,
         errorMessage: MSG_CLAIM_ERROR,
-        onSuccess: function () {
+        onSuccess() {
             document.getElementById('claim-modal').style.display = 'none';
             showFrontendSuccessToast(MSG_CLAIM_SUCCESS);
             _refreshMaterialsSection();
@@ -1128,7 +1147,7 @@ function withdrawClaimAction() {
         url: '/orders/' + orderId + '/claims/' + claimId + '/withdraw',
         toast: false,
         errorMessage: MSG_CLAIM_ERROR,
-        onSuccess: function () {
+        onSuccess() {
             document.getElementById('claim-modal').style.display = 'none';
             showFrontendSuccessToast(MSG_CLAIM_WITHDRAW_SUCCESS);
             _refreshMaterialsSection();
@@ -1202,12 +1221,12 @@ function _doStatusUpdate(orderId, status, selectElement) {
     krtOrderWrite({
         method: 'POST',
         url: '/orders/' + orderId + '/status',
-        payload: function () {
-            return { status: status, version: _orderVersion() };
+        payload() {
+            return { status, version: _orderVersion() };
         },
         toast: false,
         errorMessage: MSG_STATUS_ERROR,
-        onSuccess: function (data) {
+        onSuccess(data) {
             // Patch ONLY the two elements carrying the ORDER @Version — the status select (next
             // status change) and the edit-modal hidden input (next edit save). The assignee
             // edges carry their own per-edge version and must NOT be overwritten here.
@@ -1266,12 +1285,12 @@ function _toggleBlueprintCounting(checkbox) {
     krtOrderWrite({
         method: 'POST',
         url: '/orders/' + orderId + '/blueprint-variant-counting',
-        payload: function () {
+        payload() {
             return { countBlueprintsWithVariants: desired, version: _orderVersion() };
         },
         toast: false,
         errorMessage: MSG_BP_COUNTING_ERROR,
-        onSuccess: function (data) {
+        onSuccess(data) {
             if (data && data.version != null) {
                 const sel = document.getElementById('status-select');
                 if (sel) sel.dataset.version = data.version;
@@ -1311,7 +1330,11 @@ async function downloadHandoverReport(btn) {
         timeStr =
             String(d.getHours()).padStart(2, '0') + '-' + String(d.getMinutes()).padStart(2, '0');
     }
-    const filename = 'Übergabe Auftrag #' + orderNumber + ' ' + dateStr + ' ' + timeStr + '.pdf';
+    const filename = fillPlaceholders(ORDER_HANDOVER_I18N.reportFilename, [
+        orderNumber,
+        dateStr,
+        timeStr,
+    ]);
     try {
         // Forward the user's actual IANA time zone so the backend can render handover date/time
         // in the user's local time zone instead of the server's ZoneId.systemDefault().
@@ -1372,7 +1395,11 @@ async function downloadItemHandoverReport(btn) {
         timeStr =
             String(d.getHours()).padStart(2, '0') + '-' + String(d.getMinutes()).padStart(2, '0');
     }
-    const filename = 'Übergabe Auftrag #' + orderNumber + ' ' + dateStr + ' ' + timeStr + '.pdf';
+    const filename = fillPlaceholders(ORDER_HANDOVER_I18N.reportFilename, [
+        orderNumber,
+        dateStr,
+        timeStr,
+    ]);
     try {
         const userTimeZone =
             Intl && Intl.DateTimeFormat ? Intl.DateTimeFormat().resolvedOptions().timeZone : '';
@@ -1490,8 +1517,8 @@ async function previewHandoverReport(btn) {
     const payload = {
         jobOrderNumber: orderNumber,
         handoverTime: handoverTimeIso,
-        recipientHandle: recipientHandle,
-        items: items,
+        recipientHandle,
+        items,
     };
     if (!window.krtFetch) return;
     // A read-only POST (renders a PDF, stores nothing) — routed through krtFetch.write so it carries
@@ -1500,12 +1527,12 @@ async function previewHandoverReport(btn) {
     const result = await window.krtFetch.write({
         method: 'POST',
         url: '/api/v1/orders/' + encodeURIComponent(orderId) + '/handovers/report/preview',
-        payload: payload,
+        payload,
         accept: 'application/pdf, application/problem+json',
         responseType: 'blob',
         toast: false,
         errorMessage: MSG_HANDOVER_REPORT_ERROR,
-        onError: function () {
+        onError() {
             showFrontendErrorToast(MSG_HANDOVER_REPORT_ERROR);
             return true;
         },
@@ -1527,14 +1554,11 @@ async function previewHandoverReport(btn) {
         const previewOrderNumber = previewOrderNumberRaw.replace(/^#/, '');
         const previewDate = datePart;
         const previewTime = timePart ? timePart.replace(':', '-') : '';
-        a.download =
-            'Übergabe Auftrag #' +
-            previewOrderNumber +
-            ' ' +
-            previewDate +
-            ' ' +
-            previewTime +
-            '.pdf';
+        a.download = fillPlaceholders(ORDER_HANDOVER_I18N.reportFilename, [
+            previewOrderNumber,
+            previewDate,
+            previewTime,
+        ]);
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -1559,7 +1583,7 @@ async function toggleInventory(row) {
     /** @type {string} */
     let unlinkCell;
 
-    let nextRow = row.nextElementSibling;
+    const nextRow = row.nextElementSibling;
     if (nextRow && nextRow.classList.contains('inventory-details-row')) {
         nextRow.remove();
         return;
@@ -1904,7 +1928,7 @@ function openProductionModal(button) {
             return;
         }
         byMaterialId.set(materialId, {
-            materialId: materialId,
+            materialId,
             materialName: li.getAttribute('data-material-name') || '',
             quantityType: li.getAttribute('data-quantity-type') || 'SCU',
             requiredTotals: [requiredTotal],
@@ -1953,7 +1977,7 @@ function openProductionModal(button) {
                             ownerName: it.user ? it.user.effectiveName : '-',
                             location: it.location ? it.location.name : '-',
                             quality: it.quality != null ? it.quality : '-',
-                            slice: slice,
+                            slice,
                             stock: it.amount != null ? it.amount : 0,
                             version: it.version,
                         };
@@ -2174,7 +2198,7 @@ function _prodCollectBookIn() {
             orgUnitWrapper && !orgUnitWrapper.hidden && orgUnitEl && orgUnitEl.value
                 ? orgUnitEl.value
                 : null,
-        personal: personal,
+        personal,
         allocateToOrder: personal ? false : !!(allocateCb && allocateCb.checked),
     };
 }
@@ -2311,13 +2335,13 @@ function bookProduction() {
         payload: {
             amount: k,
             version: _prodContext.version ? parseInt(_prodContext.version, 10) : null,
-            consumption: consumption,
-            skippedMaterialIds: skippedMaterialIds,
-            bookIn: bookIn,
+            consumption,
+            skippedMaterialIds,
+            bookIn,
         },
         toast: false,
         errorMessage: PRODUCTION_I18N.allocError,
-        onSuccess: function () {
+        onSuccess() {
             const modal = document.getElementById('production-modal');
             if (modal) {
                 modal.classList.remove('krtm-modal-open');
@@ -2472,13 +2496,13 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         if (!window.krtFetch) return false;
         const errorMsg = opts.errorMsg || I18N_NOTE_ERROR;
         const common = {
-            method: method,
-            url: url,
+            method,
+            url,
             // The endpoints answer the re-rendered section as an HTML fragment.
             accept: 'text/html',
             toast: false,
             errorMessage: errorMsg,
-            onSuccess: function (html) {
+            onSuccess(html) {
                 const sec = document.getElementById('assignees-section');
                 if (sec && typeof html === 'string') {
                     // Same-origin Thymeleaf fragment (orders-detail :: assigneesSection).
@@ -2500,7 +2524,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
                     window.krtNotifyOrderChanged(['assignees']);
                 }
             },
-            onError: function (status, _body, response) {
+            onError(status, _body, response) {
                 if (status === 409) {
                     window.krtFetch.handleProblem(
                         response,
@@ -2532,7 +2556,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         const orderId = oaOrderId();
         if (!userId || !orderId) return;
         oaSend('POST', '/orders/' + orderId + '/assignees', {
-            form: new URLSearchParams({ userId: userId }),
+            form: new URLSearchParams({ userId }),
             successMsg: I18N_ADDED,
             errorMsg: I18N_ADD_ERROR,
         });
@@ -2572,7 +2596,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         const note = document.getElementById('assignee-note-text').value;
         const orderId = oaOrderId();
         if (!userId || !orderId) return;
-        const payload = { note: note, version: version ? parseInt(version, 10) : null };
+        const payload = { note, version: version ? parseInt(version, 10) : null };
         oaSend('PUT', '/orders/' + orderId + '/assignees/' + userId + '/note', {
             json: payload,
             successMsg: I18N_NOTE_SAVED,

@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.logging.LogSafe;
@@ -33,7 +33,6 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintRecipeDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalBlueprintUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.StringNormalization;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -377,23 +376,20 @@ public class PersonalInventoryBlueprintsPageController {
   @ResponseBody
   public ResponseEntity<Object> updateNoteAjax(
       @PathVariable @NotNull UUID id, @RequestBody PersonalBlueprintUpdateRequest request) {
-    try {
-      PersonalBlueprintDto dto =
-          backendApiClient.put(
-              "/api/v1/personal-blueprints/" + id,
-              new PersonalBlueprintUpdateRequest(
-                  request.acquiredAt(),
-                  StringNormalization.blankToNull(request.note()),
-                  request.version()),
-              PersonalBlueprintDto.class);
-      return ResponseEntity.ok(dto);
-    } catch (BackendServiceException e) {
-      log.debug("Failed to update blueprint note {} (ajax): {}", id, e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Failed to update blueprint note {} (ajax)", id, e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "update blueprint note " + id + " (ajax)",
+        () -> {
+          PersonalBlueprintDto dto =
+              backendApiClient.put(
+                  "/api/v1/personal-blueprints/" + id,
+                  new PersonalBlueprintUpdateRequest(
+                      request.acquiredAt(),
+                      StringNormalization.blankToNull(request.note()),
+                      request.version()),
+                  PersonalBlueprintDto.class);
+          return ResponseEntity.ok(dto);
+        });
   }
 
   /**
@@ -409,16 +405,13 @@ public class PersonalInventoryBlueprintsPageController {
   @PostMapping(value = "/{id}/delete", headers = "X-Requested-With=XMLHttpRequest")
   @ResponseBody
   public ResponseEntity<Object> deleteAjax(@PathVariable @NotNull UUID id) {
-    try {
-      backendApiClient.delete("/api/v1/personal-blueprints/" + id, Void.class);
-      return ResponseEntity.noContent().build();
-    } catch (BackendServiceException e) {
-      log.debug("Failed to remove blueprint {} (ajax): {}", id, e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Failed to remove blueprint {} (ajax)", id, e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "remove blueprint " + id + " (ajax)",
+        () -> {
+          backendApiClient.delete("/api/v1/personal-blueprints/" + id, Void.class);
+          return ResponseEntity.noContent().build();
+        });
   }
 
   /**
@@ -434,19 +427,16 @@ public class PersonalInventoryBlueprintsPageController {
   @PostMapping(value = "/delete-all", headers = "X-Requested-With=XMLHttpRequest")
   @ResponseBody
   public ResponseEntity<Object> deleteAllAjax() {
-    try {
-      PersonalBlueprintBulkDeleteResultDto result =
-          backendApiClient.delete(
-              "/api/v1/personal-blueprints", PersonalBlueprintBulkDeleteResultDto.class);
-      return ResponseEntity.ok(
-          result == null ? new PersonalBlueprintBulkDeleteResultDto(0) : result);
-    } catch (BackendServiceException e) {
-      log.debug("Failed to clear all owned blueprints (ajax): {}", e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Failed to clear all owned blueprints (ajax)", e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "clear all owned blueprints (ajax)",
+        () -> {
+          PersonalBlueprintBulkDeleteResultDto result =
+              backendApiClient.delete(
+                  "/api/v1/personal-blueprints", PersonalBlueprintBulkDeleteResultDto.class);
+          return ResponseEntity.ok(
+              result == null ? new PersonalBlueprintBulkDeleteResultDto(0) : result);
+        });
   }
 
   /**

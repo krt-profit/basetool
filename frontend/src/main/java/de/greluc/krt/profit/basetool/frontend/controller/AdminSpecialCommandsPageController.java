@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
@@ -44,7 +44,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -527,16 +526,13 @@ public class AdminSpecialCommandsPageController {
    * @return the mapped {@link ResponseEntity}
    */
   private ResponseEntity<Object> okOrRelay(Runnable backendCall) {
-    try {
-      backendCall.run();
-      return ResponseEntity.ok().build();
-    } catch (BackendServiceException e) {
-      log.debug("SpecialCommand write (ajax) failed", e);
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("SpecialCommand write (ajax) failed", e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+    return relay(
+        log,
+        "specialCommand write (ajax)",
+        () -> {
+          backendCall.run();
+          return ResponseEntity.ok().build();
+        });
   }
 
   /**

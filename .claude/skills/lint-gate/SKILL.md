@@ -21,7 +21,7 @@ the how-to behind that rule.
 | --- | --- | --- |
 | `:frontend:lintCss` | Stylelint | `static/css/**` — e.g. media-query *range* notation `(width <= Npx)` not `(max-width: Npx)`, modern `rgb(r g b / a%)` not `rgba(...)` |
 | `:frontend:lintCssInline` | Stylelint + postcss-html | the CSS inside Thymeleaf `<style>` blocks |
-| `:frontend:lintJs` | ESLint | `static/js/**` — `no-var` → `let`/`const`, unused caught errors `_`-prefixed, … |
+| `:frontend:lintJs` | ESLint | `static/js/**` — `no-var` → `let`/`const`, `prefer-const`, `object-shorthand` (both autofixable, since 2026-09-23), unused caught errors `_`-prefixed, raw `fetch` writes (REQ-FE-002), unescaped HTML sinks (REQ-FE-022), … |
 | `:frontend:lintProbeJs` | ESLint | the e2e probe script, extracted from its Java text block |
 | `:frontend:lintHtml` | HTMLHint | `templates/**` |
 | `:frontend:prettierCheck` | Prettier | CSS / JS / `types/**/*.d.ts` formatting |

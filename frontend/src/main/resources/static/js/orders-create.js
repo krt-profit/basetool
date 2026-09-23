@@ -133,7 +133,7 @@ async function importFromScmdb() {
     const lines = text.split('\n');
 
     let foundAny = false;
-    let unknownMaterials = [];
+    const unknownMaterials = [];
 
     // Regex für SCU (Spitzhacke): ⛏ Name — Menge SCU (oder ähnliche Trennzeichen)
     const scuRegex = /⛏\s*(.+?)\s*[—–-]\s*([\d,.]+)\s*SCU/i;
@@ -146,7 +146,7 @@ async function importFromScmdb() {
         line = line.trim();
         if (!line) continue;
 
-        let match = line.match(scuRegex) || line.match(pieceRegex);
+        const match = line.match(scuRegex) || line.match(pieceRegex);
 
         if (match) {
             const materialName = match[1].trim().toLowerCase();
@@ -472,7 +472,7 @@ function loadDerivation(row, qualities) {
             let html = `<strong class="oc-label-strong">${escapeHtml(ITEM_I18N.materialsTitle)}</strong>`;
             (d.materials || []).forEach((m, mi) => {
                 const mat = m.material || {};
-                const unit = mat.quantityType === 'PIECE' ? 'Stk' : 'SCU';
+                const unit = mat.quantityType === 'PIECE' ? MSG_UNIT_PIECE : MSG_UNIT_SCU;
                 const qty =
                     mat.quantityType === 'PIECE'
                         ? Math.round(m.requiredQuantity || 0)
@@ -609,15 +609,15 @@ function _submitOrderCreate(form, invalidMessage, failedMessage, submitter) {
         return;
     }
     window.krtFetch.submitForm({
-        form: form,
-        submitter: submitter,
+        form,
+        submitter,
         toast: false,
         errorMessage: failedMessage,
-        onError: function (status) {
+        onError(status) {
             showFrontendErrorToast(status === 400 ? invalidMessage : failedMessage);
             return true;
         },
-        onSuccess: function (body) {
+        onSuccess(body) {
             if (body && body.targetUrl) {
                 window.location.assign(body.targetUrl);
             } else {

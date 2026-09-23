@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -32,7 +32,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -154,24 +153,21 @@ public class AdminAnnouncementPageController {
     }
     Object versionValue = request.get("version");
     Long version = versionValue instanceof Number number ? number.longValue() : null;
-    try {
-      Map<String, Object> body = new HashMap<>();
-      body.put("content", content);
-      body.put("version", version);
-      backendApiClient.put("/api/v1/announcement", body, Void.class);
+    return relay(
+        log,
+        "update announcement (ajax)",
+        () -> {
+          Map<String, Object> body = new HashMap<>();
+          body.put("content", content);
+          body.put("version", version);
+          backendApiClient.put("/api/v1/announcement", body, Void.class);
 
-      Map<String, Object> updated =
-          backendApiClient.get("/api/v1/announcement/admin", STRING_OBJECT_MAP_TYPE);
-      Map<String, Object> result = new LinkedHashMap<>();
-      result.put("version", updated != null ? updated.get("version") : null);
-      return ResponseEntity.ok(result);
-    } catch (BackendServiceException e) {
-      log.debug("Update announcement (ajax) failed", e);
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Update announcement (ajax) failed", e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+          Map<String, Object> updated =
+              backendApiClient.get("/api/v1/announcement/admin", STRING_OBJECT_MAP_TYPE);
+          Map<String, Object> result = new LinkedHashMap<>();
+          result.put("version", updated != null ? updated.get("version") : null);
+          return ResponseEntity.ok(result);
+        });
   }
 
   /**
@@ -204,15 +200,12 @@ public class AdminAnnouncementPageController {
   @ResponseBody
   @PostMapping(value = "/delete", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> deleteAnnouncementAjax() {
-    try {
-      backendApiClient.delete("/api/v1/announcement", Void.class);
-      return ResponseEntity.ok().build();
-    } catch (BackendServiceException e) {
-      log.debug("Delete announcement (ajax) failed", e);
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Delete announcement (ajax) failed", e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+    return relay(
+        log,
+        "delete announcement (ajax)",
+        () -> {
+          backendApiClient.delete("/api/v1/announcement", Void.class);
+          return ResponseEntity.ok().build();
+        });
   }
 }

@@ -85,11 +85,11 @@ function apiCall(url, method, body) {
     }
     return window.krtFetch
         .write({
-            method: method,
-            url: url,
+            method,
+            url,
             payload: body || undefined,
             toast: false,
-            onError: function (status) {
+            onError(status) {
                 if (status === 409) {
                     toastError(MSG_CONFLICT);
                     paRefreshTopics();
@@ -98,7 +98,7 @@ function apiCall(url, method, body) {
                 }
                 return true;
             },
-            onNetworkError: function () {
+            onNetworkError() {
                 toastError(MSG_ERROR);
                 return true;
             },
@@ -261,7 +261,7 @@ function paReadCardBody(card, trigger) {
     const version = parseInt(btn.getAttribute('data-pa-version'), 10);
     if (!Number.isFinite(version)) return null;
     const body = {
-        version: version,
+        version,
         name: btn.getAttribute('data-pa-name'),
         description: btn.getAttribute('data-pa-description') || null,
         sortOrder: parseInt(btn.getAttribute('data-pa-sort'), 10) || 0,
@@ -361,16 +361,16 @@ function paSaveLevelContent(textarea) {
     if (lcId) {
         const body = {
             version: parseInt(lcVersion, 10) || 0,
-            categoryId: categoryId,
-            level: level,
-            description: description,
+            categoryId,
+            level,
+            description,
         };
         p = apiCall('/api/proxy/promotion/level-contents/' + lcId, 'PUT', body);
     } else {
         p = apiCall('/api/proxy/promotion/level-contents', 'POST', {
-            categoryId: categoryId,
-            level: level,
-            description: description,
+            categoryId,
+            level,
+            description,
         });
     }
     return p.then(function (data) {

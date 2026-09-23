@@ -56,7 +56,7 @@ const MISSIONS_SECTIONS = {
             // Global room: the longer coalesce window (#1125) flattens the re-fetch herd when many
             // viewers receive the same signal at once.
             coalesceMs: 1500,
-            refresh: function () {
+            refresh() {
                 loadResults(false);
             },
         });
