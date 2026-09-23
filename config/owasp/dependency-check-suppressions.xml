@@ -119,12 +119,21 @@
     CVE-2026-54285 is an OpenTelemetry-JAVASCRIPT vulnerability: W3CBaggagePropagator.extract()
     in @opentelemetry/core enforced the W3C Baggage size limits on the outbound inject() path
     only, so an oversized inbound baggage header allocated without a cap. It affects
-    opentelemetry-js before 2.8.0 and has no Java counterpart - the Java SDK's
-    W3CBaggagePropagator has enforced MAX_HEADER_LENGTH / MAX_ENTRIES on extract since it was
-    written.
+    opentelemetry-js before 2.8.0.
 
-    It lands on our io.opentelemetry Java jars (1.57.0 from the Boot 4 OpenTelemetry starter,
-    1.62.0 from the Keycloak SPI compile classpath) through the same umbrella
+    Corrected 2026-09-23: this note used to say the CVE "has no Java counterpart" because the Java
+    W3CBaggagePropagator had always capped extraction. That was wrong. The Java SDK had the same
+    gap and it has its own advisory, CVE-2026-45292 / GHSA-rcgg-9c38-7xpx (opentelemetry-api and
+    opentelemetry-extension-trace-propagators up to 1.61.0: no size or entry limit on W3C, Jaeger
+    or OT baggage extraction), fixed in 1.62.0 by opentelemetry-java PR 8380. It reached us as
+    Dependabot alert #14. The suppression below is still right, but for a narrower reason: the JS
+    CVE's version range is matched against Java jars by CPE confusion, and both jars the Java
+    advisory names resolve 1.62.0 everywhere in this build, past the Java fix. The note also had
+    the two sources swapped: the
+    Boot 4.1.1 BOM supplies 1.62.0 to backend/frontend/ingest, and it was the Keycloak SPI compile
+    classpath that carried 1.57.0 - now floored at 1.62.0 by the `opentelemetry` catalog entry.
+
+    It lands on our io.opentelemetry Java jars through the same umbrella
     cpe:2.3:a:opentelemetry:opentelemetry the semconv entries above document: the CPE aggregates
     the whole OpenTelemetry product family across languages, and 2.8.0 sorts below both of our
     version numbers, so every artifact in the family matches. 28 alerts in week 2026-W36, one per
@@ -135,7 +144,7 @@
     are constants-only, which the SDK and exporter jars here are not.
   -->
   <suppress>
-    <notes>False positive: CPE confusion. CVE-2026-54285 is an inbound-baggage size-limit gap in opentelemetry-JS (@opentelemetry/core before 2.8.0); the umbrella cpe:/a:opentelemetry:opentelemetry attributes it to every io.opentelemetry Java jar by version-number overlap. The Java W3CBaggagePropagator caps header length and entry count on extract.</notes>
+    <notes>False positive: CPE confusion. CVE-2026-54285 is an inbound-baggage size-limit gap in opentelemetry-JS (@opentelemetry/core before 2.8.0); the umbrella cpe:/a:opentelemetry:opentelemetry attributes it to every io.opentelemetry Java jar by version-number overlap. The Java SDK's own counterpart, CVE-2026-45292, is fixed in 1.62.0, which opentelemetry-api and opentelemetry-extension-trace-propagators resolve on every classpath of this build (2026-09-23).</notes>
     <packageUrl regex="true">^pkg:maven/io\.opentelemetry/opentelemetry-.*@.*$</packageUrl>
     <cve>CVE-2026-54285</cve>
   </suppress>
@@ -167,39 +176,21 @@
   -->
 
   <!--
-    CVE-2024-7254 (unbounded recursion -> StackOverflowError when parsing
-    untrusted nested groups, fixed in protobuf-java 3.25.5) is a REAL
-    protobuf-java CVE - but protobuf-java 3.25.1 exists exclusively on the
-    keycloak-spi module's compileOnly classpath, dragged in by the Keycloak
-    server artifacts (Infinispan/protostream) the SPI compiles against.
-    Verified via `dependencyInsight`: no basetool runtime classpath
-    (backend/frontend/ingest/keycloak-spi runtime) contains protobuf-java
-    in any version. At runtime the SPI runs inside the Keycloak container,
-    which supplies its own (Red Hat-patched) protobuf; upgrading the pin in
-    our build would change nothing that ships. Version-pinned to 3.25.1 so
-    a vulnerable protobuf appearing on a REAL classpath later still fails
-    the build.
-  -->
-  <suppress>
-    <notes>Build-time-only: protobuf-java 3.25.1 is a compileOnly transitive of the Keycloak server artifacts the keycloak-spi module compiles against; it is container-provided at runtime and absent from every basetool runtime classpath, so the CVE-2024-7254 parsing path never ships.</notes>
-    <packageUrl regex="true">^pkg:maven/com\.google\.protobuf/protobuf-java@3\.25\.1$</packageUrl>
-    <cve>CVE-2024-7254</cve>
-  </suppress>
+    The CVE-2024-7254 entry (protobuf-java 3.25.1, unbounded recursion on nested groups, fixed in
+    3.25.5) that stood here was deleted on 2026-09-23: the keycloak-spi module now imports a
+    protobuf 3.x BOM floor (`protobuf3` in gradle/libs.versions.toml), so its compile and test
+    classpaths resolve 3.25.9 instead of the 3.25.1 that Keycloak 26.7.4 -> Quarkus ->
+    grpc-protobuf 1.65.0 drags in. The same finding had reached GitHub as Dependabot alert #12 once
+    the dependency-submission workflow started reporting the Gradle graph. Upgraded rather than
+    suppressed, so there is nothing left to suppress.
 
-  <!--
-    plexus-utils 3.3.0 is pulled in transitively by Checkstyle 13.4.2 via
-    `org.apache.maven.doxia:doxia-core`/`doxia-module-xdoc` (Checkstyle's
-    Javadoc/site-rendering helper), which is exclusively on the
-    `checkstyleMain` configuration. It is never on the runtime classpath of
-    the deployed application. CVE-2025-67030 is a `Expand.extractFile` zip
-    slip - we do not call that method anywhere, and Checkstyle itself only
-    invokes it during local report rendering, not when scanning sources.
+    The CVE-2025-67030 entry (plexus-utils 3.3.0 via Checkstyle's doxia-core) was deleted on the
+    same day because it had stopped matching anything: Checkstyle 14 no longer depends on doxia, and
+    no configuration of any module resolves plexus-utils at all (checked with the `dependencies`
+    report of every project). The only plexus-utils left in the build is on the Gradle buildscript
+    classpaths, which this scan does not read; there it is held at 3.6.1, above that CVE's fix, by
+    the `plexusUtils` constraint in the root build script (Dependabot alert #13).
   -->
-  <suppress>
-    <notes>Build-time-only: plexus-utils 3.3.0 is a transitive dependency of Checkstyle (doxia-core). The Expand.extractFile zip slip is unreachable through Checkstyle's source-scanning path and the JAR never ships in the deployed Spring Boot fat JAR.</notes>
-    <packageUrl regex="true">^pkg:maven/org\.codehaus\.plexus/plexus-utils@3\.3\.0$</packageUrl>
-    <cve>CVE-2025-67030</cve>
-  </suppress>
 
   <!--
     CVE-2026-54399 (HTTP/1.1 message parser DoS) and CVE-2026-54428 (HTTP/2
@@ -272,34 +263,12 @@
   </suppress>
 
   <!--
-    CVE-2025-48924 is a REAL commons-lang3 bug: ClassUtils.getClass(...) recurses without a depth
-    bound, so a sufficiently long class name raises StackOverflowError. Affected: commons-lang3
-    3.0 up to (excluding) 3.18.0; fixed in 3.18.0.
-
-    It is suppressed because the only vulnerable jar in this build sits on a build-time-only
-    classpath, the same ground as the plexus-utils entry above - NOT because we chose to live with
-    it. Verified 2026-09-04 with `dependencyInsight` across every module and configuration: the
-    ONLY place commons-lang3 resolves to a pre-3.18.0 version is the `:keycloak-spi:checkstyle`
-    configuration, where 3.8.1 arrives via checkstyle 13.9.0 -> doxia-core 1.12.0 (Checkstyle's
-    Javadoc/site-rendering helper, the same path that drags in plexus-utils). Every REAL classpath
-    is already above the fix: `:backend:`, `:frontend:` and `:ingest:` compile/runtime/test all
-    resolve 3.20.0 (via springdoc -> swagger-core-jakarta, with commons-compress 1.28.0's 3.18.0
-    request upgraded into it), and `:keycloak-spi:` carries no commons-lang3 on any compile, runtime
-    or test classpath at all. The other modules' `checkstyle` configurations also land on 3.20.0 -
-    only keycloak-spi's stays at 3.8.1, because that module has no Spring Boot dependency
-    management to align it.
-
-    Nothing calls ClassUtils.getClass(...) in this repository, and Checkstyle reaches it only while
-    rendering doxia site reports, which the `checkstyleMain` source scan never does. A
-    StackOverflowError in a build-time linter is a failed build, not a shipped defect.
-
-    Version-pinned to 3.8.1 rather than the whole pre-3.18.0 range so a vulnerable commons-lang3
-    appearing on a REAL classpath later still fails the gate.
+    The CVE-2025-48924 entry (commons-lang3 3.8.1 on the `:keycloak-spi:checkstyle` configuration,
+    via checkstyle 13.9.0 -> doxia-core 1.12.0) was deleted on 2026-09-23 for the same reason as the
+    plexus-utils entry above: Checkstyle 14 no longer pulls doxia, and the `dependencies` report of
+    every project shows commons-lang3 only at 3.20.0 (above the 3.18.0 fix), never at 3.8.1. A
+    suppression that matches nothing hides nothing, but it reads as a live exposure to whoever
+    audits this file.
   -->
-  <suppress>
-    <notes>Build-time-only: commons-lang3 3.8.1 is a transitive of Checkstyle 13.9.0 (doxia-core 1.12.0) on the :keycloak-spi:checkstyle configuration only. Every basetool compile/runtime/test classpath resolves 3.20.0, above the 3.18.0 fix, and keycloak-spi carries no commons-lang3 outside checkstyle. The ClassUtils.getClass recursion is unreachable from Checkstyle's source-scanning path and the jar never ships (verified 2026-09-04).</notes>
-    <packageUrl regex="true">^pkg:maven/org\.apache\.commons/commons-lang3@3\.8\.1$</packageUrl>
-    <cve>CVE-2025-48924</cve>
-  </suppress>
 
 </suppressions>

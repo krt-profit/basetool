@@ -2,6 +2,15 @@ import com.github.gradle.node.npm.task.NpxTask
 import com.github.gradle.node.task.NodeTask
 import org.cyclonedx.Version
 
+// Security override on THIS script's buildscript classpath, where the `org.openapi.generator`
+// plugin below is loaded: openapi-generator 7.25.0 pins handlebars 4.3.1, which carries
+// CVE-2026-55760 (FileTemplateLoader path traversal, Dependabot alert #15). A constraint rather
+// than a plugin bump because 7.25.0 is the newest generator and upstream still pins 4.3.1. It
+// ships nowhere -- the generator runs at build time with the default Mustache engine and loads no
+// Handlebars template -- but the dependency-submission workflow reports every build classpath.
+// The version, the reasoning and the removal condition live on `handlebars` in the version catalog.
+buildscript { dependencies { constraints { classpath(libs.handlebars) } } }
+
 plugins {
   java
   checkstyle

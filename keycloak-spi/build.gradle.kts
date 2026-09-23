@@ -78,6 +78,12 @@ dependencies {
   // testImplementation below) adds version constraints only: nothing reaches the provider JAR, its
   // runtimeClasspath or its SBOM, and the Keycloak container keeps running its own netty.
   compileOnly(platform(libs.netty41.bom))
+  // The same kind of floor for two more Keycloak-dragged families: protobuf-java 3.25.1
+  // (CVE-2024-7254) and OpenTelemetry 1.57.0 (CVE-2026-45292). The catalog entries `protobuf3` and
+  // `opentelemetry` carry the chains and the removal conditions; like the netty floor, neither
+  // reaches the provider JAR or the Keycloak container.
+  compileOnly(platform(libs.protobuf3.bom))
+  compileOnly(platform(libs.opentelemetry.bom))
 
   // FindSecBugs: security-focused SpotBugs detectors, wired into spotbugsMain below. A build-time
   // plugin configuration only -- nothing here reaches the provider JAR or its (empty) SBOM.
@@ -109,6 +115,8 @@ dependencies {
   testImplementation(libs.keycloak.services)
   testImplementation(libs.keycloak.core)
   testImplementation(platform(libs.netty41.bom))
+  testImplementation(platform(libs.protobuf3.bom))
+  testImplementation(platform(libs.opentelemetry.bom))
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
