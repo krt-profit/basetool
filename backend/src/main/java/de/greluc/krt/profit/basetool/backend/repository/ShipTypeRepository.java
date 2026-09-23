@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.repository;
 import de.greluc.krt.profit.basetool.backend.model.ShipType;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -140,4 +141,14 @@ public interface ShipTypeRepository extends LookupTableRepository<ShipType, UUID
 
   /** Derived Spring-Data query - returns entities matching {@code HiddenFalse}. */
   Page<ShipType> findByHiddenFalse(Pageable pageable);
+
+  /**
+   * The UEX vehicle id and local id of every ship type that carries one, in one query — the item
+   * sync resolves each vehicle-bound item's ship type against the resulting map (BE-PERF-09).
+   *
+   * @return one (UEX vehicle id, ship type id) row per ship type with a UEX vehicle id
+   */
+  @Query(
+      "SELECT s.uexVehicleId AS uexId, s.id AS id FROM ShipType s WHERE s.uexVehicleId IS NOT NULL")
+  List<UexKeyRef> findUexVehicleRefs();
 }

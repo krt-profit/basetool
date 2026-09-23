@@ -23,20 +23,19 @@ import de.greluc.krt.profit.basetool.ingest.config.LoggingProperties;
 import de.greluc.krt.profit.basetool.ingest.model.dto.RefineryExtractDto;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
-import io.github.resilience4j.reactor.circuitbreaker.operator.CircuitBreakerOperator;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.BodyInserters;
-import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.client.RestClient;
 
 /**
  * Relays an ingest call to the backend's existing import endpoints under the <em>gateway's own</em>
@@ -52,8 +51,12 @@ import org.springframework.web.reactive.function.client.WebClient;
  *
  * <p>Each call runs through a Resilience4j circuit breaker (instance {@code backend}) so a backend
  * outage trips open quickly instead of piling up blocked threads. The breaker is configured to
- * ignore HTTP response errors (a 400 envelope reject is a client problem, not a backend-health
- * signal); only transport failures count toward opening it.
+ * ignore HTTP response errors ({@code RestClientResponseException} — a 400 envelope reject is a
+ * client problem, not a backend-health signal); only transport failures count toward opening it.
+ * The call is a blocking {@link RestClient} exchange decorated with {@link
+ * CircuitBreaker#executeSupplier} (ADR-0204), which acquires a permission, records the outcome and
+ * throws {@code CallNotPermittedException} while open — what the reactive operator did around the
+ * old {@code WebClient} chain.
  */
 @Slf4j
 @Service
@@ -100,28 +103,28 @@ public class BackendImportClient {
    */
   private static final Pattern ACCEPT_LANGUAGE_PATTERN = Pattern.compile("[A-Za-z0-9*,;=. _-]+");
 
-  private final WebClient backendWebClient;
+  private final RestClient backendRestClient;
   private final ServiceAccountTokenProvider serviceAccountTokenProvider;
   private final CircuitBreaker circuitBreaker;
   private final String correlationIdHeader;
   private final String correlationIdMdcKey;
 
   /**
-   * Wires the backend {@link WebClient}, resolves the {@code backend} circuit breaker from the
+   * Wires the backend {@link RestClient}, resolves the {@code backend} circuit breaker from the
    * Resilience4j registry, and captures the configured correlation-id header name so the outbound
    * relay uses the same header the gateway accepts inbound (REQ-OBS-002).
    *
-   * @param backendWebClient the backend-facing client from {@code WebClientConfig}
+   * @param backendRestClient the backend-facing client from {@code RestClientConfig}
    * @param serviceAccountTokenProvider supplies the gateway's own token for the backend hop
    * @param circuitBreakerRegistry the auto-configured Resilience4j registry
    * @param loggingProperties supplies the correlation-id header name
    */
   public BackendImportClient(
-      WebClient backendWebClient,
-      ServiceAccountTokenProvider serviceAccountTokenProvider,
-      CircuitBreakerRegistry circuitBreakerRegistry,
-      LoggingProperties loggingProperties) {
-    this.backendWebClient = backendWebClient;
+      @Qualifier("backendRestClient") @NotNull RestClient backendRestClient,
+      @NotNull ServiceAccountTokenProvider serviceAccountTokenProvider,
+      @NotNull CircuitBreakerRegistry circuitBreakerRegistry,
+      @NotNull LoggingProperties loggingProperties) {
+    this.backendRestClient = backendRestClient;
     this.serviceAccountTokenProvider = serviceAccountTokenProvider;
     this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("backend");
     this.correlationIdHeader = loggingProperties.correlationIdHeader();
@@ -154,16 +157,17 @@ public class BackendImportClient {
    */
   public @NotNull String forwardRefineryExtract(
       @NotNull String callerSub, String acceptLanguage, @NotNull RefineryExtractDto extract) {
-    return backendWebClient
-        .post()
-        .uri(REFINERY_PATH)
-        .headers(commonHeaders(callerSub, acceptLanguage))
-        .contentType(MediaType.APPLICATION_JSON)
-        .bodyValue(extract)
-        .retrieve()
-        .bodyToMono(String.class)
-        .transformDeferred(CircuitBreakerOperator.of(circuitBreaker))
-        .block();
+    Consumer<HttpHeaders> headers = commonHeaders(callerSub, acceptLanguage);
+    return circuitBreaker.executeSupplier(
+        () ->
+            backendRestClient
+                .post()
+                .uri(REFINERY_PATH)
+                .headers(headers)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(extract)
+                .retrieve()
+                .body(String.class));
   }
 
   /**
@@ -185,16 +189,17 @@ public class BackendImportClient {
         .part("file", new ByteArrayResource(blueprintJson))
         .filename("blueprints.json")
         .contentType(MediaType.APPLICATION_JSON);
-    return backendWebClient
-        .post()
-        .uri(BLUEPRINT_PREVIEW_PATH)
-        .headers(commonHeaders(callerSub, acceptLanguage))
-        .contentType(MediaType.MULTIPART_FORM_DATA)
-        .body(BodyInserters.fromMultipartData(builder.build()))
-        .retrieve()
-        .bodyToMono(String.class)
-        .transformDeferred(CircuitBreakerOperator.of(circuitBreaker))
-        .block();
+    Consumer<HttpHeaders> headers = commonHeaders(callerSub, acceptLanguage);
+    return circuitBreaker.executeSupplier(
+        () ->
+            backendRestClient
+                .post()
+                .uri(BLUEPRINT_PREVIEW_PATH)
+                .headers(headers)
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(builder.build())
+                .retrieve()
+                .body(String.class));
   }
 
   /**

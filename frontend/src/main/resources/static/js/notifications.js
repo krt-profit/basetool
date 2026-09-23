@@ -338,8 +338,8 @@
                 url: '/notifications/' + encodeURIComponent(id) + '/read',
                 toast: false,
                 errorMessage: i18n.error,
-                submitter: submitter,
-                onSuccess: function () {
+                submitter,
+                onSuccess() {
                     eachItem(id, markReadInPlace);
                 },
             })
@@ -359,8 +359,8 @@
                 url: '/notifications/' + encodeURIComponent(id),
                 successMessage: i18n.deleted,
                 errorMessage: i18n.error,
-                submitter: submitter,
-                onSuccess: function () {
+                submitter,
+                onSuccess() {
                     eachItem(id, removeItem);
                 },
             })
@@ -377,8 +377,8 @@
                 url: '/notifications/read-all',
                 successMessage: i18n.allRead,
                 errorMessage: i18n.error,
-                submitter: submitter,
-                onSuccess: function () {
+                submitter,
+                onSuccess() {
                     const nodes = document.querySelectorAll('.notification-item');
                     Array.prototype.forEach.call(nodes, markReadInPlace);
                 },
@@ -397,8 +397,8 @@
                     url: '/notifications/read',
                     successMessage: i18n.cleared,
                     errorMessage: i18n.error,
-                    submitter: submitter,
-                    onSuccess: function () {
+                    submitter,
+                    onSuccess() {
                         const nodes = document.querySelectorAll('.notification-item.is-read');
                         Array.prototype.forEach.call(nodes, removeItem);
                     },

@@ -315,7 +315,8 @@ The `board` key is also sent from **outside** the board, by every Lager write th
 offer: the Mein-Lager item-leaf "Für Börse freigeben" toggle (`inventory-materialboerse.js`) and the
 stock-reducing book-out / bulk check-out / (bulk) Umbuchen flows on Mein Lager (`inventory-my.js`)
 and the global Lager (`inventory-admin.js`), because those reductions ratchet or cascade-remove
-offers (REQ-MARKET-013, #1309).
+offers (REQ-MARKET-013, #1309). Both pages send that poke through the Lager module they share,
+`inventory-common.js` (`broadcastBoardChanged`, FE-SIMP-03).
 
 **Acceptance**
 - [ ] A release/deactivate/interest by one member refreshes the board of another member viewing it,
@@ -325,8 +326,8 @@ with no location or interessent identity crossing the socket.
 **Enforced by:** `LiveSyncSectionMapParityTest` (every `materialboard` key sent by the
 materialboerse / Lager modules is whitelisted), code review, CI Playwright (e2e) · **Code:** the
 shared `LiveSyncWebSocketHandler` + `LiveSyncTopicClass.MATERIALBOARD` + `materialboerse.js`
-receiver (`window.krtLiveSync`), `inventory-materialboerse.js`, `inventory-my.js`,
-`inventory-admin.js`
+receiver (`window.krtLiveSync`), `inventory-materialboerse.js`, `inventory-common.js` (used by
+`inventory-my.js` and `inventory-admin.js`)
 
 ### REQ-MARKET-011 — Notify the owner when a member registers interest
 

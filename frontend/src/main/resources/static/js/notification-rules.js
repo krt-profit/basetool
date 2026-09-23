@@ -55,15 +55,15 @@
         return;
     }
     wire({
-        form: form,
-        container: container,
-        template: template,
-        version: version,
-        eventType: eventType,
-        notificationType: notificationType,
-        description: description,
-        enabled: enabled,
-        excludeActor: excludeActor,
+        form,
+        container,
+        template,
+        version,
+        eventType,
+        notificationType,
+        description,
+        enabled,
+        excludeActor,
     });
 
     /**
@@ -293,7 +293,7 @@
             return Array.from(rows).map(function (row) {
                 const kind = readValue(row, 'kind');
                 /** @type {Record<string, string | null>} */
-                const selector = { kind: kind };
+                const selector = { kind };
                 // The event-derived kinds send only their kind: they read no selector field.
                 if (kind === 'ORG_RELATIVE_ROLE') {
                     selector.orgRelativeRole = readValue(row, 'orgRelativeRole');
@@ -409,8 +409,8 @@
                 payload: buildPayload(),
                 successMessage: i18n.saved,
                 errorMessage: i18n.error,
-                submitter: submitter,
-                onSuccess: function () {
+                submitter,
+                onSuccess() {
                     resetForm();
                     return refreshRules();
                 },
@@ -431,8 +431,8 @@
                     url: '/admin/notification-rules/' + encodeURIComponent(id),
                     successMessage: i18n.deleted,
                     errorMessage: i18n.error,
-                    submitter: submitter,
-                    onSuccess: function () {
+                    submitter,
+                    onSuccess() {
                         // Only the rule being edited is taken out of the form: an admin half-way
                         // through editing another rule keeps their input.
                         if (el.form.getAttribute('data-rule-id') === id) {

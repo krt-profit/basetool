@@ -89,12 +89,12 @@ function reswapMissionSection(action) {
 function missionWrite(form, successMessage, onSuccess) {
     const action = form.getAttribute('action');
     window.krtFetch.submitForm({
-        form: form,
+        form,
         submitter: form.querySelector('button[type="submit"]'),
-        successMessage: successMessage,
+        successMessage,
         errorMessage: MISSION_MSG.error,
         conflict: MISSION_CONFLICT,
-        onSuccess: function () {
+        onSuccess() {
             if (typeof onSuccess === 'function') {
                 onSuccess();
             }
@@ -435,7 +435,7 @@ function setupDragAndDrop(containerId, reorderUrl) {
                     toast: false,
                     errorMessage: MISSION_MSG.error,
                     conflict: MISSION_CONFLICT,
-                    onError: function (status) {
+                    onError(status) {
                         // A 409 gets krtFetch's conflict handling; every other failure keeps the
                         // page's own generic error toast.
                         if (status === 409) {

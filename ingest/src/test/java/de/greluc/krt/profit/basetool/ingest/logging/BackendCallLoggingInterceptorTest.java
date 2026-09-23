@@ -25,54 +25,52 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import de.greluc.krt.profit.basetool.ingest.support.LogCapture;
 import de.greluc.krt.profit.basetool.ingest.support.TestLoggingProperties;
+import java.io.IOException;
+import java.net.ConnectException;
 import java.net.URI;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.reactive.function.client.ClientRequest;
-import org.springframework.web.reactive.function.client.ClientResponse;
-import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
-import org.springframework.web.reactive.function.client.ExchangeFunction;
-import reactor.core.publisher.Mono;
+import org.springframework.http.client.ClientHttpRequestExecution;
+import org.springframework.mock.http.client.MockClientHttpRequest;
+import org.springframework.mock.http.client.MockClientHttpResponse;
 
 /**
  * Unit tests for the outbound relay access log. The levels are the contract here, not the wording:
  * REQ-OBS-001 requires a relay failure to be logged exactly once at the level its status warrants,
- * and {@code GlobalExceptionHandler} already owns that decision — so this filter must stay at
+ * and {@code GlobalExceptionHandler} already owns that decision — so this interceptor must stay at
  * INFO/DEBUG and never double the operator-facing WARN.
  */
-class WebClientLoggingFilterTest {
+class BackendCallLoggingInterceptorTest {
 
-  private static final ClientRequest REQUEST =
-      ClientRequest.create(
-              HttpMethod.POST, URI.create("https://backend:11261/api/v1/refinery-orders/import"))
-          .build();
+  private static final MockClientHttpRequest REQUEST =
+      new MockClientHttpRequest(
+          HttpMethod.POST, URI.create("https://backend:11261/api/v1/refinery-orders/import"));
 
   private static List<ILoggingEvent> exchange(
-      WebClientLoggingFilter filter, ExchangeFunction upstream) {
+      BackendCallLoggingInterceptor interceptor, ClientHttpRequestExecution upstream) {
     return LogCapture.capture(
-        WebClientLoggingFilter.class,
+        BackendCallLoggingInterceptor.class,
         Level.DEBUG,
         () -> {
-          ExchangeFilterFunction logging = filter.callLogging();
           try {
-            logging.filter(REQUEST, upstream).block();
-          } catch (RuntimeException propagated) {
-            // The filter never swallows a failure; the log line is what is under test.
+            interceptor.intercept(REQUEST, new byte[0], upstream);
+          } catch (IOException | RuntimeException propagated) {
+            // The interceptor never swallows a failure; the log line is what is under test.
           }
         });
   }
 
-  private static ExchangeFunction responding(HttpStatus status) {
-    return request -> Mono.just(ClientResponse.create(status).build());
+  private static ClientHttpRequestExecution responding(HttpStatus status) {
+    return (request, body) -> new MockClientHttpResponse(new byte[0], status);
   }
 
   @Test
   void logsOneInfoLineForASuccessfulRelay() {
     List<ILoggingEvent> events =
         exchange(
-            new WebClientLoggingFilter(TestLoggingProperties.defaults()),
+            new BackendCallLoggingInterceptor(TestLoggingProperties.defaults()),
             responding(HttpStatus.OK));
 
     assertThat(events).hasSize(1);
@@ -87,7 +85,7 @@ class WebClientLoggingFilterTest {
     // http.client.requests p95 histogram, not by crying wolf in the log.
     List<ILoggingEvent> events =
         exchange(
-            new WebClientLoggingFilter(TestLoggingProperties.withThresholds(2000L, 0L)),
+            new BackendCallLoggingInterceptor(TestLoggingProperties.withThresholds(2000L, 0L)),
             responding(HttpStatus.OK));
 
     assertThat(events).hasSize(1);
@@ -99,7 +97,7 @@ class WebClientLoggingFilterTest {
   void keepsABackend5xxAtDebugSoTheHandlerOwnsTheSingleWarn() {
     List<ILoggingEvent> events =
         exchange(
-            new WebClientLoggingFilter(TestLoggingProperties.defaults()),
+            new BackendCallLoggingInterceptor(TestLoggingProperties.defaults()),
             responding(HttpStatus.INTERNAL_SERVER_ERROR));
 
     assertThat(events).hasSize(1);
@@ -111,14 +109,15 @@ class WebClientLoggingFilterTest {
     // The message can carry the full target URL; the handler's WARN is the operator-facing line.
     List<ILoggingEvent> events =
         exchange(
-            new WebClientLoggingFilter(TestLoggingProperties.defaults()),
-            request ->
-                Mono.error(new IllegalStateException("connect failed to https://backend:11261")));
+            new BackendCallLoggingInterceptor(TestLoggingProperties.defaults()),
+            (request, body) -> {
+              throw new ConnectException("connect failed to https://backend:11261");
+            });
 
     assertThat(events).hasSize(1);
     assertThat(events.getFirst().getLevel()).isEqualTo(Level.DEBUG);
     assertThat(events.getFirst().getFormattedMessage())
-        .contains("IllegalStateException")
+        .contains("ConnectException")
         .doesNotContain("connect failed");
   }
 }

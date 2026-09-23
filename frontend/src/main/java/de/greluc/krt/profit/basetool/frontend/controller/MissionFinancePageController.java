@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
@@ -218,17 +218,14 @@ public class MissionFinancePageController {
       @PathVariable @NotNull UUID id,
       @RequestBody Map<String, Object> body,
       @AuthenticationPrincipal OidcUser principal) {
-    try {
-      body.put("missionId", id);
-      Object result = backendApiClient.post("/api/v1/finance-entries", body, Object.class);
-      return ResponseEntity.ok(result);
-    } catch (BackendServiceException e) {
-      log.debug("Add finance entry (AJAX) failed: status={}", e.getStatusCode());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("UNEXPECTED ERROR in addFinanceEntryAjax for mission {}", id, e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "add finance entry (ajax) for mission " + id,
+        () -> {
+          body.put("missionId", id);
+          Object result = backendApiClient.post("/api/v1/finance-entries", body, Object.class);
+          return ResponseEntity.ok(result);
+        });
   }
 
   /**
@@ -246,18 +243,14 @@ public class MissionFinancePageController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID entryId,
       @RequestBody Map<String, Object> body) {
-    try {
-      Object result =
-          backendApiClient.put("/api/v1/finance-entries/" + entryId, body, Object.class);
-      return ResponseEntity.ok(result);
-    } catch (BackendServiceException e) {
-      log.debug("Update finance entry (AJAX) failed: status={}", e.getStatusCode());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error(
-          "UNEXPECTED ERROR in updateFinanceEntryAjax for mission {} entry {}", id, entryId, e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "update finance entry (ajax) for mission " + id + " entry " + entryId,
+        () -> {
+          Object result =
+              backendApiClient.put("/api/v1/finance-entries/" + entryId, body, Object.class);
+          return ResponseEntity.ok(result);
+        });
   }
 
   /**
@@ -272,16 +265,12 @@ public class MissionFinancePageController {
   @ResponseBody
   public ResponseEntity<Object> deleteFinanceEntryAjax(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID entryId) {
-    try {
-      backendApiClient.delete("/api/v1/finance-entries/" + entryId, Void.class);
-      return ResponseEntity.noContent().build();
-    } catch (BackendServiceException e) {
-      log.debug("Delete finance entry (AJAX) failed: status={}", e.getStatusCode());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error(
-          "UNEXPECTED ERROR in deleteFinanceEntryAjax for mission {} entry {}", id, entryId, e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "delete finance entry (ajax) for mission " + id + " entry " + entryId,
+        () -> {
+          backendApiClient.delete("/api/v1/finance-entries/" + entryId, Void.class);
+          return ResponseEntity.noContent().build();
+        });
   }
 }

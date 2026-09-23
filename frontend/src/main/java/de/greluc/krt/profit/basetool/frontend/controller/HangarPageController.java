@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
@@ -621,26 +621,23 @@ public class HangarPageController {
     if (request == null || request.shipTypeId() == null || isBlank(request.insurance())) {
       return validationProblem();
     }
-    try {
-      backendApiClient.post(
-          "/api/v1/hangar/ships",
-          new ShipRequestDto(
-              request.name(),
-              request.shipTypeId(),
-              request.insurance(),
-              request.locationId(),
-              request.fitted(),
-              null,
-              request.owningOrgUnitId()),
-          ShipDto.class);
-      return ResponseEntity.noContent().build();
-    } catch (BackendServiceException e) {
-      log.debug("Failed to add ship (ajax): {}", e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Failed to add ship (ajax)", e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "add ship (ajax)",
+        () -> {
+          backendApiClient.post(
+              "/api/v1/hangar/ships",
+              new ShipRequestDto(
+                  request.name(),
+                  request.shipTypeId(),
+                  request.insurance(),
+                  request.locationId(),
+                  request.fitted(),
+                  null,
+                  request.owningOrgUnitId()),
+              ShipDto.class);
+          return ResponseEntity.noContent().build();
+        });
   }
 
   /**
@@ -663,26 +660,23 @@ public class HangarPageController {
     if (request == null || request.shipTypeId() == null || isBlank(request.insurance())) {
       return validationProblem();
     }
-    try {
-      backendApiClient.put(
-          "/api/v1/hangar/ships/" + id,
-          new ShipRequestDto(
-              request.name(),
-              request.shipTypeId(),
-              request.insurance(),
-              request.locationId(),
-              request.fitted(),
-              request.version(),
-              null),
-          ShipDto.class);
-      return ResponseEntity.noContent().build();
-    } catch (BackendServiceException e) {
-      log.debug("Failed to update ship (ajax): {}", e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Failed to update ship (ajax)", e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "update ship (ajax)",
+        () -> {
+          backendApiClient.put(
+              "/api/v1/hangar/ships/" + id,
+              new ShipRequestDto(
+                  request.name(),
+                  request.shipTypeId(),
+                  request.insurance(),
+                  request.locationId(),
+                  request.fitted(),
+                  request.version(),
+                  null),
+              ShipDto.class);
+          return ResponseEntity.noContent().build();
+        });
   }
 
   /**
@@ -696,16 +690,13 @@ public class HangarPageController {
   @PostMapping(value = "/{id}/delete", headers = "X-Requested-With=XMLHttpRequest")
   @ResponseBody
   public ResponseEntity<Object> deleteShipAjax(@PathVariable @NotNull UUID id) {
-    try {
-      backendApiClient.delete("/api/v1/hangar/ships/" + id, Void.class);
-      return ResponseEntity.noContent().build();
-    } catch (BackendServiceException e) {
-      log.debug("Failed to delete ship (ajax): {}", e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Failed to delete ship (ajax)", e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "delete ship (ajax)",
+        () -> {
+          backendApiClient.delete("/api/v1/hangar/ships/" + id, Void.class);
+          return ResponseEntity.noContent().build();
+        });
   }
 
   /**
@@ -725,16 +716,13 @@ public class HangarPageController {
     if (request == null || request.locationId() == null) {
       return validationProblem();
     }
-    try {
-      backendApiClient.post("/api/v1/hangar/ships/home-location", request, Void.class);
-      return ResponseEntity.noContent().build();
-    } catch (BackendServiceException e) {
-      log.debug("Failed to set home location (ajax): {}", e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Failed to set home location (ajax)", e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "set home location (ajax)",
+        () -> {
+          backendApiClient.post("/api/v1/hangar/ships/home-location", request, Void.class);
+          return ResponseEntity.noContent().build();
+        });
   }
 
   /**

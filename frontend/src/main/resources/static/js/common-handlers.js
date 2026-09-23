@@ -118,7 +118,7 @@
         // bypasses the fragment.
         return;
     }
-    let on = window.krtEvents.on;
+    const on = window.krtEvents.on;
 
     /**
      * Strict whitelist regex for same-origin path URLs. Matches a string that starts with
@@ -129,7 +129,7 @@
      * can be assigned to the corresponding {@link HTMLAnchorElement} setter, which validates
      * its argument structurally and cannot be tricked into changing the URL's scheme.
      */
-    let SAFE_PATH_REGEX = /^(\/[^/\\][^?#\s<>"'`]*)(\?[^#\s<>"'`]*)?(#[^\s<>"'`]*)?$/;
+    const SAFE_PATH_REGEX = /^(\/[^/\\][^?#\s<>"'`]*)(\?[^#\s<>"'`]*)?(#[^\s<>"'`]*)?$/;
 
     /**
      * Navigate to a same-origin path safely. Sets {@code pathname} / {@code search} /
@@ -147,9 +147,9 @@
      */
     function navigateSafe(raw) {
         if (typeof raw !== 'string') return false;
-        let match = SAFE_PATH_REGEX.exec(raw);
+        const match = SAFE_PATH_REGEX.exec(raw);
         if (!match) return false;
-        let a = document.createElement('a');
+        const a = document.createElement('a');
         a.href = window.location.origin;
         a.pathname = match[1];
         if (match[2]) a.search = match[2];
@@ -178,7 +178,7 @@
      */
     on('change', 'navigate-select', function (el) {
         if (!el.value) return;
-        let template = el.getAttribute('data-url-template');
+        const template = el.getAttribute('data-url-template');
         if (!template) return;
         navigateSafe(template.replace('{value}', encodeURIComponent(el.value)));
     });
@@ -224,9 +224,9 @@
      * leaves the {@code change} handler as the single submit trigger).
      */
     function submitFormByIdHandler(el, event) {
-        let id = el.getAttribute('data-form-id');
+        const id = el.getAttribute('data-form-id');
         if (!id) return;
-        let form = document.getElementById(id);
+        const form = document.getElementById(id);
         if (!form || typeof form.submit !== 'function') return;
         if (event && typeof event.preventDefault === 'function' && el.tagName === 'BUTTON') {
             event.preventDefault();
@@ -243,7 +243,7 @@
      */
     function filterTableHandler(el) {
         if (typeof window.filterTable !== 'function') return;
-        let tableId = el.getAttribute('data-table-id');
+        const tableId = el.getAttribute('data-table-id');
         if (!tableId) return;
         window.filterTable(tableId, el.value);
     }
@@ -258,9 +258,9 @@
      * info-boxes and "show details" reveals; the shown state is the element's own CSS display.
      */
     on('click', 'toggle-display', function (el, event) {
-        let id = el.getAttribute('data-target');
+        const id = el.getAttribute('data-target');
         if (!id) return;
-        let target = document.getElementById(id);
+        const target = document.getElementById(id);
         if (!target) return;
         event.preventDefault();
         target.classList.toggle('krtm-hidden');
@@ -274,12 +274,12 @@
      * modal convention.
      */
     on('click', 'set-display', function (el, event) {
-        let id = el.getAttribute('data-target');
+        const id = el.getAttribute('data-target');
         if (!id) return;
-        let target = document.getElementById(id);
+        const target = document.getElementById(id);
         if (!target) return;
         event.preventDefault();
-        let dv = el.getAttribute('data-display') || '';
+        const dv = el.getAttribute('data-display') || '';
         if (dv === 'none') {
             target.classList.add('krtm-hidden');
             target.classList.remove('krtm-modal-open');
@@ -307,9 +307,9 @@
      * the modal was last closed.
      */
     on('click', 'open-modal-display', function (el, event) {
-        let id = el.getAttribute('data-modal-id');
+        const id = el.getAttribute('data-modal-id');
         if (!id) return;
-        let modal = document.getElementById(id);
+        const modal = document.getElementById(id);
         if (!modal) return;
         event.preventDefault();
         modal.style.removeProperty('display');
@@ -332,9 +332,9 @@
      * inline property lets {@code krtm-hidden} take effect regardless of how the modal was opened.
      */
     on('click', 'close-modal-display', function (el, event) {
-        let id = el.getAttribute('data-modal-id');
+        const id = el.getAttribute('data-modal-id');
         if (!id) return;
-        let modal = document.getElementById(id);
+        const modal = document.getElementById(id);
         if (!modal) return;
         event.preventDefault();
         modal.style.removeProperty('display');

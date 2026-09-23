@@ -173,6 +173,8 @@ declare const MSG_ERROR_PAYOUT_UPDATE: string;
 /** Injected by the page bootstrap (declared in mission-detail.html). */
 declare const MSG_ERROR_USER_REQUIRED: string;
 /** Injected by the page bootstrap (declared in mission-detail.html). */
+declare const MSG_ERROR_MISSION_ID_MISSING: string;
+/** Injected by the page bootstrap (declared in mission-detail.html). */
 declare const missionId: string | null;
 // --- consumed by: operation-detail.js
 /** Injected by the page bootstrap (declared in operation-detail.html). */
@@ -295,6 +297,8 @@ declare const MSG_HANDOVER_MISSION_REST: string;
 declare const MSG_HANDOVER_NOITEMS: string;
 /** Injected by the page bootstrap (declared in orders-detail.html). */
 declare const MSG_HANDOVER_REPORT_ERROR: string;
+/** Injected by the page bootstrap (declared in orders-detail.html). */
+declare const ORDER_HANDOVER_I18N: KrtI18nDict;
 /** Injected by the page bootstrap (declared in orders-detail.html). */
 declare const MSG_HANDOVER_REPORT_VALIDATION_AMOUNT: string;
 /** Injected by the page bootstrap (declared in orders-detail.html). */

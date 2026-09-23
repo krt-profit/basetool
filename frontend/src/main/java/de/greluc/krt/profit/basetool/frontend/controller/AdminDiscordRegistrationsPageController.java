@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ApproveRegistrationRequest;
@@ -38,7 +38,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -148,17 +147,14 @@ public class AdminDiscordRegistrationsPageController {
   public ResponseEntity<Object> approveAjax(
       @PathVariable @NotNull UUID id,
       @Nullable @RequestBody(required = false) ApproveRegistrationRequest body) {
-    try {
-      return ResponseEntity.ok(
-          backendApiClient.post(
-              BACKEND_BASE + "/" + id + "/approve", body, PendingRegistrationDto.class));
-    } catch (BackendServiceException e) {
-      log.debug("Approve registration {} failed", id, e);
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Approve registration {} failed", id, e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+    return relay(
+        log,
+        "approve registration " + id,
+        () -> {
+          return ResponseEntity.ok(
+              backendApiClient.post(
+                  BACKEND_BASE + "/" + id + "/approve", body, PendingRegistrationDto.class));
+        });
   }
 
   /**
@@ -173,17 +169,14 @@ public class AdminDiscordRegistrationsPageController {
   public ResponseEntity<Object> rejectAjax(
       @PathVariable @NotNull UUID id,
       @Nullable @RequestBody(required = false) RejectRegistrationRequest body) {
-    try {
-      return ResponseEntity.ok(
-          backendApiClient.post(
-              BACKEND_BASE + "/" + id + "/reject", body, PendingRegistrationDto.class));
-    } catch (BackendServiceException e) {
-      log.debug("Reject registration {} failed", id, e);
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Reject registration {} failed", id, e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+    return relay(
+        log,
+        "reject registration " + id,
+        () -> {
+          return ResponseEntity.ok(
+              backendApiClient.post(
+                  BACKEND_BASE + "/" + id + "/reject", body, PendingRegistrationDto.class));
+        });
   }
 
   /**
@@ -200,17 +193,14 @@ public class AdminDiscordRegistrationsPageController {
   public ResponseEntity<Object> reopenAjax(
       @PathVariable @NotNull UUID id,
       @Nullable @RequestBody(required = false) ReopenRegistrationRequest body) {
-    try {
-      return ResponseEntity.ok(
-          backendApiClient.post(
-              BACKEND_BASE + "/" + id + "/reopen", body, PendingRegistrationDto.class));
-    } catch (BackendServiceException e) {
-      log.debug("Reopen registration {} failed", id, e);
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Reopen registration {} failed", id, e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+    return relay(
+        log,
+        "reopen registration " + id,
+        () -> {
+          return ResponseEntity.ok(
+              backendApiClient.post(
+                  BACKEND_BASE + "/" + id + "/reopen", body, PendingRegistrationDto.class));
+        });
   }
 
   /**
@@ -230,17 +220,14 @@ public class AdminDiscordRegistrationsPageController {
   public ResponseEntity<Object> mergeAjax(
       @PathVariable @NotNull UUID id,
       @Nullable @RequestBody(required = false) MergeAccountRequest body) {
-    try {
-      return ResponseEntity.ok(
-          backendApiClient.post(
-              BACKEND_BASE + "/" + id + "/merge", body, PendingRegistrationDto.class));
-    } catch (BackendServiceException e) {
-      log.debug("Merge into registration {} failed", id, e);
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Merge into registration {} failed", id, e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+    return relay(
+        log,
+        "merge into registration " + id,
+        () -> {
+          return ResponseEntity.ok(
+              backendApiClient.post(
+                  BACKEND_BASE + "/" + id + "/merge", body, PendingRegistrationDto.class));
+        });
   }
 
   /**
@@ -257,16 +244,13 @@ public class AdminDiscordRegistrationsPageController {
   public ResponseEntity<Object> linkAjax(
       @PathVariable @NotNull UUID id,
       @Nullable @RequestBody(required = false) LinkRegistrationRequest body) {
-    try {
-      return ResponseEntity.ok(
-          backendApiClient.post(
-              BACKEND_BASE + "/" + id + "/link", body, PendingRegistrationDto.class));
-    } catch (BackendServiceException e) {
-      log.debug("Link registration {} failed", id, e);
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Link registration {} failed", id, e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+    return relay(
+        log,
+        "link registration " + id,
+        () -> {
+          return ResponseEntity.ok(
+              backendApiClient.post(
+                  BACKEND_BASE + "/" + id + "/link", body, PendingRegistrationDto.class));
+        });
   }
 }

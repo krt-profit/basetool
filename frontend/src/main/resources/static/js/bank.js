@@ -217,10 +217,10 @@
                 }
                 done[cfg.container] = true;
                 window.krtFetch.swap({
-                    url: url,
+                    url,
                     container: cfg.container,
                     fragmentValue: cfg.fragmentValue,
-                    errorMessage: errorMessage,
+                    errorMessage,
                 });
             });
         };
@@ -692,13 +692,13 @@
         // toast), and onNetworkError reproduces the old null-response inline _global error.
         const submitButton = form.querySelector('button[type="submit"]');
         await window.krtFetch.write({
-            method: method,
+            method,
             url: endpoint,
             payload: method !== 'GET' && method !== 'DELETE' ? body : undefined,
             submitter: submitButton,
             toast: false,
             errorMessage: genericError(),
-            onSuccess: function (payload) {
+            onSuccess(payload) {
                 handleBankSuccess(form);
                 // REQ-BANK-047/ADR-0109: an over-ceiling KRT withdrawal/transfer is not booked but
                 // filed as an approval request; the outcome body then carries `pendingRequest`
@@ -709,7 +709,7 @@
                     }
                 }
             },
-            onError: function (status, payload) {
+            onError(status, payload) {
                 // A backend body flag (not the header-based 401 that krtFetch redirects on) telling
                 // us the OAuth2 session is gone: reload so the browser re-runs the login flow.
                 if (payload && payload.unauthenticated) {
@@ -734,7 +734,7 @@
                 showError(form, field, message);
                 return true;
             },
-            onNetworkError: function () {
+            onNetworkError() {
                 showError(form, '_global', genericError());
                 return true;
             },
@@ -892,7 +892,7 @@
         });
         window.krtFetch
             .swap({
-                url: url,
+                url,
                 container: spec.container,
                 fragmentValue: form.getAttribute('data-refresh'),
                 errorMessage: refreshError || genericError(),
@@ -1319,7 +1319,7 @@
                 row.getAttribute('data-user-id') +
                 ':' +
                 row.getAttribute('data-account-id'),
-            payload: function () {
+            payload() {
                 const p = {
                     canDeposit: row.getAttribute('data-can-deposit') === 'true',
                     canWithdraw: row.getAttribute('data-can-withdraw') === 'true',
@@ -1332,7 +1332,7 @@
             submitter: flagButton,
             toast: false,
             errorMessage: genericError(),
-            onSuccess: function (payload) {
+            onSuccess(payload) {
                 applyGrantFlagResult(flagButton, row, flag, newValue, payload);
                 // The grants matrix changed for every other viewer (REQ-FE-015). This isolated
                 // DOM-patch write does not go through handleBankSuccess, so broadcast here.
@@ -1340,14 +1340,14 @@
                     window.krtLiveSync.sendChanged('bank', ['grants']);
                 }
             },
-            onError: function (status, payload) {
+            onError(status, payload) {
                 const message = payload && payload.message ? payload.message : genericError();
                 if (typeof window.showFrontendErrorToast === 'function') {
                     window.showFrontendErrorToast(message);
                 }
                 return true;
             },
-            onNetworkError: function () {
+            onNetworkError() {
                 if (typeof window.showFrontendErrorToast === 'function') {
                     window.showFrontendErrorToast(genericError());
                 }
@@ -1908,7 +1908,7 @@
         }
         let response;
         try {
-            response = await fetch(url, { method: 'GET', headers: headers });
+            response = await fetch(url, { method: 'GET', headers });
         } catch {
             response = null;
         }
@@ -1989,10 +1989,10 @@
         window.krtFetch
             .write({
                 method: 'POST',
-                url: url,
+                url,
                 toast: false,
                 errorMessage: form.getAttribute('data-wipe-error') || genericError(),
-                onSuccess: function (body) {
+                onSuccess(body) {
                     const accountsReset =
                         body && body.accountsReset != null ? body.accountsReset : 0;
                     const zeroed =
@@ -2488,7 +2488,7 @@
 
     function writeSaved(layout) {
         try {
-            localStorage.setItem(storageKey(), JSON.stringify({ layout: layout }));
+            localStorage.setItem(storageKey(), JSON.stringify({ layout }));
         } catch {
             /* localStorage unavailable (private mode): the choice simply will not persist. */
         }
@@ -2697,7 +2697,7 @@
         const view =
             (params.get('view') || '').toLowerCase() === 'employee' ? 'employee' : 'account';
         return {
-            view: view,
+            view,
             accountId: view === 'account' ? params.get('accountId') : null,
             userId: view === 'employee' ? params.get('userId') : null,
         };
@@ -2744,7 +2744,7 @@
         }
         const view = select.getAttribute('data-view') === 'employee' ? 'employee' : 'account';
         writeSaved({
-            view: view,
+            view,
             accountId: view === 'account' && select.value ? select.value : null,
             userId: view === 'employee' && select.value ? select.value : null,
         });
@@ -2805,7 +2805,7 @@
 
     function writeSaved(range) {
         try {
-            localStorage.setItem(storageKey(), JSON.stringify({ range: range }));
+            localStorage.setItem(storageKey(), JSON.stringify({ range }));
         } catch {
             /* localStorage unavailable (private mode): the choice simply will not persist. */
         }

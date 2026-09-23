@@ -153,11 +153,11 @@ document.addEventListener('DOMContentLoaded', function () {
         window.krtFetch.write({
             method: 'POST',
             url: form.getAttribute('action'),
-            payload: { name: name },
+            payload: { name },
             successMessage: CAT_MSG.createSuccess,
             errorMessage: CAT_MSG.createError,
             conflict: CAT_CONFLICT,
-            onSuccess: function (created) {
+            onSuccess(created) {
                 if (!created || created.id == null) {
                     return;
                 }
@@ -202,7 +202,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     successMessage: CAT_MSG.deleteSuccess,
                     errorMessage: CAT_MSG.deleteError,
                     conflict: CAT_CONFLICT,
-                    onSuccess: function () {
+                    onSuccess() {
                         removeCategoryOption(categoryId);
                         const row = form.closest('tr');
                         const tbody = row ? row.parentElement : null;
@@ -261,7 +261,7 @@ function updateMaterial(selectElement) {
     // of a second control reads the version the first edit synced back instead of a stale one.
     function buildRequestBody() {
         const requestBody = {
-            updateType: updateType,
+            updateType,
             version: parseInt(tr.getAttribute('data-version'), 10),
         };
         if (updateType === 'QUANTITY_TYPE') {
@@ -345,7 +345,7 @@ function submitCreateMaterial(btn) {
         return;
     }
     const payload = {
-        name: name,
+        name,
         type: document.getElementById('cm-type').value,
         quantityType: document.getElementById('cm-quantity-type').value,
         description: document.getElementById('cm-description').value || null,
@@ -364,13 +364,13 @@ function submitCreateMaterial(btn) {
     window.krtFetch.write({
         method: 'POST',
         url: '/admin/materials/ajax',
-        payload: payload,
+        payload,
         // Double-submit guard: the button stays disabled for the whole round-trip.
         submitter: btn || null,
         successMessage: MSG_CREATE_SUCCESS,
         errorMessage: MSG_CREATE_ERROR,
         conflict: CAT_CONFLICT,
-        onSuccess: function () {
+        onSuccess() {
             closeCreateMaterialModal();
             // Re-render the table in place so the new row (with its "Manuell" badge) appears
             // without a page reload (REQ-FE-001).

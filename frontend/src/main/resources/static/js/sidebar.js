@@ -117,10 +117,15 @@ document.addEventListener('DOMContentLoaded', function () {
         document.body.classList.add('admin-mode');
         const navEl = document.querySelector('header > nav');
         if (navEl && !document.querySelector('.admin-mode-chip')) {
+            // Both labels come from the bundle via the sidebar fragment's data attributes.
+            const labels = document.getElementById('sidebar');
             const chip = document.createElement('span');
             chip.className = 'admin-mode-chip';
-            chip.setAttribute('aria-label', 'Administration');
-            chip.textContent = 'ADMIN';
+            chip.setAttribute(
+                'aria-label',
+                (labels && labels.getAttribute('data-admin-mode-label')) || '',
+            );
+            chip.textContent = (labels && labels.getAttribute('data-admin-mode-chip')) || '';
             navEl.appendChild(chip);
         }
     }

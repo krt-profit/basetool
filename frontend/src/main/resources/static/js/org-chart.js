@@ -123,7 +123,7 @@ const ORG_CHART_UNITS_SECTION = 'units';
             coalesceMs: 1500,
             // No keepScroll argument: the peer-driven path has no modal-close reflow to guard
             // against, so refreshChart reads the live scrollLeft itself.
-            refresh: function () {
+            refresh() {
                 refreshChart();
             },
             // Keeps the tree — and every data-version in it — from being swapped out from
@@ -131,7 +131,7 @@ const ORG_CHART_UNITS_SECTION = 'units';
             // version. The dialog is a `.krt-modal-overlay` now, so krtLiveSync's generic
             // "any modal open" probe covers this too; the explicit test stays because this
             // module owns the guarantee rather than inheriting it.
-            busyTest: function () {
+            busyTest() {
                 return !!modal && window.getComputedStyle(modal).display !== 'none';
             },
         });
@@ -277,12 +277,12 @@ const ORG_CHART_UNITS_SECTION = 'units';
         // refresh-and-retry and the re-auth redirect. The success toast and the error handling stay
         // this page's own, so the success path runs in onSuccess with toast:false.
         window.krtFetch.write({
-            method: method,
-            url: url,
+            method,
+            url,
             payload: body === null ? undefined : body,
             toast: false,
             errorMessage: OC_I18N.genericError,
-            onSuccess: function () {
+            onSuccess() {
                 window.showFrontendSuccessToast(OC_I18N.saved);
                 // Capture the horizontal scroll BEFORE closeModal(): closeModal() returns focus to
                 // the trigger and clears `inert` on <main>, whose reflow can reset chart.scrollLeft
@@ -297,7 +297,7 @@ const ORG_CHART_UNITS_SECTION = 'units';
                 // #1235: and tell every peer viewing the Organigramm or the admin editor.
                 broadcastOrgStructureChanged();
             },
-            onError: function (_status, data) {
+            onError(_status, data) {
                 if (data && data.code === 'OPTIMISTIC_LOCK') {
                     // The version the modal carried is stale; close it and re-render so the user
                     // retries against the freshly-stamped chart instead of re-409ing — in place,
@@ -323,7 +323,7 @@ const ORG_CHART_UNITS_SECTION = 'units';
         if (mode === 'rename') {
             send('PUT', '/org-chart/positions/' + positionId + '/ajax', {
                 name: field('oc-name'),
-                version: version,
+                version,
             });
             return;
         }
@@ -356,8 +356,8 @@ const ORG_CHART_UNITS_SECTION = 'units';
                 return;
             }
             send('PUT', '/org-chart/positions/' + positionId + '/ajax', {
-                displayName: displayName,
-                version: version,
+                displayName,
+                version,
             });
             return;
         }
@@ -370,7 +370,7 @@ const ORG_CHART_UNITS_SECTION = 'units';
             window.showFrontendErrorToast(OC_I18N.displayNameRequired);
             return;
         }
-        const body = { positionType: positionType };
+        const body = { positionType };
         // An empty name on an optional (COMMAND_LEAD) holder stays a leaderless Kommando.
         if (displayName) {
             body.displayName = displayName;

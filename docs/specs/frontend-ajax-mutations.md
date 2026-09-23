@@ -501,8 +501,8 @@ structure.
 The **admin materials** create (2026-09-22, FE-PERF-06) dropped the `setTimeout(location.reload)`
 that followed a successful create: the page has no `?fragment=` render, so it re-reads itself and
 swaps the table body, the name datalist and the create modal's refined-material select in place,
-then re-applies the active name filter. The Lager allocation popovers (`inventory-admin.js` /
-`inventory-my.js`), the inventory note modal and the order-detail assignee notes likewise dropped
+then re-applies the active name filter. The Lager allocation popovers (`inventory-common.js`,
+shared by `inventory-admin.js` / `inventory-my.js`), the inventory note modal and the order-detail assignee notes likewise dropped
 their timed reload on a `409`: the conflict goes through `krtFetch`'s reload-confirm (REQ-FE-003),
 the only sanctioned reload.
 
@@ -1036,8 +1036,8 @@ type-then-add race · **Code:** `krt-fetch.js` (`runSerialized`, lazy `url`/`pay
 `submitForm`, awaited `onSuccess`, the `sectionWrite` `serialize` default, exposed `krtFetch.serialize`),
 `mission-detail.js` (`objectivesVersion` / `stepsVersion` lazy readers, actual-time / party-lead
 thunks, payout-preference `section:participant`, core-edit `submitForm` on `section:schedule`),
-`operation-detail.js` (`operation:core` serialize + thunk), `bank.js`, `inventory-my.js`,
-`inventory-admin.js`, `inventory-note-modal.js`, `orders-detail.js` (`krtOrderWrite` serialize default
+`operation-detail.js` (`operation:core` serialize + thunk), `bank.js`, `inventory-common.js`
+(the `inv-assoc:{id}` allocation serialize both Lager pages share), `inventory-note-modal.js`, `orders-detail.js` (`krtOrderWrite` serialize default
 + `_orderVersion`), `admin-org-structure.js`, `leitung.js` · **ADR:** ADR-0071 · **Issues:** #1143,
 #1145, #1117, #1118
 
@@ -1670,8 +1670,9 @@ Convert them when opting a file in.
 > **Config:** `frontend/tsconfig.json` (`allowJs` + `noEmit` + `moduleDetection: legacy`),
 > `frontend/build.gradle.kts` (`generateApiTypes`, `typecheckJs`) · **Code:**
 > `frontend/types/globals.d.ts`, `frontend/types/thymeleaf-bootstrap.d.ts`,
-> `frontend/types/dto.d.ts`, `frontend/scripts/gen-api-types.mjs`, the 35 files (of 95) carrying
-> `// @ts-check` (recounted 2026-09-22) · **ADR:** ADR-0125, ADR-0130 ·
+> `frontend/types/dto.d.ts`, `frontend/scripts/gen-api-types.mjs`, the 40 files (of 96) carrying
+> `// @ts-check` (recounted 2026-09-23, after FE-SIMP-03 added `inventory-common.js` and opted
+> `inventory-admin.js` / `inventory-my.js` in) · **ADR:** ADR-0125, ADR-0130 ·
 > **Issues:** —
 
 ### REQ-FE-019 — The same live sync reaches the native app, in both directions

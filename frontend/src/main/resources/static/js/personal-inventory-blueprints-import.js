@@ -103,13 +103,13 @@
         window.krtFetch
             .write({
                 method: 'POST',
-                url: url,
+                url,
                 toast: false,
-                onError: function () {
+                onError() {
                     handoffNotFound();
                     return true;
                 },
-                onNetworkError: function () {
+                onNetworkError() {
                     handoffNotFound();
                     return true;
                 },
@@ -152,11 +152,11 @@
                 method: 'POST',
                 formData: fd,
                 toast: false,
-                onError: function () {
+                onError() {
                     toastError();
                     return true;
                 },
-                onNetworkError: function () {
+                onNetworkError() {
                     toastError();
                     return true;
                 },
@@ -485,7 +485,7 @@
                 payload: resolutions,
                 toast: false,
                 errorMessage: i18n().error,
-                onSuccess: function (result) {
+                onSuccess(result) {
                     const res = result || {};
                     const msg =
                         (i18n().applied || 'Import complete.') +

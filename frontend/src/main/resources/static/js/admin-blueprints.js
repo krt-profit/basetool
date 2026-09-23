@@ -130,7 +130,7 @@
         const url =
             form.getAttribute('action') + (search ? '?search=' + encodeURIComponent(search) : '');
         if (window.krtFetch) {
-            window.krtFetch.swap({ url: url, container: '#' + RESULTS_ID, history: true });
+            window.krtFetch.swap({ url, container: '#' + RESULTS_ID, history: true });
         } else {
             window.location.assign(url);
         }

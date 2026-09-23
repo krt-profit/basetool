@@ -39,7 +39,7 @@
         if (url.charAt(0) !== '/') {
             return fallback === undefined ? null : fallback;
         }
-        let second = url.charAt(1);
+        const second = url.charAt(1);
         if (second === '/' || second === '\\') {
             return fallback === undefined ? null : fallback;
         }

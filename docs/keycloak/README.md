@@ -429,7 +429,11 @@ having its refresh token bound.
   confidential-client migration.
 - **`basetool-sc-extractor` carries an unused authorization-code flow** (`standardFlowEnabled:
   true`, loopback redirect wildcards, no PKCE) — the extractor uses only the device grant. The
-  owner's decision, recorded as the hardening runbook's thirteenth item.
+  hardening runbook's thirteenth item. **Decided 2026-09-22: off, redirect URIs removed** — together
+  with both ingest scopes on `basetool-android` and the frontend's `http://frontend:18081` pair
+  (ADR-0202 amendment 1). `scripts/provision-keycloak-realm.py` removes all three; production keeps
+  them until it is applied there. `realm-config.reference.json` was hand-corrected to the target
+  shape on 2026-09-23 and says so in its `_comment`; regenerate it from an export after the apply.
 - **`basetool-provisioner` is in the 2026-09-09 snapshot** — an artifact of exporting mid-procedure;
   it goes when WP-K2 finishes, and the snapshot is regenerated then.
 

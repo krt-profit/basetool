@@ -13,16 +13,16 @@
 (function () {
     'use strict';
 
-    let i18n = window.materialgesuchI18n || {};
-    let modal = document.getElementById('mg-modal');
+    const i18n = window.materialgesuchI18n || {};
+    const modal = document.getElementById('mg-modal');
     if (!modal || !window.krtFetch) {
         return;
     }
 
-    let SERIALIZE_KEY = 'materialgesuch';
+    const SERIALIZE_KEY = 'materialgesuch';
     // REQ-FE-015 (ADR-0094): the global live-sync room a request create/edit publishes to over the
     // shared multiplexed /ws/sync socket, on the 'requests' section key (the offers use 'board').
-    let MATERIALBOARD_TOPIC = 'materialboard';
+    const MATERIALBOARD_TOPIC = 'materialboard';
     let state = {
         mode: null,
         requestId: null,
@@ -35,7 +35,7 @@
         onCancel: null,
     };
     let lastFocused = null;
-    let PICKER_SEARCH_DEBOUNCE_MS = 200;
+    const PICKER_SEARCH_DEBOUNCE_MS = 200;
     // Both catalogue comboboxes start CLOSED and open only on an explicit gesture, so the floating
     // list never covers the fields below it the moment the modal opens (see materialboerse-release.js).
     let materialSeq = 0;
@@ -63,14 +63,14 @@
     }
 
     function setText(sel, text) {
-        let el = q(sel);
+        const el = q(sel);
         if (el) {
             el.textContent = text;
         }
     }
 
     function toggle(sel, on) {
-        let el = q(sel);
+        const el = q(sel);
         if (el) {
             el.hidden = !on;
         }
@@ -83,8 +83,8 @@
     }
 
     function updateCharCount() {
-        let ta = q('[data-mg-remark]');
-        let counter = q('[data-mg-charcount]');
+        const ta = q('[data-mg-remark]');
+        const counter = q('[data-mg-charcount]');
         if (ta && counter) {
             counter.textContent = fmt(
                 i18n.charCounter || '{0} / 20.000',
@@ -95,9 +95,9 @@
 
     /** Sets the quantity field's unit label + numeric step for the current kind/material type. */
     function applyQuantityUnit() {
-        let isPiece = state.kind === 'ITEM' || state.quantityType === 'PIECE';
-        let unit = q('[data-mg-qty-unit]');
-        let input = q('[data-mg-qty]');
+        const isPiece = state.kind === 'ITEM' || state.quantityType === 'PIECE';
+        const unit = q('[data-mg-qty-unit]');
+        const input = q('[data-mg-qty]');
         if (unit) {
             unit.textContent = isPiece ? i18n.unitPiece || 'Stück' : i18n.unitScu || 'SCU';
         }
@@ -123,17 +123,17 @@
             onDone = doneOrOpts.onDone || null;
             onCancel = doneOrOpts.onCancel || null;
         }
-        let isEdit = mode === 'edit';
+        const isEdit = mode === 'edit';
         state = {
-            mode: mode,
+            mode,
             requestId: ctx.requestId || null,
             version: ctx.version || null,
             kind: ctx.kind === 'ITEM' ? 'ITEM' : 'MATERIAL',
             materialId: null,
             productKey: null,
             quantityType: ctx.quantityType === 'PIECE' ? 'PIECE' : 'SCU',
-            onDone: onDone,
-            onCancel: onCancel,
+            onDone,
+            onCancel,
         };
         materialListOpen = false;
         itemListOpen = false;
@@ -169,13 +169,13 @@
         }
         applyQuantityUnit();
 
-        let ta = q('[data-mg-remark]');
+        const ta = q('[data-mg-remark]');
         ta.value = ctx.remark || '';
         updateCharCount();
 
         lastFocused = document.activeElement;
         modal.style.display = 'flex';
-        let first = isEdit
+        const first = isEdit
             ? q('[data-mg-qty]')
             : state.kind === 'ITEM'
               ? q('[data-mg-item-picker-input]')
@@ -186,14 +186,14 @@
     }
 
     function setValue(sel, value) {
-        let el = q(sel);
+        const el = q(sel);
         if (el) {
             el.value = value == null || value === '' ? '' : String(value);
         }
     }
 
     function setKindRadio(kind) {
-        let radio = modal.querySelector('[data-mg-kind-radio][value="' + kind + '"]');
+        const radio = modal.querySelector('[data-mg-kind-radio][value="' + kind + '"]');
         if (radio) {
             radio.checked = true;
         }
@@ -201,7 +201,7 @@
 
     /** Shows the material combobox for a MATERIAL request, the item combobox for an ITEM request. */
     function applyKindBlocks() {
-        let isItem = state.kind === 'ITEM';
+        const isItem = state.kind === 'ITEM';
         toggle('[data-mg-material-block]', !isItem);
         toggle('[data-mg-item-block]', isItem);
     }
@@ -225,7 +225,7 @@
     }
 
     function cancel() {
-        let onCancel = state.onCancel;
+        const onCancel = state.onCancel;
         hide();
         if (onCancel) {
             onCancel();
@@ -233,7 +233,7 @@
     }
 
     function finish(body) {
-        let onDone = state.onDone;
+        const onDone = state.onDone;
         hide();
         if (onDone) {
             return onDone(body);
@@ -243,8 +243,8 @@
     // -------- material catalogue picker --------
 
     function loadMaterialPicker(query) {
-        let seq = ++materialSeq;
-        let url =
+        const seq = ++materialSeq;
+        const url =
             '/materialboerse/request-materials' + (query ? '?q=' + encodeURIComponent(query) : '');
         fetch(url, {
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
@@ -280,7 +280,7 @@
 
     function openMaterialList() {
         materialListOpen = true;
-        let list = q('[data-mg-picker-list]');
+        const list = q('[data-mg-picker-list]');
         if (list) {
             list.hidden = false;
         }
@@ -288,14 +288,14 @@
 
     function closeMaterialList() {
         materialListOpen = false;
-        let list = q('[data-mg-picker-list]');
+        const list = q('[data-mg-picker-list]');
         if (list) {
             list.hidden = true;
         }
     }
 
     function renderMaterialPicker() {
-        let list = q('[data-mg-picker-list]');
+        const list = q('[data-mg-picker-list]');
         if (!list) {
             return;
         }
@@ -310,7 +310,7 @@
         // Accumulated from literals and escapeHtml / escapeAttr calls only (FE-SEC-05).
         let html = '';
         materialItems.forEach(function (it) {
-            let unit =
+            const unit =
                 it.quantityType === 'PIECE' ? i18n.unitPiece || 'Stück' : i18n.unitScu || 'SCU';
             html +=
                 '<li class="krt-combobox__option" role="option" data-material-id="' +
@@ -340,8 +340,8 @@
     // -------- item (blueprint-product) picker --------
 
     function loadItemPicker(query) {
-        let seq = ++itemSeq;
-        let url =
+        const seq = ++itemSeq;
+        const url =
             '/materialboerse/offerable-products' + (query ? '?q=' + encodeURIComponent(query) : '');
         fetch(url, {
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
@@ -377,7 +377,7 @@
 
     function openItemList() {
         itemListOpen = true;
-        let list = q('[data-mg-item-picker-list]');
+        const list = q('[data-mg-item-picker-list]');
         if (list) {
             list.hidden = false;
         }
@@ -385,14 +385,14 @@
 
     function closeItemList() {
         itemListOpen = false;
-        let list = q('[data-mg-item-picker-list]');
+        const list = q('[data-mg-item-picker-list]');
         if (list) {
             list.hidden = true;
         }
     }
 
     function renderItemPicker() {
-        let list = q('[data-mg-item-picker-list]');
+        const list = q('[data-mg-item-picker-list]');
         if (!list) {
             return;
         }
@@ -434,12 +434,12 @@
 
     /** Reads the optional min-quality field; returns undefined when blank, null on an invalid value. */
     function readMinQuality() {
-        let input = q('[data-mg-min-quality]');
-        let raw = input ? input.value.trim() : '';
+        const input = q('[data-mg-min-quality]');
+        const raw = input ? input.value.trim() : '';
         if (raw === '') {
             return undefined;
         }
-        let n = Number(raw);
+        const n = Number(raw);
         if (isNaN(n) || n < 0 || n > 1000 || Math.floor(n) !== n) {
             return null;
         }
@@ -448,12 +448,12 @@
 
     /** Reads the desired-quantity field; returns null when non-positive or (for items) non-whole. */
     function readQuantity() {
-        let input = q('[data-mg-qty]');
-        let n = input ? Number(input.value) : NaN;
+        const input = q('[data-mg-qty]');
+        const n = input ? Number(input.value) : NaN;
         if (isNaN(n) || n <= 0) {
             return null;
         }
-        let isPiece = state.kind === 'ITEM' || state.quantityType === 'PIECE';
+        const isPiece = state.kind === 'ITEM' || state.quantityType === 'PIECE';
         if (isPiece && Math.floor(n) !== n) {
             return null;
         }
@@ -461,17 +461,17 @@
     }
 
     function submit() {
-        let remark = q('[data-mg-remark]').value;
-        let minQuality = readMinQuality();
+        const remark = q('[data-mg-remark]').value;
+        const minQuality = readMinQuality();
         if (minQuality === null) {
             toggle('[data-mg-quality-error]', true);
             return;
         }
         toggle('[data-mg-quality-error]', false);
-        let quantity = readQuantity();
+        const quantity = readQuantity();
         if (quantity === null) {
             toggle('[data-mg-qty-error]', true);
-            let qtyInput = q('[data-mg-qty]');
+            const qtyInput = q('[data-mg-qty]');
             if (qtyInput) {
                 qtyInput.focus();
             }
@@ -486,14 +486,14 @@
                 payload: {
                     desiredAmount: quantity,
                     minQuality: minQuality === undefined ? null : minQuality,
-                    remark: remark,
+                    remark,
                     version: Number(state.version),
                 },
                 successMessage: i18n.updated,
                 errorMessage: i18n.error,
                 conflict: i18n.conflict,
                 serialize: SERIALIZE_KEY,
-                onSuccess: function (body) {
+                onSuccess(body) {
                     notifyPeers();
                     return finish(body);
                 },
@@ -512,13 +512,13 @@
                 payload: {
                     productKey: state.productKey,
                     minQuality: minQuality === undefined ? null : minQuality,
-                    quantity: quantity,
-                    remark: remark,
+                    quantity,
+                    remark,
                 },
                 successMessage: i18n.created,
                 errorMessage: i18n.error,
                 serialize: SERIALIZE_KEY,
-                onSuccess: function (body) {
+                onSuccess(body) {
                     notifyPeers();
                     return finish(body);
                 },
@@ -537,12 +537,12 @@
                 materialId: state.materialId,
                 minQuality: minQuality === undefined ? null : minQuality,
                 requestedAmount: quantity,
-                remark: remark,
+                remark,
             },
             successMessage: i18n.created,
             errorMessage: i18n.error,
             serialize: SERIALIZE_KEY,
-            onSuccess: function (body) {
+            onSuccess(body) {
                 notifyPeers();
                 return finish(body);
             },
@@ -589,12 +589,12 @@
             openItemList();
             return;
         }
-        let li = e.target.closest('[data-mg-picker-list] .krt-combobox__option');
+        const li = e.target.closest('[data-mg-picker-list] .krt-combobox__option');
         if (li) {
             pickMaterial(li);
             return;
         }
-        let pli = e.target.closest('[data-mg-item-picker-list] .krt-combobox__option');
+        const pli = e.target.closest('[data-mg-item-picker-list] .krt-combobox__option');
         if (pli) {
             pickProduct(pli);
         }
@@ -640,17 +640,17 @@
     });
 
     function trapFocus(e) {
-        let focusable = modal.querySelectorAll(
+        const focusable = modal.querySelectorAll(
             'button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])',
         );
-        let visible = Array.prototype.filter.call(focusable, function (el) {
+        const visible = Array.prototype.filter.call(focusable, function (el) {
             return el.offsetParent !== null && !el.hidden;
         });
         if (!visible.length) {
             return;
         }
-        let first = visible[0];
-        let last = visible[visible.length - 1];
+        const first = visible[0];
+        const last = visible[visible.length - 1];
         if (e.shiftKey && document.activeElement === first) {
             e.preventDefault();
             last.focus();
@@ -660,5 +660,5 @@
         }
     }
 
-    window.krtMaterialRequest = { open: open, close: cancel };
+    window.krtMaterialRequest = { open, close: cancel };
 })();

@@ -47,8 +47,8 @@ import org.springframework.security.web.SecurityFilterChain;
  * three read endpoints therefore keeps {@code POST /actuator/loggers/**} on its {@code ROLE_ADMIN}
  * gate (REQ-OBS-016) while still letting a credential-free Prometheus scrape and Docker health
  * probe through. Widening this matcher to {@code /actuator/**} would silently un-gate the mutator,
- * and setting {@code ROOT} to {@code TRACE} makes Spring Security, WebClient and Netty write bearer
- * tokens and request bodies into a Loki stream retained for 744 h.
+ * and setting {@code ROOT} to {@code TRACE} makes Spring Security and the outbound HTTP client
+ * write bearer tokens and request bodies into a Loki stream retained for 744 h.
  *
  * <p>The endpoints opened here carry no authentication, matching Keycloak's internal port 9000
  * (REQ-SEC-014): the management port is reachable only from {@code net-monitoring-scrape} and

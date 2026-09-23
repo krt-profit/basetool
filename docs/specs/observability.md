@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
-> **Owner area:** OBS · **Related:** [`security-and-access.md`](security-and-access.md), [`org-unit-tenancy.md`](org-unit-tenancy.md), [ADR-0072](../adr/0072-monitoring-stack-prometheus-grafana.md), [ADR-0095](../adr/0095-ship-app-container-stdout-to-loki.md), [ADR-0162](../adr/0162-edge-is-native-nginx-with-a-separate-acme-client.md) (native edge, NPM retired), [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md) (rootless Podman), monitoring epic [#936](https://github.com/krt-profit/basetool/issues/936) · **Operator doc:** [`monitoring/README.md`](../../monitoring/README.md)
+> **Owner area:** OBS · **Related:** [`security-and-access.md`](security-and-access.md), [ADR-0204](../adr/0204-backend-and-ingest-call-http-through-restclient-without-webflux.md) (outbound clients of backend and ingest), [`org-unit-tenancy.md`](org-unit-tenancy.md), [ADR-0072](../adr/0072-monitoring-stack-prometheus-grafana.md), [ADR-0095](../adr/0095-ship-app-container-stdout-to-loki.md), [ADR-0162](../adr/0162-edge-is-native-nginx-with-a-separate-acme-client.md) (native edge, NPM retired), [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md) (rootless Podman), monitoring epic [#936](https://github.com/krt-profit/basetool/issues/936) · **Operator doc:** [`monitoring/README.md`](../../monitoring/README.md)
 >
 > **Runtime.** Since the 2026-09-22 cutover production runs rootless Podman under Quadlet on Rocky
 > Linux 10. The monitoring plane is nine Quadlet container units (generated from
@@ -211,8 +211,10 @@ internet-facing caller forge a second, fabricated log line, and neither the logb
 secrets from what reached the appender, `LogSafe` removes structure-breaking characters before the
 value is handed to the logger.
 
-The gateway carries the same log-once discipline on its **outbound** relay. `WebClientLoggingFilter`
-emits one line per backend call with method, host, path, status and elapsed time — `INFO` normally,
+The gateway carries the same log-once discipline on its **outbound** relay.
+`BackendCallLoggingInterceptor` (a `RestClient` interceptor since ADR-0204; it was the
+`WebClientLoggingFilter` exchange filter before, with the same levels and wording) emits one line per
+backend call with method, host, path, status and elapsed time — `INFO` normally,
 `INFO` with the `Slow backend call` marker past `app.logging.slow-backend-call-threshold-ms`
 (1500 ms, issue #1204 — relay latency is alerted on through the `http.client.requests` p95
 histogram, not by escalating this line), and `DEBUG` for a backend 5xx or any error signal, because
@@ -896,8 +898,16 @@ Tracing on the OTel SDK) behind a hard master gate:
   correlation-id system (REQ-OBS-001/-002) is untouched — `traceId` is an additional field,
   not a replacement.
 - The trace service identity is pinned to the module's `application` metric tag
-  (`basetool-{backend,frontend,ingest}`); hand-built `WebClient`s are explicitly wired to
-  the observation registry (Boot's customizer only covers the auto-configured builder).
+  (`basetool-{backend,frontend,ingest}`); every hand-built client is explicitly wired to the
+  observation registry — the frontend's `WebClient`s, and the backend's and the ingest's
+  `RestClient`s (ADR-0204), because neither of those two modules ships Boot's
+  `spring-boot-restclient` whose customizer would otherwise do it. All of them record Spring's
+  `http.client.requests` with the default key values (`method`, `uri`, `status`, `outcome`,
+  `exception`, `client.name`), so `http_client_requests_seconds{client_name=…}` looks the same
+  whichever client type produced it; `RestClientConfigTest`, `UexClientTest` and `KeycloakServiceTest`
+  assert the name and the tags. The backend's Keycloak Admin API client is observed too since
+  2026-09-22 (BE-MOD-02) — it used to be built per call from a bare `RestClient.builder()` and
+  recorded nothing.
   The frontend's SSE relay client is deliberately not observed (a ~30-minute stream would
   hold one span open for its whole lifetime). The **server side** of that same stream is
   excluded symmetrically: each module's `NotificationStreamObservationPredicate` drops the
@@ -1286,8 +1296,11 @@ the boot run carries the last run's values over and re-reads only the reboot fla
   `ScWikiClient` swallow an upstream fetch or parse error into an empty result (`source` = the fixed
   literal `uex` / `scwiki`). Because every upstream failure is mapped to an empty list and the sync
   job still records a success, this is the only signal of a sustained catalogue outage; it backs the
-  `ExternalFetchErrors` alert. The backend `WebClient.Builder` is wired to the `ObservationRegistry`
-  (REQ-OBS-009) so these same calls also emit `http_client_requests_seconds` + client spans.
+  `ExternalFetchErrors` alert. The backend's `RestClient.Builder` (`RestClientConfig`, ADR-0204) is
+  wired to the `ObservationRegistry` (REQ-OBS-009) so these same calls also emit
+  `http_client_requests_seconds` + client spans. A response body past the clients' 16 MiB cap
+  (`ResponseSizeLimitInterceptor`) fails the fetch into this same counted fallback — it is never
+  truncated into a partial parse.
   **Known gap, to close:** since the 2026-08 audit this one undifferentiated series carries three
   distinct causes — a transport failure, a non-`ok` envelope `status`, and the SC-Wiki
   pagination/`total` anomalies (REQ-OBS-001) — so the counter can no longer say *what* failed. The
@@ -1447,6 +1460,15 @@ the boot run carries the last run's values over and re-reads only the reboot fla
   `JvmHeapHigh`'s 90% trips). No metaspace rule (nonheap max is often -1 → NaN). Deepened
   `03-spring-apps.json`: per-pool heap, GC pause max by action/cause, thread states, open FDs vs max,
   per-app CPU.
+- Request concurrency (FE-PERF-07, 2026-09-22): the `03-spring-apps.json` "In-flight Requests"
+  panel plots `sum by (application) (http_server_requests_active_seconds_gcount)` — the active count
+  of Spring MVC's `http.server.requests` long-task timer. It replaced "Tomcat Busy Threads": all
+  three apps run Tomcat on virtual threads (`spring.threads.virtual.enabled`), which gives the
+  connector an external `VirtualThreadExecutor`, so `tomcat_threads_*` read a constant `-1` and
+  `server.tomcat.threads.max` / `min-spare` had no effect. Those keys and the Tomcat MBean registry
+  (`server.tomcat.mbeanregistry.enabled`, enabled only to feed that panel) are gone;
+  `accept-count` / `max-connections` act before the executor and stay. `ManagementPortIsolationTest`
+  (backend and frontend) pins the executor type and the gauge's presence.
 - `basetool_http_error_total{code}` counter at the `GlobalExceptionHandler` 409/401/403 methods
   (`OPTIMISTIC_LOCK` = optimistic-locking regression indicator, `PESSIMISTIC_LOCK`,
   `UNAUTHENTICATED`, `ACCESS_DENIED`) plus two filter-level codes that bypass the advice and are

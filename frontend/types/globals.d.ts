@@ -486,6 +486,66 @@ interface KrtHerkunftApi {
 }
 
 /**
+ * What differs between the two Lager pages that share `inventory-common.js` —
+ * the global Lager (`/inventory/all`, `inventory-admin.js`) and the personal one
+ * (`/inventory/my`, `inventory-my.js`).
+ */
+interface KrtInventoryLagerConfig {
+    /** The page's data-trigger prefix: `inv-admin` or `inv-my`. */
+    triggerPrefix: string;
+    /** The route root the stack-entries endpoints hang off: `/inventory/all` or `/inventory/my`. */
+    basePath: string;
+    /** The global Lager's stacks are per owner: its stack-entries URL carries `userId`. */
+    stackPerOwner: boolean;
+    /** The personal Lager's stack key carries the personal flag. */
+    stackPersonalFlag: boolean;
+    /** Re-pulls the page's grouped table in place after a write. */
+    refreshTable: () => void;
+    /** Tells peers viewing the page's own Lager room that the stock changed. */
+    notifyInventoryChanged: () => void;
+    /** Runs after a stack's entries were injected (the personal page re-applies its bulk selection). */
+    onStackEntriesLoaded?: (content: HTMLElement) => void;
+}
+
+/** One page's instance of the shared Lager behaviour, from `krtInventory.createLager`. */
+interface KrtInventoryLager {
+    /** Whether the Items (game-item) view is active rather than the Material view. */
+    lagerIsItemsView(): boolean;
+    /** Re-applies the persisted group and stack expansion after a grouped-table re-swap. */
+    restoreExpandedTree(): void;
+    /** The job-order ids earmarked on an entry's leaf row, read before a stock write. */
+    collectLeafOrderIds(itemId: string | null): string[];
+    /** Pokes the affected job orders' rooms and the cross-order demand overview. */
+    broadcastOrdersChanged(orderIds: Array<string | null | undefined> | null | undefined): void;
+    /** Pokes the Materialbörse board after a stock-reducing write. */
+    broadcastBoardChanged(): void;
+    /** Closes the Umbuchen modal and resets its Herkunft picker. */
+    closeUmbuchenModal(): void;
+    /** Records the Umbuchen row's owning org unit the target-OrgUnit picker is preset to. */
+    setUmbuchenCurrentOwningOrgUnit(orgUnitId: string | null): void;
+    /** Fills the Umbuchen target-OrgUnit picker from the selected target user's memberships. */
+    refreshUmbuchenTransferOrgUnitPicker(): void;
+    /** Installs the shared delegated handlers, the book-out submit and the initial tree restore. */
+    bind(): void;
+}
+
+/** The shared Lager module installed by `inventory-common.js`. */
+interface KrtInventoryApi {
+    /** Builds one page's instance of the shared Lager behaviour. */
+    createLager(config: KrtInventoryLagerConfig): KrtInventoryLager;
+}
+
+/** The SCU amount helpers installed by `scu-decimal-input.js`. */
+interface KrtScuInputApi {
+    /** Canonicalises a typed amount (commas become dots, first dot kept); "" when there is no digit. */
+    normalize(raw: unknown): string;
+    /** Parses a typed amount, accepting either decimal separator; NaN when it is not a number. */
+    parse(raw: unknown): number;
+    /** Rounds a canonical dot string half-up to three decimals, stripping trailing zeros. */
+    round(value: string): string;
+}
+
+/**
  * A Materialbörse create/edit dialog — the offer side from
  * `materialboerse-release.js` (`krtMaterialRelease`) and the request side from
  * `materialgesuch-modal.js` (`krtMaterialRequest`). Both expose the same pair.
@@ -552,13 +612,23 @@ interface DocumentEventMap {
 
 // ------------------------------------------------------ element augmentation
 
+/** The controller `krt-searchable-select.js` attaches to an enhanced combobox. */
+interface KrtComboboxController {
+    /**
+     * Selects `value` (empty or unknown clears) without firing `change`. `label`
+     * names a value outside the loaded item set — the remote-mode case — and
+     * `data` is option metadata mirrored onto the hidden input.
+     */
+    setValue(value: string, label?: string, data?: object): void;
+}
+
 interface HTMLElement {
     /**
      * The combobox controller `krt-searchable-select.js` attaches to both the
      * hidden input and the wrapper, so later code can drive an already-enhanced
      * field without re-querying the DOM.
      */
-    krtCombobox?: unknown;
+    krtCombobox?: KrtComboboxController;
 }
 
 // ------------------------------------------------------- window augmentation
@@ -698,6 +768,9 @@ interface Window {
         ownersUrl?: string;
     };
     krtHerkunft?: KrtHerkunftApi;
+    /** The shared Lager behaviour of the two inventory pages (`inventory-common.js`). */
+    krtInventory?: KrtInventoryApi;
+    krtScuInput?: KrtScuInputApi;
     krtMaterialRelease?: KrtMaterialDialogApi;
     krtMaterialRequest?: KrtMaterialDialogApi;
     /**

@@ -361,7 +361,7 @@ class BackendApiClientHappyPathTest {
 
   @Test
   void post_withNullBody_sendsEmptyBody() throws Exception {
-    // The {@code body != null} branch in executePost is otherwise uncovered.
+    // The {@code body != null} branch in withOptionalBody is otherwise uncovered for POST.
     server.enqueue(jsonOk("ok"));
 
     String result = client.post("/api/v1/trigger", null, String.class);

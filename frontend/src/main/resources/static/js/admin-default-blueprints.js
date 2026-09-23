@@ -268,7 +268,7 @@
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
         removeBtn.className = 'krt-bp-chip-remove';
-        removeBtn.setAttribute('aria-label', 'x');
+        removeBtn.setAttribute('aria-label', i18n.chipRemove || '');
         removeBtn.textContent = '×';
         removeBtn.addEventListener('click', function () {
             unstageProduct(stagedKey);
@@ -383,7 +383,7 @@
                 submitter: confirmBtn,
                 successMessage: i18n.removed,
                 errorMessage: i18n.removeError,
-                onSuccess: function () {
+                onSuccess() {
                     pendingForm = null;
                     closeDeleteModal();
                     return refreshList();

@@ -633,13 +633,13 @@
             // A 401 with X-Reauthenticate means the session lost its OAuth2 token: redirect the
             // window to re-login instead of toasting an error the user cannot act on.
             if (maybeReauthenticate(response)) {
-                return { ok: false, status: response.status, body: body };
+                return { ok: false, status: response.status, body };
             }
 
             // The Terms of Use changed while this tab was open: navigate to the consent page rather
             // than toasting a write error the user cannot act on (REQ-SEC-028).
             if (maybeTermsGate(response)) {
-                return { ok: false, status: response.status, body: body };
+                return { ok: false, status: response.status, body };
             }
 
             if (!response.ok) {
@@ -653,11 +653,11 @@
                         /* an error callback must never break the UX */
                     }
                     if (handled) {
-                        return { ok: false, status: response.status, body: body };
+                        return { ok: false, status: response.status, body };
                     }
                 }
                 await handleProblem(response, body, opts);
-                return { ok: false, status: response.status, body: body };
+                return { ok: false, status: response.status, body };
             }
 
             if (opts.containerSelector && body && body.version != null) {
@@ -686,7 +686,7 @@
             return {
                 ok: true,
                 status: response.status,
-                body: body,
+                body,
                 redirected: !!response.redirected,
             };
         } finally {
@@ -729,7 +729,7 @@
             const payload = typeof opts.payload === 'function' ? opts.payload() : opts.payload;
             function buildInit() {
                 const headers = writeHeaders(true, opts.accept);
-                const init = { method: method, headers: headers };
+                const init = { method, headers };
                 const sendsBody =
                     method !== 'GET' && (method !== 'DELETE' || opts.bodyOnDelete === true);
                 if (payload !== undefined && sendsBody) {
@@ -797,7 +797,7 @@
                         : form
                           ? new FormData(form)
                           : undefined;
-                return { method: method, headers: headers, body: body };
+                return { method, headers, body };
             }
 
             return send(opts, buildInit, url);
@@ -988,7 +988,7 @@
                     // can tell an expired-session login bounce (redirected) from a 5xx fragment
                     // render (status) without reproducing the failure.
                     devWarn('krtFetch.swap bailed: response is not a fragment', {
-                        url: url,
+                        url,
                         status: res.status,
                         redirected: res.redirected,
                     });
@@ -1017,7 +1017,7 @@
                     // `toasted` records which of the two it was, so the console line distinguishes
                     // "the user was told and ignored it" from "the UI lied by omission".
                     devWarn('krtFetch.swap did not update the container', {
-                        url: url,
+                        url,
                         container: opts.container,
                         toasted: !!opts.errorMessage,
                     });
@@ -1028,9 +1028,7 @@
                 // Let page/global enhancers re-process the freshly swapped subtree
                 // (e.g. the .utc-time localiser in sidebar.html). A one-shot
                 // DOMContentLoaded enhancer would otherwise miss swapped-in content.
-                document.dispatchEvent(
-                    new CustomEvent('krt:swapped', { detail: { container: container } }),
-                );
+                document.dispatchEvent(new CustomEvent('krt:swapped', { detail: { container } }));
                 if (opts.history) {
                     window.history.replaceState(
                         window.history.state,
@@ -1057,7 +1055,7 @@
                 // stale render and there is no other signal anywhere that it did.
                 const superseded = (error && error.name === 'AbortError') || !isCurrent();
                 if (!superseded) {
-                    devWarn('krtFetch.swap transport failure', { url: url, error: error });
+                    devWarn('krtFetch.swap transport failure', { url, error });
                 }
                 return false;
             });
@@ -1151,7 +1149,7 @@
      */
     function sectionWrite(config) {
         return {
-            write: function (opts) {
+            write(opts) {
                 const dict = config.dict() || {};
                 function t(key, fallback) {
                     return dict[key] != null && dict[key] !== '' ? dict[key] : fallback;
@@ -1179,7 +1177,7 @@
                     }),
                 );
             },
-            refresh: function (sectionKeys, opts) {
+            refresh(sectionKeys, opts) {
                 const list = Array.isArray(sectionKeys) ? sectionKeys : [sectionKeys];
                 if ((!opts || opts.broadcast !== false) && typeof config.broadcast === 'function') {
                     config.broadcast(list);
@@ -1192,7 +1190,7 @@
                             return Promise.resolve(false);
                         }
                         return swap({
-                            url: url,
+                            url,
                             container: cfg.container,
                             fragmentValue: cfg.fragmentValue,
                             history: false,
@@ -1206,7 +1204,7 @@
                     }),
                 );
             },
-            notify: function (sectionKeys) {
+            notify(sectionKeys) {
                 const list = Array.isArray(sectionKeys) ? sectionKeys : [sectionKeys];
                 if (typeof config.broadcast === 'function') {
                     config.broadcast(list);
@@ -1216,22 +1214,22 @@
     }
 
     window.krtFetch = {
-        write: write,
-        submitForm: submitForm,
-        swap: swap,
-        bindSwap: bindSwap,
-        setTrustedHtml: setTrustedHtml,
-        replaceWithTrustedHtml: replaceWithTrustedHtml,
-        syncVersion: syncVersion,
-        handleProblem: handleProblem,
+        write,
+        submitForm,
+        swap,
+        bindSwap,
+        setTrustedHtml,
+        replaceWithTrustedHtml,
+        syncVersion,
+        handleProblem,
         // Exposed so a page-local onError handler — which bypasses handleProblem entirely — can
         // render the SAME localized wording for OWNER_ORG_UNIT_REQUIRED instead of falling back to
         // the backend's English detail (REQ-ORG-023). Duplicating the branch per page is how the
         // two would drift.
-        ownerOrgUnitRequiredMessage: ownerOrgUnitRequiredMessage,
-        maybeReauthenticate: maybeReauthenticate,
-        reauthRedirect: reauthRedirect,
-        sectionWrite: sectionWrite,
+        ownerOrgUnitRequiredMessage,
+        maybeReauthenticate,
+        reauthRedirect,
+        sectionWrite,
         // Exposed so a raw-fetch write (one not routed through write/submitForm) can share the same
         // per-key serialization: krtFetch.serialize('scope:id', () => doTheWrite()) runs its task
         // after the previous same-key task settles. Wrap the WHOLE write — including where it reads

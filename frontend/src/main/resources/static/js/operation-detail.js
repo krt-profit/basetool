@@ -55,16 +55,16 @@ const OPERATION_SECTIONS = {
         return; // no-JS / no-foundation: the classic POST->redirect forms run.
     }
     const operationSeam = window.krtFetch.sectionWrite({
-        dict: function () {
+        dict() {
             return { 'operation.section.refresh.error': OPS_DETAIL_MSG.sectionRefreshError };
         },
         keys: { refreshErrorKey: 'operation.section.refresh.error' },
         sections: OPERATION_SECTIONS,
-        pageUrl: function () {
+        pageUrl() {
             return window.operationId ? '/operations/' + window.operationId : null;
         },
         // Tell other users viewing this operation that these sections changed (REQ-FE-015).
-        broadcast: function (keys) {
+        broadcast(keys) {
             if (
                 window.operationId &&
                 window.krtLiveSync &&
@@ -86,13 +86,13 @@ const OPERATION_SECTIONS = {
         window.krtLiveSync.createReceiver({
             topic: 'operation:' + window.operationId,
             sections: OPERATION_SECTIONS,
-            refresh: function (keys) {
+            refresh(keys) {
                 if (window.opRefreshSection) {
                     window.opRefreshSection(keys, { broadcast: false });
                 }
             },
             pill: {
-                label: function () {
+                label() {
                     return OPS_DETAIL_MSG.livesyncUpdates;
                 },
             },
@@ -261,15 +261,15 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
             payload: { markdown: input.value },
             accept: 'text/html, application/problem+json',
             toast: false,
-            onSuccess: function (html) {
+            onSuccess(html) {
                 // Server-rendered by the frontend's own markdown renderer, which escapes the raw
                 // input — the same trust contract as a Thymeleaf fragment.
                 window.krtFetch.setTrustedHtml(preview, typeof html === 'string' ? html : '');
             },
-            onError: function () {
+            onError() {
                 return true;
             },
-            onNetworkError: function () {
+            onNetworkError() {
                 return true;
             },
         });
@@ -350,7 +350,7 @@ function opsDetailConflict() {
                 // explicit submitter also disables the button while the first save is in flight.
                 serialize: 'operation:core',
                 submitter: form.querySelector('button[type="submit"]'),
-                payload: function () {
+                payload() {
                     return {
                         name: form.querySelector('[name="name"]').value,
                         description: form.querySelector('[name="description"]').value,
@@ -362,7 +362,7 @@ function opsDetailConflict() {
                 successMessage: OPS_DETAIL_MSG.updateSuccess,
                 errorMessage: OPS_DETAIL_MSG.updateError,
                 conflict: opsDetailConflict(),
-                onSuccess: function (body) {
+                onSuccess(body) {
                     if (body && body.version != null && versionInput) {
                         versionInput.value = body.version;
                     }
@@ -394,7 +394,7 @@ function opsDetailConflict() {
                 successMessage: OPS_DETAIL_MSG.deleteSuccess,
                 errorMessage: OPS_DETAIL_MSG.deleteError,
                 conflict: opsDetailConflict(),
-                onSuccess: function () {
+                onSuccess() {
                     window.location.assign('/operations');
                 },
             });
@@ -462,10 +462,10 @@ async function handlePayoutPaidToggle(checkbox) {
     try {
         const result = await window.krtFetch.write({
             method: 'POST',
-            url: url,
-            payload: { participantKey: participantKey, paidOut: desired },
+            url,
+            payload: { participantKey, paidOut: desired },
             toast: false,
-            onError: function (status) {
+            onError(status) {
                 checkbox.checked = previous;
                 if (window.showFrontendErrorToast) {
                     window.showFrontendErrorToast(
@@ -476,7 +476,7 @@ async function handlePayoutPaidToggle(checkbox) {
                 }
                 return true; // handled: skip krtFetch's default problem+json toast/reload-confirm
             },
-            onNetworkError: function () {
+            onNetworkError() {
                 checkbox.checked = previous;
                 if (window.showFrontendErrorToast) {
                     window.showFrontendErrorToast(MSG_PAYOUT_PAID_ERROR);

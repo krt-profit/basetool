@@ -181,7 +181,13 @@ class InventoryPageControllerMvcTest {
         // Ausbuchen and Umbuchen modals, wired to their shared inventory-herkunft.js module.
         .andExpect(content().string(containsString("data-herkunft=\"bookout\"")))
         .andExpect(content().string(containsString("data-herkunft=\"umbuchen\"")))
-        .andExpect(content().string(containsString("/js/inventory-herkunft.js")));
+        .andExpect(content().string(containsString("/js/inventory-herkunft.js")))
+        // FE-SIMP-03: the Lager behaviour both inventory pages share (tree, book-out modal,
+        // allocation chips) loads ahead of the page module, and the book-out terminal picker's
+        // wording comes from the bundle rather than from the script.
+        .andExpect(content().string(containsString("/js/inventory-common.js")))
+        .andExpect(content().string(containsString("terminalLoading")))
+        .andExpect(content().string(containsString("terminalNoMaterial")));
   }
 
   // REQ-INV-027: the personal Lager's Ausbuchen + Umbuchen modals carry the same "Herkunft"
@@ -199,7 +205,9 @@ class InventoryPageControllerMvcTest {
         .andExpect(content().string(containsString("data-herkunft=\"bookout\"")))
         .andExpect(content().string(containsString("data-herkunft=\"umbuchen\"")))
         .andExpect(content().string(containsString("data-herkunft-body")))
-        .andExpect(content().string(containsString("/js/inventory-herkunft.js")));
+        .andExpect(content().string(containsString("/js/inventory-herkunft.js")))
+        .andExpect(content().string(containsString("/js/inventory-common.js")))
+        .andExpect(content().string(containsString("terminalLoading")));
   }
 
   // REQ-INV-027: the prefill note for a determined dimension (single tag, no rest) is rendered from

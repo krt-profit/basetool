@@ -16,14 +16,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Track input changes
     document.addEventListener('input', function (e) {
-        let form = /** @type {Element} */ (e.target).closest('form');
+        const form = /** @type {Element} */ (e.target).closest('form');
         if (form && !form.classList.contains('no-track')) {
             isDirty = true;
         }
     });
 
     document.addEventListener('change', function (e) {
-        let form = /** @type {Element} */ (e.target).closest('form');
+        const form = /** @type {Element} */ (e.target).closest('form');
         if (form && !form.classList.contains('no-track')) {
             isDirty = true;
         }
@@ -41,12 +41,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Intercept internal link clicks
     document.addEventListener('click', function (event) {
-        let a = /** @type {Element} */ (event.target).closest('a');
+        const a = /** @type {Element} */ (event.target).closest('a');
 
         if (!a || !a.href) return;
 
         // Exclude specific links that don't trigger normal navigation
-        let href = a.getAttribute('href');
+        const href = a.getAttribute('href');
         if (!href || href === '#' || href.startsWith('#') || a.target === '_blank') {
             return;
         }

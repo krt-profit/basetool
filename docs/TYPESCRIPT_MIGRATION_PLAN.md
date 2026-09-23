@@ -1,4 +1,4 @@
-> **Doc type:** Living plan — a costed option, not scheduled; only Phase 0 is done. Last reviewed: 2026-09-22.
+> **Doc type:** Living plan — a costed option, not scheduled; only Phase 0 is done. Last reviewed: 2026-09-23.
 > **Owner area:** FE/UI · **Related ADRs:** ADR-0125 (the current decision), ADR-0130 (its DTO emitter + TypeScript 7), ADR-0069, ADR-0012/0013 · **Spec:** REQ-FE-018
 
 # TypeScript migration plan
@@ -22,7 +22,7 @@ Three properties of the codebase, all measured rather than assumed (recounted 20
 | Still inline in Thymeleaf templates        | ~2 480 lines in 60 templates |
 | `<script th:src>` tags                     | 114                          |
 | JS build step today                        | none                         |
-| Files under `// @ts-check`                 | 35 of 95                     |
+| Files under `// @ts-check`                 | 40 of 96 (2026-09-23)        |
 | Backend DTO schemas available from OpenAPI | 417                          |
 
 The blocking constraint is **ADR-0069**. The static scripts are classic non-module `<script>` tags
@@ -73,7 +73,7 @@ Everything below builds on this rather than replacing it.
 
 ### Phase 1 — Finish `@ts-check` coverage of `static/js`
 
-Take the remaining 60 files to green, largest-value first. Not busywork: this is where the real
+Take the remaining 56 files to green, largest-value first. Not busywork: this is where the real
 migration cost is discovered per file, and every fix survives into the TypeScript version.
 
 - Known work per file, measured on the files converted so far: DOM narrowing casts
@@ -82,9 +82,12 @@ migration cost is discovered per file, and every fix survives into the TypeScrip
 - Opting both inventory modules in restores the automated guard against the cross-file
   redeclaration class (TS6200). The one instance that existed — `inventory-my.js` and
   `inventory-admin.js` declaring the same eight script-scope names — was fixed with ADR-0125 by
-  prefixing the admin module's copies, but until both files are checked, nothing stops a third
-  page module from reintroducing it.
-- **Exit criteria:** all 95 files carry `// @ts-check`; `checkJs` flipped to `true` globally and the
+  prefixing the admin module's copies. **Done 2026-09-23 (FE-SIMP-03):** the shared Lager code
+  moved into `inventory-common.js`, which keeps its state in one closure per page, and all three
+  files carry `// @ts-check`. Opting in surfaced one live collision the prefix had missed: both
+  `inventory-admin.js` and `materials-profit-calculation.js` declared a global `getTranslations`
+  with different shapes (renamed `adminFilterTranslations`).
+- **Exit criteria:** all 96 files carry `// @ts-check`; `checkJs` flipped to `true` globally and the
   per-file comments removed; gate green.
 
 ### Phase 2 — Eliminate the inline template JavaScript
@@ -103,9 +106,9 @@ Raise the bar while still in JavaScript, so the eventual conversion is syntax-on
 syntax *and* semantics.
 
 - Enable `noImplicitAny`, then `strictFunctionTypes` and `noImplicitThis`.
-- Replace the `unknown` placeholders in `types/globals.d.ts` (`krtSearchableSelect`, `krtCombobox`,
-  `MissionPresence`, the `createReceiver` config) with real shapes. `krtHerkunft` and
-  `krtRefineryYield` already have theirs.
+- Replace the `unknown` placeholders in `types/globals.d.ts` (`krtSearchableSelect`,
+  `MissionPresence`, the `createReceiver` config) with real shapes. `krtHerkunft`,
+  `krtRefineryYield` and `krtCombobox` (`KrtComboboxController`, 2026-09-23) already have theirs.
 - **Exit criteria:** the only distance left to TypeScript is syntax.
 
 ### Phase 4 — Introduce the build step *(the point of no return)*

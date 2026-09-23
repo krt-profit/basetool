@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintImportApplyRequest;
@@ -349,19 +349,16 @@ public class AdminPersonalBlueprintsPageController {
   @PostMapping(value = "/delete-all-users", headers = "X-Requested-With=XMLHttpRequest")
   @ResponseBody
   public ResponseEntity<Object> deleteAllUsersAjax() {
-    try {
-      PersonalBlueprintBulkDeleteResultDto result =
-          backendApiClient.delete(
-              "/api/v1/admin/personal-blueprints", PersonalBlueprintBulkDeleteResultDto.class);
-      return ResponseEntity.ok(
-          result == null ? new PersonalBlueprintBulkDeleteResultDto(0) : result);
-    } catch (BackendServiceException e) {
-      log.debug("Admin failed to clear all users' blueprints (ajax): {}", e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Admin failed to clear all users' blueprints (ajax)", e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "clear all users' blueprints (ajax)",
+        () -> {
+          PersonalBlueprintBulkDeleteResultDto result =
+              backendApiClient.delete(
+                  "/api/v1/admin/personal-blueprints", PersonalBlueprintBulkDeleteResultDto.class);
+          return ResponseEntity.ok(
+              result == null ? new PersonalBlueprintBulkDeleteResultDto(0) : result);
+        });
   }
 
   /**

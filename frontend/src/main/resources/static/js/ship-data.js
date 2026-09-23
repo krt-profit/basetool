@@ -142,8 +142,8 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
                 url: form.getAttribute('action') + '?hidden=' + desired,
                 toast: false,
                 errorMessage: i18n.toggleError,
-                conflict: conflict,
-                onSuccess: function () {
+                conflict,
+                onSuccess() {
                     const row = form.closest('tr');
                     if (row) {
                         row.style.opacity = desired ? '0.5' : '';
@@ -178,8 +178,8 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
                 url: shipDataResetUrl,
                 toast: false,
                 errorMessage: i18n.resetError,
-                conflict: conflict,
-                onSuccess: function () {
+                conflict,
+                onSuccess() {
                     closeModal('reset-fitted-confirm-modal');
                     if (window.showFrontendSuccessToast) {
                         window.showFrontendSuccessToast(i18n.resetSuccess);

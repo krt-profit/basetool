@@ -43,10 +43,7 @@
     const descInput = document.getElementById('sc-desc');
 
     function openCreate() {
-        title.textContent =
-            document.documentElement.lang === 'en'
-                ? 'New Special Command'
-                : 'Neues Spezialkommando';
+        title.textContent = SC_MSG.createTitle;
         form.action = '/admin/special-commands';
         versionInput.value = '0';
         nameInput.value = '';
@@ -56,10 +53,7 @@
     }
 
     function openEdit(btn) {
-        title.textContent =
-            document.documentElement.lang === 'en'
-                ? 'Edit Special Command'
-                : 'Spezialkommando bearbeiten';
+        title.textContent = SC_MSG.editTitle;
         form.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
         versionInput.value = btn.getAttribute('data-version') || '0';
         nameInput.value = btn.getAttribute('data-name') || '';
@@ -142,7 +136,7 @@
             const url =
                 '/admin/special-commands' +
                 (includeInactive.checked ? '?includeInactive=true' : '');
-            window.krtFetch.swap({ url: url, container: '#sc-results', history: true });
+            window.krtFetch.swap({ url, container: '#sc-results', history: true });
         });
 
         if (/[?&]includeInactive=/.test(window.location.search)) {
@@ -173,7 +167,7 @@
         const url =
             '/admin/special-commands' +
             (includeInactive && includeInactive.checked ? '?includeInactive=true' : '');
-        window.krtFetch.swap({ url: url, container: '#sc-results', history: false });
+        window.krtFetch.swap({ url, container: '#sc-results', history: false });
     }
 
     // FormData POST to an SK AJAX twin (keeps the @ModelAttribute / @RequestParam binding) with
@@ -188,10 +182,10 @@
     function scWrite(theForm, successMessage, onSuccess) {
         window.krtFetch.submitForm({
             form: theForm,
-            successMessage: successMessage,
+            successMessage,
             errorMessage: SC_MSG.error,
             conflict: SC_CONFLICT,
-            onSuccess: function () {
+            onSuccess() {
                 if (typeof onSuccess === 'function') {
                     onSuccess();
                 }

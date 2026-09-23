@@ -168,7 +168,7 @@
             e.preventDefault();
             const params = new URLSearchParams(new FormData(e.target)).toString();
             const url = e.target.getAttribute('action') + (params ? '?' + params : '');
-            window.krtFetch.swap({ url: url, container: '#bp-results', history: true });
+            window.krtFetch.swap({ url, container: '#bp-results', history: true });
         });
     }
 
@@ -398,7 +398,7 @@
                 toast: false,
                 errorMessage: i18n().errorToast,
                 conflict: conflictObj(),
-                onSuccess: function (result) {
+                onSuccess(result) {
                     const res = result || {};
                     const msg =
                         (i18n().addedLabel || 'added') +
@@ -507,11 +507,11 @@
             .write({
                 method: 'POST',
                 url: window.safeSameOriginUrl(editForm.getAttribute('action'), editForm.action),
-                payload: payload,
+                payload,
                 successMessage: i18n().noteUpdated,
                 errorMessage: i18n().editError,
                 conflict: conflictObj(),
-                onSuccess: function (dto) {
+                onSuccess(dto) {
                     closeEdit();
                     patchBlueprintRow(dto);
                 },
@@ -603,7 +603,7 @@
                 successMessage: i18n().removed,
                 errorMessage: i18n().removeError,
                 conflict: conflictObj(),
-                onSuccess: function () {
+                onSuccess() {
                     closeDelete();
                     reswapList();
                 },
@@ -639,7 +639,7 @@
                 toast: false,
                 errorMessage: i18n().removeAllError,
                 conflict: conflictObj(),
-                onSuccess: function (body) {
+                onSuccess(body) {
                     const count = body && body.deleted != null ? body.deleted : 0;
                     if (window.showFrontendSuccessToast) {
                         const tpl = i18n().removedAllCount || '{0}';

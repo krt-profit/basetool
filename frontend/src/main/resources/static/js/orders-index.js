@@ -46,7 +46,7 @@ const ORDERS_SECTIONS = {
         return; // no-JS / no-foundation: the classic GET filter form runs.
     }
     const ordersQueueSeam = window.krtFetch.sectionWrite({
-        dict: function () {
+        dict() {
             return {
                 'orders.section.refresh.error':
                     typeof KRT_ORDERS_SECTION_REFRESH_ERROR !== 'undefined'
@@ -57,10 +57,10 @@ const ORDERS_SECTIONS = {
         keys: { refreshErrorKey: 'orders.section.refresh.error' },
         sections: ORDERS_SECTIONS,
         // Each peer re-fetches ITS OWN current filter + page, not the actor's.
-        pageUrl: function () {
+        pageUrl() {
             return window.location.pathname + window.location.search;
         },
-        broadcast: function (keys) {
+        broadcast(keys) {
             if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
                 window.krtLiveSync.sendChanged('orders', keys);
             }
@@ -76,17 +76,17 @@ const ORDERS_SECTIONS = {
             // Global room: coalesce longer (#1125) to flatten the refetch herd when many viewers get
             // the same signal at once.
             coalesceMs: 1500,
-            refresh: function (keys) {
+            refresh(keys) {
                 if (window.krtRefreshOrdersQueue) {
                     window.krtRefreshOrdersQueue(keys, { broadcast: false });
                 }
             },
             // Never yank the queue out from under an in-flight drag-reorder.
-            busyTest: function () {
+            busyTest() {
                 return window.__ordersDragging === true;
             },
             pill: {
-                label: function () {
+                label() {
                     return typeof KRT_ORDERS_LIVESYNC_UPDATES !== 'undefined'
                         ? KRT_ORDERS_LIVESYNC_UPDATES
                         : undefined;

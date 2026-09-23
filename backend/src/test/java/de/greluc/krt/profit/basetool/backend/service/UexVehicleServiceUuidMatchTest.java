@@ -41,6 +41,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
@@ -56,6 +57,9 @@ class UexVehicleServiceUuidMatchTest {
   @Mock private ShipTypeRepository shipTypeRepository;
   @Mock private ManufacturerRepository manufacturerRepository;
   @Mock private ManufacturerUexCompanyRepository manufacturerAliasRepository;
+
+  /** A real chunk writer, so the rows are actually written through its callbacks (BE-PERF-09). */
+  @Spy private SyncChunkWriter chunkWriter = new SyncChunkWriter(new RecordingTransactionManager());
 
   @InjectMocks private UexVehicleService service;
 

@@ -45,7 +45,7 @@ function calcScu(index) {
     const unitInput = document.getElementById('outputQuantity_' + index);
     const scuInput = document.getElementById('outputQuantityScu_' + index);
     if (unitInput && scuInput) {
-        let valStr = unitInput.value.replace(/\./g, '').replace(',', '.');
+        const valStr = unitInput.value.replace(/\./g, '').replace(',', '.');
         const val = parseFloat(valStr);
         if (!isNaN(val)) {
             const scu = val / 100.0;
@@ -482,17 +482,17 @@ function _submitRefineryCreate(form, submitter) {
         return;
     }
     window.krtFetch.submitForm({
-        form: form,
-        submitter: submitter,
+        form,
+        submitter,
         toast: false,
         errorMessage: MSG_RFC_CREATE_FAILED,
-        onError: function (status, body) {
+        onError(status, body) {
             if (window.showFrontendErrorToast) {
                 window.showFrontendErrorToast(_refineryCreateErrorMessage(status, body));
             }
             return true;
         },
-        onSuccess: function (body) {
+        onSuccess(body) {
             if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
             if (body && body.targetUrl) window.location.assign(body.targetUrl);
             else window.location.reload();
@@ -576,7 +576,7 @@ function _swapRefineryImportFragment(html) {
     }
     // Same-origin Thymeleaf fragment (refineryImportFormBody), escaped by the template engine.
     window.krtFetch.setTrustedHtml(container, html);
-    document.dispatchEvent(new CustomEvent('krt:swapped', { detail: { container: container } }));
+    document.dispatchEvent(new CustomEvent('krt:swapped', { detail: { container } }));
     if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
 }
 
@@ -614,7 +614,7 @@ function _submitRefineryImport(form) {
     }
     window.krtFetch
         .submitForm({
-            form: form,
+            form,
             method: 'POST',
             // The endpoint answers the re-rendered form as an HTML fragment.
             accept: 'text/html',

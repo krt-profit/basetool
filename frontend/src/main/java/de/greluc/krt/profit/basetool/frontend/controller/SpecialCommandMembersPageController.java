@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitKind;
@@ -366,16 +366,13 @@ public class SpecialCommandMembersPageController {
    */
   @NotNull
   private ResponseEntity<Object> okOrRelay(@NotNull Runnable backendCall) {
-    try {
-      backendCall.run();
-      return ResponseEntity.ok().build();
-    } catch (BackendServiceException e) {
-      log.debug("SpecialCommand member write (ajax) failed", e);
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("SpecialCommand member write (ajax) failed", e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+    return relay(
+        log,
+        "specialCommand member write (ajax)",
+        () -> {
+          backendCall.run();
+          return ResponseEntity.ok().build();
+        });
   }
 
   /**

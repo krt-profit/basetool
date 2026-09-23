@@ -114,29 +114,44 @@ public class KeycloakService {
   private final MeterRegistry meterRegistry;
 
   /**
-   * Pre-built request factory pinned (via {@link KeycloakTrustSupport}) to trust only the {@link
-   * #KEYCLOAK_TRUST_BUNDLE} truststore, or {@code null} when that bundle is not configured for the
-   * active profile. {@code null} makes {@link #adminClient()} fall back to the default {@link
-   * RestClient}, which trusts the JVM {@code cacerts} and is what the dev/test plain-HTTP admin URL
-   * needs. Built once at construction so the keystore is parsed a single time, not per request.
+   * The one Keycloak Admin API client, bound to the configured admin base URL and built once at
+   * construction (BE-MOD-02). It comes from the observed builder of {@code RestClientConfig}, so
+   * every admin call records {@code http.client.requests} and, with tracing on, a client span
+   * (REQ-OBS-009) — the per-call {@code RestClient.builder()} this replaces was never observed.
+   * When the {@link #KEYCLOAK_TRUST_BUNDLE} bundle is configured its truststore-pinned request
+   * factory (via {@link KeycloakTrustSupport}) replaces the builder's default one; otherwise the
+   * default JDK factory trusts the JVM {@code cacerts}, which is what the dev/test plain-HTTP admin
+   * URL needs.
    */
-  @Nullable private final ClientHttpRequestFactory trustedRequestFactory;
+  private final RestClient adminClient;
 
   /**
-   * Wires the user-sync properties and resolves the TLS trust for the Keycloak Admin API once at
-   * startup.
+   * Wires the user-sync properties and builds the Keycloak Admin API client once at startup,
+   * resolving its TLS trust from the SSL bundles.
    *
    * @param properties the {@code app.keycloak.sync.*} configuration (admin URL, realm, credentials)
+   * @param restClientBuilder a fresh, observed builder from {@code RestClientConfig}
+   *     (prototype-scoped, so the base URL and request factory set here stay with this client)
    * @param sslBundles the registered Spring SSL bundles; consulted for {@link
    *     #KEYCLOAK_TRUST_BUNDLE} to pin the self-signed Keycloak certificate in production
    * @param meterRegistry the Micrometer registry for the {@code
    *     basetool_keycloak_sync_fetch_failures_total} counter
    */
   public KeycloakService(
-      KeycloakSyncProperties properties, SslBundles sslBundles, MeterRegistry meterRegistry) {
+      @NotNull KeycloakSyncProperties properties,
+      RestClient.@NotNull Builder restClientBuilder,
+      @NotNull SslBundles sslBundles,
+      MeterRegistry meterRegistry) {
     this.properties = properties;
-    this.trustedRequestFactory = buildTrustedRequestFactory(sslBundles);
     this.meterRegistry = meterRegistry;
+    if (properties.getAdminUrl() != null) {
+      restClientBuilder.baseUrl(properties.getAdminUrl());
+    }
+    ClientHttpRequestFactory trustedRequestFactory = buildTrustedRequestFactory(sslBundles);
+    if (trustedRequestFactory != null) {
+      restClientBuilder.requestFactory(trustedRequestFactory);
+    }
+    this.adminClient = restClientBuilder.build();
   }
 
   /**
@@ -161,23 +176,6 @@ public class KeycloakService {
           KEYCLOAK_TRUST_BUNDLE);
     }
     return factory;
-  }
-
-  /**
-   * Creates a {@link RestClient} bound to the configured admin base URL, using the
-   * truststore-pinned request factory when one was resolved at construction. Callers guarantee the
-   * admin URL is non-null (see {@link #fetchUsers(Collection, Set)}), so building the lightweight
-   * client per call is safe — the expensive TLS context lives in {@link #trustedRequestFactory} and
-   * is reused.
-   *
-   * @return a ready-to-use {@link RestClient} for the Keycloak Admin API
-   */
-  private RestClient adminClient() {
-    RestClient.Builder builder = RestClient.builder().baseUrl(properties.getAdminUrl());
-    if (trustedRequestFactory != null) {
-      builder.requestFactory(trustedRequestFactory);
-    }
-    return builder.build();
   }
 
   /**
@@ -298,7 +296,7 @@ public class KeycloakService {
     while (true) {
       final int currentFirst = first;
       List<KeycloakUserDto> page =
-          adminClient()
+          adminClient
               .get()
               .uri(
                   uriBuilder ->
@@ -460,7 +458,7 @@ public class KeycloakService {
     while (true) {
       final int currentFirst = first;
       List<Map<String, Object>> page =
-          adminClient()
+          adminClient
               .get()
               .uri(
                   uriBuilder ->
@@ -527,7 +525,7 @@ public class KeycloakService {
     List<Map<String, Object>> composites;
     try {
       composites =
-          adminClient()
+          adminClient
               .get()
               .uri(
                   uriBuilder ->
@@ -622,7 +620,7 @@ public class KeycloakService {
       List<Map<String, Object>> page;
       try {
         page =
-            adminClient()
+            adminClient
                 .get()
                 .uri(
                     uriBuilder ->
@@ -756,7 +754,7 @@ public class KeycloakService {
     }
     String token = getAccessToken();
     try {
-      adminClient()
+      adminClient
           .post()
           .uri(
               "/admin/realms/{realm}/users/{id}/federated-identity/{provider}",
@@ -805,7 +803,7 @@ public class KeycloakService {
     requireAdminUrl();
     String token = getAccessToken();
     try {
-      adminClient()
+      adminClient
           .delete()
           .uri(
               "/admin/realms/{realm}/users/{id}/federated-identity/{provider}",
@@ -841,7 +839,7 @@ public class KeycloakService {
   public boolean userExists(@NotNull UUID keycloakUserId) {
     requireAdminUrl();
     try {
-      adminClient()
+      adminClient
           .get()
           .uri("/admin/realms/{realm}/users/{id}", properties.getRealm(), keycloakUserId)
           .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + getAccessToken())
@@ -882,7 +880,7 @@ public class KeycloakService {
     requireAdminUrl();
     try {
       Map<String, Object> user =
-          adminClient()
+          adminClient
               .get()
               .uri("/admin/realms/{realm}/users/{id}", properties.getRealm(), keycloakUserId)
               .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + getAccessToken())
@@ -909,7 +907,7 @@ public class KeycloakService {
   public void deleteUser(@NotNull UUID keycloakUserId) {
     requireAdminUrl();
     try {
-      adminClient()
+      adminClient
           .delete()
           .uri("/admin/realms/{realm}/users/{id}", properties.getRealm(), keycloakUserId)
           .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + getAccessToken())
@@ -933,7 +931,7 @@ public class KeycloakService {
    */
   private Optional<DiscordLink> fetchDiscordLink(UUID userId, String token) {
     List<Map<String, Object>> identities =
-        adminClient()
+        adminClient
             .get()
             .uri(
                 "/admin/realms/{realm}/users/{id}/federated-identity",
@@ -973,7 +971,8 @@ public class KeycloakService {
 
   /**
    * Guards a write against an unconfigured admin URL, failing with a clear message rather than a
-   * downstream NPE when {@link #adminClient()} would build against a {@code null} base URL.
+   * downstream NPE when {@link #adminClient} would resolve a relative path against no base URL at
+   * all.
    *
    * @throws ExternalServiceException when the Keycloak admin URL is not configured
    */
@@ -1000,7 +999,7 @@ public class KeycloakService {
 
     try {
       Map response =
-          adminClient()
+          adminClient
               .post()
               .uri("/realms/{realm}/protocol/openid-connect/token", properties.getRealm())
               .contentType(MediaType.APPLICATION_FORM_URLENCODED)

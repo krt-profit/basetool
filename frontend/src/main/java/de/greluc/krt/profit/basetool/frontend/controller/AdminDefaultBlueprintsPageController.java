@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.logging.LogSafe;
@@ -249,16 +249,13 @@ public class AdminDefaultBlueprintsPageController {
   @ResponseBody
   @PostMapping(value = "/{id}/delete", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> removeAjax(@PathVariable @NotNull UUID id) {
-    try {
-      backendApiClient.delete(BACKEND_BASE + "/" + id, Void.class);
-      return ResponseEntity.ok().build();
-    } catch (BackendServiceException e) {
-      log.debug("Failed to remove default blueprint {} (ajax): {}", id, e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Failed to remove default blueprint {} (ajax)", id, e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
+    return relay(
+        log,
+        "remove default blueprint " + id + " (ajax)",
+        () -> {
+          backendApiClient.delete(BACKEND_BASE + "/" + id, Void.class);
+          return ResponseEntity.ok().build();
+        });
   }
 
   /**

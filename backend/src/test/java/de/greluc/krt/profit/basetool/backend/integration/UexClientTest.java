@@ -25,13 +25,17 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import de.greluc.krt.profit.basetool.backend.config.RestClientConfig;
 import de.greluc.krt.profit.basetool.backend.config.UexProperties;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexCommodityDto;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexCommodityPriceDto;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexItemDto;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexStarSystemDto;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.observation.DefaultMeterObservationHandler;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.micrometer.observation.ObservationRegistry;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import okhttp3.mockwebserver.MockResponse;
@@ -42,10 +46,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
-import org.springframework.web.reactive.function.client.WebClient;
 
 /**
- * Unit tests for the {@link UexClient}. Uses {@link MockWebServer} to drive the WebClient against
+ * Unit tests for the {@link UexClient}. Uses {@link MockWebServer} to drive the RestClient against
  * an in-process HTTP endpoint instead of hitting the real UEX API.
  *
  * <p>Three behaviour patterns to cover for every endpoint method:
@@ -53,8 +56,8 @@ import org.springframework.web.reactive.function.client.WebClient;
  * <ol>
  *   <li>Happy path — JSON wrapped in {@code {"status":"ok","data":[...]}} → list contents are
  *       parsed and returned.
- *   <li>Server error (5xx, network blip) → the {@code onErrorResume} fallback returns an empty list
- *       so the caller never sees an exception.
+ *   <li>Server error (5xx, network blip) → the counted fallback returns an empty list so the caller
+ *       never sees an exception.
  *   <li>Empty body / no {@code data} field → empty list.
  * </ol>
  *
@@ -80,13 +83,87 @@ class UexClientTest {
     // part of property-binding tests.
 
     meterRegistry = new SimpleMeterRegistry();
-    client = new UexClient(WebClient.builder(), properties, meterRegistry);
+    client =
+        new UexClient(
+            new RestClientConfig().restClientBuilder(ObservationRegistry.NOOP),
+            properties,
+            meterRegistry);
     client.initClient();
   }
 
   @AfterEach
   void tearDown() throws Exception {
     server.shutdown();
+  }
+
+  /**
+   * REQ-OBS-009 / BE-MOD-01: the UEX fetch goes out through the observed builder of {@link
+   * RestClientConfig}, so it records {@code http.client.requests} — the Prometheus {@code
+   * http_client_requests_seconds} series — with the same default key values the replaced {@code
+   * WebClient} recorded: {@code method}, {@code status}, {@code outcome}, {@code uri} and {@code
+   * client.name} (the {@code client_name} label).
+   *
+   * @throws Exception if the client cannot be built
+   */
+  @Test
+  void fetch_recordsTheHttpClientRequestsObservation() throws Exception {
+    SimpleMeterRegistry observed = new SimpleMeterRegistry();
+    ObservationRegistry observationRegistry = ObservationRegistry.create();
+    observationRegistry
+        .observationConfig()
+        .observationHandler(new DefaultMeterObservationHandler(observed));
+    UexClient observedClient =
+        new UexClient(
+            new RestClientConfig().restClientBuilder(observationRegistry),
+            properties,
+            meterRegistry);
+    observedClient.initClient();
+    server.enqueue(
+        new MockResponse()
+            .setResponseCode(200)
+            .setHeader("Content-Type", "application/json")
+            .setBody("{\"status\":\"ok\",\"data\":[]}"));
+
+    observedClient.getCommodities();
+
+    Timer timer =
+        observed
+            .find("http.client.requests")
+            .tag("method", "GET")
+            .tag("status", "200")
+            .tag("outcome", "SUCCESS")
+            .tag("client.name", server.getHostName())
+            .timer();
+    assertNotNull(timer, "the UEX fetch must be observed as http.client.requests");
+    assertEquals(1, timer.count());
+    assertNotNull(timer.getId().getTag("uri"), "the uri key value must stay on the metric");
+  }
+
+  /**
+   * The 16 MiB response-body cap the reactive codec used to enforce survives the move to {@code
+   * RestClient}: a body past {@link UexClient#MAX_RESPONSE_BYTES} is not truncated into a partial
+   * parse but fails the fetch into the counted empty-result fallback, so an oversized feed stays
+   * visible on {@code basetool_external_fetch_errors_total{source=uex}}.
+   */
+  @Test
+  void getCommodities_bodyPastTheSizeCap_failsIntoTheCountedFallback() {
+    String filler = "x".repeat((int) UexClient.MAX_RESPONSE_BYTES);
+    server.enqueue(
+        new MockResponse()
+            .setResponseCode(200)
+            .setHeader("Content-Type", "application/json")
+            .setBody("{\"status\":\"ok\",\"data\":[{\"id\":1,\"name\":\"" + filler + "\"}]}"));
+
+    List<UexCommodityDto> commodities = client.getCommodities().data();
+
+    assertTrue(commodities.isEmpty(), "an oversized body must not yield a partial parse");
+    assertEquals(
+        1.0,
+        meterRegistry
+            .get(MetricNames.EXTERNAL_FETCH_ERRORS)
+            .tag(MetricNames.TAG_SOURCE, MetricNames.SOURCE_UEX)
+            .counter()
+            .count());
   }
 
   // ─── getCommodities ─────────────────────────────────────────────────────

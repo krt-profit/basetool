@@ -12,6 +12,16 @@
   Smuggling über einen fehlerhaften `Transfer-Encoding`-Header) in Backend, Webtool und Ingest.
   Keine Funktionsänderung.
 
+- **Oberfläche: die letzten fest verdrahteten Texte kommen aus den Sprachdateien.** Die
+  Terminal-Auswahl beim Ausbuchen, die Lagereintrag-Zeile und der Dateiname des
+  Übergabeprotokolls im Auftrag, die Titel des Spezialkommando-Dialogs und der ADMIN-Hinweis
+  erschienen in der englischen Oberfläche bisher auf Deutsch.
+
+- **Monitoring: „In-flight Requests" statt „Tomcat Busy Threads".** Das Panel im
+  Spring-Apps-Dashboard stand unter virtuellen Threads immer bei -1; es zeigt jetzt die gerade
+  bearbeiteten Requests je Anwendung. Die wirkungslosen `server.tomcat.threads.*`-Einstellungen
+  sind entfernt.
+
 - **Monitoring: Container-Limits werden wieder gelesen.** Der cgroup-Collector las seit der
   Podman-Umstellung die Unit statt des Containers und sah deshalb kein Speicher-, pids- oder
   CPU-Limit: Die Alarme `ContainerMemoryHigh`, `ContainerPidsHigh` und `ContainerCpuThrottledHigh`
@@ -48,6 +58,12 @@
 
 ### Changed
 
+- **UEX-Abgleich: ein fehlerhafter Datensatz kostet nur noch sich selbst.** Preise, Rohstoffe,
+  Raffinerie-Ausbeuten und Universumsdaten werden nach dem Abruf in kleinen, getrennten Paketen
+  gespeichert; bisher verwarf ein einziger abgelehnter Datensatz den ganzen Abgleich, und während UEX
+  antwortete, blieb eine Datenbankverbindung belegt. Schreibzugriffe werden allgemein gebündelt
+  (REQ-DATA-005, REQ-DATA-003).
+
 - **Schnellere Einsatz-Details, Nutzerlisten und Personenauswahl.** Mitglieder in Teilnehmerlisten,
   Bearbeiter-Listen und Nutzerseiten werden gesammelt statt einzeln geladen; ein 30-köpfiger Einsatz
   braucht so viele Datenbankabfragen wie ein 5-köpfiger. Die Personenauswahl lädt pro Tastendruck nur
@@ -83,6 +99,11 @@
 
 - **Monitoring: der Restore-Drill meldet einen ausgefallenen Wochenlauf nach 8 statt 35 Tagen**, und
   der Container-Metrik-Kollektor alarmiert auch, wenn er nie geschrieben hat.
+
+- **Backend und Ingest-Gateway: ohne WebFlux.** Ausgehende Aufrufe (UEX, SC Wiki, Keycloak, das
+  Weiterleiten an das Backend) laufen blockierend über `RestClient` auf dem JDK-HTTP-Client; rund 20
+  Bibliotheken fallen aus jedem Image, die Keycloak-Admin-Aufrufe erscheinen jetzt in den
+  HTTP-Client-Metriken (ADR-0204). Für Nutzer ändert sich nichts.
 
 - **Betrieb: die Betriebsskripte kennen nur noch Podman.** Die Docker-Zweige in Deploy, Backup,
   Restore-Drill und Cleanup sind entfernt, ebenso cAdvisor und der Docker-Socket-Proxy im Monitoring

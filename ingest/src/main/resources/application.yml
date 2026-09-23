@@ -1,9 +1,7 @@
 server:
-  # Enable the Tomcat MBean registry so Micrometer's TomcatMetrics binder publishes
-  # tomcat_threads_* (busy/current/max) for the "Spring Boot apps" dashboard (epic #936).
-  tomcat:
-    mbeanregistry:
-      enabled: true
+  # No Tomcat MBean registry (FE-PERF-07, 2026-09-22). It was enabled only so TomcatMetrics could
+  # publish tomcat_threads_* for the "Spring Boot apps" dashboard (epic #936), but under virtual
+  # threads those gauges are always -1; the panel reads http_server_requests_active_seconds_gcount.
   port: 11262
   # Behind nginx-proxy-manager (TLS terminated at the proxy). `native` routes X-Forwarded-* through
   # Tomcat's RemoteIpValve, which only honours the header from a TRUSTED internal proxy (its default
@@ -172,7 +170,7 @@ resilience4j:
         failure-rate-threshold: 60
         wait-duration-in-open-state: 10s
         ignore-exceptions:
-          - org.springframework.web.reactive.function.client.WebClientResponseException
+          - org.springframework.web.client.RestClientResponseException
 
 logging:
   level:

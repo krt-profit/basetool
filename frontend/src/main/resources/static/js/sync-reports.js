@@ -89,10 +89,10 @@ document.addEventListener('DOMContentLoaded', function () {
             encodeURIComponent(sourceValue);
         window.krtFetch.write({
             method: 'POST',
-            url: url,
+            url,
             toast: false,
             errorMessage: SYNC_MSG.deleteError,
-            onSuccess: function (body) {
+            onSuccess(body) {
                 const count = body && body.deleted != null ? body.deleted : 0;
                 if (window.showFrontendSuccessToast) {
                     window.showFrontendSuccessToast(SYNC_MSG.successTemplate.replace('{0}', count));

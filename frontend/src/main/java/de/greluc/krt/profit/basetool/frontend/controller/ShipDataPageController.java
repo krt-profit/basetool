@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
-import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
+import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ManufacturerDto;
@@ -28,7 +28,6 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.ShipTypeDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.ManufacturerForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.ShipTypeForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.CatalogPages;
 import de.greluc.krt.profit.basetool.frontend.support.CatalogPages.CompleteCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
@@ -226,16 +225,13 @@ public class ShipDataPageController {
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   @ResponseBody
   public ResponseEntity<Object> resetAllFittedAjax() {
-    try {
-      backendApiClient.post("/api/v1/hangar/ships/reset-fitted", null, Void.class);
-      return ResponseEntity.noContent().build();
-    } catch (BackendServiceException e) {
-      log.debug("Reset all fitted failed (ajax): {}", e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Reset all fitted failed (ajax)", e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "reset all fitted (ajax)",
+        () -> {
+          backendApiClient.post("/api/v1/hangar/ships/reset-fitted", null, Void.class);
+          return ResponseEntity.noContent().build();
+        });
   }
 
   /**
@@ -252,17 +248,14 @@ public class ShipDataPageController {
   @ResponseBody
   public ResponseEntity<Object> toggleShipTypeVisibilityAjax(
       @PathVariable @NotNull UUID id, @RequestParam boolean hidden) {
-    try {
-      backendApiClient.put(
-          "/api/v1/ship-types/" + id + "/visibility?hidden=" + hidden, null, Void.class);
-      return ResponseEntity.noContent().build();
-    } catch (BackendServiceException e) {
-      log.debug("Update ShipType visibility failed (ajax): {}", e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Update ShipType visibility failed (ajax)", e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "update ShipType visibility (ajax)",
+        () -> {
+          backendApiClient.put(
+              "/api/v1/ship-types/" + id + "/visibility?hidden=" + hidden, null, Void.class);
+          return ResponseEntity.noContent().build();
+        });
   }
 
   /**
@@ -281,16 +274,13 @@ public class ShipDataPageController {
   @ResponseBody
   public ResponseEntity<Object> toggleManufacturerVisibilityAjax(
       @PathVariable @NotNull UUID id, @RequestParam boolean hidden) {
-    try {
-      backendApiClient.put(
-          "/api/v1/manufacturers/" + id + "/visibility?hidden=" + hidden, null, Void.class);
-      return ResponseEntity.noContent().build();
-    } catch (BackendServiceException e) {
-      log.debug("Update Manufacturer visibility failed (ajax): {}", e.getMessage());
-      return propagateBackendError(e);
-    } catch (Exception e) {
-      log.error("Update Manufacturer visibility failed (ajax)", e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return relay(
+        log,
+        "update Manufacturer visibility (ajax)",
+        () -> {
+          backendApiClient.put(
+              "/api/v1/manufacturers/" + id + "/visibility?hidden=" + hidden, null, Void.class);
+          return ResponseEntity.noContent().build();
+        });
   }
 }

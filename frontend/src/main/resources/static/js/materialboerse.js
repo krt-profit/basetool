@@ -15,18 +15,18 @@
 (function () {
     'use strict';
 
-    let i18n = window.materialboerseI18n || {};
-    let gi18n = window.materialgesuchI18n || {};
+    const i18n = window.materialboerseI18n || {};
+    const gi18n = window.materialgesuchI18n || {};
     if (!window.krtFetch || !document.getElementById('mb-board')) {
         return;
     }
 
-    let SERIALIZE_KEY = 'materialboerse';
-    let REQUEST_SERIALIZE_KEY = 'materialgesuch';
+    const SERIALIZE_KEY = 'materialboerse';
+    const REQUEST_SERIALIZE_KEY = 'materialgesuch';
     // REQ-FE-015 (ADR-0094): the global live-sync room the board publishes to / subscribes from,
     // multiplexed over the shared /ws/sync socket. Offers broadcast the `board` section key,
     // requests the `requests` key; the receiver refreshes only the visible board.
-    let MATERIALBOARD_TOPIC = 'materialboard';
+    const MATERIALBOARD_TOPIC = 'materialboard';
     let selectedId = readSelectedId();
     let selectedRequestId = readSelectedRequestId();
     let searchTimer = null;
@@ -39,17 +39,17 @@
     }
 
     function readSelectedId() {
-        let active = document.querySelector('.mb-mrow.is-active[data-offer-id]');
+        const active = document.querySelector('.mb-mrow.is-active[data-offer-id]');
         return active ? active.getAttribute('data-offer-id') : null;
     }
 
     function readSelectedRequestId() {
-        let active = document.querySelector('.mb-mrow.is-active[data-request-id]');
+        const active = document.querySelector('.mb-mrow.is-active[data-request-id]');
         return active ? active.getAttribute('data-request-id') : null;
     }
 
     function val(selector) {
-        let el = document.querySelector(selector);
+        const el = document.querySelector(selector);
         return el ? el.value.trim() : '';
     }
 
@@ -58,12 +58,12 @@
     }
 
     function activeTab() {
-        let tab = activeTabEl();
+        const tab = activeTabEl();
         return tab ? tab.getAttribute('data-mb-tab') : 'alle';
     }
 
     function activeMode() {
-        let tab = activeTabEl();
+        const tab = activeTabEl();
         return tab ? tab.getAttribute('data-mb-mode') || 'offers' : 'offers';
     }
 
@@ -74,8 +74,8 @@
     // deliberately NOT persisted. Absent key = no saved preference = the server-rendered
     // defaults. Guarded so privacy modes that deny storage degrade to the defaults instead of
     // breaking the board.
-    let FILTER_PREF_KEY = 'materialboerse_filters';
-    let SORT_KEYS = ['qual', 'menge', 'mat', 'neu'];
+    const FILTER_PREF_KEY = 'materialboerse_filters';
+    const SORT_KEYS = ['qual', 'menge', 'mat', 'neu'];
 
     function defaultBoardFilters() {
         return { minQuality: '', minAmount: '', sort: 'qual' };
@@ -83,7 +83,7 @@
 
     function readFilterPref() {
         try {
-            let raw = localStorage.getItem(FILTER_PREF_KEY);
+            const raw = localStorage.getItem(FILTER_PREF_KEY);
             return raw === null ? null : JSON.parse(raw);
         } catch (_e) {
             return null; // corrupt value / storage unavailable: fall back to the defaults
@@ -116,7 +116,7 @@
     }
 
     function normalizeFilterPref(saved) {
-        let state = {
+        const state = {
             mode: 'offers',
             tab: 'alle',
             offers: defaultBoardFilters(),
@@ -136,8 +136,8 @@
         return state;
     }
 
-    let rawFilterPref = readFilterPref();
-    let filterState = normalizeFilterPref(rawFilterPref);
+    const rawFilterPref = readFilterPref();
+    const filterState = normalizeFilterPref(rawFilterPref);
 
     // Snapshots the current widget state into localStorage, immediately on every tab / filter /
     // sort / reset interaction (not debounced with the re-fetch). Only the visible board's
@@ -166,7 +166,7 @@
     // board swap would otherwise silently drop the target board's persisted filters. The swap
     // URL then carries them and the server echoes them into the swapped-in toolbar.
     function filterVal(selector, savedValue) {
-        let el = document.querySelector(selector);
+        const el = document.querySelector(selector);
         if (el) {
             return el.value.trim();
         }
@@ -176,21 +176,21 @@
     // -------- offer swaps ----------------------------------------------------
 
     function params() {
-        let p = new URLSearchParams();
+        const p = new URLSearchParams();
         p.set('tab', activeTab());
-        let qv = val('[data-mb-search]');
+        const qv = val('[data-mb-search]');
         if (qv) {
             p.set('q', qv);
         }
-        let minQ = filterVal('[data-mb-minquality]', filterState.offers.minQuality);
+        const minQ = filterVal('[data-mb-minquality]', filterState.offers.minQuality);
         if (minQ) {
             p.set('minQuality', minQ);
         }
-        let minA = filterVal('[data-mb-minamount]', filterState.offers.minAmount);
+        const minA = filterVal('[data-mb-minamount]', filterState.offers.minAmount);
         if (minA) {
             p.set('minAmount', minA);
         }
-        let sort = filterVal('[data-mb-sort]', filterState.offers.sort);
+        const sort = filterVal('[data-mb-sort]', filterState.offers.sort);
         if (sort) {
             p.set('sort', sort);
         }
@@ -201,7 +201,7 @@
     }
 
     function swapList() {
-        let p = params();
+        const p = params();
         p.set('fragment', 'list');
         return window.krtFetch.swap({
             url: '/materialboerse?' + p.toString(),
@@ -212,7 +212,7 @@
     }
 
     function swapBoard() {
-        let p = params();
+        const p = params();
         p.set('fragment', 'board');
         return window.krtFetch.swap({
             url: '/materialboerse?' + p.toString(),
@@ -234,22 +234,22 @@
     // -------- request (Gesuche) swaps ---------------------------------------
 
     function requestParams() {
-        let p = new URLSearchParams();
+        const p = new URLSearchParams();
         p.set('mode', 'requests');
         p.set('tab', activeTab());
-        let qv = val('[data-mg-search]');
+        const qv = val('[data-mg-search]');
         if (qv) {
             p.set('q', qv);
         }
-        let minQ = filterVal('[data-mg-minquality]', filterState.requests.minQuality);
+        const minQ = filterVal('[data-mg-minquality]', filterState.requests.minQuality);
         if (minQ) {
             p.set('minQuality', minQ);
         }
-        let minA = filterVal('[data-mg-minamount]', filterState.requests.minAmount);
+        const minA = filterVal('[data-mg-minamount]', filterState.requests.minAmount);
         if (minA) {
             p.set('minAmount', minA);
         }
-        let sort = filterVal('[data-mg-sort]', filterState.requests.sort);
+        const sort = filterVal('[data-mg-sort]', filterState.requests.sort);
         if (sort) {
             p.set('sort', sort);
         }
@@ -260,7 +260,7 @@
     }
 
     function swapRequestList() {
-        let p = requestParams();
+        const p = requestParams();
         p.set('fragment', 'list');
         return window.krtFetch.swap({
             url: '/materialboerse?' + p.toString(),
@@ -271,7 +271,7 @@
     }
 
     function swapRequestBoard() {
-        let p = requestParams();
+        const p = requestParams();
         p.set('fragment', 'board');
         return window.krtFetch.swap({
             url: '/materialboerse?' + p.toString(),
@@ -294,22 +294,22 @@
 
     function applyAgo(root) {
         (root || document).querySelectorAll('[data-mb-ago]').forEach(function (el) {
-            let ts = el.getAttribute('data-ts');
+            const ts = el.getAttribute('data-ts');
             if (!ts) {
                 return;
             }
-            let then = Date.parse(ts);
+            const then = Date.parse(ts);
             if (isNaN(then)) {
                 return;
             }
-            let hours = Math.floor((Date.now() - then) / 3600000);
+            const hours = Math.floor((Date.now() - then) / 3600000);
             let text;
             if (hours < 1) {
                 text = i18n.agoNow || 'gerade eben';
             } else if (hours < 24) {
                 text = fmt(i18n.agoHours || 'vor {0} Std', hours);
             } else {
-                let days = Math.round(hours / 24);
+                const days = Math.round(hours / 24);
                 text =
                     days === 1
                         ? i18n.agoDayOne || 'vor 1 Tag'
@@ -323,7 +323,7 @@
 
     function setActiveTabEl(el) {
         document.querySelectorAll('.tab[data-mb-tab]').forEach(function (btn) {
-            let on = btn === el;
+            const on = btn === el;
             btn.classList.toggle('active', on);
             btn.setAttribute('aria-selected', on ? 'true' : 'false');
         });
@@ -343,7 +343,7 @@
 
     function markActiveRow(id) {
         document.querySelectorAll('.mb-mrow[data-offer-id]').forEach(function (row) {
-            let on = row.getAttribute('data-offer-id') === id;
+            const on = row.getAttribute('data-offer-id') === id;
             row.classList.toggle('is-active', on);
             row.setAttribute('aria-pressed', on ? 'true' : 'false');
         });
@@ -351,7 +351,7 @@
 
     function markActiveRequestRow(id) {
         document.querySelectorAll('.mb-mrow[data-request-id]').forEach(function (row) {
-            let on = row.getAttribute('data-request-id') === id;
+            const on = row.getAttribute('data-request-id') === id;
             row.classList.toggle('is-active', on);
             row.setAttribute('aria-pressed', on ? 'true' : 'false');
         });
@@ -378,7 +378,7 @@
     }
 
     function setInputVal(selector, value) {
-        let el = document.querySelector(selector);
+        const el = document.querySelector(selector);
         if (el) {
             el.value = value;
         }
@@ -386,7 +386,7 @@
 
     function anyModalOpen() {
         return ['mb-modal', 'mg-modal'].some(function (id) {
-            let modal = document.getElementById(id);
+            const modal = document.getElementById(id);
             return (
                 modal &&
                 window.getComputedStyle(modal).display !== '' &&
@@ -398,15 +398,15 @@
     // -------- offer writes ---------------------------------------------------
 
     function toggleInterest(button) {
-        let id = button.getAttribute('data-offer-id');
-        let interested = button.getAttribute('data-interested') === 'true';
+        const id = button.getAttribute('data-offer-id');
+        const interested = button.getAttribute('data-interested') === 'true';
         window.krtFetch.write({
             method: interested ? 'DELETE' : 'POST',
             url: '/materialboerse/offers/' + id + '/interest/ajax',
             successMessage: interested ? i18n.interestRemoved : i18n.interestAdded,
             errorMessage: i18n.error,
             serialize: SERIALIZE_KEY,
-            onSuccess: function () {
+            onSuccess() {
                 notifyPeersBoard();
                 return swapList();
             },
@@ -431,7 +431,7 @@
                     successMessage: i18n.deactivated,
                     errorMessage: i18n.error,
                     serialize: SERIALIZE_KEY,
-                    onSuccess: function () {
+                    onSuccess() {
                         notifyPeersBoard();
                         selectedId = null;
                         return swapBoard();
@@ -450,15 +450,15 @@
     // -------- request (Gesuche) writes --------------------------------------
 
     function toggleFulfillment(button) {
-        let id = button.getAttribute('data-request-id');
-        let interested = button.getAttribute('data-interested') === 'true';
+        const id = button.getAttribute('data-request-id');
+        const interested = button.getAttribute('data-interested') === 'true';
         window.krtFetch.write({
             method: interested ? 'DELETE' : 'POST',
             url: '/materialboerse/requests/' + id + '/interest/ajax',
             successMessage: interested ? gi18n.interestRemoved : gi18n.interestAdded,
             errorMessage: gi18n.error,
             serialize: REQUEST_SERIALIZE_KEY,
-            onSuccess: function () {
+            onSuccess() {
                 notifyPeersRequests();
                 return swapRequestList();
             },
@@ -483,7 +483,7 @@
                     successMessage: gi18n.deactivated,
                     errorMessage: gi18n.error,
                     serialize: REQUEST_SERIALIZE_KEY,
-                    onSuccess: function () {
+                    onSuccess() {
                         notifyPeersRequests();
                         selectedRequestId = null;
                         return swapRequestBoard();
@@ -577,8 +577,8 @@
     document.addEventListener('click', function (e) {
         let el;
         if ((el = e.target.closest('[data-mb-tab]'))) {
-            let toMode = el.getAttribute('data-mb-mode') || 'offers';
-            let fromMode = activeMode();
+            const toMode = el.getAttribute('data-mb-mode') || 'offers';
+            const fromMode = activeMode();
             setActiveTabEl(el);
             toggleCtaGroups(toMode);
             persistFilters(); // REQ-UI-017: keep the (mode, tab) selection across visits
@@ -620,7 +620,7 @@
             return;
         }
         if (e.target.closest('[data-mb-deselect]') || e.target.closest('[data-mg-deselect]')) {
-            let md = document.querySelector('.mb-md');
+            const md = document.querySelector('.mb-md');
             if (md) {
                 md.classList.remove('has-sel');
             }
@@ -649,7 +649,7 @@
         if ((el = e.target.closest('[data-mb-select]'))) {
             selectedId = el.getAttribute('data-offer-id');
             markActiveRow(selectedId);
-            let mdSel = document.querySelector('.mb-md');
+            const mdSel = document.querySelector('.mb-md');
             if (mdSel) {
                 mdSel.classList.add('has-sel');
             }
@@ -659,7 +659,7 @@
         if ((el = e.target.closest('[data-mg-select]'))) {
             selectedRequestId = el.getAttribute('data-request-id');
             markActiveRequestRow(selectedRequestId);
-            let mdSel = document.querySelector('.mb-md');
+            const mdSel = document.querySelector('.mb-md');
             if (mdSel) {
                 mdSel.classList.add('has-sel');
             }
@@ -696,7 +696,7 @@
     // the request list and vice-versa.
     let peerTimer = null;
     function onPeerChanged(sections) {
-        let secs = Array.isArray(sections) ? sections : [];
+        const secs = Array.isArray(sections) ? sections : [];
         if (peerTimer) {
             clearTimeout(peerTimer);
         }
@@ -725,7 +725,7 @@
 
     // Writes a saved value into a rendered toolbar widget; reports whether it actually changed.
     function setIfDifferent(selector, value) {
-        let el = document.querySelector(selector);
+        const el = document.querySelector(selector);
         if (!el || el.value.trim() === value) {
             return false;
         }
@@ -754,7 +754,7 @@
         if (rawFilterPref === null) {
             return; // no saved preference: keep the server-rendered defaults
         }
-        let target = tabEl(filterState.mode, filterState.tab);
+        const target = tabEl(filterState.mode, filterState.tab);
         if (!target) {
             return;
         }
