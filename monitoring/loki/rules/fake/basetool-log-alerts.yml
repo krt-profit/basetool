@@ -119,6 +119,43 @@ groups:
 
   - name: log-alerts-warning
     rules:
+      # The JVM started WITHOUT the startup cache baked into its image (IMG-CI-13, REQ-OPS-030,
+      # ADR-0180). The image build proves the cache is usable by a JVM started with the image's own
+      # object layout (docker/app/Dockerfile runs a second start under -XX:AOTMode=on and fails the
+      # build otherwise). What it cannot prove is that a DEPLOYMENT starts that way: the layout flag
+      # lives in JAVA_TOOL_OPTIONS (docker-compose.yml, quadlet/env.d), and the documented rollback
+      # `IRI_EXTRA_JAVA_OPTS=-XX:-UseCompactObjectHeaders` flips it on purpose. A JVM whose layout
+      # differs from the cache's does not fail -- under the default -XX:AOTMode=auto it prints the
+      # lines below to stdout and starts without the cache, which costs startup time and nothing
+      # else (a bare ingest context refresh: 3.2 s with the cache, 6.5 s without; ADR-0209). That silent shape is exactly what went unnoticed under AppCDS, so it
+      # is made loud here, at warning: the service is up, only slower, and the fix is a flag or an
+      # image rebuild, never an incident.
+      #
+      # Verified 2026-09-23 on eclipse-temurin:25-jre-alpine@sha256:3137541d… (Temurin 25.0.4+7):
+      # an ingest cache trained with -XX:+UseCompactObjectHeaders, started with the flag off, writes
+      #
+      #   [0.005s][warning][aot] Unable to use AOT cache.
+      #   [                    ] The AOT cache's UseCompactObjectHeaders setting (enabled) does not
+      #                          equal the current UseCompactObjectHeaders setting (disabled).
+      #   [0.005s][error  ][aot] Loading static archive failed.
+      #
+      # and then starts. The AppCDS wording the images used until 2026-09-23 ("Unable to use shared
+      # archive file", "Loading dynamic archive failed", verified 2026-09-15 for ADR-0180) is matched
+      # too, so an image from before the switch is still covered while it can be rolled back to.
+      # These lines are written by HotSpot's unified logging, outside logback, so they exist only in
+      # the `<svc>-stdout` streams (ADR-0095); none of the three Alloy masking replaces can touch
+      # them. scripts/check-loki-rule-signatures.py asserts the filter against the verbatim lines,
+      # and the next Temurin bump owes the same re-check as JvmNativeThreadExhaustion
+      # (monitoring/README.md).
+      - alert: JvmStartupCacheRejected
+        expr: 'sum by (app) (count_over_time({app=~"(backend|frontend|ingest)-stdout"} |~ "Unable to use (AOT cache|shared archive)|Loading (static|dynamic) archive failed" [10m])) > 0'
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "A JVM started without its image's startup cache ({{ $labels.app }})"
+          description: "The container's stdout carries 'Unable to use AOT cache' (or the AppCDS equivalent): the JVM refused the cache baked into the image and started without it, typically because JAVA_TOOL_OPTIONS sets a different -XX:UseCompactObjectHeaders than the image was built with (ADR-0180, REQ-OPS-030). The service runs; only its start is slower. Compare the flag in JAVA_TOOL_OPTIONS / IRI_EXTRA_JAVA_OPTS with docker/app/Dockerfile; if the rollback lever is in use on purpose, this is expected until the image is rebuilt."
+
       # Fail-open Discord SPI: a persistently erroring precheck silently disables a security gate
       # while logins keep succeeding — only the Keycloak ERROR-rate catches it.
       - alert: KeycloakErrorRateHigh

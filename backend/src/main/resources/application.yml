@@ -535,7 +535,7 @@ app:
 # keycloak CONTAINER's own healthcheck (not this indicator) gates backend startup
 # via `depends_on: condition: service_healthy`.
 # `livenessState` is likewise not in this group.
-# The Docker HEALTHCHECK in backend/Dockerfile points at /actuator/health/readiness
+# The Docker HEALTHCHECK in docker/app/Dockerfile (stage runtime-backend) points at /actuator/health/readiness
 # so this group is what gates docker-compose `service_healthy`.
 management:
   endpoints:

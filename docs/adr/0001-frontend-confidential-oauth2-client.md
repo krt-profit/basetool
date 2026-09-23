@@ -1,6 +1,7 @@
 # ADR-0001 — Frontend as a confidential OAuth2 client (PKCE + client secret)
 
-- **Status:** Accepted — implementation pending
+- **Status:** Accepted — implemented 2026-09-23 (code, inert until configured); production rollout
+  pending the owner (see *Implementation*)
 - **Date:** 2026-05-20
 - **Deciders:** Repository owner (security-audit follow-up)
 - **Related:** security-audit finding **M-6** (2026-05-20) · implementation runbook
@@ -40,6 +41,30 @@ then useless without the server-only secret.
   linked migration doc.
 - The secret must be rotated like any other credential (Keycloak → `basetool-frontend` →
   Credentials → Regenerate).
+
+## Implementation (2026-09-23, REQ-SEC-069)
+
+The consequence above — "logins fail between flipping the client and deploying the secret" — was
+a property of the order it assumed, not of the decision. The implementation removes it:
+
+1. **The client type follows the secret.** `KEYCLOAK_FRONTEND_CLIENT_SECRET` set makes the
+   registration `client_secret_basic` + PKCE; unset keeps `none` + PKCE
+   (`FrontendClientAuthenticationConfig`). One variable, so method and secret cannot disagree, and a
+   release carrying the code changes nothing until the variable exists.
+2. **Frontend first, Keycloak second.** Keycloak ignores a secret presented by a client it considers
+   public (measured on 26.7), so the frontend can start sending it before Keycloak requires it. The
+   provisioner then flips the client and sets Keycloak's secret to the operator's value in one update
+   (`--frontend-client confidential`, ADR-0202 amendment 2). No window, no maintenance.
+3. **Sessions follow, and never hold the secret.** Spring Security refreshes with the registration
+   stored inside the session's authorized client, which would have refreshed every pre-rollout
+   session as a public client — `invalid_client`, and every member back through the login.
+   `CurrentRegistrationAuthorizedClientRepository` stores the client with an empty secret and swaps
+   the current registration back in on read, so sessions switch with the frontend and the secret
+   never reaches Redis.
+4. **The E2E realm is confidential**, so every Playwright login proves the confidential path.
+
+Rotating the secret goes through the public state (Keycloak accepts both then); the runbook has the
+sequence.
 
 ## Alternatives considered
 

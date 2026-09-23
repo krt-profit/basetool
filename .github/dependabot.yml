@@ -31,7 +31,7 @@ updates:
     commit-message:
       prefix: "chore(actions)"
 
-  # The three app modules share ONE base image (eclipse-temurin:25-jre-alpine,
+  # The three app images share ONE base image (eclipse-temurin:25-jre-alpine,
   # digest-pinned), so this cadence is the dominant term in how long an OS-level
   # CVE survives in production. Measured 2026-09-03: the pin has moved exactly
   # once since the images went to Alpine, and the whole path is
@@ -47,39 +47,14 @@ updates:
   # choice, and the lever anyone reaching for a faster patch should pull first is
   # this interval, not a rebase pipeline.
   #
-  # Not consolidated into one `directories:` entry with a `groups:` block, which
-  # would turn a base bump into a single PR instead of three: a wrong key there
-  # makes Dependabot silently stop updating these paths, and silently LENGTHENING
-  # this exact loop is the failure this entry exists to prevent. Worth doing
-  # deliberately, verified against a real run - not blind.
+  # ONE entry since 2026-09-23: the three per-module Dockerfiles became
+  # docker/app/Dockerfile (IMG-SIMP-14), so a base bump is one PR instead of three
+  # that had to be merged together. This is a plain `directory:` like the three
+  # entries it replaces, not a `directories:` + `groups:` construction, so it
+  # carries none of the silent-misconfiguration risk that argued against grouping
+  # the old three.
   - package-ecosystem: docker
-    directory: /backend
-    schedule:
-      interval: weekly
-      day: monday
-    open-pull-requests-limit: 5
-    labels:
-      - dependencies
-      - docker
-    commit-message:
-      prefix: "chore(docker)"
-
-  - package-ecosystem: docker
-    directory: /frontend
-    schedule:
-      interval: weekly
-      day: monday
-    open-pull-requests-limit: 5
-    labels:
-      - dependencies
-      - docker
-    commit-message:
-      prefix: "chore(docker)"
-
-  # The ingest gateway is internet-facing like backend/frontend, so its base
-  # image must get the same automated CVE bumps (security audit gap-fill).
-  - package-ecosystem: docker
-    directory: /ingest
+    directory: /docker/app
     schedule:
       interval: weekly
       day: monday

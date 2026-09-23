@@ -698,6 +698,82 @@ assert_eq "$(writes_in "$state")" "0" "and sends no write"
 rm -rf "$state"
 
 # ---------------------------------------------------------------------------
+echo "9. without --frontend-client the frontend's client type is never touched (ADR-0001)"
+# ---------------------------------------------------------------------------
+# The rollout is the owner's. A run in between -- or after it -- must neither flip production's
+# frontend to confidential nor flip it back to public.
+state="$(mktemp -d)"
+make_stub "$state" empty
+run_provisioner "$state" --apply >/dev/null
+assert_eq "$(query "$state" "client('basetool-frontend')['publicClient']")" "True" "a new frontend client is created public, production's pre-rollout shape"
+STUB_STATE="$state" "$PYTHON" -c '
+import json, os, pathlib
+p = pathlib.Path(os.environ["STUB_STATE"]) / "state.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+fe = next(c for c in d["clients"] if c["clientId"] == "basetool-frontend")
+fe["publicClient"] = False
+fe["clientAuthenticatorType"] = "client-secret"
+fe["secret"] = "ROLLED-OUT-SECRET-must-never-be-printed"
+p.write_text(json.dumps(d), encoding="utf-8")
+'
+output="$(run_provisioner "$state")"
+assert_eq "$(cat "${state}/rc")" "0" "a confidential frontend is 'in shape' without the flag"
+assert_not_contains "$output" "publicClient" "no plan line touches the client type"
+assert_not_contains "$output" "ROLLED-OUT-SECRET" "the stored secret is never printed"
+rm -rf "$state"
+
+# ---------------------------------------------------------------------------
+echo "10. --frontend-client confidential without the secret in the environment refuses"
+# ---------------------------------------------------------------------------
+state="$(mktemp -d)"
+make_stub "$state" empty
+run_provisioner "$state" --apply >/dev/null
+before="$(cat "${state}/state.json")"
+unset KEYCLOAK_FRONTEND_CLIENT_SECRET
+output="$(run_provisioner "$state" --frontend-client confidential --apply)"
+assert_eq "$(cat "${state}/rc")" "1" "the apply is refused"
+assert_contains "$output" "KEYCLOAK_FRONTEND_CLIENT_SECRET" "the refusal names the variable"
+assert_eq "$(cat "${state}/state.json")" "$before" "nothing is written"
+rm -rf "$state"
+
+# ---------------------------------------------------------------------------
+echo "11. --frontend-client confidential switches the client with the operator's secret, once"
+# ---------------------------------------------------------------------------
+state="$(mktemp -d)"
+make_stub "$state" empty
+run_provisioner "$state" --apply >/dev/null
+rm -f "${state}/SECRET_SENT_BACK"
+output="$(KEYCLOAK_FRONTEND_CLIENT_SECRET="OPERATOR-SECRET-must-never-be-printed" run_provisioner "$state" --frontend-client confidential)"
+assert_eq "$(cat "${state}/rc")" "2" "the dry run plans the switch"
+assert_contains "$output" "~ publicClient: true -> false" "the plan names the switch"
+assert_contains "$output" "~ secret: set from \$KEYCLOAK_FRONTEND_CLIENT_SECRET" "the plan says where the secret comes from"
+assert_not_contains "$output" "OPERATOR-SECRET" "the dry run never prints the secret"
+output="$(KEYCLOAK_FRONTEND_CLIENT_SECRET="OPERATOR-SECRET-must-never-be-printed" run_provisioner "$state" --frontend-client confidential --apply)"
+assert_eq "$(cat "${state}/rc")" "0" "the apply succeeds and verifies clean"
+assert_not_contains "$output" "OPERATOR-SECRET" "the apply never prints the secret"
+assert_eq "$(query "$state" "client('basetool-frontend')['publicClient'], client('basetool-frontend')['clientAuthenticatorType'], client('basetool-frontend')['secret']")" \
+  "(False, 'client-secret', 'OPERATOR-SECRET-must-never-be-printed')" "Keycloak holds exactly the operator's secret"
+assert_eq "$(query "$state" "client('basetool-frontend')['attributes']['pkce.code.challenge.method']")" "S256" "PKCE S256 stays required"
+output="$(KEYCLOAK_FRONTEND_CLIENT_SECRET="A-DIFFERENT-VALUE" run_provisioner "$state" --frontend-client confidential --apply)"
+assert_contains "$output" "No changes" "once confidential, a later run changes nothing"
+assert_eq "$(query "$state" "client('basetool-frontend')['secret']")" "OPERATOR-SECRET-must-never-be-printed" "and never rewrites the secret"
+rm -rf "$state"
+
+# ---------------------------------------------------------------------------
+echo "12. --frontend-client public is the rollback, and sends no secret"
+# ---------------------------------------------------------------------------
+state="$(mktemp -d)"
+make_stub "$state" empty
+run_provisioner "$state" --apply >/dev/null
+KEYCLOAK_FRONTEND_CLIENT_SECRET="OPERATOR-SECRET-must-never-be-printed" run_provisioner "$state" --frontend-client confidential --apply >/dev/null
+rm -f "${state}/SECRET_SENT_BACK"
+output="$(run_provisioner "$state" --frontend-client public --apply)"
+assert_eq "$(cat "${state}/rc")" "0" "the rollback applies and verifies clean"
+assert_eq "$(query "$state" "client('basetool-frontend')['publicClient']")" "True" "the frontend is public again"
+assert_eq "$([[ -f "${state}/SECRET_SENT_BACK" ]] && echo sent || echo none)" "none" "no secret travels on the rollback"
+rm -rf "$state"
+
+# ---------------------------------------------------------------------------
 echo
 if [[ $tests_failed -gt 0 ]]; then
   echo "FAILED: ${tests_failed} of ${tests_run} assertions"

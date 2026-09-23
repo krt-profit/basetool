@@ -112,6 +112,11 @@ What to know before running it:
   decisions: the Android client's realm-role scope is converged both ways (`REQ-SEC-035`),
   `offline_access` is withheld from it (ADR-0131), and a client the run *creates* gets exactly its
   production scope lists.
+- **The frontend's client type is left alone unless you name it** (ADR-0202 amendment 2):
+  `--frontend-client confidential` switches `basetool-frontend` to confidential and sets Keycloak's
+  secret from `$KEYCLOAK_FRONTEND_CLIENT_SECRET` in the same update (refused without it);
+  `--frontend-client public` is the rollback. Without the flag a run never changes the type, in
+  either direction ([`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md)).
 - **Origins are arguments.** `--public-origin https://<the environment's host>` feeds the frontend's
   and the app's redirect URIs, web origins and post-logout list; nothing production-specific is
   hard-coded.

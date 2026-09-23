@@ -1615,7 +1615,7 @@ generated one is a silent-drift machine — did not stop at the artifacts themse
 `.github/scripts/check_sbom_coverage.py` · `.github/workflows/repo-lint.yml` (`sbom-coverage`) ·
 **Related:** REQ-OPS-025 (the set it mirrors), REQ-OPS-023 (provenance for those same assets)
 
-### REQ-OPS-030 — The object layout is set once and matched by the baked CDS archive
+### REQ-OPS-030 — The object layout is set once and matched by the baked startup cache
 
 All three application JVMs run **`-XX:+UseCompactObjectHeaders`** (64-bit object headers instead of
 96-bit), a product option since JDK 25 (JEP 519) and the default from JDK 27 (JEP 534). It is taken
@@ -1624,19 +1624,33 @@ on the LTS the stack already runs rather than waited for, because the stack is m
 
 **The flag is set in two places and both are mandatory:**
 
-|                            Place                            |                              Why                              |
-|-------------------------------------------------------------|---------------------------------------------------------------|
-| `docker-compose.yml` → each `JAVA_TOOL_OPTIONS`             | The runtime layout; beside the collector flag of REQ-OPS-028  |
-| `<module>/Dockerfile` → the `-XX:ArchiveClassesAtExit` line | The AppCDS training run, which cannot see `JAVA_TOOL_OPTIONS` |
+|                               Place                               |                               Why                                |
+|-------------------------------------------------------------------|------------------------------------------------------------------|
+| `docker-compose.yml` / `quadlet/env.d` → each `JAVA_TOOL_OPTIONS` | The runtime layout; beside the collector flag of REQ-OPS-028     |
+| `docker/app/Dockerfile` → `layout=` in the AOT-cache training run | The image build's training run, which cannot see `JAVA_TOOL_OPTIONS` |
 
-A CDS archive records the object layout it was dumped with and the JVM validates it at startup, so
-the two settings must agree. They cannot be kept in step by accident: the training run happens during
-the **image build**, where `JAVA_TOOL_OPTIONS` is not set, and a mismatch is **not** caught by the
-`ENTRYPOINT`'s fallback — that tests whether the `.jsa` *exists*, and it does. The JVM prints
-`The shared archive file's UseCompactObjectHeaders setting (disabled) does not equal the current
-UseCompactObjectHeaders setting (enabled)` followed by `Loading dynamic archive failed`, and then
-**starts normally without CDS**. Setting the flag on one side only therefore trades the 30–50 %
-startup saving away silently, with nothing failing anywhere. The check rules in both directions.
+Each image carries a startup cache created during its build — since 2026-09-23 the Java 25 **AOT
+cache** `/app/app.aot` (ADR-0209), before that a dynamic AppCDS archive `/app/application.jsa`. The
+cache records the object layout it was created with and the JVM validates it at startup, so the two
+settings must agree. They cannot be kept in step by accident: the training run happens during the
+**image build**, where `JAVA_TOOL_OPTIONS` is not set. A JVM started with the other layout prints
+`Unable to use AOT cache. The AOT cache's UseCompactObjectHeaders setting (enabled) does not equal
+the current UseCompactObjectHeaders setting (disabled)` and **starts normally without the cache**
+(the AppCDS wording was `Unable to use shared archive file` / `Loading dynamic archive failed`).
+Setting the flag on one side only therefore costs the startup saving — measured on the three images
+in ADR-0209 — with nothing failing. The check rules in both directions.
+
+**Both halves of that failure are now detected** (IMG-CI-13, 2026-09-23):
+
+- **At build time.** The training run must complete the context refresh, the cache must be written,
+  and a second start under `-XX:AOTMode=on` with the image's own layout must accept it — otherwise
+  the image build fails. Until 2026-09-23 the AppCDS run was best-effort (`|| true`, an entrypoint
+  that only tested whether the archive *existed*), and the backend and frontend training runs had in
+  fact been dying at the missing keystore for as long as that code existed, unnoticed.
+- **At run time.** A deployment that starts with a different layout — including the documented
+  rollback `IRI_EXTRA_JAVA_OPTS=-XX:-UseCompactObjectHeaders` — writes the lines above to its
+  `<svc>-stdout` stream, and the Loki rule **`JvmStartupCacheRejected`** (warning) fires on them.
+  `scripts/check-loki-rule-signatures.py` holds the rule to the verbatim lines.
 
 **The heap saving does not license a smaller budget until it is measured.** Every figure in the
 `JVM CONTAINER SIZING` block of `docker-compose.yml` was measured with 96-bit headers and is the
@@ -1649,23 +1663,36 @@ on two different collectors).
 
 - [x] `backend`, `frontend` and `ingest` each pass `-XX:+UseCompactObjectHeaders` in
   `JAVA_TOOL_OPTIONS`.
-- [x] Each module's `Dockerfile` passes the same flag on its AppCDS training run, and both sides
-  carry a comment naming the other.
+- [x] The image's training run passes the same flag, and both sides carry a comment naming the
+  other.
+- [x] The image build fails when the training run does not complete the context refresh, when no
+  cache is written, or when a start under `-XX:AOTMode=on` with the image's layout refuses the cache
+  (verified 2026-09-23 with two deliberately broken ingest builds — a verifying start under the
+  other layout, and a training run without its JWK-set stub — each failed with its `[AOT] FAILED`
+  message).
+- [x] `JvmStartupCacheRejected` fires on the JVM's rejection lines and stays silent on an accepted
+  start (`check-loki-rule-signatures.py`, run in `repo-lint.yml`).
 - [x] No memory limit and no `MaxRAMPercentage` changed in the same unit of work.
-- [x] No monitoring change is required: `jvm_memory_*` and the container working-set alert are the
-  measurement instrument, and the 90 % `ContainerMemoryHigh` line can only move further away.
+- [x] No change to the memory monitoring is required: `jvm_memory_*` and the container working-set
+  alert are the measurement instrument, and the 90 % `ContainerMemoryHigh` line can only move
+  further away.
 - [ ] Re-measured on production after a full week under the new layout, with the snapshot queries in
   `monitoring/README.md`, and the new table written into the `JVM CONTAINER SIZING` block. Freed
   headroom may be spent only after that.
 
-**Code:** `docker-compose.yml` (each service's `JAVA_TOOL_OPTIONS`) · `backend/Dockerfile` ·
-`frontend/Dockerfile` · `ingest/Dockerfile` · **Decision:**
-[ADR-0180](../adr/0180-compact-object-headers-on-java-25.md) · **Related:** REQ-OPS-028 (the other
-JVM flag, same file, same failure class), REQ-OPS-020 (the measured limits this must not pre-empt)
+**Code:** `docker-compose.yml` and `quadlet/env.d/*.env.tmpl` (each service's `JAVA_TOOL_OPTIONS`) ·
+`docker/app/Dockerfile` (the training `RUN`) · `monitoring/loki/rules/fake/basetool-log-alerts.yml`
+(`JvmStartupCacheRejected`) · **Decision:**
+[ADR-0180](../adr/0180-compact-object-headers-on-java-25.md),
+[ADR-0209](../adr/0209-the-images-ship-a-java-aot-cache-trained-eagerly-and-verified-at-build.md) ·
+**Related:** REQ-OPS-028 (the other JVM flag, same file, same failure class), REQ-OPS-020 (the
+measured limits this must not pre-empt)
 
 ### REQ-OPS-031 — The image build leaves nothing root-owned behind, and the image starts unmounted
 
-The AppCDS training run of REQ-OPS-030 is a **real application start**, so Logback builds every
+The startup-cache training run of REQ-OPS-030 is a **real application start** — since 2026-09-23 two
+of them, the training run and the start under `-XX:AOTMode=on` that verifies its cache — so Logback
+builds every
 appender `logback-spring.xml` declares and creates `logs/<svc>.log` and `logs/<svc>-error.log`
 relative to `WORKDIR /app`. It runs *before* `USER 10001:10001`, and a `USER` switch does not change
 an existing file's owner — so without cleanup those files ship inside the image owned by `root`.
@@ -1674,7 +1701,9 @@ an existing file's owner — so without cleanup those files ship inside the imag
 whole requirement: a later `RUN rm` only stacks a whiteout on top and still ships the bytes
 underneath, so "cleaned up afterwards" would leave the payload in the published image and merely
 hide it. `/app/logs` itself must survive, owned by `10001:10001` — it is the mount point the compose
-templates bind `/var/iri/<svc>/log` over.
+templates bind `/var/iri/<svc>/log` over. The same `RUN` also removes the empty, root-owned
+`/tmp/tomcat.*` and `/tmp/tomcat-docbase.*` working directories each start leaves behind (found
+2026-09-23; every image since the training run existed carried two of them).
 
 **The property this protects is that a published image starts with nothing mounted over it.** The
 baked files broke it, in a way that reads as an application defect: `/app/logs` *is* writable by the
@@ -1709,14 +1738,16 @@ reads an empty value as *no explicit config* and falls back to the classpath `lo
   were the only instance of it.
 - [x] `docker run` on the image with **no** `/app/logs` mount gets past Logback — it fails on missing
   configuration, not on `(Permission denied)`.
-- [x] The training run's flags are unchanged, so the REQ-OPS-030 archive stays representative: the
-  classes the runtime loads at startup are the classes training loaded.
+- [x] The training run keeps the full logging configuration, so the REQ-OPS-030 cache stays
+  representative: the appender and masking classes every real startup loads are in it. (The other
+  training flags changed on 2026-09-23 — an eager refresh with per-module stubs instead of
+  `lazy-initialization`, ADR-0209.)
 - [ ] The `find /app -user 0` assertion runs in `release-images.yml` against the built image, so a
   future build-stage side effect fails the build instead of waiting to be noticed. Not built — today
-  the guarantee rests on the three `Dockerfile`s and this requirement.
+  the guarantee rests on `docker/app/Dockerfile` and this requirement.
 
-**Code:** `backend/Dockerfile` · `frontend/Dockerfile` · `ingest/Dockerfile` (the
-`-XX:ArchiveClassesAtExit` `RUN` in each) · **Related:** REQ-OPS-030 (the training run this cleans up
+**Code:** `docker/app/Dockerfile` (the training `RUN`; one file for all three images since
+2026-09-23) · **Related:** REQ-OPS-030 (the training run this cleans up
 after, and the same silent-degradation failure class), REQ-OPS-014 (the runtime posture the fixed
 UID/GID serves)
 
@@ -1823,7 +1854,8 @@ archive the frontend's linters run on — and Gradle refuses an artifact whose b
 that has no entry at all, before it is used.
 
 - **Strict everywhere a product is built**: CI, the E2E and PIT workflows, the three image builds
-  (they copy `gradle/` already) and the release workflows run in the default strict mode.
+  (`docker/app/Dockerfile` copies `gradle/`; verified strict on an empty cache in all three builds
+  on 2026-09-23) and the release workflows run in the default strict mode.
   `dependency-submission.yml` alone runs lenient — it ships nothing, and its action injects an
   init-script plugin the file does not describe.
 - **Checksums only.** PGP signatures are not verified (ADR-0208 says why and when to revisit).
@@ -1848,7 +1880,7 @@ that has no entry at all, before it is used.
   "Dependency verification failed" (the negative case, run once at introduction).
 
 **Enforced by:** `gradle/verification-metadata.xml` (every Gradle invocation) · `ci.yml`,
-`e2e.yml`, `pitest.yml`, `release-images.yml`, the three `Dockerfile`s (strict by default) ·
+`e2e.yml`, `pitest.yml`, `release-images.yml`, `docker/app/Dockerfile` (strict by default) ·
 **Decision:** [ADR-0208](../adr/0208-gradle-verifies-every-dependency-against-a-committed-sha-256.md)
 · **Related:** REQ-OPS-025 (the SBOMs describing what these artifacts become), REQ-OPS-021 (one
 image build per commit)
