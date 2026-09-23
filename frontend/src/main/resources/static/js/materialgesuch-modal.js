@@ -141,7 +141,7 @@
         itemListOpen = false;
 
         setText(
-            '[data-mg-modal-title]',
+            '#mg-modal-title',
             isEdit
                 ? i18n.editTitle
                 : state.kind === 'ITEM'
@@ -577,7 +577,7 @@
             closeMaterialList();
             closeItemList();
         }
-        if (e.target.closest('[data-mg-modal-close]') || e.target === modal) {
+        if (e.target.closest('[data-mg-modal-close], .mg-modal-close') || e.target === modal) {
             cancel();
             return;
         }

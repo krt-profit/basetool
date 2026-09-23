@@ -248,7 +248,7 @@
         const isEdit = mode === 'edit';
         const isItem = mode === 'item';
         setText(
-            '[data-mb-modal-title]',
+            '#mb-modal-title',
             isEdit ? i18n.editTitle : isItem ? i18n.itemTitle : i18n.releaseTitle,
         );
         setText('[data-mb-submit-label]', isEdit ? i18n.submitSave : i18n.submitRelease);
@@ -738,7 +738,7 @@
             closePickerList();
             closeItemPickerList();
         }
-        if (e.target.closest('[data-mb-modal-close]') || e.target === modal) {
+        if (e.target.closest('[data-mb-modal-close], .mb-modal-close') || e.target === modal) {
             cancel();
             return;
         }
