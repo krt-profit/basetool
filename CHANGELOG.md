@@ -62,6 +62,11 @@
 
 ### Changed
 
+- **Backend: weniger Datenbanklast pro Anfrage.** Die Berechtigungen eines Mitglieds werden pro
+  Anmeldesitzung zwischengespeichert statt pro Zugriffstoken, sodass die alle fünf Minuten
+  erneuerten Tokens sie nicht mehr jedes Mal neu laden. Eine in Keycloak entzogene Rolle wirkt
+  weiterhin beim nächsten Token (ADR-0174).
+
 - **Lager: Mehrfachfilter sind auf beiden Seiten gleich beschriftet.** Sind keine oder alle
   Einträge angehakt, steht dort „Alle", sonst der Name oder „N ausgewählt". „Mein Lager" zeigte bei
   allen angehakten Einträgen bisher „N ausgewählt".
