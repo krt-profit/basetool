@@ -232,6 +232,9 @@
     </th:block>
 </main>
 
+<!--/* The dialogs render only where their openers and their script do: in the admin's
+     all-squadrons view the page shows a pick-a-squadron prompt and loads neither. */-->
+<th:block th:unless="${isAllSquadronsMode}">
 <!--/* Create Topic Modal */-->
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='modal-create-topic', titleKey='promotion.admin.topics.modal.create.title', variant='krt-modal--wide', body=~{::modal-create-topic-body})}">
     <th:block th:ref="modal-create-topic-body">
@@ -333,6 +336,7 @@
             <button class="btn btn--cta" data-trigger="pa-update-category"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{promotion.admin.topics.edit}">Speichern</span></button>
         </div>
     </th:block>
+</th:block>
 </th:block>
 
 <th:block th:replace="~{fragments/toast :: toast}" />

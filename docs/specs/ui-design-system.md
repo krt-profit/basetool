@@ -291,13 +291,18 @@ hiding it — so the class always wins regardless of how the other side toggled 
 - [x] Every dialog is rendered by `modal-wrapper :: modal`; no other template carries
   `.krt-modal-overlay`, `.krt-modal`, `.krt-modal-head` or `.krt-modal-close`, and the head is an
   `<h2>` and an ✕ (2026-09-23).
+- [x] A dialog renders only where its openers and the script that drives it do. The promotion
+  admin pages in the admin's all-squadrons view, and the admin blueprint page before a member is
+  picked, render none of their dialogs (2026-09-23; until then they rendered dead markup).
 - [x] Every dialog on every page route and on a seeded mission, operation, order, refinery order and
   bank account opens modally with a title, an accessible name and a visible ✕, takes focus, and
   closes on Escape and on its ✕. A declared dialog the walk does not reach is listed with its reason.
 
 **Enforced by:** `SingleModalShapeTest` (`everyOverlayIsANativeDialog`,
 `everyDialogIsRenderedByTheWrapper`), `ModalWrapperRenderTest`, `DialogA11yE2eTest`
-(`everyDialogFollowsTheContract`), `OrgChartKeyboardA11yE2eTest`, `TouchClassLayoutE2eTest`
+(`everyDialogFollowsTheContract`), `PromotionAdminDialogsRenderWithTheirScriptMvcTest`,
+`AdminPersonalBlueprintsPageControllerMvcTest`, `OrgChartKeyboardA11yE2eTest`,
+`TouchClassLayoutE2eTest`
 
 **Three sanctioned widths, and no fourth.** `.krt-modal` is 440 px (confirms and single-field
 prompts), `.krt-modal--wide` is 600 px (form-heavy: 3+ stacked fields) and `.krt-modal--xwide` is
@@ -305,16 +310,17 @@ prompts), `.krt-modal--wide` is 600 px (form-heavy: 3+ stacked fields) and `.krt
 material/item pickers and the refinery store sheet. A dialog that needs a width none of these gives
 is a signal to revisit its content, not to add a per-page `max-width`.
 
-**The head's parts are styled, and both heading levels count.** `.krt-modal-close` carries the
+**The head's parts are styled.** `.krt-modal-close` carries the
 `.close-sidebar-btn` treatment (its already-approved sibling — same job, an ✕ that dismisses a
 surface), squared and floored to 44 px in the touch block, with `flex-shrink: 0` so a long German
 title cannot squeeze it narrower than its glyph and a `:focus-visible` ring because it is the first
 Tab stop inside a dialog. It had **no rule at all** until #1884 found it by measurement, and the
 port would have moved the legacy dialogs onto something worse than the styled `.close-modal` they
-came from. The head's title rule covers **`h2` and `h3`**: once the hand-written shells used `h2`
-and the `modal-wrapper` fragment emitted `h3`, and while only `h2` was styled a fragment-rendered
-title fell through to the global heading rule and rendered orange at the browser's default `h3` size
-instead of white at `0.85rem`. Since 2026-09-23 the wrapper, and so every dialog, emits `h2`. The close button's accessible name is **`general.a11y.closeModal`**
+came from. The head's title rule styles the wrapper's **`h2`**. It covered `h3` as well while the
+hand-written shells used `h2` and the fragment emitted `h3` (an unstyled `h3` title fell through to
+the global heading rule and rendered orange at the browser's `h3` size); since 2026-09-23 every
+dialog's title is the wrapper's `h2` and the `h3` selector is gone. The close button's accessible
+name is **`general.a11y.closeModal`**
 (it was `bank.a11y.closeModal`, on fifteen pages that have nothing to do with the Bank).
 
 **A wrapper between the frame and its form needs `.krt-modal-flow`.** The frame caps itself at
@@ -388,7 +394,7 @@ out-specify the page-level `.form-row > .form-group` floor, which is declared la
 - [ ] The frame's width is one of the three sanctioned variants (default / `--wide` / `--xwide`),
   not a per-page `max-width`.
 - [ ] The head carries a `.krt-modal-close` labelled `general.a11y.closeModal`, and its title is an
-  `h2` or `h3` (both are styled).
+  `h2`.
 - [ ] A swap container between `.krt-modal` and its `<form>` carries `.krt-modal-flow`, so the body
   still scrolls under the `90vh` cap.
 - [ ] `.krt-modal-overlay` is `display:none` by default in the global `styles.css` (not only in a

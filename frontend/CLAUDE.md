@@ -121,7 +121,9 @@ state), `closeTrigger` (the ✕'s own handler; `''` when a script binds it by `c
 `closeClass` and `closeId`. The wrapper's head comment documents each one. A condition or iteration
 goes on a `<th:block>` around the call. In a fragment file, name the body with its template
 (`~{fragments/x :: x-modal-body}`). A new dialog id also needs `DialogA11yE2eTest` to reach it, or an
-`UNREACHED` entry with the reason.
+`UNREACHED` entry with the reason. Render a dialog under the same condition as its openers and the
+script that drives it: a dialog nothing can open, or whose handlers were never loaded, is dead
+markup (the promotion admin all-squadrons view and the bare admin blueprint page were).
 
 ## Live update
 

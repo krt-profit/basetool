@@ -109,6 +109,10 @@ class DialogA11yE2eTest {
    */
   private static final Map<String, String> UNREACHED = Map.of();
 
+  /** Pages whose dialogs render only with a squadron pinned, walked again with IRIDIUM pinned. */
+  private static final List<String> SQUADRON_PAGES =
+      List.of("/promotion/admin/topics", "/promotion/admin/rank-requirements");
+
   /** Detail pages reached by the seeded entities' ids; filled in {@link #setUp}. */
   private static final List<String> SEEDED_DETAILS = new ArrayList<>();
 
@@ -284,6 +288,28 @@ class DialogA11yE2eTest {
           findings.add(path + ": could not be checked: " + firstLine(failure.getMessage()));
         }
       }
+      // The promotion admin pages render their dialogs only with a squadron pinned; the admin's
+      // default all-squadrons view shows a prompt instead (REQ-UI-013). Pin IRIDIUM through the
+      // app's own switcher, walk them, and unpin again: the pin lives in the server-side session,
+      // which the shared storage state hands to every later class.
+      try {
+        pinOrgUnit(page, baseUrl, IRIDIUM_ID);
+        for (String path : SQUADRON_PAGES) {
+          try {
+            E2eSupport.navigate(page, baseUrl + path);
+            visited.add(path + " (pinned)");
+            for (String id : dialogIds(page)) {
+              checkDialog(page, baseUrl, path, id, findings);
+              exercised.add(id);
+            }
+          } catch (PlaywrightException failure) {
+            findings.add(
+                path + " (pinned): could not be checked: " + firstLine(failure.getMessage()));
+          }
+        }
+      } finally {
+        pinOrgUnit(page, baseUrl, "");
+      }
     }
 
     List<String> unreached = new ArrayList<>();
@@ -385,6 +411,26 @@ class DialogA11yE2eTest {
                 + " return !d || (!d.open && getComputedStyle(d).display === 'none'); }",
             id);
     return Boolean.TRUE.equals(state);
+  }
+
+  /**
+   * Pins the session's active org unit through the sidebar switcher's form, the way a user does,
+   * and waits for the POST to be answered. An empty id returns to the all-org-units view.
+   *
+   * @param page the page
+   * @param baseUrl the frontend origin
+   * @param orgUnitId the org unit to pin, or {@code ""} to unpin
+   */
+  private static void pinOrgUnit(Page page, String baseUrl, String orgUnitId) {
+    E2eSupport.navigate(page, baseUrl + "/");
+    page.waitForResponse(
+        response -> response.url().contains("/me/active-org-unit"),
+        () ->
+            page.evaluate(
+                "(id) => { const s = document.getElementById('squadron-switcher-select'); s.value ="
+                    + " id; document.getElementById('squadron-switcher-form').submit(); }",
+                orgUnitId));
+    page.waitForLoadState();
   }
 
   /** Closes a dialog that failed to close itself, so the next check starts from a clean page. */

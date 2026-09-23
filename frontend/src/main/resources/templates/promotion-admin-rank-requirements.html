@@ -139,6 +139,9 @@
     </th:block>
 </main>
 
+<!--/* The dialogs render only where their openers and their script do: in the admin's
+     all-squadrons view the page shows a pick-a-squadron prompt and loads neither. */-->
+<th:block th:unless="${isAllSquadronsMode}">
 <!--/* Create Modal */-->
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='modal-create', titleKey='promotion.admin.ranks.modal.create.title', variant='krt-modal--wide', body=~{::modal-create-body})}">
     <th:block th:ref="modal-create-body">
@@ -260,6 +263,7 @@
             <button class="btn btn--cta" data-trigger="ar-submit-edit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{promotion.admin.ranks.edit}">Speichern</span></button>
         </div>
     </th:block>
+</th:block>
 </th:block>
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}" th:unless="${isAllSquadronsMode}">

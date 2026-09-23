@@ -198,6 +198,9 @@
     </th:block>
 </main>
 
+<!--/* The member's edit / remove / import dialogs render only with a member selected, like
+     their openers and the import script below. */-->
+<th:block th:if="${selectedUserSub != null and !#strings.isEmpty(selectedUserSub)}">
 <!--/* Edit-note modal (KRT modal frame, no native dialogs) */-->
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='krt-bp-edit-modal', titleKey='personalInventory.blueprints.modal.editNote.title', variant='krt-modal--wide', titleId='krt-bp-edit-title', closeTrigger='bp-close-edit', body=~{::krt-bp-edit-modal-body})}">
     <th:block th:ref="krt-bp-edit-modal-body">
@@ -256,6 +259,7 @@
                     th:text="#{personalInventory.blueprints.import.apply}">Anwenden</button>
         </div>
     </th:block>
+</th:block>
 </th:block>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
