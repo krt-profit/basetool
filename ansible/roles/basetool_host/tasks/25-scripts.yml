@@ -62,6 +62,11 @@
     # SHA-256 hashes from the rules template installed beside it. Run by the OPERATOR, never by
     # deploy.sh -- writing the ACL of a live session store is a decision, not a deploy step.
     - render-redis-acl.py
+    # The internal TLS minter (REQ-SEC-TBD04T, ADR-TBD04T): a private CA, one leaf per service, a
+    # CA-only truststore, the CA key destroyed at the end. POSIX sh + keytool, run by the OPERATOR
+    # through the backend image (the host has no JDK) -- minting the stack's identities is a
+    # decision, never a deploy step (docs/deployment.md, "Internal TLS").
+    - mint-internal-tls.sh
 
 - name: Install the Redis ACL rules template
   ansible.builtin.copy:

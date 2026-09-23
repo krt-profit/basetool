@@ -43,7 +43,9 @@ keystore.p12
 # was destroyed at generation time and the server key can only serve loopback and
 # docker-network names. The two rules above stay so the PRODUCTION keystore, which
 # is named exactly keystore.p12, still cannot land next to it.
-!docker/test-tls/basetool-test-keystore.p12
+# Since REQ-SEC-TBD04T the material has production's shape: one leaf per service plus a CA-only
+# truststore, all under the basetool-test- prefix.
+!docker/test-tls/basetool-test-*.p12
 realm-export.json
 *.log
 Mining_Hub_V0.3.0.py

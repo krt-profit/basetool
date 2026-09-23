@@ -52,6 +52,14 @@ import org.springframework.validation.annotation.Validated;
  *     (ADR-0161 §8.5). {@code CBOR} asks for {@code application/cbor} and falls back to JSON for
  *     anything the backend answers with a preset content type — RFC 7807 problems above all.
  *     Request bodies are unaffected and stay JSON either way.
+ * @param verifyBackendHostname whether the frontend→backend TLS hop verifies that the backend's
+ *     certificate names the host it dialled ({@code backend}), on top of the pinned chain
+ *     (REQ-SEC-TBD04T, ADR-TBD04T). {@code false} — the default, and every deployment's behaviour
+ *     before the per-service certificates — pins the chain only; {@code true} once each service
+ *     serves its own leaf from the internal CA, which is the point: with one CA trusted, only the
+ *     name tells the backend's certificate from any other service's. Bound from {@code
+ *     INTERNAL_TLS_VERIFY_HOSTNAME}. Ignored under {@code dev}/{@code test}, which trust the
+ *     ephemeral certificate wholesale.
  */
 @Validated
 @ConfigurationProperties(prefix = "app.http")
@@ -63,7 +71,8 @@ public record AppHttpProperties(
     @NotNull @DefaultValue("5s") Duration writeTimeout,
     @NotNull @DefaultValue("H2") BackendProtocol backendProtocol,
     @Min(1) @Max(100) @DefaultValue("20") int maxConcurrentStreams,
-    @NotNull @DefaultValue("CBOR") BackendCodec codec) {
+    @NotNull @DefaultValue("CBOR") BackendCodec codec,
+    @DefaultValue("false") boolean verifyBackendHostname) {
 
   /**
    * The wire protocol offered on the frontend→backend hop.

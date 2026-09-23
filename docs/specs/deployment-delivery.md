@@ -717,14 +717,18 @@ The deploy path is hardened at the host layer, beyond running as an unprivileged
   **translated** host uids, `root:110000` plus `user:100999:r` (subuid base 100000), and an extra
   `user:iri:r` so the backup helper, which runs as the service user, can read it. The private-key
   material is never readable by `other`; the Docker host's `root:10001` + `u:1000` is the same rule
-  before translation.
+  before translation. The per-service keystores under `/var/iri/secrets/tls/` (REQ-SEC-TBD04T)
+  follow the same rule, each readable only by the service it belongs to (and `iri` for the backup);
+  the CA-only truststore and `ca.crt` hold no key and may be `0644`.
 - **The pre-flight checks the keystore the stack will actually mount** (since 2026-09-22). Under
   Compose that is `IRI_KEYSTORE_HOST_PATH` from `.env`; under Quadlet it is the source of the units'
   `Volume=…:/run/secrets/keystore.p12`, which `generate-quadlet.py` fixes at
   `/var/iri/secrets/keystore.p12` and which never reads `.env` again. `deploy.sh` checked `.env` on
   both runtimes until then, so on the Podman host it could certify a file the units do not mount; it
   now reads the path out of the installed units and falls back to `.env` only while no unit names a
-  keystore mount (a host before its first bundle).
+  keystore mount (a host before its first bundle). Since REQ-SEC-TBD04T it checks **every**
+  PKCS#12 the units mount under `/run/secrets/` — each service's own keystore and the internal
+  truststore — not just the first match.
 - **The deployer runs from `/`.** `sudo -u <service user>` keeps the caller's working directory and
   the service user cannot enter `/root`, so `deploy.sh` started by hand from there failed every
   rootless call with `cannot chdir to /root`, which runtime detection reported as "no lingering user

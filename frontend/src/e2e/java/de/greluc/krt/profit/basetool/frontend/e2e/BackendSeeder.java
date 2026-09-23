@@ -2660,12 +2660,13 @@ public final class BackendSeeder {
   }
 
   /**
-   * Builds an {@link SSLContext} that trusts ONLY the e2e backend's self-signed dev certificate,
-   * loaded from the keystore {@link E2eStackExtension} generates at the repository root. The cert's
-   * SAN covers {@code localhost}, so the JDK's default hostname verification still applies — this
-   * is a scoped trust anchor, not a trust-all manager.
+   * Builds an {@link SSLContext} that trusts ONLY the committed test CA (ADR-0139), loaded from the
+   * CA-only test truststore -- the same shape production pins (REQ-SEC-TBD04T). The backend's leaf
+   * names {@code localhost}, so the JDK's default hostname verification still applies and does
+   * real work: the CA also signed the frontend's, ingest's and Keycloak's leaves, and none of those
+   * would be accepted here in the backend's place by name alone.
    *
-   * @return a TLS context trusting only the backend dev cert
+   * @return a TLS context trusting only the test CA
    */
   private static SSLContext backendCertContext() {
     try {
@@ -2673,8 +2674,8 @@ public final class BackendSeeder {
       try (InputStream in = Files.newInputStream(locateKeystore())) {
         keyStore.load(in, E2eStackExtension.KEYSTORE_PW.toCharArray());
       }
-      // The generated store holds a private-key entry; its certificate is not a trust anchor until
-      // copied into a trust store as a trusted-certificate entry.
+      // Copied entry by entry rather than handed over as is, so a store that also carried a key
+      // entry would still contribute only certificates.
       KeyStore trustStore = KeyStore.getInstance("PKCS12");
       trustStore.load(null, null);
       for (String alias : Collections.list(keyStore.aliases())) {
@@ -2695,26 +2696,26 @@ public final class BackendSeeder {
   }
 
   /**
-   * Locates the committed test keystore under {@code docker/test-tls/} (ADR-0139) by walking up
+   * Locates the committed test truststore under {@code docker/test-tls/} (ADR-0139) by walking up
    * from the working directory, since the e2e tests run with the {@code frontend} module as CWD
-   * while the file sits under the repository root. It is the same store the compose stack mounts at
-   * {@code /run/secrets/keystore.p12}, so the certificate trusted here is by construction the one
-   * the backend serves. Nothing generates a keystore any more, so a miss means the repository
-   * checkout is incomplete rather than that an earlier step failed to run.
+   * while the file sits under the repository root. It holds the CA that signed the leaf the compose
+   * stack mounts into the backend at {@code /run/secrets/keystore.p12}, so the certificate the
+   * backend serves chains to it by construction. Nothing generates the material at test time, so a
+   * miss means the repository checkout is incomplete rather than that an earlier step failed.
    *
-   * @return the path to the committed test keystore
-   * @throws IllegalStateException if the keystore is not found up to the filesystem root
+   * @return the path to the committed test truststore
+   * @throws IllegalStateException if the truststore is not found up to the filesystem root
    */
   private static Path locateKeystore() {
     for (Path p = Paths.get("").toAbsolutePath(); p != null; p = p.getParent()) {
       Path candidate =
-          p.resolve("docker").resolve("test-tls").resolve("basetool-test-keystore.p12");
+          p.resolve("docker").resolve("test-tls").resolve("basetool-test-truststore.p12");
       if (Files.exists(candidate)) {
         return candidate;
       }
     }
     throw new IllegalStateException(
-        "docker/test-tls/basetool-test-keystore.p12 not found walking up from "
+        "docker/test-tls/basetool-test-truststore.p12 not found walking up from "
             + Paths.get("").toAbsolutePath());
   }
 }

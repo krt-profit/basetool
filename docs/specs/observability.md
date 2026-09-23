@@ -805,14 +805,16 @@ not silent — so the only detector was a human reading a log export.
   owner-approved (2026-07-02, epic #936) and amends the HTTPS-only posture; the REQ-SEC-014
   wording in [`security-and-access.md`](security-and-access.md) is amended in the Phase-2 PR
   that actually creates those networks. Rationale and residual risk live in ADR-0072.
-- The private key of the shared `keystore.p12` never leaves the four existing services;
-  Grafana gets its own self-signed certificate.
+- The private key of the shared `keystore.p12` never leaves the four existing services — and, once
+  REQ-SEC-TBD04T is rolled out, each of those four holds only its own leaf's key; Grafana gets its
+  own self-signed certificate.
 - **Internal-cert expiry is monitored — what is served, by probe; what is not, by file.** Together
   these two mechanisms cover **every** certificate in the deployment, and the split between them is
   the point: a probe can only see a certificate something is *serving*.
 
   **What is served.** The self-signed internal certs — the basetool-CA-signed `keystore.p12` on the
-  app modules, Keycloak's `https://keycloak:18443` listener, and Grafana's own cert — are probed
+  app modules (per-service leaves of the internal CA after REQ-SEC-TBD04T's rollout; the probes
+  already check each service's name, so their configuration does not change), Keycloak's `https://keycloak:18443` listener, and Grafana's own cert — are probed
   from inside the monitoring plane by the blackbox `https_internal` / `https_internal_insecure`
   modules (the CA is mounted into the blackbox exporter; Grafana uses the `insecure_skip_verify`
   variant since its cert is not CA-signed, and `probe_ssl_earliest_cert_expiry` is still emitted).

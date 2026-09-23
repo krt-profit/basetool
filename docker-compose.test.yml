@@ -131,7 +131,7 @@ services:
         target: /app/logs
         tmpfs:
           mode: 0o777
-      - ./docker/test-tls/basetool-test-keystore.p12:/run/secrets/keystore.p12:ro
+      - ./docker/test-tls/basetool-test-backend.p12:/run/secrets/keystore.p12:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
@@ -161,7 +161,7 @@ services:
         target: /app/logs
         tmpfs:
           mode: 0o777
-      - ./docker/test-tls/basetool-test-keystore.p12:/run/secrets/keystore.p12:ro
+      - ./docker/test-tls/basetool-test-frontend.p12:/run/secrets/keystore.p12:ro
 
   ingest-dev:
     environment:
@@ -193,4 +193,4 @@ services:
           mode: 0o777
       # Restores the mount `!override` dropped: the gateway serves HTTPS on 11262 like the other
       # two, so replacing its volume list without repeating the keystore left it unable to start.
-      - ./docker/test-tls/basetool-test-keystore.p12:/run/secrets/keystore.p12:ro
+      - ./docker/test-tls/basetool-test-ingest.p12:/run/secrets/keystore.p12:ro

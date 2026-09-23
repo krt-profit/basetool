@@ -20,7 +20,8 @@
 #     host cannot serve HTTPS, and re-issuing runs into Let's Encrypt's limit of
 #     five duplicate certificates per week for this SAN set
 #   * host secrets and configuration needed to stand the stack up
-#     (.env, keystore.p12, realm-export.json, keycloak/providers, and the redis
+#     (.env, keystore.p12, the per-service internal TLS material under
+#     /var/iri/secrets/tls once rolled out, realm-export.json, keycloak/providers, and the redis
 #     users.acl — which is ACCESS CONTROL, not session data: redis refuses to
 #     start without the file its --aclfile names, ADR-0088)
 #   * the monitoring plane (epic #936, ADR-0072)     — Grafana SQLite (consistent
@@ -207,12 +208,15 @@ set +a
 
 KEYSTORE_PATH="$(read_env IRI_KEYSTORE_HOST_PATH)"
 KEYSTORE_PATH="${KEYSTORE_PATH:-/var/iri/secrets/keystore.p12}"
+# Where scripts/mint-internal-tls.sh put the per-service material (docs/deployment.md, "Internal
+# TLS"). Overridable for a host that keeps it elsewhere; absent until the rollout.
+INTERNAL_TLS_DIR="${IRI_INTERNAL_TLS_DIR:-/var/iri/secrets/tls}"
 
 cd "${COMPOSE_DIR}"
 
 # --- Dry run ----------------------------------------------------------------
 if [[ "${DRY_RUN}" == "true" ]]; then
-  log "DRY RUN — would back up: krt_basetool + keycloak dumps, the edge-certs/edge-acme-state/edge-acme-webroot volumes, .env, ${KEYSTORE_PATH}, ${REDIS_ACL_PATH}, realm-export.json, keycloak/providers"
+  log "DRY RUN — would back up: krt_basetool + keycloak dumps, the edge-certs/edge-acme-state/edge-acme-webroot volumes, .env, ${KEYSTORE_PATH}, ${INTERNAL_TLS_DIR} (if present), ${REDIS_ACL_PATH}, realm-export.json, keycloak/providers"
   log "DRY RUN — quiesce=${QUIESCE} (stop: ${WRITER_SERVICES[*]}); repo=${RESTIC_REPOSITORY}; retention ${KEEP_DAILY}/${KEEP_WEEKLY}/${KEEP_MONTHLY}"
   log "existing snapshots:"
   restic snapshots --compact 2>&1 | sed 's/^/  /' || log "  (repo not reachable / not initialized yet)"
@@ -355,6 +359,22 @@ if [[ -f "${KEYSTORE_PATH}" ]]; then
   fi
 else
   log "WARN: keystore not found at ${KEYSTORE_PATH} — skipped"
+fi
+# The per-service internal TLS material (REQ-SEC-TBD04T): one keystore per service, the CA-only
+# truststore and the CA certificate, minted into one directory. Its CA key no longer exists, so a
+# lost file cannot be re-issued -- only the whole set re-minted, with every consumer restarted.
+# Captured as one tar through the helper, like the keystore above and for the same reason (the
+# keystores are 0640 and the deploy user cannot read them). A host that has not rolled out the
+# per-service material yet has no such directory; that is not a failure.
+if [[ -d "${INTERNAL_TLS_DIR}" ]]; then
+  if rt_read_mount "${INTERNAL_TLS_DIR}" "${HELPER_IMAGE}" tar -C /src -cf - . \
+       > "${STAGING}/config/internal-tls.tar" 2>/dev/null \
+     && [[ -s "${STAGING}/config/internal-tls.tar" ]]; then
+    :
+  else
+    rm -f "${STAGING}/config/internal-tls.tar"
+    log "WARN: could not read the internal TLS material at ${INTERNAL_TLS_DIR} via ${HELPER_IMAGE} — skipped"
+  fi
 fi
 if [[ -f "${COMPOSE_DIR}/realm-export.json" ]]; then
   # Through the helper, like the keystore, and for the same reason: this is an operator-provided

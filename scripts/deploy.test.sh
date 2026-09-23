@@ -2313,6 +2313,25 @@ scenario_podman_missing_mounted_keystore_refuses() {
   rm -rf "${tmp}"
 }
 
+scenario_podman_missing_per_service_keystore_refuses() {
+  echo "Scenario: every /run/secrets/*.p12 the units mount is checked, not only the first one"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  podman_units "${tmp}"
+  write_marker "${PMARKER}"
+  # REQ-SEC-TBD04T: after the per-service rollout the backend's file exists and the ingest unit
+  # names its OWN keystore -- plus an internal truststore -- which this host lacks.
+  printf 'Volume=%s/tls/ingest.p12:/run/secrets/keystore.p12:ro\n' "${tmp}" >> "${T_UNIT_DIR}/ingest.container"
+  printf 'Volume=%s/keystore.p12:/run/secrets/internal-truststore.p12:ro\n' "${tmp}" >> "${T_UNIT_DIR}/ingest.container"
+  mapfile -t pod < <(podman_env)
+  mapfile -t conv < <(podman_converged_env)
+  run_deploy -- "${pod[@]}" "${conv[@]}" || rc=$?
+  assert_exit 1 "$rc" "podman: a missing per-service keystore refuses before anything is applied"
+  assert_contains "required file missing: ${tmp}/tls/ingest.p12" "podman: ...and names that service's file"
+  rm -rf "${tmp}"
+}
+
 # --- the working directory podman inherits -----------------------------------
 
 scenario_podman_runs_podman_from_root_dir() {
@@ -2350,6 +2369,7 @@ scenario_podman_changed_monitoring_and_acme_units_are_restarted
 scenario_podman_acme_is_part_of_the_stack
 scenario_podman_keystore_checked_where_the_unit_mounts_it
 scenario_podman_missing_mounted_keystore_refuses
+scenario_podman_missing_per_service_keystore_refuses
 scenario_podman_runs_podman_from_root_dir
 
 echo

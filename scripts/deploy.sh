@@ -999,17 +999,24 @@ fi
 # /run/secrets/keystore.p12. A unit directory that names no keystore mount yet -- a freshly
 # provisioned host before its first bundle -- falls back to .env, and the generator's constant is
 # the last resort.
-keystore_mount_source() {
+#
+# EVERY PKCS#12 mounted under /run/secrets/, not the first one (REQ-SEC-TBD04T): since the
+# per-service keystores each service mounts its own file plus the internal truststore, and one
+# missing file among several is exactly the case `head -n1` could not see.
+keystore_mount_sources() {
   local src=""
-  src="$(grep -h -E '^Volume=[^:]+:/run/secrets/keystore\.p12(:|$)' "${RT_UNIT_DIR}"/*.container \
-           2>/dev/null | head -n1 | sed -E 's/^Volume=([^:]+):.*/\1/' || true)"
+  src="$(grep -h -E '^Volume=[^:]+:/run/secrets/[A-Za-z0-9._-]+\.p12(:|$)' "${RT_UNIT_DIR}"/*.container \
+           2>/dev/null | sed -E 's/^Volume=([^:]+):.*/\1/' | sort -u || true)"
   if [[ -z "${src}" ]]; then
     src="$(read_env IRI_KEYSTORE_HOST_PATH || true)"
   fi
   printf '%s\n' "${src:-/var/iri/secrets/keystore.p12}"
 }
-KEYSTORE_HOST_PATH="$(keystore_mount_source)"
-require_file "${KEYSTORE_HOST_PATH}"
+while IFS= read -r KEYSTORE_HOST_PATH; do
+  if [[ -n "${KEYSTORE_HOST_PATH}" ]]; then
+    require_file "${KEYSTORE_HOST_PATH}"
+  fi
+done < <(keystore_mount_sources)
 
 # cosign is required for the host-side signature gate (REQ-OPS-015). Fail closed:
 # a host that cannot verify signatures must not silently fall back to trusting an

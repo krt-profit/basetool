@@ -88,7 +88,8 @@ class DataExportProxyControllerTest {
                 Duration.ofSeconds(5),
                 AppHttpProperties.BackendProtocol.H2,
                 20,
-                AppHttpProperties.BackendCodec.CBOR));
+                AppHttpProperties.BackendCodec.CBOR,
+                false));
   }
 
   @AfterEach

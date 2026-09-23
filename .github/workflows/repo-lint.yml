@@ -717,6 +717,13 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/render-redis-acl.py --selftest
 
+      # The internal TLS minter (REQ-SEC-TBD04T, ADR-TBD04T): the files it promises and no CA key,
+      # each leaf verifying for its own names and for no other service's. keytool and openssl are
+      # both preinstalled on ubuntu-latest.
+      - name: internal-tls / Self-test the internal TLS minter
+        if: ${{ !cancelled() }}
+        run: bash scripts/mint-internal-tls.test.sh
+
   container-checks:
     name: Container checks
     runs-on: ubuntu-latest

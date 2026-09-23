@@ -230,7 +230,7 @@ class BackendHealthIndicatorTest {
     when(environment.getActiveProfiles()).thenReturn(new String[] {"prod"});
 
     BackendHealthIndicator indicator =
-        new BackendHealthIndicator(backendUrl, sslBundles, environment);
+        new BackendHealthIndicator(backendUrl, sslBundles, environment, false);
 
     assertEquals(Status.UP, indicator.health().getStatus());
   }
