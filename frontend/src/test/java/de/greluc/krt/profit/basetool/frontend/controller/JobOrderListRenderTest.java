@@ -27,7 +27,7 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import de.greluc.krt.profit.basetool.frontend.config.CapabilityFlagsAdvice;
+import de.greluc.krt.profit.basetool.frontend.config.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.model.dto.AggregatedMaterialDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.GameItemReferenceDto;
@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -78,9 +79,8 @@ class JobOrderListRenderTest {
     // The default @WithMockUser is a non-admin, so the orders view's profit gate would otherwise
     // redirect to /orders/create. Stub the capability as a profit-eligible viewer so the list path
     // renders.
-    when(backendApiClient.get(
-            "/api/v1/me/capabilities", CapabilityFlagsAdvice.CapabilitiesResponse.class))
-        .thenReturn(new CapabilityFlagsAdvice.CapabilitiesResponse(true, true, true));
+    when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.capabilities(true, true, true));
   }
 
   private MaterialDto material(String name, String quantityType) {

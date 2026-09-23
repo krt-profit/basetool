@@ -1,0 +1,469 @@
+/* Page stylesheet of templates/operation-detail.html, moved out of its inline style block
+ * (FE-PERF-02). Linked in the same place the block stood, so the cascade order is
+ * unchanged. */
+
+label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    font-weight: bold;
+}
+input[type='text'],
+input[type='url'],
+select,
+textarea {
+    width: 100%;
+    padding: 0.8rem;
+    background-color: var(--color-surface-input);
+    border: 1px solid var(--color-gray-3);
+    color: var(--color-gray-1);
+    font-family: var(--font-body);
+    box-sizing: border-box;
+}
+input:focus,
+select:focus,
+textarea:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 5px rgba(231, 126, 35, 0.3);
+}
+.form-row {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+.form-row > .form-group {
+    flex: 1;
+    min-width: 250px;
+}
+
+/* =========================================================
+   Operation-Detail Tab Layout (final Einsatz design, #818):
+   sticky head + facts bar + tab nav, five panes. Mirrors the
+   mission-detail tab shell (Variante B). The shell/panel CSS is
+   duplicated here intentionally — extracting it into a shared
+   stylesheet would touch the shipped mission page; kept local
+   to keep this change frontend-only and regression-free.
+   ========================================================= */
+html,
+body {
+    margin: 0;
+    overflow-x: hidden;
+}
+.page-wrapper {
+    width: 100%;
+    max-width: 1800px;
+    margin: 0 auto;
+    overflow-x: clip;
+    box-sizing: border-box;
+    padding-bottom: calc(var(--krt-footer-height, 5rem) + 5rem);
+}
+/* The phone-class reserve for this page lives in styles.css's `width <= 768px`
+   block, with every other page's, written `div.page-wrapper` so it out-specifies this
+   rule — head.html renders the per-page style block after styles.css, so an equal-specificity
+   override there loses the source-order tie. The DESKTOP reserve stays here. */
+.mission-head-sticky {
+    position: sticky;
+    top: 0;
+    z-index: 900;
+    background-color: var(--color-bg-black);
+}
+.mission-head {
+    background-color: var(--color-bg-dark-gray);
+    border-bottom: var(--border-hairline);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.mission-head-title {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+.mission-head-title h1 {
+    font-family: var(--font-headline);
+    font-weight: var(--fw-bold);
+    color: var(--color-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 1.05rem;
+    margin: 0;
+    display: inline;
+}
+.mission-head-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.tab-panes {
+    padding: 14px 16px 18px;
+}
+.tab-pane {
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+}
+.tab-pane.on {
+    display: flex;
+}
+
+.pane-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    align-items: start;
+}
+.pane-col {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+}
+@media (width <= 980px) {
+    .pane-grid-2 {
+        grid-template-columns: 1fr;
+    }
+}
+
+.kpanel {
+    background-color: var(--color-bg-dark-gray);
+    border: var(--border-hairline);
+    min-width: 0;
+}
+.kpanel-head {
+    padding: 8px 12px;
+    background-color: var(--color-surface-input);
+    border-left: 4px solid var(--color-primary);
+    border-bottom: var(--border-hairline);
+    font-family: var(--font-body);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: var(--fw-bold);
+    color: var(--color-gray-1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.kpanel-body {
+    padding: 12px;
+}
+.kpanel-body > .table-responsive {
+    width: 100%;
+    overflow-x: auto;
+}
+.btn-xs2 {
+    min-height: 32px;
+    padding: 0.25rem 0.6rem;
+    font-size: 0.68rem;
+}
+.desc {
+    font-size: 0.85rem;
+    font-weight: 300;
+    color: var(--color-gray-1);
+    margin: 0;
+    line-height: 1.55;
+    max-width: 80ch;
+}
+.ph-extra {
+    color: var(--color-gray-2-text);
+    font-weight: var(--fw-bold);
+    text-transform: none;
+    font-variant-numeric: tabular-nums;
+}
+#pane-op-fin details.hud-details,
+#pane-op-ueb details.hud-details {
+    background-color: var(--color-bg-dark-gray);
+    border: var(--border-hairline);
+    padding: 12px 14px;
+}
+.op-mission-result-link {
+    color: var(--color-gray-1);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.op-mission-result-link:hover {
+    color: var(--color-primary);
+}
+
+/* Finance summary strip (matches the mission Finanzen tab). */
+.sumstrip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+}
+@media (width <= 880px) {
+    .sumstrip {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+.sum {
+    background-color: var(--color-bg-dark-gray);
+    border: var(--border-hairline);
+    padding: 10px 14px;
+}
+.sum.is-total {
+    border-top: 3px solid var(--color-primary);
+}
+.sum .sk {
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-gray-2-text);
+    font-weight: var(--fw-bold);
+}
+.sum .sv {
+    font-family: var(--font-headline);
+    font-weight: var(--fw-bold);
+    font-size: 1.15rem;
+    color: var(--color-white);
+    font-variant-numeric: tabular-nums;
+    margin-top: 2px;
+}
+.sum .sv.pos {
+    color: var(--color-success);
+}
+.sum .sv.neg {
+    color: var(--color-danger-text);
+}
+.sum .sv.donate {
+    color: var(--color-dept-profit);
+}
+.sum .sd {
+    font-size: 0.66rem;
+    color: var(--color-gray-2-text);
+    margin-top: 2px;
+}
+
+/* "Ergebnis je Einsatz" proportional result bars (Übersicht). */
+.holder-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 0;
+}
+.holder-name {
+    flex: 0 0 38%;
+    min-width: 0;
+    font-size: 0.8rem;
+    color: var(--color-gray-1);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.holder-bar {
+    flex: 1;
+    height: 8px;
+    background: var(--color-surface-input);
+    border: 1px solid var(--color-gray-3);
+    overflow: hidden;
+}
+.holder-bar i {
+    display: block;
+    height: 100%;
+    background: var(--color-success);
+}
+.holder-value {
+    flex: 0 0 auto;
+    font-variant-numeric: tabular-nums;
+    font-weight: var(--fw-bold);
+    color: var(--color-success);
+    font-size: 0.82rem;
+}
+.holder-sum {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: var(--border-hairline);
+    font-weight: var(--fw-bold);
+    color: var(--color-gray-1);
+    font-size: 0.85rem;
+}
+
+/* Markdown description editor (Verwaltung): Bearbeiten / Vorschau + formatting toolbar. */
+.md-toolbar {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+.md-toolbar .btn-xs2 {
+    min-width: 34px;
+}
+.md-input {
+    min-height: 200px;
+    resize: vertical;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+.md-preview {
+    min-height: 200px;
+    padding: 12px;
+    background: var(--color-surface-input);
+    border: 1px solid var(--color-gray-3);
+}
+.md-preview:empty::before {
+    content: attr(data-empty);
+    color: var(--color-gray-2-text);
+    font-style: italic;
+}
+
+/* =========================================================
+   Auszahlungen panel — Payout table layout (preserved verbatim
+   from the previous column layout; the table itself is unchanged,
+   only its container moved into the Auszahlung tab).
+   ========================================================= */
+.payout-table {
+    margin-top: 1rem;
+}
+.payout-table th:last-child,
+.payout-table td:last-child {
+    text-align: center;
+    white-space: nowrap;
+}
+.payout-table th.payout-user-col,
+.payout-table td.payout-user-cell {
+    text-align: left;
+    font-weight: 600;
+}
+.payout-table th.payout-percentage-col,
+.payout-table td.payout-percentage-cell {
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-gray-2-text);
+}
+.payout-table th.payout-preference-col,
+.payout-table td.payout-preference-cell {
+    text-align: left;
+    white-space: nowrap;
+}
+.payout-preference-badge {
+    display: inline-block;
+    padding: 0.18rem 0.65rem;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    font-size: 0.78em;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    line-height: 1.4;
+}
+.payout-preference-badge--payout {
+    color: var(--color-primary);
+    background-color: rgba(231, 126, 35, 0.12);
+}
+.payout-preference-badge--donate {
+    color: var(--color-dept-marine);
+    background-color: rgba(122, 94, 150, 0.14);
+}
+.payout-table th.payout-amount-col,
+.payout-table td.payout-amount-cell {
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    min-width: 11em;
+}
+.payout-table .payout-amount-value {
+    display: block;
+    font-weight: 600;
+    color: var(--color-gray-1);
+}
+.payout-table .payout-amount-reimbursement,
+.payout-table .payout-amount-transferfee,
+.payout-table .payout-amount-donation {
+    display: block;
+    font-size: 0.78em;
+    color: var(--color-gray-2-text);
+    font-style: italic;
+    margin-top: 0.2rem;
+}
+.payout-donation-total {
+    margin: 1rem 0 0;
+    text-align: right;
+    font-family: 'Lato', sans-serif;
+    font-weight: 700;
+    color: var(--color-dept-profit);
+}
+.payout-table th.payout-paid-col,
+.payout-table td.payout-paid-cell {
+    text-align: center;
+    white-space: nowrap;
+    min-width: 9em;
+}
+.payout-table .payout-paid-label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.55rem;
+    cursor: pointer;
+    margin: 0;
+    font-weight: normal;
+    color: inherit;
+}
+.payout-table .payout-paid-checkbox {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    accent-color: var(--color-primary);
+    flex: 0 0 auto;
+    margin: 0;
+}
+.payout-table .payout-paid-status {
+    font-size: 0.78em;
+    color: var(--color-gray-2-text);
+    line-height: 1.2;
+}
+.payout-table .payout-paid-yes {
+    color: var(--color-dept-profit);
+    font-weight: 600;
+}
+.payout-table .payout-paid-no {
+    color: var(--color-gray-2-text);
+}
+.payout-table tbody tr:has(.payout-paid-checkbox:checked),
+.payout-table tbody tr:has(.payout-paid-yes) {
+    background-color: rgba(35, 158, 51, 0.06);
+}
+.payout-table tbody tr:has(.payout-paid-checkbox:checked) td.payout-paid-cell,
+.payout-table tbody tr:has(.payout-paid-yes) td.payout-paid-cell {
+    box-shadow: inset 3px 0 0 var(--color-dept-profit);
+}
+@media (width <= 768px) {
+    .payout-table th,
+    .payout-table td {
+        padding: 0.75rem 0.6rem;
+    }
+}
+
+.footacts {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    align-items: center;
+    flex-wrap: wrap;
+    border-top: var(--border-hairline);
+    padding-top: 12px;
+}
+.manager-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--color-surface-input);
+    border: var(--border-hairline);
+    padding: 0.2rem 0.5rem;
+}

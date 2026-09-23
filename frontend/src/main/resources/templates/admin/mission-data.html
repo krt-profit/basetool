@@ -5,31 +5,7 @@
     <th:block th:fragment="extraLinks">
         <meta name="_csrf" th:content="${_csrf.token}"/>
         <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
-<style th:attr="nonce=${cspNonce}">
-        .data-section {
-            margin-bottom: 3rem;
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-family: var(--font-body);
-            font-size: 0.8rem;
-        }
-        /* Checkboxes (the job-type modal's leadership / mission-lead toggles) and radios are
-           excluded: width:100% + the 0.5rem padding would stretch the 1.2rem KRT squares
-           (styles.css) full-width. The exclusions sit in :where() so they add ZERO specificity —
-           the rule keeps the plain `.form-group input` weight (0,1,1) and stays below the
-           (0,2,0) combobox rule `.krt-combobox .krt-combobox__input`. */
-        .form-group input:where(:not([type='checkbox']):not([type='radio'])), .form-group select, .form-group textarea {
-            width: 100%;
-            padding: 0.5rem;
-            background-color: var(--color-surface-input);
-            border: 1px solid var(--color-gray-3);
-            color: var(--color-gray-1);
-            font-family: var(--font-body);
-            box-sizing: border-box;
-        }
-    </style>
+<link rel="stylesheet" th:href="@{/css/pages/admin-mission-data.css}">
     </th:block>
 </head>
 <body>
@@ -54,7 +30,7 @@
         <h1 th:text="#{admin.mission_data.title}">Missionsdaten verwalten</h1>
     </div>
 
-    <!-- Squadrons Section -->
+    <!--/* Squadrons Section */-->
     <div class="hud-box data-section mt-2" id="squadrons-box">
         <div class="box-header krtm-display-flex-justify-content-space-between-a-c95b" data-trigger="mission-data-toggle-box" data-box-id="squadrons-box">
             <h2 th:text="#{admin.mission_data.squadrons}" class="m-0">Staffeln</h2>
@@ -70,14 +46,14 @@
             </div>
         </div>
         
-        <!-- AJAX swap target (REQ-FE-002): the include-inactive toggle re-renders only this
+        <!--/* AJAX swap target (REQ-FE-002): the include-inactive toggle re-renders only this
              section's table via krtFetch. Per-row edit/delete are document-delegated (survive),
              so nothing needs re-init. The toggle is JS-driven (it was already JS-only before this
-             change); a manual refresh of the swap-synced URL reproduces the filtered state. -->
+             change); a manual refresh of the swap-synced URL reproduces the filtered state. */-->
         <div class="box-content" id="squadrons-results">
             <th:block th:fragment="squadrons-results">
-            <!-- Inside the swapped fragment on purpose: the include-inactive AJAX swap must
-                 re-evaluate the truncation warning (REQ-ADMIN-002). -->
+            <!--/* Inside the swapped fragment on purpose: the include-inactive AJAX swap must
+                 re-evaluate the truncation warning (REQ-ADMIN-002). */-->
             <th:block th:if="${squadronsTruncated}">
                 <div th:replace="~{fragments/components :: alert('warning', 'admin.catalog.truncated', 'mb-1')}"></div>
             </th:block>
@@ -123,7 +99,7 @@
         </div>
     </div>
 
-    <!-- JobTypes Section -->
+    <!--/* JobTypes Section */-->
     <div class="hud-box data-section mt-2" id="jobtypes-box">
         <div class="box-header krtm-display-flex-justify-content-space-between-a-c95b" data-trigger="mission-data-toggle-box" data-box-id="jobtypes-box">
             <h2 th:text="#{admin.mission_data.job_types}" class="m-0">Aufgabenwünsche</h2>
@@ -139,11 +115,11 @@
             </div>
         </div>
 
-        <!-- AJAX swap target (REQ-FE-002): include-inactive toggle re-renders only this section. -->
+        <!--/* AJAX swap target (REQ-FE-002): include-inactive toggle re-renders only this section. */-->
         <div class="box-content" id="jobtypes-results">
             <th:block th:fragment="jobtypes-results">
-            <!-- Inside the swapped fragment on purpose: the include-inactive AJAX swap must
-                 re-evaluate the truncation warning (REQ-ADMIN-002). -->
+            <!--/* Inside the swapped fragment on purpose: the include-inactive AJAX swap must
+                 re-evaluate the truncation warning (REQ-ADMIN-002). */-->
             <th:block th:if="${jobTypesTruncated}">
                 <div th:replace="~{fragments/components :: alert('warning', 'admin.catalog.truncated', 'mb-1')}"></div>
             </th:block>
@@ -197,7 +173,7 @@
     </div>
 
 
-    <!-- FrequencyTypes Section -->
+    <!--/* FrequencyTypes Section */-->
     <div class="hud-box data-section mt-2" id="freqtypes-box">
         <div class="box-header krtm-display-flex-justify-content-space-between-a-c95b" data-trigger="mission-data-toggle-box" data-box-id="freqtypes-box">
             <h2 th:text="#{admin.mission_data.frequency_types}" class="m-0">Frequenztypen</h2>
@@ -213,13 +189,13 @@
             </div>
         </div>
 
-        <!-- AJAX swap target (REQ-FE-002): include-inactive toggle re-renders only this section.
+        <!--/* AJAX swap target (REQ-FE-002): include-inactive toggle re-renders only this section.
              Drag-drop reorder is rebound to this stable #freqtypes-results container (not the
-             swapped inner tbody), so it survives the swap. -->
+             swapped inner tbody), so it survives the swap. */-->
         <div class="box-content" id="freqtypes-results">
             <th:block th:fragment="freqtypes-results">
-            <!-- Inside the swapped fragment on purpose: the include-inactive AJAX swap must
-                 re-evaluate the truncation warning (REQ-ADMIN-002). -->
+            <!--/* Inside the swapped fragment on purpose: the include-inactive AJAX swap must
+                 re-evaluate the truncation warning (REQ-ADMIN-002). */-->
             <th:block th:if="${frequencyTypesTruncated}">
                 <div th:replace="~{fragments/components :: alert('warning', 'admin.catalog.truncated', 'mb-1')}"></div>
             </th:block>
@@ -263,7 +239,7 @@
         </div>
     </div>
 
-    <!-- Squadron Modal -->
+    <!--/* Squadron Modal */-->
     <div id="squadron-modal" class="krt-modal-overlay" th:classappend="${openModal == 'squadron-modal'} ? 'krtm-modal-open' : 'krtm-hidden'">
         <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{admin.squadron.create}">
             <div class="krt-modal-head">
@@ -297,7 +273,7 @@
         </div>
     </div>
 
-    <!-- JobType Modal -->
+    <!--/* JobType Modal */-->
     <div id="jobtype-modal" class="krt-modal-overlay" th:classappend="${openModal == 'jobtype-modal'} ? 'krtm-modal-open' : 'krtm-hidden'">
         <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{admin.job_type.create}">
             <div class="krt-modal-head">
@@ -349,7 +325,7 @@
         </div>
     </div>
 
-    <!-- FrequencyType Modal -->
+    <!--/* FrequencyType Modal */-->
     <div id="frequency-type-modal" class="krt-modal-overlay" th:classappend="${openModal == 'frequency-type-modal'} ? 'krtm-modal-open' : 'krtm-hidden'">
         <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{admin.frequency_type.create}">
             <div class="krt-modal-head">
@@ -378,7 +354,7 @@
         </div>
     </div>
 
-    <!-- Delete Confirmation Modal -->
+    <!--/* Delete Confirmation Modal */-->
     <div id="delete-confirm-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
         <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{info.delete.confirm.title}">
             <div class="krt-modal-head">
@@ -418,6 +394,6 @@
         edit:           '[[#{admin.edit}]]'
     };
 </script>
-<script th:src="@{/js/mission-data.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/mission-data.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

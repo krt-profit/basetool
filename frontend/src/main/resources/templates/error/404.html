@@ -3,60 +3,7 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{error.404.title} + ' - ' + ${appTitle}">Signal Lost - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-<style th:attr="nonce=${cspNonce}">
-        .error-container {
-            text-align: center;
-            border: 2px solid var(--color-primary);
-            box-shadow: 0 0 15px rgba(231, 126, 35, 0.2);
-            background: rgba(20, 20, 20, 0.6);
-            padding: 2.5rem 2rem;
-            max-width: 600px;
-            width: 100%;
-            margin: 0 auto;
-        }
-        .error-code {
-            font-family: var(--font-headline);
-            font-size: 4rem;
-            color: var(--color-primary);
-            margin-bottom: 0.5rem;
-        }
-        .error-title {
-            font-family: var(--font-headline);
-            font-size: 2rem;
-            color: var(--color-gray-1);
-            margin-bottom: 1.5rem;
-            text-transform: uppercase;
-        }
-        .error-message {
-            font-size: 1.2rem;
-            color: var(--color-gray-1);
-            margin-bottom: 2rem;
-        }
-        .btn-return {
-            display: inline-block;
-            padding: 0.8rem 1.5rem;
-            background-color: var(--color-primary);
-            color: var(--color-bg-black);
-            font-family: var(--font-headline);
-            text-decoration: none;
-            font-weight: bold;
-            transition: all 0.3s ease;
-            text-transform: uppercase;
-        }
-        .btn-return:hover {
-            background-color: var(--color-accent-light);
-            box-shadow: 0 0 10px var(--color-accent-light);
-        }
-        /* Make sure main takes full screen if no sidebar */
-        main {
-            margin-left: 0 !important;
-            padding-top: 80px;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-    </style>
+<link rel="stylesheet" th:href="@{/css/pages/error-404.css}">
     </th:block>
 </head>
 <body>

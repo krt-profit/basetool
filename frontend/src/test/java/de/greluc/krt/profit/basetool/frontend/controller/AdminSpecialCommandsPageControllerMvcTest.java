@@ -40,6 +40,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
+import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -123,10 +124,9 @@ class AdminSpecialCommandsPageControllerMvcTest {
         .perform(get("/admin/special-commands"))
         .andExpect(status().isOk())
         .andExpect(
-            content()
-                .string(
-                    containsString(
-                        ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
+            PageStylesheets.content(
+                containsString(
+                    ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
   }
 
   // covers REQ-FE-002 — fragment=results renders only the inner SK-list block: the row is present,

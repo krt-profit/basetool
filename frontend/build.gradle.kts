@@ -887,10 +887,18 @@ val lintCss =
 // and the gate would never be enabled. `media-feature-range-notation` is the one style rule worth
 // its cost: it is what keeps `@media (max-width: 768px)` from reappearing beside the range form
 // every rule in static/css uses, and it auto-fixes.
+//
+// FE-PERF-02 (2026-09-23) moved every page <style> block into `static/css/pages/<page>.css`, linked
+// in the same place, so the page CSS no longer rides in every HTML response. The coverage moved
+// with it: this task now reads those files with the SAME tiny rule set, and `.stylelintrc.json`
+// ignores the directory so the strict stylesheet config does not suddenly apply to 170 KB of CSS
+// it never read. It still reads the templates too, which should find nothing — a new <style>
+// block fails TemplateCommentHygieneTest — but would parse one if it came back.
 val lintCssInline =
   tasks.register<NpxTask>("lintCssInline") {
     group = "verification"
-    description = "Lints the CSS inside Thymeleaf <style> blocks (Stylelint + postcss-html)."
+    description =
+      "Lints the page stylesheets (static/css/pages) and any Thymeleaf <style> block with Stylelint."
     dependsOn(tasks.named("npmInstall"))
     command.set("stylelint")
     args.set(
@@ -898,10 +906,12 @@ val lintCssInline =
         "--config",
         ".stylelintrc.templates.json",
         "src/main/resources/templates/**/*.html",
+        "src/main/resources/static/css/pages/**/*.css",
       )
     )
     ignoreExitValue.set(false)
     inputs.files(fileTree("src/main/resources/templates") { include("**/*.html") })
+    inputs.files(fileTree("src/main/resources/static/css/pages") { include("**/*.css") })
     inputs.file("package.json")
     inputs.file(".stylelintrc.templates.json")
   }

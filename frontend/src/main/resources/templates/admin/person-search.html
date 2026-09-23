@@ -3,13 +3,7 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{admin.personSearch.title} + ' - ' + ${appTitle}">Personensuche - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-<style th:attr="nonce=${cspNonce}">
-        .ps-snippet {
-            font-family: var(--font-body); color: var(--color-gray-1);
-            word-break: break-word; max-width: 46rem;
-        }
-        .ps-where { color: var(--color-gray-2-text); font-size: 0.8rem; }
-    </style>
+<link rel="stylesheet" th:href="@{/css/pages/admin-person-search.css}">
     </th:block>
 </head>
 <body>
@@ -35,9 +29,9 @@
         <p th:text="#{admin.personSearch.subtitle}">Jede Stelle finden, an der ein Name vorkommt.</p>
     </div>
 
-    <!-- Why the page exists, stated on the page: a rectification that fixes one of four
+    <!--/* Why the page exists, stated on the page: a rectification that fixes one of four
          occurrences is not a rectification, and the free-text surfaces are exactly the ones no
-         foreign key leads to. -->
+         foreign key leads to. */-->
     <div class="hud-box mt-2 krtm-border-color-var-color-warning-display-flex-1b12" role="note">
         <svg class="krt-icon krtm-flex-0-0-auto-margin-top-0-1rem-f087" aria-hidden="true">
             <use href="#krt-icon-info"/></svg>
@@ -69,8 +63,8 @@
             <p th:text="#{${error}}">Fehler.</p>
         </div>
 
-        <!-- A capped list that looked complete would make an erasure look complete when it is
-             not, so the cap is always stated. -->
+        <!--/* A capped list that looked complete would make an erasure look complete when it is
+             not, so the cap is always stated. */-->
         <div th:if="${truncated}" class="hud-box krtm-border-color-var-color-warning-display-flex-1b12"
              role="alert" data-testid="person-search-truncated">
             <svg class="krt-icon krtm-flex-0-0-auto-margin-top-0-1rem-f087" aria-hidden="true">
@@ -78,11 +72,11 @@
             <p class="krtm-margin-0-2a0c" th:text="#{admin.personSearch.truncated}">Die Liste ist gek&uuml;rzt. Bitte den Suchbegriff eingrenzen.</p>
         </div>
 
-        <!-- The per-column cap, which is reached far more often than the overall one: 75 searched
+        <!--/* The per-column cap, which is reached far more often than the overall one: 75 searched
              columns at 25 hits each means a name occurring 40 times in ONE column produced a union
              total far below 300, so the banner above stayed silent and the list looked complete.
              The affected columns are named, because "narrow the term" is not the remedy here --
-             the remedy is to open that one area and work through it. -->
+             the remedy is to open that one area and work through it. */-->
         <div th:if="${!#lists.isEmpty(cappedColumns)}"
              class="hud-box krtm-border-color-var-color-warning-display-flex-1b12"
              role="alert" data-testid="person-search-capped">
@@ -115,14 +109,14 @@
                             </td>
                             <td class="ps-where" th:text="${hit.table()} + '.' + ${hit.column()}">tabelle.spalte</td>
                             <td class="ps-snippet" th:text="${hit.snippet()}">Eintrag</td>
-                            <!-- th:switch, not a chain of th:if, because the default branch is the
+                            <!--/* th:switch, not a chain of th:if, because the default branch is the
                                  point: `th:case="*"` catches every kind without a destination,
                                  whereas the previous `linkKind() == null` fallback only caught the
                                  kinds that declare none. Four kinds matched neither and rendered an
                                  empty cell -- BANK above all, which is where an erasure has to act.
                                  The four area links point at the area rather than the row: a
                                  booking, a market remark or an org-unit description has no page of
-                                 its own, and landing the admin in the right area beats no link. -->
+                                 its own, and landing the admin in the right area beats no link. */-->
                             <td th:switch="${hit.linkKind()}">
                                 <a th:case="'MEMBER'" class="btn btn-ghost btn-xs"
                                    th:href="@{/members/{id}/edit(id=${hit.rowId()})}"
@@ -164,6 +158,6 @@
     </div>
 </main>
 
-<script th:src="@{/js/admin-person-search.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/admin-person-search.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

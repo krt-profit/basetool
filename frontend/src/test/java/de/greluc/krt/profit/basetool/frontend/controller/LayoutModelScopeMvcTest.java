@@ -61,6 +61,9 @@ import org.springframework.web.reactive.function.client.WebClient;
  * authenticated (so the advices' {@code isAuthenticated()} guards would pass), returns JSON, and
  * needs none of the layout model.
  *
+ * <p>Since FE-PERF-01 the same holds for a {@code ResponseBody} handler <em>inside</em> a view
+ * controller, and a rendered page reads the layout in one call instead of four.
+ *
  * <p>The <em>positive</em> half of this contract — that view controllers still receive the model —
  * is covered by the module's ~100 existing {@code @SpringBootTest} render tests (for instance
  * {@link FanKitComplianceMvcTest}, which asserts against rendered {@code GET /} markup). Scoping
@@ -81,6 +84,7 @@ class LayoutModelScopeMvcTest {
    */
   private static final Set<String> LAYOUT_MODEL_BACKEND_CALLS =
       Set.of(
+          "/api/v1/me/layout",
           "/api/v1/me/capabilities",
           "/api/v1/notifications/unread-count",
           "/api/v1/me/active-org-unit",
@@ -123,6 +127,63 @@ class LayoutModelScopeMvcTest {
                 + " not be invoked for it, and each of these calls is an uncached backend round"
                 + " trip spent on a model that is discarded")
         .isEmpty();
+  }
+
+  /**
+   * The unread-count poll is a {@code ResponseBody} handler inside a view controller ({@code
+   * NotificationPageController} carries {@code UsesLayoutModel}), so the type-level selector alone
+   * cannot spare it: before FE-PERF-01 every poll — once a minute per open tab — paid the whole
+   * layout model on top of its own read. It must cost exactly one backend call now, its own.
+   */
+  @Test
+  @WithMockUser
+  void unreadCountPoll_makesExactlyOneBackendCall_itsOwn() throws Exception {
+    mockMvc
+        .perform(get("/notifications/unread-count").header("X-Requested-With", "XMLHttpRequest"))
+        .andExpect(status().isOk());
+
+    assertThat(allBackendCalls())
+        .as(
+            "the poll's own read is the only backend call it may make; a layout read here means"
+                + " the handler test in LayoutContextLoader stopped recognising a ResponseBody"
+                + " handler")
+        .containsExactly("/api/v1/notifications/unread-count");
+  }
+
+  /**
+   * A rendered page still receives the whole layout model, but reads it in <em>one</em> call: the
+   * three advices share {@code GET /api/v1/me/layout} through the request-scoped memo in {@code
+   * LayoutContextLoader}, and none of the four retired reads is made. The cached squadron catalogue
+   * is the one other layout read, and it is not a backend call on a cache hit.
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void renderedPage_readsTheLayoutOnce() throws Exception {
+    mockMvc.perform(get("/")).andExpect(status().isOk());
+
+    List<String> calls = allBackendCalls();
+    assertThat(calls.stream().filter("/api/v1/me/layout"::equals).count())
+        .as("the three layout advices must share one /api/v1/me/layout read per request")
+        .isEqualTo(1L);
+    assertThat(calls)
+        .as("the four separate layout reads were replaced by /api/v1/me/layout (FE-PERF-01)")
+        .doesNotContain(
+            "/api/v1/me/capabilities",
+            "/api/v1/notifications/unread-count",
+            "/api/v1/me/active-org-unit",
+            "/api/v1/me/org-units");
+  }
+
+  /**
+   * Every first argument the mocked client was called with, in call order — the backend path, or
+   * the {@code CachedCatalog} constant for {@code getCached}.
+   *
+   * @return the call identifiers
+   */
+  private List<String> allBackendCalls() {
+    return mockingDetails(backendApiClient).getInvocations().stream()
+        .map(invocation -> String.valueOf(invocation.getArguments()[0]))
+        .toList();
   }
 
   /**

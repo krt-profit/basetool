@@ -3,7 +3,8 @@
   "ignoreFiles": [
     "build/**",
     "**/*.min.css",
-    "node_modules/**"
+    "node_modules/**",
+    "**/static/css/pages/**"
   ],
   "rules": {
     "selector-class-pattern": null,

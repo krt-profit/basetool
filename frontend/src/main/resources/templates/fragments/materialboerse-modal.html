@@ -1,17 +1,17 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="de">
 <body>
-<!--
+<!--/*
   Shared Materialbörse release / edit modal (REQ-MARKET-002/007). Included on the
   Materialbörse board page and the Mein-Lager page. The logic lives in
   materialboerse-release.js (window.krtMaterialRelease); strings come from
   window.materialboerseI18n (bootstrapped below, merged so a host page can add its own).
--->
+*/-->
 <th:block th:fragment="releaseModal">
-    <!-- Opened via inline display:flex from materialboerse-release.js (the app-wide
+    <!--/* Opened via inline display:flex from materialboerse-release.js (the app-wide
          .krt-modal-overlay contract); the global styles.css default keeps it display:none
          until then, so no `hidden` attribute is used (that left the CSS display:none intact
-         and the modal opened invisibly). -->
+         and the modal opened invisibly). */-->
     <div id="mb-modal" class="krt-modal-overlay">
         <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true"
              aria-labelledby="mb-modal-title" data-mb-modal>
@@ -25,11 +25,11 @@
             </div>
             <div class="krt-modal-body">
                 <div class="mb-modal-picker" data-mb-picker hidden>
-                    <!-- Material/Item kind radio (REQ-MARKET-002): the releasable-items picker lists
+                    <!--/* Material/Item kind radio (REQ-MARKET-002): the releasable-items picker lists
                          BOTH the caller's material rows and their stock-backed game-item rows; this
                          radio narrows the combobox below to one kind. The chosen kind rides the
                          picker's /releasable-items?kind=… query (server-side filter, so a row past
-                         the picker's row cap is never hidden), driven by materialboerse-release.js. -->
+                         the picker's row cap is never hidden), driven by materialboerse-release.js. */-->
                     <div class="mb-modal-kind" data-mb-kind role="radiogroup"
                          th:aria-label="#{materialboerse.modal.kind.label}">
                         <label class="mb-modal-kind__opt">

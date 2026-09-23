@@ -25,8 +25,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import de.greluc.krt.profit.basetool.frontend.config.CapabilityFlagsAdvice;
+import de.greluc.krt.profit.basetool.frontend.config.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -69,9 +70,8 @@ class JobOrderViewProfitGateMvcTest {
     // (canViewOwnJobOrders=true) instead sees their "Meine Auftraege" list (REQ-ORDERS-023),
     // covered
     // by the backend gate tests + e2e.
-    when(backendApiClient.get(
-            "/api/v1/me/capabilities", CapabilityFlagsAdvice.CapabilitiesResponse.class))
-        .thenReturn(new CapabilityFlagsAdvice.CapabilitiesResponse(false, false, false));
+    when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.capabilities(false, false, false));
   }
 
   @Test

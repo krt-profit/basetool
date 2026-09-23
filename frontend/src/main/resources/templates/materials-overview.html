@@ -33,7 +33,7 @@
             <p th:text="#{__${error}__}">Fehler</p>
         </div>
 
-        <!--
+        <!--/*
           Filter widgets are server-rendered (one checkbox per material / star system) and wired up
           by /js/materials-matrix.js: it binds the dropdown open/close, the select-all toggles and
           the boolean filters, then re-fetches /materials/overview/data with the selection as query
@@ -44,9 +44,9 @@
           narrowing a filter never removes options. The selection is persisted per browser in
           localStorage and restored before the initial fetch (REQ-UI-016), so it survives reloads
           and later visits.
-        -->
-        <!-- Filters collapse behind one toggle (REQ-FE-021): this block carries two
-             multi-selects plus the boolean filters and fills a phone viewport on its own. -->
+        */-->
+        <!--/* Filters collapse behind one toggle (REQ-FE-021): this block carries two
+             multi-selects plus the boolean filters and fills a phone viewport on its own. */-->
         <div class="actions-bar">
             <div th:replace="~{fragments/components :: filterToggle('materials-filter-panel', 'materials-filter-toggle')}"></div>
         </div>
@@ -97,12 +97,12 @@
                 <input type="checkbox" id="filterAutoLoad" class="mtx-bool-filter">
                 <label for="filterAutoLoad" class="krtm-margin-bottom-0-margin-top-0-acac" th:text="#{filter.hasAutoLoad}">Hat Auto Load</label>
             </div>
-            <!--
+            <!--/*
               Category-grouping toggle. Checked (default) groups material rows under the
               admin-defined category header rows; unchecked drops the headers and shows every
               material in one flat, alphabetically sorted list. Handled entirely in
               /js/materials-matrix.js and persisted per browser in localStorage.
-            -->
+            */-->
             <div class="form-group krtm-display-flex-align-items-center-gap-0-5rem-m-dd56">
                 <input type="checkbox" id="filterGroupByCategory" checked data-filter-ignore>
                 <label for="filterGroupByCategory" class="krtm-margin-bottom-0-margin-top-0-acac" th:text="#{filter.groupByCategory}">Nach Kategorie gruppieren</label>
@@ -110,12 +110,12 @@
         </div>
         </div>
 
-        <!--
+        <!--/*
           Client-rendered, virtual-scrolling grid. The server ships only this empty skeleton plus
           the JSON config below; /js/materials-matrix.js fetches the (server-filtered) matrix from
           /materials/overview/data and materializes just the visible rows into <tbody>, so the DOM
           stays small no matter how large the universe is. See the controller class Javadoc.
-        -->
+        */-->
         <div id="matrixConfig"
              th:data-data-url="@{/materials/overview/data}"
              th:data-label-material="#{materials.matrix.material}"

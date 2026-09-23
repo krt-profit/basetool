@@ -1,0 +1,88 @@
+/* Page stylesheet of templates/fragments/toast.html, moved out of its inline style block
+ * (FE-PERF-02). Linked in the same place the block stood, so the cascade order is
+ * unchanged. */
+
+.krt-confirm-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    padding: 1rem;
+}
+.krt-confirm-dialog {
+    background: var(--color-bg-dark-gray);
+    border: 1px solid var(--color-primary);
+    border-radius: var(--radius-none);
+    max-width: 480px;
+    width: 100%;
+    padding: 1.5rem;
+    color: var(--color-gray-1);
+    font-family: var(--font-body);
+    box-shadow: 0 0 24px rgba(231, 126, 35, 0.35);
+}
+.krt-confirm-title {
+    font-family: var(--font-headline);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-primary);
+    margin: 0 0 0.75rem 0;
+    font-size: 1.05rem;
+}
+.krt-confirm-message {
+    margin: 0 0 1.25rem 0;
+    line-height: 1.4;
+    font-weight: 300;
+}
+.krt-confirm-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+}
+.krt-confirm-actions .btn {
+    min-height: 44px;
+    min-width: 96px;
+    padding: 0 1rem;
+    font-family: var(--font-headline);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 0.85rem;
+    cursor: pointer;
+    border-radius: var(--radius-none);
+    border: 1px solid transparent;
+    transition:
+        background-color 0.15s ease,
+        border-color 0.15s ease;
+}
+.krt-confirm-actions .btn-secondary {
+    background: transparent;
+    color: var(--color-gray-1);
+    border-color: var(--color-gray-2);
+}
+.krt-confirm-actions .btn-secondary:hover {
+    border-color: var(--color-gray-1);
+    color: var(--color-gray-1);
+}
+.krt-confirm-actions .btn-danger {
+    background: var(--color-primary);
+    color: var(--color-bg-black);
+    border-color: var(--color-primary);
+}
+.krt-confirm-actions .btn-danger:hover {
+    background: var(--color-accent-light);
+    border-color: var(--color-accent-light);
+}
+@media (width <= 768px) {
+    .krt-confirm-dialog {
+        padding: 1rem;
+    }
+    .krt-confirm-actions {
+        flex-direction: column-reverse;
+    }
+    .krt-confirm-actions .btn {
+        width: 100%;
+    }
+}

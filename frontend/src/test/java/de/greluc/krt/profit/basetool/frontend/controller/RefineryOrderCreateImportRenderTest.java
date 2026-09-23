@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.frontend.model.form.RefineryGoodForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.RefineryOrderForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -309,10 +310,9 @@ class RefineryOrderCreateImportRenderTest {
         .perform(get("/refinery-orders/create").with(oidcLogin()))
         .andExpect(status().isOk())
         .andExpect(
-            content()
-                .string(
-                    containsString(
-                        ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
+            PageStylesheets.content(
+                containsString(
+                    ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
   }
 
   private static RefineryGoodForm good(

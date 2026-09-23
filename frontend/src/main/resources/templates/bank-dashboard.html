@@ -35,17 +35,17 @@
                 <span class="utc-time" th:text="${now}">2026-06-12T14:02:00Z</span>
             </p>
         </div>
-        <!-- Header actions. The account-name live filter (REQ-BANK-046) and the two view checkboxes
+        <!--/* Header actions. The account-name live filter (REQ-BANK-046) and the two view checkboxes
              (REQ-BANK-016: table-view + by-Bereich grouping, persisted per user; the card grid ordered
              A→Z is the default when both are unchecked) are visible to EVERY viewer who sees at least
              one card. The direct-booking Kontobewegung CTA shows for any bank employee once a bookable
              account exists; the three-month report stays bank-management only. Verwaltung and
              Berechtigungen are reached from the sidebar (nav.bank.manage / nav.bank.grants), so they
-             are no longer duplicated in the header. -->
+             are no longer duplicated in the header. */-->
         <div class="bank-head-actions">
-            <!-- View options: two independent checkboxes (table view + group by Bereich). bank.js owns
+            <!--/* View options: two independent checkboxes (table view + group by Bereich). bank.js owns
                  their checked state, persists the choice per user in localStorage and re-fetches the
-                 bankGrid fragment on change. Both unchecked = the default card grid ordered A→Z. -->
+                 bankGrid fragment on change. Both unchecked = the default card grid ordered A→Z. */-->
             <th:block th:if="${!#lists.isEmpty(cards)}">
                 <div class="bank-view-toggles" role="group" data-bank-view-toggles
                      th:aria-label="#{bank.dashboard.view.aria}">
@@ -62,9 +62,9 @@
                 </div>
                 <th:block th:replace="~{fragments/components :: bankAccSearch('bank-acc-filter', '#bank-grid-results', '#bank-acc-filter-empty')}"></th:block>
             </th:block>
-            <!-- Direct-booking CTA (REQ-BANK-017/-023): a bank employee books a deposit/withdrawal/
+            <!--/* Direct-booking CTA (REQ-BANK-017/-023): a bank employee books a deposit/withdrawal/
                  transfer straight against a chosen account via the shared unified movement modal.
-                 Shown whenever an active account exists (canBook). -->
+                 Shown whenever an active account exists (canBook). */-->
             <button type="button" class="btn btn--cta" th:if="${canBook}"
                     data-trigger="open-modal-display" data-modal-id="bank-movement-modal"
                     data-testid="bank-movement-open">
@@ -83,8 +83,8 @@
         </div>
     </div>
 
-    <!-- Management-only aggregate strip (.kpi-total, D1 / REQ-BANK-016). View-independent, so it sits
-         outside the swappable bankGrid fragment. -->
+    <!--/* Management-only aggregate strip (.kpi-total, D1 / REQ-BANK-016). View-independent, so it sits
+         outside the swappable bankGrid fragment. */-->
     <div class="bank-totals mt-2" th:if="${dashboard != null and dashboard.totals() != null}"
          data-testid="bank-totals">
         <div class="kpi-total">
@@ -109,16 +109,16 @@
         </div>
     </div>
 
-    <!-- bankGrid fragment: the switchable account view (card/table layout × alphabetical/by-Bereich
+    <!--/* bankGrid fragment: the switchable account view (card/table layout × alphabetical/by-Bereich
          grouping); swapped in place when a view toggle changes (REQ-FE-005). The account-name filter
-         scopes this whole container so it works across every view. -->
+         scopes this whole container so it works across every view. */-->
     <div id="bank-grid-results" th:fragment="bankGrid">
         <th:block th:if="${!#lists.isEmpty(cards)}">
-            <!-- Alphabetical (flat) view. th:if/th:unless must NOT share an element with th:replace:
+            <!--/* Alphabetical (flat) view. th:if/th:unless must NOT share an element with th:replace:
                  th:replace (attribute precedence 1) is processed BEFORE th:if/th:unless (3), so a
                  same-element combination renders the fragment UNCONDITIONALLY and BOTH the table and
                  the card grid appear at once. The condition therefore gates an outer wrapper while
-                 th:replace sits alone on the inner block. -->
+                 th:replace sits alone on the inner block. */-->
             <th:block th:if="${group != 'bereich'}">
                 <th:block th:if="${layout == 'table'}">
                     <th:block th:replace="~{fragments/bank-account-views :: accTable(${cards})}"></th:block>
@@ -127,18 +127,18 @@
                     <th:block th:replace="~{fragments/bank-account-views :: accGrid(${cards})}"></th:block>
                 </th:block>
             </th:block>
-            <!-- By-Bereich (grouped) view: coloured vertical groups the user scrolls through. th:each
+            <!--/* By-Bereich (grouped) view: coloured vertical groups the user scrolls through. th:each
                  (precedence 2) is likewise processed AFTER th:replace (1); sharing an element leaves
                  the loop variable unbound (grp == null -> group.key() NPE -> HTTP 500). th:each gates
-                 an outer wrapper while th:replace sits alone on the inner block. -->
+                 an outer wrapper while th:replace sits alone on the inner block. */-->
             <th:block th:if="${group == 'bereich'}">
                 <th:block th:each="grp : ${groups}">
                     <th:block th:replace="~{fragments/bank-account-views :: accGroup(${grp}, ${layout})}"></th:block>
                 </th:block>
             </th:block>
-            <!-- No-results note for the client-side account-name filter (REQ-BANK-046): revealed by
+            <!--/* No-results note for the client-side account-name filter (REQ-BANK-046): revealed by
                  bank.js when the live filter hides every account. Distinct from the "no accounts at
-                 all" empty state below. -->
+                 all" empty state below. */-->
             <div id="bank-acc-filter-empty" class="empty-state mt-2" hidden>
                 <div class="empty-text" th:text="#{bank.filter.empty}">Keine Konten passen zum Filter.</div>
             </div>
@@ -151,13 +151,13 @@
         </div>
     </div>
 
-    <!-- Direct-booking movement modal (REQ-BANK-017/-023): outside the swapped bankGrid fragment, with
+    <!--/* Direct-booking movement modal (REQ-BANK-017/-023): outside the swapped bankGrid fragment, with
          a source-account selector; a successful booking re-renders the account grid in place so the
-         balances and 30-day deltas refresh without a reload, and shows the saved toast. -->
-    <!-- th:if must NOT share an element with th:replace: th:replace (attribute precedence 1) runs
+         balances and 30-day deltas refresh without a reload, and shows the saved toast. */-->
+    <!--/* th:if must NOT share an element with th:replace: th:replace (attribute precedence 1) runs
          BEFORE th:if (3), so a same-element guard is dead and the modal renders even for a viewer
          with no active accounts (canBook false). The condition gates an outer th:block, mirroring
-         the correctly-gated CTA button above. -->
+         the correctly-gated CTA button above. */-->
     <th:block th:if="${canBook}">
         <th:block th:replace="~{fragments/bank-movement-modal :: movementModal('bank-movement-modal', 'bankGrid', null, true, false, true, true, true)}"></th:block>
     </th:block>

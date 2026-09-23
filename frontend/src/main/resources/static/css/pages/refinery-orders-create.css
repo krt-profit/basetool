@@ -1,0 +1,154 @@
+/* Page stylesheet of templates/refinery-orders-create.html, moved out of its inline style block
+ * (FE-PERF-02). Linked in the same place the block stood, so the cascade order is
+ * unchanged. */
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-family: var(--font-body);
+    font-weight: bold;
+    font-size: 0.9rem;
+}
+/* Checkboxes and radios are excluded: width:100% + the padding would stretch the
+   1.2rem KRT squares (styles.css) full-width. The exclusions sit in :where() so they
+   add ZERO specificity — the rule keeps the plain `.form-group input` weight (0,1,1)
+   and stays below the (0,2,0) combobox rule `.krt-combobox .krt-combobox__input`.
+   No .form-group checkbox/radio exists here today; the exclusion closes the latent
+   trap that broke admin/materials when its flag checkboxes were added later. */
+.form-group input:where(:not([type='checkbox']):not([type='radio'])),
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 0.75rem;
+    background-color: var(--color-surface-input);
+    border: 1px solid var(--color-gray-3);
+    color: var(--color-gray-1);
+    font-family: var(--font-body);
+    box-sizing: border-box;
+}
+.material-row {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    align-items: flex-end;
+}
+@media (width <= 768px) {
+    .material-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+/*
+ * The owner-picker fragment renders `.form-group.owner-picker` without
+ * the inline `flex: X; margin-bottom: 0;` reset that every sibling field
+ * in `.material-row` carries. Without these overrides the picker inherits
+ * the global `.form-group { margin-bottom: 1.25rem; }` from styles.css and
+ * floats above the row baseline under `align-items: flex-end`. `flex: 2`
+ * matches the Besitzer select that sits next to it on the first row.
+ */
+.material-row > .owner-picker {
+    flex: 2;
+    margin-bottom: 0;
+}
+/* UEX refinery yield bonus/malus next to the output-quantity label.
+   Positive = green (Profit department color), negative = red (danger),
+   zero = muted. Matches the semantic-color palette in styles.css. */
+.yield-bonus-badge {
+    display: inline-block;
+    margin-left: 0.5rem;
+    padding: 0.05rem 0.4rem;
+    font-family: var(--font-body);
+    font-weight: bold;
+    font-size: 0.75rem;
+    letter-spacing: 0;
+    border-radius: var(--radius-none);
+    text-transform: none;
+}
+.yield-bonus-badge.yield-positive {
+    color: var(--color-dept-profit);
+    background-color: rgba(35, 158, 51, 0.12);
+    border: 1px solid var(--color-dept-profit);
+}
+.yield-bonus-badge.yield-negative {
+    color: var(--color-danger);
+    background-color: rgba(163, 0, 10, 0.12);
+    border: 1px solid var(--color-danger);
+}
+.yield-bonus-badge.yield-zero {
+    color: var(--color-gray-2-text);
+    background-color: var(--color-gray-4);
+    border: 1px solid var(--color-gray-3);
+}
+/*
+ * When the output-quantity label contains the yield bonus badge, the
+ * global `.form-group:has([required]) > label::after` asterisk lands
+ * AFTER the badge ("Erwartete Ausgangsmenge (Units) -5% *"), which
+ * reads as if the badge itself were the required marker. Override:
+ * anchor the asterisk to the first <span> (the field name) instead,
+ * and suppress the outer ::after for these labels.
+ */
+.form-group:has([required]) > label:has(> .yield-bonus-badge) > span:first-child::after {
+    content: ' *';
+    color: var(--color-primary);
+}
+.form-group:has([required]) > label:has(> .yield-bonus-badge)::after {
+    content: none;
+}
+/* Small "Material #N" header at the top of every material entry.
+   Hosts the per-entry Remove button on the right so it never overlaps
+   the input fields, matching the layout the detail page already uses. */
+.material-entry-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--color-gray-3);
+}
+.material-entry-title {
+    color: var(--color-gray-1);
+    font-family: var(--font-body);
+    font-weight: bold;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+/* Full-width "add another row" affordance below the materials list.
+   Dashed outline + transparent fill keep it visually subordinate to
+   the solid Speichern/Abbrechen actions further down, while the
+   primary-orange color anchors it to the same form section. The
+   button sits after #materials-container, so it naturally moves
+   down whenever a new material row is appended. */
+.btn-add-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    min-height: 44px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    background-color: rgba(231, 126, 35, 0.05);
+    border: 1px dashed var(--color-primary);
+    color: var(--color-primary);
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition:
+        background-color 0.15s ease,
+        border-style 0.15s ease;
+}
+.btn-add-row:hover {
+    background-color: rgba(231, 126, 35, 0.12);
+    border-style: solid;
+}
+.btn-add-row::before {
+    content: '+';
+    font-size: 1.1rem;
+    font-weight: 700;
+    line-height: 1;
+}

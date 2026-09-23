@@ -30,91 +30,19 @@
             <p th:text="#{__${error}__}">Error</p>
         </div>
 
-        <style th:attr="nonce=${cspNonce}">
-            .details-row {
-                display: none;
-            }
-            /* Toggled per row by blueprint-overview.js. A tr:has(details[open]) sibling
-               rule here forced a style recalculation across the whole (up to 1000-row)
-               table on every expand and visibly janked the UI (REQ-INV-012). */
-            .details-row.bp-expanded {
-                display: table-row;
-            }
-            .details-row td {
-                border-left: 2px solid var(--color-primary) !important;
-                padding: 0 !important;
-                background-color: rgba(0, 0, 0, 0.1);
-            }
-            .bp-owners-panel {
-                padding: 0.75rem 1rem;
-            }
-            .bp-owners-loading,
-            .bp-owners-empty,
-            .bp-owners-error {
-                font-size: 0.85rem;
-                color: var(--color-gray-2-text);
-            }
-            .bp-owners-error {
-                color: var(--color-danger);
-            }
-            .bp-owners-list {
-                list-style: none;
-                margin: 0;
-                padding: 0;
-                display: flex;
-                flex-wrap: wrap;
-                gap: 0.4rem;
-            }
-            .bp-owners-list .bp-owner {
-                padding: 0.2rem 0.6rem;
-                font-size: 0.85rem;
-                color: var(--color-gray-1);
-                background-color: rgba(231, 126, 35, 0.08);
-                border: 1px solid rgba(231, 126, 35, 0.25);
-            }
-            /* Discreet marker for an owner shown only via global blueprint sharing
-               (REQ-INV-018) — not a member of the caller's oversight org unit. */
-            .bp-owners-list .bp-owner-external {
-                margin-left: 0.4rem;
-                color: var(--color-gray-2-text);
-                font-size: 0.78rem;
-                font-style: italic;
-            }
-            .bp-owner-count {
-                font-weight: 700;
-            }
-            /* ---- Blueprint live filter ---- */
-            .bp-filter {
-                position: relative;
-                max-width: 360px;
-                margin-bottom: 1.25rem;
-            }
-            .bp-filter .bp-filter-icon {
-                position: absolute;
-                left: 0.85rem;
-                top: 50%;
-                transform: translateY(-50%);
-                display: inline-flex;
-                color: var(--color-gray-2-text);
-                pointer-events: none;
-            }
-            .bp-filter input[type="search"] {
-                width: 100%;
-                padding-left: 2.6rem;
-            }
-        </style>
+        <link rel="stylesheet" th:href="@{/css/pages/blueprint-overview.css}">
 
-        <!-- The overview aggregates owned blueprints per product across the caller's oversight
+        <!--/* The overview aggregates owned blueprints per product across the caller's oversight
              org units. In admin "all org units" mode the bucket merges every org unit - tell the
-             admin the totals span all of them. Officers / SK leads only ever see their own. -->
+             admin the totals span all of them. Officers / SK leads only ever see their own. */-->
         <div th:if="${isAllSquadronsMode}" class="squadron-badge squadron-badge-muted krtm-display-block-padding-0-6rem-0-9rem-margin-b-3373"
              th:text="#{blueprintOverview.all_orgunits_notice}">
             Aggregation across all org units.
         </div>
 
-        <!-- Server-side search (REQ-INV-013): the table is paginated, so a client-side row
+        <!--/* Server-side search (REQ-INV-013): the table is paginated, so a client-side row
              filter would only ever see the current page. Submitting reloads page 0 with the
-             search applied before pagination; the chosen page size is carried along. -->
+             search applied before pagination; the chosen page size is carried along. */-->
         <form class="bp-filter" method="get" th:action="@{/blueprint-overview}"
               th:if="${overviewPage != null and (overviewPage.totalElements() > 0 or search != null)}">
             <span class="bp-filter-icon" aria-hidden="true">
@@ -125,9 +53,9 @@
             <input type="hidden" name="size" th:value="${overviewPage.size()}">
         </form>
 
-        <!-- AJAX swap target (REQ-FE-002): filter, paging and the size picker re-render only
+        <!--/* AJAX swap target (REQ-FE-002): filter, paging and the size picker re-render only
              this block via blueprint-overview.js + krtFetch; the no-JS GET fallback still
-             reloads the whole page. -->
+             reloads the whole page. */-->
         <div id="bp-overview-results">
         <th:block th:fragment="results">
         <div class="table-responsive">
@@ -168,8 +96,8 @@
         </table>
         </div>
 
-        <!-- Footer bar: size picker left, page-nav right (REQ-INV-013). The base URL keeps the
-             active search so paging and re-sizing never drop the filter. -->
+        <!--/* Footer bar: size picker left, page-nav right (REQ-INV-013). The base URL keeps the
+             active search so paging and re-sizing never drop the filter. */-->
         <div class="pagination-controls" th:if="${overviewPage != null}"
              th:with="bpBase=${search != null ? '/blueprint-overview?search=' + #uris.escapeQueryParam(search) : '/blueprint-overview'}">
             <nav th:replace="~{fragments/pagination :: pageSizePicker(pageResponse=${overviewPage}, baseUrl=${bpBase}, sizes=${pageSizes})}"></nav>
@@ -194,7 +122,7 @@
     };
     /*]]*/
 </script>
-<script th:src="@{/js/blueprint-overview.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/blueprint-overview.js}" defer th:attr="nonce=${cspNonce}"></script>
 
 </body>
 </html>

@@ -24,15 +24,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 /**
  * ArchUnit tests that enforce CLAUDE.md's "frontend never talks to PostgreSQL or Keycloak Admin API
@@ -192,6 +198,63 @@ class ArchitectureTest {
     assertThat(marked)
         .as("a @RestController discards the layout model; it must not carry @UsesLayoutModel")
         .isEmpty();
+  }
+
+  /**
+   * Ratchet on the body-writing handlers that live inside layout controllers (FE-PERF-01).
+   *
+   * <p>{@code @ControllerAdvice} selects per controller <em>type</em>, so a {@code ResponseBody}
+   * handler in a {@code @UsesLayoutModel} class is offered the layout model although it can never
+   * render it. {@code LayoutContextLoader} now spares such a handler the backend read at runtime —
+   * unless it reads a {@code ModelAttribute} parameter — so these handlers are no longer a cost,
+   * but each one still runs the layout advices and still depends on that runtime test staying
+   * right. The count may therefore only fall: a new JSON endpoint belongs in a
+   * {@code @RestController}, which the advices never see. When a change moves handlers out, lower
+   * {@link #BODY_HANDLERS_IN_LAYOUT_CONTROLLERS} to the new count in the same change.
+   */
+  @Test
+  void bodyWritingHandlersInLayoutControllersOnlyEverDecrease() {
+    long count =
+        CLASSES.stream()
+            .filter(c -> c.isAnnotatedWith(UsesLayoutModel.class))
+            .flatMap(c -> c.getMethods().stream())
+            .filter(m -> m.isMetaAnnotatedWith(RequestMapping.class))
+            .filter(ArchitectureTest::writesItsOwnBody)
+            .count();
+
+    assertThat(count)
+        .as(
+            "a new JSON handler belongs in a @RestController, not in a @UsesLayoutModel view"
+                + " controller (FE-PERF-01)")
+        .isLessThanOrEqualTo(BODY_HANDLERS_IN_LAYOUT_CONTROLLERS);
+    assertThat(count)
+        .as(
+            "handlers were moved out — lower BODY_HANDLERS_IN_LAYOUT_CONTROLLERS to %d so the"
+                + " ratchet holds the gain",
+            count)
+        .isEqualTo(BODY_HANDLERS_IN_LAYOUT_CONTROLLERS);
+  }
+
+  /**
+   * The number of body-writing handlers inside {@code @UsesLayoutModel} controllers when the
+   * ratchet was introduced (2026-09-23: 217, less the two catalog picker searches moved into a
+   * {@code RestController} the same day). It may only be lowered.
+   */
+  private static final long BODY_HANDLERS_IN_LAYOUT_CONTROLLERS = 215L;
+
+  /**
+   * Whether a handler method writes its response body directly, mirroring the shapes {@code
+   * LayoutContextLoader#decide} recognises.
+   *
+   * @param method the handler method
+   * @return {@code true} for a {@code ResponseBody} method or an {@code HttpEntity}, {@code
+   *     ResponseBodyEmitter} or {@code StreamingResponseBody} return type
+   */
+  private static boolean writesItsOwnBody(JavaMethod method) {
+    return method.isAnnotatedWith(ResponseBody.class)
+        || method.getRawReturnType().isAssignableTo(HttpEntity.class)
+        || method.getRawReturnType().isAssignableTo(ResponseBodyEmitter.class)
+        || method.getRawReturnType().isAssignableTo(StreamingResponseBody.class);
   }
 
   /**

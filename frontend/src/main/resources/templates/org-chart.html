@@ -3,8 +3,8 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{orgChart.title} + ' - ' + ${appTitle}">Organigramm - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-        <!-- The _csrf / _csrf_header meta tags come from fragments/head.html; the inline editor reads
-             them through window.krtCsrf (epic #571 / REQ-SEC-010), so no page-local copy is needed. -->
+        <!--/* The _csrf / _csrf_header meta tags come from fragments/head.html; the inline editor reads
+             them through window.krtCsrf (epic #571 / REQ-SEC-010), so no page-local copy is needed. */-->
         <link rel="stylesheet" th:href="@{/css/org-chart.css}">
     </th:block>
 </head>
@@ -33,10 +33,10 @@
                 Übersicht der Funktionsränge in Bereichsleitung, Staffeln und Spezialkommandos.
             </p>
         </div>
-        <!-- Inline-editor toggle, ADMIN-only (the only edit right on the descriptive chart,
+        <!--/* Inline-editor toggle, ADMIN-only (the only edit right on the descriptive chart,
              REQ-ORG-010): assign / rename / remove positions. It sits in the trailing edge of the
              title box but stays OUTSIDE #oc-chart, so an in-place chart refresh (REQ-FE-005) never
-             duplicates it — pinned by OrgChartPageRenderTest#chartBodyFragment_rendersTreeWithoutPageChrome. -->
+             duplicates it — pinned by OrgChartPageRenderTest#chartBodyFragment_rendersTreeWithoutPageChrome. */-->
         <button type="button" class="btn btn-outline oc-edit-toggle" data-trigger="oc-toggle-edit"
                 sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:if="${orgChart != null}"
                 aria-pressed="false" th:text="#{orgChart.edit}">Bearbeiten</button>
@@ -44,17 +44,17 @@
 
     <th:block th:replace="~{fragments/components :: alert(type='danger', msgKey=${error}, extraClass='mt-2')}"></th:block>
 
-    <!-- Edit-mode legend: hidden until the toolbar toggle turns editing on (oc-edit-hint--on),
-         so the cloud of dashed "+" affordances has context. Admins only, like the toolbar. -->
+    <!--/* Edit-mode legend: hidden until the toolbar toggle turns editing on (oc-edit-hint--on),
+         so the cloud of dashed "+" affordances has context. Admins only, like the toolbar. */-->
     <div id="oc-edit-hint" class="oc-edit-hint" role="note"
          sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" th:if="${orgChart != null}"
          th:text="#{orgChart.editHint}">Bearbeiten aktiv: Positionen zuweisen, umbenennen oder entfernen.</div>
 
-    <!-- #oc-chart is the STABLE swap container (its `editing` class + the toolbar toggle survive an
+    <!--/* #oc-chart is the STABLE swap container (its `editing` class + the toolbar toggle survive an
          innerHTML swap); the inner th:block th:fragment renders only its children, so re-fetching
          `?fragment=chartBody` and assigning container.innerHTML never double-nests the id and
          re-stamps every data-version atomically (epic #571 / REQ-FE-005). `area` is rebound on the
-         fragment block because a standalone fragment render ignores the ancestor th:with. -->
+         fragment block because a standalone fragment render ignores the ancestor th:with. */-->
     <div id="oc-chart" class="oc-chart" th:if="${orgChart != null}">
         <th:block th:fragment="chartBody"
                   th:with="ol=${orgChart.organisationsleitung()},
@@ -64,8 +64,8 @@
                            showLegacy=${legacyHasContent or noHierarchy},
                            chartEmpty=${noHierarchy and !legacyHasContent}">
 
-        <!-- ===== Organisationsleitung (top tier) — its own ARIA tree: the OL root box (level 1)
-             with its OL members fanning out (level 2). Rendered only when an active OL exists. ===== -->
+        <!--/* ===== Organisationsleitung (top tier) — its own ARIA tree: the OL root box (level 1)
+             with its OL members fanning out (level 2). Rendered only when an active OL exists. ===== */-->
         <th:block th:if="${ol != null}">
             <div class="oc-caption">
                 <span class="oc-caption-title" th:text="#{orgChart.ol.title}">Organisationsleitung</span>
@@ -77,13 +77,13 @@
                         <span class="sh" th:text="${ol.shorthand()}">OL</span>
                         <span class="nm" th:text="${ol.name()}">Organisationsleitung</span>
                     </div>
-                    <!-- Grand Admiral (REQ-ORG-021): the single Grand Admiral on a spine directly under
+                    <!--/* Grand Admiral (REQ-ORG-021): the single Grand Admiral on a spine directly under
                          the OL box, above the other members. Held by an account (kept with OL-member
                          rights, managed under Leitung, read-only here) OR a free-text name (like every
                          other chart field, editable here). The node suppresses the generic position
                          actions (editable=false) and carries its own OL-level controls, since the Grand
                          Admiral lives on the OL row, not as a position. When vacant the OL box connects
-                         straight to the member fan below. -->
+                         straight to the member fan below. */-->
                     <th:block th:if="${ol.grandAdmiral() != null}">
                         <div class="oc-v"></div>
                         <th:block th:replace="~{fragments/org-chart-node :: ocNodeLabeled(${ol.grandAdmiral()}, 2, 'orgChart.rank.GRAND_ADMIRAL', false)}"></th:block>
@@ -103,16 +103,16 @@
                             </button>
                         </div>
                     </th:block>
-                    <!-- Add a free-text Grand Admiral when the post is vacant (edit mode, admins). -->
+                    <!--/* Add a free-text Grand Admiral when the post is vacant (edit mode, admins). */-->
                     <button type="button" class="oc-add" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
                             th:if="${ol.grandAdmiral() == null}"
                             data-trigger="oc-ga-add" th:data-org-unit-id="${ol.orgUnitId()}"
                             th:data-rank-label="#{orgChart.rank.GRAND_ADMIRAL}"
                             th:text="#{orgChart.add.grandAdmiral}">Grand Admiral hinzuf&#252;gen</button>
-                    <!-- OL Stab (members) fan out side by side beneath the OL box (level 2) — the same
+                    <!--/* OL Stab (members) fan out side by side beneath the OL box (level 2) — the same
                          horizontal peer grouping the Staffeln/SKs use under a Staffelleiter, so the OL
                          members read as peers rather than a vertical spine. Guarded so an empty OL
-                         draws no stray connector; the Bereiche fan below stays its own set of trees. -->
+                         draws no stray connector; the Bereiche fan below stays its own set of trees. */-->
                     <ul class="oc-fan" role="group" th:if="${!#lists.isEmpty(ol.members())}">
                         <li th:each="m : ${ol.members()}">
                             <div class="oc-col">
@@ -127,9 +127,9 @@
                             th:text="#{orgChart.add.olMember}">OL-Mitglied hinzufügen</button>
                 </div>
             </div>
-            <!-- ===== OL → Bereiche connector: the Bereiche fan out side by side beneath the OL,
+            <!--/* ===== OL → Bereiche connector: the Bereiche fan out side by side beneath the OL,
                  each its own ARIA tree, drawn with the same .oc-fan lines as a Bereich → its
-                 Staffeln/SKs. Each <li> is one Bereich subtree (caption + collapsible tree). ===== -->
+                 Staffeln/SKs. Each <li> is one Bereich subtree (caption + collapsible tree). ===== */-->
             <ul class="oc-fan oc-fan--bereiche" role="presentation"
                 th:if="${!#lists.isEmpty(orgChart.bereiche())}">
                 <li th:each="b : ${orgChart.bereiche()}">
@@ -138,8 +138,8 @@
             </ul>
         </th:block>
 
-        <!-- ===== No OL yet: render the Bereiche side by side without a connector head (the OL apex
-             that would parent them does not exist), each still its own collapsible ARIA tree. ===== -->
+        <!--/* ===== No OL yet: render the Bereiche side by side without a connector head (the OL apex
+             that would parent them does not exist), each still its own collapsible ARIA tree. ===== */-->
         <th:block th:if="${ol == null and !#lists.isEmpty(orgChart.bereiche())}">
             <div class="oc-bereich-row">
                 <th:block th:each="b : ${orgChart.bereiche()}">
@@ -148,20 +148,20 @@
             </div>
         </th:block>
 
-        <!-- ===== Legacy / ungrouped tier: the singleton Area Leadership + every profit-eligible
+        <!--/* ===== Legacy / ungrouped tier: the singleton Area Leadership + every profit-eligible
              Staffel/SK not yet wired under a Bereich. Shown while it still holds content OR while no
              hierarchy exists at all (the pre-#692 single-tree view); hidden once everything has moved
-             under Bereiche, so an empty Area-Lead spine never lingers below a populated chart. ===== -->
+             under Bereiche, so an empty Area-Lead spine never lingers below a populated chart. ===== */-->
         <th:block th:if="${showLegacy}">
         <div class="oc-caption">
             <span class="oc-caption-title" th:text="#{orgChart.area.title}">Bereichsleitung</span>
         </div>
 
         <div class="oc-tree" role="tree" th:aria-label="#{orgChart.area.title}">
-            <!-- Leadership spine: Area Lead, then the Stab entries, then the units fan -->
+            <!--/* Leadership spine: Area Lead, then the Stab entries, then the units fan */-->
             <div class="oc-col">
 
-                <!-- Bereichsleiter (hero) or vacant -->
+                <!--/* Bereichsleiter (hero) or vacant */-->
                 <th:block th:if="${area.lead() != null}">
                     <th:block th:replace="~{fragments/org-chart-node :: ocNode(${area.lead()}, 1)}"></th:block>
                 </th:block>
@@ -176,11 +176,11 @@
                         th:data-rank-label="#{orgChart.rank.AREA_LEAD}"
                         th:text="#{orgChart.add.areaLead}">Bereichsleiter zuweisen</button>
 
-                <!-- Stab: one row per rank under the Bereichsleiter (the area level has no
+                <!--/* Stab: one row per rank under the Bereichsleiter (the area level has no
                      Commander) — Koordinatoren side by side, Operatoren as a second row beneath
                      them. Kept identical to the Bereich tier's Stab in org-chart-node.html
                      (`ocBereich`): the two render the same concept and must not drift into two
-                     different pictures of one organisation. -->
+                     different pictures of one organisation. */-->
                 <ul class="oc-fan" role="group" th:if="${!#lists.isEmpty(area.coordinators())}">
                     <li th:each="n : ${area.coordinators()}">
                         <div class="oc-col">
@@ -196,11 +196,11 @@
                     </li>
                 </ul>
 
-                <!-- one button to add a Stab member (Koordinator/Operator; the modal picks the type) -->
+                <!--/* one button to add a Stab member (Koordinator/Operator; the modal picks the type) */-->
                 <button type="button" class="oc-add" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
                         data-trigger="oc-add-staff" th:text="#{orgChart.add.staff}">Stab hinzufügen</button>
 
-                <!-- Tier 2: the ungrouped Staffeln + Spezialkommandos fan out under the Area Lead -->
+                <!--/* Tier 2: the ungrouped Staffeln + Spezialkommandos fan out under the Area Lead */-->
                 <th:block th:replace="~{fragments/org-chart-node :: ocUnitFan(${orgChart.squadrons()}, ${orgChart.specialCommands()})}"></th:block>
             </div>
         </div>
@@ -215,7 +215,7 @@
     </div>
 </main>
 
-<!-- Assign / reassign / add-staff modal (admins only) -->
+<!--/* Assign / reassign / add-staff modal (admins only) */-->
 <div id="oc-modal" class="krt-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="oc-modal-title"
      sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
     <div class="krt-modal krt-modal--wide">
@@ -245,9 +245,9 @@
             <input type="text" id="oc-name" maxlength="120"
                    th:placeholder="#{orgChart.modal.commandNamePlaceholder}">
         </div>
-        <!-- Account-linked seats are mirror-only now (epic #800, REQ-ROLE-006): the chart editor
+        <!--/* Account-linked seats are mirror-only now (epic #800, REQ-ROLE-006): the chart editor
              places only a free-text holder (a member without a Basetool account). Accounts are
-             appointed under Organisation -> Leitung. -->
+             appointed under Organisation -> Leitung. */-->
         <div class="form-group" id="oc-user-group">
             <label for="oc-display-name" th:text="#{orgChart.modal.displayName}">Name</label>
             <input type="text" id="oc-display-name" maxlength="120"
@@ -289,6 +289,6 @@
         vacateConfirm: /*[[#{orgChart.vacateLead.confirm}]]*/ 'Remove this command group\'s Kommandoleiter?'
     };
 </script>
-<script th:src="@{/js/org-chart.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/org-chart.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

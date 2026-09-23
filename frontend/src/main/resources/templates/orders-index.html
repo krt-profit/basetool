@@ -27,8 +27,8 @@
     </div>
 
     <div class="hud-box mt-2">
-        <!-- Filters collapse behind one toggle (REQ-FE-021). "Neuer Auftrag" already lives in the
-             page head above, so this bar carries the toggle alone. -->
+        <!--/* Filters collapse behind one toggle (REQ-FE-021). "Neuer Auftrag" already lives in the
+             page head above, so this bar carries the toggle alone. */-->
         <div class="actions-bar">
             <div th:replace="~{fragments/components :: filterToggle('orders-filter-panel', 'orders-filter-toggle')}"></div>
         </div>
@@ -52,13 +52,13 @@
                 <input type="checkbox" name="status" value="COMPLETED" th:checked="${selectedStatuses != null and selectedStatuses.contains('COMPLETED')}">
                 <span th:text="#{status.COMPLETED}">Abgeschlossen</span>
             </label>
-            <!-- Squadron multi-select filter (REQ-ORDERS-027): check the squadrons whose orders to
+            <!--/* Squadron multi-select filter (REQ-ORDERS-027): check the squadrons whose orders to
                  show (matching responsible OR requesting side). All active squadrons are offered;
                  default = all checked (= no narrowing). The selection is persisted per BROWSER in
                  localStorage by orders-index.js (bare key, no user id; not a server cookie —
                  ADR-0120) and re-applied on load. The
                  dropdown mirrors the Lager multi-select (.multi-select-container). The backend filter
-                 is a display preference, not an access-control gate. -->
+                 is a display preference, not an access-control gate. */-->
             <th:block th:unless="${requesterView}">
             <span th:text="#{orders.index.filter.scope}" class="krtm-font-weight-700-font-size-0-8rem-color-var-c-372a">Staffel:</span>
             <div class="multi-select-container" id="squadronFilterContainer">
@@ -128,10 +128,10 @@
                         <span th:case="'ITEM'" class="order-kind-badge order-kind-item" th:text="#{orders.kind.item}">Item</span>
                         <span th:case="*" class="order-kind-badge order-kind-material" th:text="#{orders.kind.material}">Material</span>
                     </span>
-                    <!-- Processing unit (Bearbeitende Einheit) surfaced under the ID + type so the
+                    <!--/* Processing unit (Bearbeitende Einheit) surfaced under the ID + type so the
                          handling squadron/SK is visible at a glance in the overview, not only in the
                          detail view (#1188). Mirrors the Auftraggeber badge markup: shorthand as text,
-                         full name as title, muted em-dash fallback. -->
+                         full name as title, muted em-dash fallback. */-->
                     <span class="order-responsible-label" th:text="#{orders.index.responsible}">Bearbeitende Einheit</span>
                     <span th:if="${order.responsibleOrgUnit != null}" class="squadron-badge"
                           th:title="${order.responsibleOrgUnit.name()}"
@@ -154,22 +154,22 @@
                     <span th:text="${@handles.display(order.handle)}"></span>
                 </td>
                 <td class="p-0" th:with="matCount=${order.type == 'ITEM' ? (order.aggregatedMaterials != null ? order.aggregatedMaterials.size() : 0) : (order.materials != null ? order.materials.size() : 0)}">
-                    <!-- Collapsible material sublist (default collapsed, per-BROWSER localStorage
+                    <!--/* Collapsible material sublist (default collapsed, per-BROWSER localStorage
                          state restored on load + after every fragment swap by orders-index.js — the
                          same idiom as the Lager tree, REQ-INV-002, but keyed per browser: this key
                          carries no user id where the Lager tree's does). The toggle button + the
-                         count stay visible; only the tables collapse. -->
+                         count stay visible; only the tables collapse. */-->
                     <button type="button" class="btn btn-ghost ord-materials-toggle" data-trigger="ord-toggle-materials" th:data-order-id="${order.id}" aria-expanded="false">
                         <span class="toggle-icon" aria-hidden="true">&#9654;</span>
                         <span th:text="#{orders.index.materials}">Materialien</span>
                         <span class="text-muted" th:text="'(' + ${matCount} + ')'">(0)</span>
                     </button>
                     <div class="ord-materials-body krtm-display-none-5790" th:data-order-materials="${order.id}">
-                    <!-- Both order kinds render the same material-requirement summary: the material
+                    <!--/* Both order kinds render the same material-requirement summary: the material
                          name, the total required amount and the collection progress (stock / required).
                          MATERIAL orders use their per-line requirements; ITEM orders use the
                          aggregated material list derived from the ordered items' blueprints (#595),
-                         so the column shows what materials must be gathered — not the item count. -->
+                         so the column shows what materials must be gathered — not the item count. */-->
                     <div th:if="${order.type != 'ITEM'}" class="table-responsive">
                     <table class="data-table krtm-margin-0-background-transparent-border-none-f884">
                         <colgroup>
@@ -260,7 +260,7 @@
     const KRT_ORDERS_LIVESYNC_UPDATES = /*[[#{livesync.updates_available}]]*/ 'Aktualisierungen verfuegbar';
     const KRT_ORDERS_SECTION_REFRESH_ERROR = /*[[#{orders.section.refresh.error}]]*/ 'Die Liste konnte nicht aktualisiert werden. Bitte Seite neu laden.';
 </script>
-<script th:src="@{/js/orders-index.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/orders-index.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)" th:inline="javascript" th:attr="nonce=${cspNonce}">
     // LOGISTICIAN-only: localized strings for the in-place queue drag-reorder (#575); consumed by the
     // orders-index-reorder.js page module loaded immediately after this bootstrap (ADR-0069). Both
@@ -277,6 +277,6 @@
         }
     };
 </script>
-<script sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)" th:src="@{/js/orders-index-reorder.js}" th:attr="nonce=${cspNonce}"></script>
+<script sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN)" th:src="@{/js/orders-index-reorder.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-<!--
+<!--/*
   The profile page's "delete account" card (REQ-SEC-061, ADR-0181), as a fragment so
   profile.js can swap it in place after the member raises or withdraws a request
   (REQ-FE-001) rather than reloading the page. The proxy controller renders exactly this
@@ -21,7 +21,7 @@
   anything had gone wrong. "I cannot show you this right now" is the honest answer, and
   suppressing the actions with it stops the member raising a second request on top of one
   they cannot see.
--->
+*/-->
 <div th:fragment="card">
     <div class="card card--inset" id="profile-deletion-card"
          th:attr="data-status=${deletionRequest != null ? deletionRequest.status : ''}">

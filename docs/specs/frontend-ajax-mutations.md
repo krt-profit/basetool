@@ -1831,6 +1831,29 @@ reads — four uncached, plus the cached squadron page-walk — to build a model
 in-place mutation is the app's primary interaction model (REQ-FE-001…REQ-FE-010), that sat on the
 hot path.
 
+**Amended 2026-09-23 (FE-PERF-01) — per handler, and one read.** A `@ControllerAdvice` selects per
+controller *type*, so the marker alone left the ~200 `ResponseBody` handlers that live inside view
+controllers (the in-place mutation endpoints, the unread-count poll) paying for the model. Two rules
+close that:
+
+- **A handler that cannot render does not read the layout.** `LayoutContextLoader.needsLayoutModel`
+  looks at the handler the dispatcher matched: a method that writes its own body (`ResponseBody` on
+  the method or class, or an `HttpEntity` / `ResponseBodyEmitter` / `StreamingResponseBody` return
+  type) **and** declares no `ModelAttribute` parameter gets the fail-closed empty context with no
+  backend read. The second condition is load-bearing — `JobOrderWriteController`'s AJAX create
+  handlers are `ResponseBody` and read `canViewJobOrders` as a parameter. A handler that returns a
+  view, full page or XHR fragment, always gets the whole model: the list fragments of the hangar,
+  missions, refinery orders, the Lager admin and the promotion pages read `isAllSquadronsMode`, so
+  no fragment is skipped on the strength of a request header.
+- **A rendered page reads the layout once.** The three advices take their org-unit context,
+  pinnable units, capability flags and unread count from one `GET /api/v1/me/layout`
+  (REQ-API-012), memoised as a request attribute, instead of four separate reads. It fails closed
+  as a whole (ADR-0151). The squadron catalogue stays the cached `CachedCatalog.SQUADRONS` read.
+
+New JSON handlers belong in a `@RestController`; `ArchitectureTest` ratchets the number of
+body-writing handlers inside `@UsesLayoutModel` controllers (215 on 2026-09-23) so it can only
+fall.
+
 **Acceptance**
 
 - [ ] An authenticated request to a `@RestController` in the `frontend` module triggers none of
@@ -1842,11 +1865,21 @@ hot path.
   app title, unread count, CSRF metas and app version.
 - [ ] `GlobalBindingAdvice` remains unscoped, and a `String` `@RequestParam`/`@PathVariable` on a
   proxy is still trimmed and length-capped.
+- [x] The unread-count poll (`GET /notifications/unread-count`, a `ResponseBody` handler in a view
+  controller) makes exactly one backend call, its own (2026-09-23).
+- [x] A rendered page makes exactly one `/api/v1/me/layout` read and none of the four retired
+  layout reads; the three advices share it (2026-09-23).
+- [x] A `ResponseBody` handler that reads a `ModelAttribute` parameter still receives the model
+  (2026-09-23).
+- [x] The body-writing handlers inside `@UsesLayoutModel` controllers only ever decrease (ratchet,
+  2026-09-23).
 
-**Enforced by:** `LayoutModelScopeMvcTest` (no layout backend read on a `@RestController`),
-`ArchitectureTest` (both halves of the `@UsesLayoutModel` marker rule) · **Code:**
-`config/UsesLayoutModel` and the five `@ControllerAdvice(annotations = UsesLayoutModel.class)` layout
-advices · **ADR:** ADR-0165
+**Enforced by:** `LayoutModelScopeMvcTest` (no layout backend read on a `@RestController`; one call
+for the unread-count poll; one layout read per rendered page), `LayoutContextLoaderTest` (memo,
+fail-closed, the handler test), `ArchitectureTest` (both halves of the `@UsesLayoutModel` marker
+rule; the body-handler ratchet) · **Code:** `config/UsesLayoutModel`, `config/LayoutContextLoader`
+and the five `@ControllerAdvice(annotations = UsesLayoutModel.class)` layout advices · **ADR:**
+ADR-0165
 
 ### REQ-FE-021 — A list page's filters collapse behind one toggle
 
@@ -1896,6 +1929,56 @@ calls `refresh()` after the swap so a collapsed panel never under-reports.
 **Enforced by:** `InventoryFilterPanelCollapseE2eTest`, `JobOrderMaterialDemandE2eTest`,
 `InventoryPageControllerMvcTest` (the panel markup and the shared `filterToggle`) · **Code:**
 `krt-filter-panel.js`, `fragments/components.html` (`filterToggle`)
+
+### REQ-FE-023 — Every script is deferred, and an inline script runs nothing at parse time
+
+Every external `<script>` of the frontend — the shared ones `fragments/head.html` loads and every
+page module — carries `defer` (FE-PERF-05, 2026-09-23). Deferred scripts run in **document order**
+after the HTML is parsed and before `DOMContentLoaded`, so the dependency order is unchanged: the
+head's shared scripts before the page modules that use them, `krt-fetch.js` before
+`krt-live-sync.js`, the three remote-source registries before the combobox enhancer. Nothing blocks
+the first paint any more; before, eleven head scripts (about 268 KB unminified, 85 KB gzipped) did.
+
+Two rules make that safe, and both are about the one thing that still runs earlier — an **inline**
+script, which runs where it stands, during parsing, before any deferred file:
+
+- **`krt-client-error.js` stays synchronous and first.** It installs the `error` /
+  `unhandledrejection` handlers that observe every other script, so it must run before them.
+- **An inline page script declares and registers, it does not run.** At its top level it may define
+  constants, functions and `window.*` dictionaries, look up elements already parsed above it,
+  register listeners and `window.krtEvents.on(...)` handlers (the head stub queues those). Anything
+  it has to *run* goes into a `DOMContentLoaded` listener, which fires after every deferred script.
+  A top-level call that touches `window.krtFetch` would otherwise meet an undefined global, and the
+  `if (window.krtFetch)` guard such scripts carry turns that into a silent no-op — the shape this
+  load order regressed in three times. The inline scripts that ran code at parse time moved onto
+  `DOMContentLoaded` (the bank detail / holder / manage pagers, the org-unit bank tabs and account
+  detail, the member edit form). `fragments/head.html`'s own inline scripts are exempt: they are the
+  bootstrap stubs and dictionaries that must exist first.
+
+A second `krtEvents` watchdog sits in the head, beside the stub: if `event-delegation.js` has not
+replaced the stub five seconds after `load` it **throws**, so the client-error beacon reports a
+`script_error` and `basetool_client_error_total` counts it. The watchdog inside `event-delegation.js`
+could never fire for the case it exists for — that file failing to load.
+
+**Comment-stripping minification is declined** (owner decision 2026-09-23, recorded in ADR-0125):
+it would save about 57 KB gzip on the head scripts, on a first visit after a deploy only (the assets
+are hashed and `immutable`), at the risk of silently corrupting production JavaScript and of serving
+a file other than the one the type check and the linters read. The transfer saving comes from edge
+compression instead (`gzip_types` for JavaScript, CSS and JSON, PR #2021).
+
+**Acceptance**
+
+- [x] Every `<script src>` in the templates is `defer` except `krt-client-error.js`, which is the
+  head's first script and synchronous.
+- [x] No inline page script makes a top-level call other than element look-ups, listener and
+  `krtEvents` registrations, and no inline page script is an immediately invoked function.
+- [x] On every core page, after load, the shared globals exist, the `krtEvents` stub is replaced, no
+  script threw and no client-error beacon was sent.
+
+**Enforced by:** `InlineScriptLoadOrderTest` (the first two), `ScriptLoadOrderE2eTest` (the third,
+over `FrontendPageRoutes.CORE_SMOKE`) · **Code:** `fragments/head.html`, `event-delegation.js`,
+`krt-client-error.js` · **Related:** REQ-FE-001, REQ-OBS-* (`basetool_client_error_total`), ADR-0069
+(page JavaScript in static modules), ADR-0125
 
 ## Out of scope
 

@@ -945,11 +945,11 @@ them, per REQ-API-009.
 - [x] The frontend proxies forward to them (`UserProxyControllerTest`).
 - [x] `/me/layout` answers the four parts from the same resolvers (`MeControllerTest`) in exactly one
   transaction, where the separate calls open several (`MeLayoutSingleTransactionTest`).
-- [ ] The web layout uses `/me/layout` instead of the separate calls — the frontend half of
-  BE-PERF-07 / FE-PERF-01, a separate change.
+- [x] The web layout uses `/me/layout` instead of the separate calls — the frontend half of
+  BE-PERF-07 / FE-PERF-01, done 2026-09-23 (`LayoutContextLoader`, REQ-FE-020).
 
 **Enforced by:** `UserReferenceSearchTest`, `MeLayoutSingleTransactionTest`, `MeControllerTest` ·
-`UserProxyControllerTest` (frontend) ·
+`UserProxyControllerTest`, `LayoutModelScopeMvcTest`, `LayoutContextLoaderTest` (frontend) ·
 **Related:** REQ-API-005, REQ-API-009, REQ-DATA-003, REQ-FE-016, REQ-SEC-037, REQ-SEC-047, ADR-0089,
 ADR-0151
 

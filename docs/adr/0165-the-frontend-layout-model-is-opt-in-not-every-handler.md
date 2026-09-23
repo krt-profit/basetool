@@ -105,3 +105,22 @@ marker and that no `@RestController` does; `LayoutModelScopeMvcTest` asserts tha
   larger refactor and is not attempted here.
 - PR #1870's manifest controller inherits the fix on merge without a conflict: it is a
   `@RestController`, so it simply never opts in.
+
+## Amendment 2026-09-23 — the mixed controllers, and one read (FE-PERF-01)
+
+The last consequence above is no longer true. It was not solved by splitting the 38 mixed
+controllers but by a per-*handler* test at runtime, which `@ControllerAdvice` cannot express and
+the model attribute methods can: the dispatcher has already put the matched `HandlerMethod` into
+the request (`HandlerMapping.BEST_MATCHING_HANDLER_ATTRIBUTE`) before `ModelFactory` runs.
+`LayoutContextLoader` reads it and skips the backend for a handler that writes its own body and
+declares no `ModelAttribute` parameter. The parameter clause is what makes this safe:
+`JobOrderWriteController`'s AJAX create handlers are `ResponseBody` and read `canViewJobOrders`.
+
+A view handler — including an XHR fragment — keeps the whole model. Skipping on a request header
+was considered and rejected: the swapped list fragments of five areas read `isAllSquadronsMode`.
+
+The four layout reads became one: the three advices share `GET /api/v1/me/layout` (REQ-API-012)
+through a request-attribute memo. Splitting the mixed controllers remains possible but buys nothing
+at runtime any more; `ArchitectureTest` ratchets their body-writing handlers (215) so the count
+only falls, and the two picker searches of `CatalogSearchController` — the one controller with no
+view handler at all — moved into a `@RestController`.

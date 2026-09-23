@@ -3,20 +3,7 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{admin.discordRegistrations.title} + ' - ' + ${appTitle}">Discord-Registrierungen - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-<style th:attr="nonce=${cspNonce}">
-        .reg-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-        .reg-when { color: var(--color-gray-2-text); font-size: 0.85rem; }
-        .modal {
-            position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75);
-            align-items: center; justify-content: center; padding: 1rem;
-        }
-        #reject-reason,
-        #reopen-reason {
-            width: 100%; min-height: 80px; padding: 0.5rem; box-sizing: border-box;
-            background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3);
-            color: var(--color-gray-1); font-family: var(--font-body);
-        }
-    </style>
+<link rel="stylesheet" th:href="@{/css/pages/admin-discord-registrations.css}">
     </th:block>
 </head>
 <body>
@@ -93,9 +80,9 @@
         </div>
     </div>
 
-    <!-- Rejected registrations (REQ-SEC-034). Read-only apart from the reopen action, which returns
+    <!--/* Rejected registrations (REQ-SEC-034). Read-only apart from the reopen action, which returns
          a row to the queue above so an erroneous rejection is recoverable from the UI instead of by
-         a manual database write. -->
+         a manual database write. */-->
     <div class="hud-box mt-2">
         <h2 class="mt-0" th:text="#{admin.discordRegistrations.rejected.title}">Abgelehnte Registrierungen</h2>
         <p class="reg-when" th:text="#{admin.discordRegistrations.rejected.hint}">Eine irrtümlich abgelehnte Registrierung kann wieder in die Warteschlange zurückgeholt werden.</p>
@@ -143,7 +130,7 @@
         </div>
     </div>
 
-    <!-- Reject reason modal (no native dialogs, REQ-UI) -->
+    <!--/* Reject reason modal (no native dialogs, REQ-UI) */-->
     <div id="reject-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
         <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{admin.discordRegistrations.reject.modal.title}">
             <div class="krt-modal-head">
@@ -162,8 +149,8 @@
         </div>
     </div>
 
-    <!-- Reopen-confirmation modal (no native dialogs, REQ-UI). Carries an optional note that lands
-         in the approval audit alongside the REOPENED decision (REQ-SEC-034). -->
+    <!--/* Reopen-confirmation modal (no native dialogs, REQ-UI). Carries an optional note that lands
+         in the approval audit alongside the REOPENED decision (REQ-SEC-034). */-->
     <div id="reopen-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
         <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{admin.discordRegistrations.reopen.modal.title}">
             <div class="krt-modal-head">
@@ -183,9 +170,9 @@
         </div>
     </div>
 
-    <!-- Link-to-existing-account modal (no native dialogs, REQ-UI). Server-searched account picker
+    <!--/* Link-to-existing-account modal (no native dialogs, REQ-UI). Server-searched account picker
          (remote-users combobox) so an admin can find the existing account even when the Discord
-         handle differs from the in-app name (REQ-SEC-026). -->
+         handle differs from the in-app name (REQ-SEC-026). */-->
     <div id="link-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
         <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{admin.discordRegistrations.link.modal.title}">
             <div class="krt-modal-head">
@@ -207,11 +194,11 @@
             </div>
         </div>
     </div>
-    <!-- Merge-an-older-account modal (no native dialogs, REQ-UI). The remedy for the queue's
+    <!--/* Merge-an-older-account modal (no native dialogs, REQ-UI). The remedy for the queue's
          duplicate-callsign marker: a login whose subject matches no account no longer adopts one
          found by name, so a member who ended up with two accounts needs their data moved onto the
          one they can reach (REQ-SEC-045). Same server-searched account picker as the link modal --
-         the two differ in what moves, not in how the account is chosen. -->
+         the two differ in what moves, not in how the account is chosen. */-->
     <div id="merge-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
         <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{admin.discordRegistrations.merge.modal.title}">
             <div class="krt-modal-head">
@@ -257,6 +244,6 @@
         rejectedEmpty: /*[[#{admin.discordRegistrations.rejected.empty}]]*/ 'Keine abgelehnten Registrierungen.'
     };
 </script>
-<script th:src="@{/js/discord-registrations.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/discord-registrations.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

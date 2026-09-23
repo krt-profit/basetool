@@ -27,7 +27,7 @@
         <p class="krt-subtitle" th:text="#{admin.p4kImport.subtitle}">Spielkatalog importieren</p>
     </div>
 
-    <!-- Upload: enqueues a background preview job -->
+    <!--/* Upload: enqueues a background preview job */-->
     <div class="hud-box mt-2">
         <p th:text="#{admin.p4kImport.intro}">Der Katalog wird im Hintergrund analysiert.</p>
 
@@ -44,7 +44,7 @@
         </div>
     </div>
 
-    <!-- Job list (polled) -->
+    <!--/* Job list (polled) */-->
     <div class="hud-box mt-2">
         <h2 th:text="#{admin.p4kImport.jobs.title}">Importe</h2>
         <div class="table-responsive">
@@ -60,14 +60,14 @@
                 </tr>
                 </thead>
                 <tbody id="krt-p4k-jobs">
-                <!-- rows injected by p4k-import.js -->
+                <!--/* rows injected by p4k-import.js */-->
                 </tbody>
             </table>
         </div>
         <p id="krt-p4k-jobs-empty" class="text-muted" th:text="#{admin.p4kImport.jobs.empty}" hidden>Noch keine Importe.</p>
     </div>
 
-    <!-- Apply panel (revealed when applying a finished preview) -->
+    <!--/* Apply panel (revealed when applying a finished preview) */-->
     <div id="krt-p4k-apply-panel" class="hud-box mt-2" hidden>
         <h2 th:text="#{admin.p4kImport.apply.panel.title}">Import anwenden</h2>
         <p>
@@ -92,7 +92,7 @@
         </div>
     </div>
 
-    <!-- Details panel (per-type result of the selected job) -->
+    <!--/* Details panel (per-type result of the selected job) */-->
     <div id="krt-p4k-results" class="hud-box mt-2" hidden>
         <div class="mt-2-flex-gap">
             <h2 th:text="#{admin.p4kImport.results.title}">Ergebnis</h2>
@@ -121,7 +121,7 @@
                 </tr>
                 </thead>
                 <tbody id="krt-p4k-rows">
-                <!-- rows injected by p4k-import.js -->
+                <!--/* rows injected by p4k-import.js */-->
                 </tbody>
             </table>
         </div>
@@ -170,6 +170,6 @@
     };
     /*]]>*/
 </script>
-<script th:src="@{/js/p4k-import.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/p4k-import.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

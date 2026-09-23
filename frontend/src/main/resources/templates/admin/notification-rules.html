@@ -3,40 +3,7 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{admin.notificationRules.title} + ' - ' + ${appTitle}">Notification rules - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-        <style th:attr="nonce=${cspNonce}">
-            .form-group label {
-                display: block;
-                margin-bottom: 0.4rem;
-                font-family: var(--font-body);
-                font-size: 0.8rem;
-            }
-            .form-group input[type='text'], .form-group select, .form-group textarea {
-                width: 100%;
-                padding: 0.5rem;
-                background-color: var(--color-gray-4);
-                border: 1px solid var(--color-gray-3);
-                color: var(--color-gray-1);
-                box-sizing: border-box;
-            }
-            .form-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-                gap: 1rem;
-            }
-            .selector-row {
-                display: flex;
-                flex-wrap: wrap;
-                align-items: end;
-                gap: 0.75rem;
-                padding: 0.75rem;
-                margin-bottom: 0.75rem;
-                border: 1px solid var(--color-gray-3);
-            }
-            .selector-row .form-group {
-                flex: 1 1 160px;
-                margin: 0;
-            }
-        </style>
+        <link rel="stylesheet" th:href="@{/css/pages/admin-notification-rules.css}">
     </th:block>
 </head>
 <body>
@@ -67,7 +34,7 @@
 
     <div class="hud-box mt-2">
         <h2 th:text="#{admin.notificationRules.existing}">Vorhandene Regeln</h2>
-        <!-- .table-responsive (REQ-UI-009): seven columns of rule metadata measure 1303px, which
+        <!--/* .table-responsive (REQ-UI-009): seven columns of rule metadata measure 1303px, which
              is wider than every device class this app supports — the page scrolled SIDEWAYS even at
              1280px, and on a phone it widened the layout viewport to 1329px and took the header and
              the notification bell out of view with it. Found the day /admin/notification-rules was
@@ -75,7 +42,7 @@
              #rules-host is the swap container: after a create, update or delete notification-rules.js
              re-fetches the `rules` fragment (?fragment=rules) into it instead of reloading the page
              (REQ-FE-001). The load-failure message lives inside the fragment, so a swap that finds
-             the backend down says so in place. -->
+             the backend down says so in place. */-->
         <div class="table-responsive" id="rules-host">
         <th:block th:fragment="rules">
         <table id="rules-table">
@@ -90,8 +57,8 @@
             </tr>
             </thead>
             <tbody>
-            <!-- A code this page has no label for (a backend enum value newer than the bundles)
-                 shows as the raw code rather than as ??key??. -->
+            <!--/* A code this page has no label for (a backend enum value newer than the bundles)
+                 shows as the raw code rather than as ??key??. */-->
             <tr th:each="r : ${rules}" th:attr="data-rule-id=${r.id}">
                 <td th:text="${#messages.msgOrNull('admin.notificationRules.eventType.' + r.eventType) ?: r.eventType}">Auftrag angelegt</td>
                 <td th:text="${#messages.msgOrNull('admin.notificationRules.notificationType.' + r.notificationType) ?: r.notificationType}">Auftrag angelegt</td>
@@ -128,9 +95,9 @@
             <div class="form-grid">
                 <div class="form-group">
                     <label for="rule-eventType" th:text="#{admin.notificationRules.eventType}">Ereignis</label>
-                    <!-- Every option list on this page is rendered from the controller's code lists
+                    <!--/* Every option list on this page is rendered from the controller's code lists
                          (backend enum declaration order); the value stays the enum code, the text is
-                         its localized label. -->
+                         its localized label. */-->
                     <select id="rule-eventType">
                         <option th:each="code : ${eventTypes}" th:value="${code}"
                                 th:text="#{admin.notificationRules.eventType.__${code}__}">Auftrag angelegt</option>
@@ -176,8 +143,8 @@
         <div class="selector-row" data-selector-row>
             <div class="form-group">
                 <label th:text="#{admin.notificationRules.selector.kind}">Art</label>
-                <!-- A new row is set to ORG_RELATIVE_ROLE by notification-rules.js, not to the first
-                     option, so an empty row never starts out as a user picker with no user. -->
+                <!--/* A new row is set to ORG_RELATIVE_ROLE by notification-rules.js, not to the first
+                     option, so an empty row never starts out as a user picker with no user. */-->
                 <select data-selector-kind>
                     <option th:each="code : ${selectorKinds}" th:value="${code}"
                             th:text="#{admin.notificationRules.selector.kind.__${code}__}">Bestimmter Nutzer</option>
@@ -204,16 +171,16 @@
                             th:text="#{admin.notificationRules.selector.roleCode.__${code}__}">Admin</option>
                 </select>
             </div>
-            <!-- The three event-derived kinds (ACCOUNT_GRANT, EVENT_RECIPIENT, ACCOUNT_RESPONSIBLE)
-                 have no further field: the account or the recipient comes from the event. -->
+            <!--/* The three event-derived kinds (ACCOUNT_GRANT, EVENT_RECIPIENT, ACCOUNT_RESPONSIBLE)
+                 have no further field: the account or the recipient comes from the event. */-->
             <div class="form-group" data-field="fromEvent">
                 <p class="form-hint" th:text="#{admin.notificationRules.selector.fromEvent}">Die Empfänger ergeben sich aus dem Ereignis.</p>
             </div>
             <div class="form-group" data-field="userId">
                 <label th:text="#{admin.notificationRules.selector.userId}">Benutzer</label>
-                <!-- Server-side searchable combobox (remote-users, #1193): the roster is searched on
+                <!--/* Server-side searchable combobox (remote-users, #1193): the roster is searched on
                      demand via /users/search. An existing rule's chosen user is seeded in edit mode
-                     by notification-rules.js (resolves the name via /users/{id}). -->
+                     by notification-rules.js (resolves the name via /users/{id}). */-->
                 <select data-selector-userId data-krt-combobox="remote-users">
                     <option value="" th:text="#{admin.notificationRules.selector.userId.placeholder}">-- Nutzer wählen --</option>
                 </select>
@@ -226,6 +193,6 @@
     </template>
 </main>
 
-<script th:src="@{/js/notification-rules.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/notification-rules.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

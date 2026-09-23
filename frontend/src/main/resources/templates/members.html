@@ -27,7 +27,7 @@
 
     <div class="hud-box mt-2">
 
-        <!-- Filters collapse behind one toggle (REQ-FE-021). -->
+        <!--/* Filters collapse behind one toggle (REQ-FE-021). */-->
         <div class="actions-bar">
             <div th:replace="~{fragments/components :: filterToggle('members-filter-panel', 'members-filter-toggle')}"></div>
         </div>
@@ -70,8 +70,8 @@
             <tbody>
                 <tr th:each="user : ${users}">
                     <td th:text="${user.effectiveName}">Username</td>
-                    <!-- REQ-ORG-017 — a member may hold up to two Staffeln; render every badge
-                         (mirrors the SK column's separated-badge style). -->
+                    <!--/* REQ-ORG-017 — a member may hold up to two Staffeln; render every badge
+                         (mirrors the SK column's separated-badge style). */-->
                     <td>
                         <span th:if="${user.squadrons != null and !user.squadrons.isEmpty()}">
                             <th:block th:each="sq, st : ${user.squadrons}">
@@ -83,8 +83,8 @@
                         <span th:if="${user.squadrons == null or user.squadrons.isEmpty()}"
                               class="squadron-badge squadron-badge-muted">&mdash;</span>
                     </td>
-                    <!-- SPEZIALKOMMANDO_PLAN.md §7.5 — comma-separated SK shorthand list (neutral
-                         badge style so SK pins do not compete with the Staffel brand colour). -->
+                    <!--/* SPEZIALKOMMANDO_PLAN.md §7.5 — comma-separated SK shorthand list (neutral
+                         badge style so SK pins do not compete with the Staffel brand colour). */-->
                     <td>
                         <span th:if="${userSkMemberships != null and userSkMemberships.get(user.id) != null and !userSkMemberships.get(user.id).isEmpty()}">
                             <th:block th:each="sk, st : ${userSkMemberships.get(user.id)}">
@@ -131,12 +131,12 @@
         </table>
         </div>
         
-        <!-- Consolidate-a-duplicate modal (no native dialogs, REQ-UI). The remedy for a member who
+        <!--/* Consolidate-a-duplicate modal (no native dialogs, REQ-UI). The remedy for a member who
              ended up with two accounts once the duplicate has already been approved: the approval
              queue's own link action is gone by then, because that queue serves PENDING/REJECTED
              only (ADR-0140) and the action guards on PENDING in the service too. Same
              server-searched account picker as the queue's dialogs -- they differ in what moves, not
-             in how the account is chosen. -->
+             in how the account is chosen. */-->
         <div id="consolidate-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
             <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{members.consolidate.modal.title}">
                 <div class="krt-modal-head">
@@ -167,7 +167,7 @@
     </div>
 
 </main>
-<script th:src="@{/js/autocomplete.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/autocomplete.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script th:attr="nonce=${cspNonce}">
     document.addEventListener('DOMContentLoaded', function() {
         const searchInput = document.getElementById('member-search');

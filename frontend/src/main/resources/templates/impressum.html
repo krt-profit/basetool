@@ -62,7 +62,7 @@
             <span th:text="#{impressum.credits_prefix}">Erstellt mit</span> <a href="https://impressum-generator.de" rel="dofollow noopener noreferrer" target="_blank" th:text="#{impressum.credits_generator}">Impressum-Generator.de</a><span th:text="#{impressum.credits_middle}">, dem Tool f\u00fcr Impressum und</span> <a href="https://impressum-generator.de/datenschutz-generator" rel="dofollow noopener noreferrer" target="_blank" th:text="#{impressum.credits_privacy}">Datenschutz-Erkl\u00e4rung</a><span th:text="#{impressum.credits_suffix}">. Nach einer Vorlage der</span> <a href="https://www.kanzlei-hasselbach.de/" rel="dofollow noopener noreferrer" target="_blank" th:text="#{impressum.credits_lawyer}">Kanzlei Hasselbach</a><span th:text="#{impressum.credits_end}">.</span>
         </p>
     </div>
-    <!--
+    <!--/*
       Fankit Agreement clause 2 g asks for its notice "wherever materials, trademarks, or
       properties owned by CIG are located". These are the legal pages the Android app's
       Datenschutz / Impressum rows open — the app has no in-app legal screen of its own, so this
@@ -73,7 +73,7 @@
 
       This is an ADDITION. The sanctioned §2b placement stays the home page; a legal subpage is
       not one of the two surfaces section 2b accepts and never substitutes for it.
-    -->
+    */-->
     <th:block th:replace="~{fragments/fankit :: band}" />
 </main>
 </body>

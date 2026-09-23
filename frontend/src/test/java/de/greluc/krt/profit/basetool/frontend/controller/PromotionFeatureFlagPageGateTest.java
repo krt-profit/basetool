@@ -27,11 +27,13 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.frontend.config.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.config.OrgUnitContextAdvice;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -86,9 +88,8 @@ class PromotionFeatureFlagPageGateTest {
     // through getCached — stub it too or the squadron list is empty and the gate misreads the flag.
     when(backendApiClient.getCached(eq(CachedCatalog.SQUADRONS), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(squadron), 0, 1000, 1, 1, List.of()));
-    when(backendApiClient.get(
-            eq("/api/v1/me/active-org-unit"), eq(OrgUnitContextAdvice.ActiveOrgUnitResponse.class)))
-        .thenReturn(new OrgUnitContextAdvice.ActiveOrgUnitResponse(squadronId));
+    when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.activeOrgUnit(squadronId));
   }
 
   @Test
@@ -158,9 +159,8 @@ class PromotionFeatureFlagPageGateTest {
     // A non-admin whose home squadron does not resolve (active-org-unit endpoint returns null) has
     // no promotion system of their own: the menu is hidden and direct page access is blocked, so a
     // squadron-less caller never sees the cross-staffel union.
-    when(backendApiClient.get(
-            eq("/api/v1/me/active-org-unit"), eq(OrgUnitContextAdvice.ActiveOrgUnitResponse.class)))
-        .thenReturn(new OrgUnitContextAdvice.ActiveOrgUnitResponse(null));
+    when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.activeOrgUnit(null));
     mockMvc.perform(get("/promotion/overview")).andExpect(status().isForbidden());
   }
 

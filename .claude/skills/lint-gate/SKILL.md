@@ -20,7 +20,7 @@ the how-to behind that rule.
 | Task | Tool | Covers |
 | --- | --- | --- |
 | `:frontend:lintCss` | Stylelint | `static/css/**` — e.g. media-query *range* notation `(width <= Npx)` not `(max-width: Npx)`, modern `rgb(r g b / a%)` not `rgba(...)` |
-| `:frontend:lintCssInline` | Stylelint + postcss-html | the CSS inside Thymeleaf `<style>` blocks |
+| `:frontend:lintCssInline` | Stylelint (+ postcss-html for templates) | the page stylesheets under `static/css/pages/` (the former inline `<style>` blocks, FE-PERF-02) and any `<style>` block that comes back — with the tiny `.stylelintrc.templates.json` rule set, not the strict one |
 | `:frontend:lintJs` | ESLint | `static/js/**` — `no-var` → `let`/`const`, `prefer-const`, `object-shorthand` (both autofixable, since 2026-09-23), unused caught errors `_`-prefixed, raw `fetch` writes (REQ-FE-002), unescaped HTML sinks (REQ-FE-022), … |
 | `:frontend:lintProbeJs` | ESLint | the e2e probe script, extracted from its Java text block |
 | `:frontend:lintHtml` | HTMLHint | `templates/**` |

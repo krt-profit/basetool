@@ -32,12 +32,12 @@
            th:text="#{orders.demand.back}">Zurück zur Auftragsverwaltung</a>
     </div>
 
-    <!-- Filter surface. It sits OUTSIDE the swapped results fragment on purpose: a live-sync
+    <!--/* Filter surface. It sits OUTSIDE the swapped results fragment on purpose: a live-sync
          refresh must never yank the panel out from under an open dropdown, and the controls are a
          stable surface rather than data. The consequence is handled in the JS: the material list is
          rendered from the data present at page load, and a material that only appears after a swap
          is simply never in the exclusion set, so it stays visible rather than being silently
-         filtered away. -->
+         filtered away. */-->
     <div class="demand-actions-bar">
         <div th:replace="~{fragments/components :: filterToggle('demandFilterPanel', 'demand-filter-toggle')}"></div>
     </div>
@@ -78,8 +78,8 @@
 
             <fieldset class="demand-filter-field demand-filter-qualities">
                 <legend class="demand-filter-label" th:text="#{orders.demand.col.quality}">Qualit&auml;t</legend>
-                <!-- The two checks share one row so this field is exactly as tall as the material
-                     field beside it; a two-line fieldset would ragged-align the whole filter row. -->
+                <!--/* The two checks share one row so this field is exactly as tall as the material
+                     field beside it; a two-line fieldset would ragged-align the whole filter row. */-->
                 <div class="demand-filter-checks">
                     <label class="demand-filter-check">
                         <input type="checkbox" class="demandQualCheck" value="GOOD" checked
@@ -141,9 +141,9 @@
                             <col class="w-1">
                         </colgroup>
                         <thead>
-                        <!-- Sortable columns. Quality deliberately is not one: it is a two-value
+                        <!--/* Sortable columns. Quality deliberately is not one: it is a two-value
                              bucket the filter panel already narrows. One sort selection drives
-                             EVERY group table so the units stay comparable side by side. -->
+                             EVERY group table so the units stay comparable side by side. */-->
                         <tr>
                             <th class="demand-sortable" data-sort-col="material" aria-sort="none">
                                 <button type="button" class="demand-sort-btn" data-trigger="demand-sort"
@@ -184,16 +184,16 @@
                         </tr>
                         </thead>
                         <tbody>
-                        <!-- Two rows per bucket: the aggregated figures, plus a drill-down row listing
+                        <!--/* Two rows per bucket: the aggregated figures, plus a drill-down row listing
                              the contributing orders. The drill-down starts collapsed and its expanded
                              state is persisted per browser in localStorage by orders-material-demand.js
                              (the REQ-ORDERS-027 idiom), re-applied on load and after every fragment
                              swap. The bucket key is material+quality, which is unique within a group;
-                             the org-unit id keeps it unique across groups. -->
+                             the org-unit id keeps it unique across groups. */-->
                         <th:block th:each="row : ${group.materials()}"
                                   th:with="bucketKey=${(group.orgUnit() != null ? group.orgUnit().id() : 'none') + '|' + row.material().id() + '|' + row.qualityRequirement()}">
-                            <!-- Sort/filter keys ride as data attributes: the JS must never parse
-                                 the LOCALISED cell text (1000,000 SCU) back into a number. -->
+                            <!--/* Sort/filter keys ride as data attributes: the JS must never parse
+                                 the LOCALISED cell text (1000,000 SCU) back into a number. */-->
                             <tr data-testid="demand-row" th:data-bucket-key="${bucketKey}"
                                 th:data-material-id="${row.material().id()}"
                                 th:data-material-name="${row.material().name()}"
@@ -288,8 +288,8 @@
                 </div>
             </section>
 
-            <!-- Shown by the JS when every row is filtered out, so a blank page is never left
-                 unexplained. Server-rendered hidden: without JS nothing is ever filtered. -->
+            <!--/* Shown by the JS when every row is filtered out, so a blank page is never left
+                 unexplained. Server-rendered hidden: without JS nothing is ever filtered. */-->
             <p class="text-muted demand-no-match" id="demandNoMatch" hidden
                data-testid="demand-no-match" th:text="#{orders.demand.filter.noMatch}">
                 Keine Materialien entsprechen den gew&auml;hlten Filtern.
@@ -308,7 +308,7 @@
     const KRT_DEMAND_LIVESYNC_UPDATES = /*[[#{orders.demand.livesync.updates}]]*/ 'Neue Daten verfügbar';
     /*]]>*/
 </script>
-<script th:src="@{/js/orders-material-demand.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/orders-material-demand.js}" defer th:attr="nonce=${cspNonce}"></script>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 </body>

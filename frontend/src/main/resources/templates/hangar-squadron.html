@@ -31,91 +31,21 @@
             <p th:text="#{__${error}__}">Fehler</p>
         </div>
 
-        <style th:attr="nonce=${cspNonce}">
-            .details-row {
-                display: none;
-            }
-            /* Toggled per row by the inline details handler below. A
-               tr:has(details[open]) sibling rule here forced a style recalculation
-               across the whole table on every expand and visibly janked the UI
-               (same fix as blueprint-overview, REQ-INV-012). */
-            .details-row.sq-expanded {
-                display: table-row;
-            }
-            .details-row td {
-                border-left: 2px solid var(--color-primary) !important;
-                padding: 0 !important;
-                background-color: rgba(0, 0, 0, 0.1);
-            }
-            .sub-table {
-                width: 100%;
-                margin: 0;
-                border-collapse: collapse;
-                border: none !important;
-            }
-            .sub-table th {
-                background-color: rgba(231, 126, 35, 0.05) !important;
-                color: var(--color-gray-1) !important;
-                font-family: var(--font-headline) !important;
-                font-size: 0.7rem !important;
-                letter-spacing: 0.05em;
-                padding: 0.5rem 1rem !important;
-                border-bottom: 1px solid rgba(231, 126, 35, 0.2) !important;
-                text-transform: uppercase;
-            }
-            .sub-table td {
-                padding: 0.5rem 1rem !important;
-                font-size: 0.85rem !important;
-                border-bottom: 1px solid var(--color-gray-3) !important;
-                color: var(--color-gray-1) !important;
-            }
-            .sub-table tr:last-child td {
-                border-bottom: none !important;
-            }
-            .sub-table tr:hover {
-                background-color: rgba(231, 126, 35, 0.05) !important;
-            }
-            /* ---- Server-side ship-type filter above the table ---- */
-            .squadron-filter-form {
-                display: flex;
-                flex-wrap: wrap;
-                align-items: center;
-                gap: 0.5rem;
-                margin-bottom: 1.25rem;
-            }
-            .hangar-filter {
-                position: relative;
-                width: 360px;
-                max-width: 100%;
-            }
-            .hangar-filter .hangar-filter-icon {
-                position: absolute;
-                left: 0.85rem;
-                top: 50%;
-                transform: translateY(-50%);
-                display: inline-flex;
-                color: var(--color-gray-2-text);
-                pointer-events: none;
-            }
-            .hangar-filter input[type="search"] {
-                width: 100%;
-                padding-left: 2.6rem;
-            }
-        </style>
+        <link rel="stylesheet" th:href="@{/css/pages/hangar-squadron.css}">
 
-        <!-- Org-unit overview aggregates ship counts per ship-type across every org unit the
+        <!--/* Org-unit overview aggregates ship counts per ship-type across every org unit the
              caller can see (REQ-HANGAR-003): without a pin a member sees their own Staffeln/SKs,
              a Bereichsleitung the units of their Bereich, and the OL every ship. In admin "all
              org units" mode the bucket merges ships from every unit - tell the admin the totals
-             span all of them. An active pin narrows the view back to the pinned unit. -->
+             span all of them. An active pin narrows the view back to the pinned unit. */-->
         <div th:if="${isAllSquadronsMode}" class="squadron-badge squadron-badge-muted krtm-display-block-padding-0-6rem-0-9rem-margin-b-3373"
              th:text="#{hangar.squadron.all_squadrons_notice}">
             Aggregation across all org units. Select a single org unit to filter.
         </div>
 
-        <!-- Server-side filter: the form GETs back to this page (search resets to page 0 by
+        <!--/* Server-side filter: the form GETs back to this page (search resets to page 0 by
              omitting the page param). It stays visible while a search yields nothing -
-             otherwise the filter could never be cleared. -->
+             otherwise the filter could never be cleared. */-->
         <form th:if="${!#lists.isEmpty(overview) or search != null}"
               id="squadron-filter-form" class="squadron-filter-form" role="search"
               method="get" th:action="@{/hangar/squadron}">
@@ -189,9 +119,9 @@
         </table>
         </div>
 
-        <!-- Footer bar: size picker left, page-nav right (same pattern as the blueprint
+        <!--/* Footer bar: size picker left, page-nav right (same pattern as the blueprint
              overview). The base URL keeps the active search so paging and re-sizing
-             never drop the filter. -->
+             never drop the filter. */-->
         <div class="pagination-controls" th:if="${overviewPage != null}">
             <nav th:replace="~{fragments/pagination :: pageSizePicker(pageResponse=${overviewPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
             <nav th:replace="~{fragments/pagination :: pagination(pageResponse=${overviewPage}, baseUrl=${paginationBaseUrl})}"></nav>
@@ -201,7 +131,7 @@
     </div>
 </main>
 
-<script th:src="@{/js/hangar-squadron.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/hangar-squadron.js}" defer th:attr="nonce=${cspNonce}"></script>
 
 </body>
 </html>

@@ -4,92 +4,7 @@
     <title th:text="#{admin.materials.title} + ' - ' + ${appTitle}">Materialien verwalten - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
     <link rel="stylesheet" th:href="@{/css/promotion-admin.css}">
-    <style th:attr="nonce=${cspNonce}">
-        .data-section {
-            margin-bottom: 3rem;
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-family: var(--font-body);
-            font-size: 0.8rem;
-        }
-        /* Checkboxes (the create-modal's flag toggles) and radios are excluded: width:100% +
-           the 0.5rem padding would stretch the 1.2rem KRT squares (styles.css) full-width. The
-           exclusions sit in :where() so they add ZERO specificity — the rule keeps the plain
-           `.form-group input` weight (0,1,1) and stays below the (0,2,0) combobox rule
-           `.krt-combobox .krt-combobox__input`. */
-        .form-group input:where(:not([type='checkbox']):not([type='radio'])), .form-group select, .form-group textarea {
-            width: 100%;
-            padding: 0.5rem;
-            background-color: var(--color-surface-input);
-            border: 1px solid var(--color-gray-3);
-            color: var(--color-gray-1);
-            font-family: var(--font-body);
-            box-sizing: border-box;
-        }
-        .inline-form {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin: 0;
-        }
-        .inline-form select {
-            width: auto;
-            flex-grow: 1;
-        }
-        .material-manual-badge {
-            display: inline-block;
-            margin-right: 0.4rem;
-            padding: 0.05rem 0.4rem;
-            font-size: 0.7rem;
-            font-family: var(--font-headline);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--color-bg-black);
-            background-color: var(--color-primary);
-            border-radius: var(--radius-none);
-            vertical-align: middle;
-        }
-        .material-hidden-badge {
-            display: inline-block;
-            margin-right: 0.4rem;
-            padding: 0.05rem 0.4rem;
-            font-size: 0.7rem;
-            font-family: var(--font-headline);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--color-warning);
-            background-color: transparent;
-            border: 1px solid var(--color-warning);
-            border-radius: var(--radius-none);
-            vertical-align: middle;
-        }
-        .krt-modal-create-material {
-            max-width: 640px;
-        }
-        .krt-modal-create-material .form-checkboxes {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0.5rem;
-        }
-        .krt-modal-create-material .form-checkboxes label {
-            display: flex;
-            align-items: center;
-            gap: 0.4rem;
-            font-family: var(--font-body);
-            font-size: 0.85rem;
-            color: var(--color-gray-1);
-            text-transform: none;
-            margin: 0;
-            min-height: 44px;
-        }
-        @media (width <= 768px) {
-            .krt-modal-create-material .form-checkboxes {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
+    <link rel="stylesheet" th:href="@{/css/pages/admin-materials.css}">
     </th:block>
 </head>
 <body>
@@ -252,7 +167,7 @@
     </div>
 </main>
 
-<!-- Create Material Modal -->
+<!--/* Create Material Modal */-->
 <div id="modal-create-material" class="krt-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-create-material-title">
     <div class="krt-modal krt-modal--wide krt-modal-create-material">
         <div class="krt-modal-head">
@@ -329,7 +244,7 @@
     </div>
 </div>
 
-<script th:src="@{/js/autocomplete.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/autocomplete.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     // Thymeleaf-interpolated i18n strings only; the imperative logic lives in the admin-materials.js
     // page module loaded immediately after this bootstrap (ADR-0069). Each value is a single-primitive
@@ -357,6 +272,6 @@
     const MSG_CREATE_SUCCESS = /*[[#{admin.materials.create.success}]]*/ 'Material wurde angelegt.';
     const MSG_CREATE_ERROR = /*[[#{admin.materials.create.error}]]*/ 'Material konnte nicht angelegt werden.';
 </script>
-<script th:src="@{/js/admin-materials.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/admin-materials.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

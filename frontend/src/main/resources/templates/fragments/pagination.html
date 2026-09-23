@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-<!--
+<!--/*
   Pagination fragment — renders the design-system `.pagination` component:
   square page-nav, chevron icons (first/last stack two), a tabular-figure status
   readout and a TRUE disabled state. The disabled first/previous (and next/last)
@@ -14,7 +14,7 @@
   size(), totalElements(), totalPages(). `baseUrl` may already carry a query
   string (e.g. '/blueprint-overview?search=x'); the Thymeleaf link expression
   then appends the page/size parameters with '&'.
--->
+*/-->
 <nav th:fragment="pagination(pageResponse, baseUrl)" class="pagination"
      th:if="${pageResponse != null and pageResponse.totalPages() > 1}"
      th:aria-label="#{general.pagination.aria}">
@@ -56,14 +56,14 @@
     </a>
 </nav>
 
-<!--
+<!--/*
   Page-size picker — square link group in the same `.page-btn` visual language
   (design-system: square-first, no native select). Each size is a plain link
   that jumps back to page 0; the active size renders as an inert <span> marked
   `.active` + aria-current. Hidden while the total fits the smallest size, where
   switching could never change anything. Shares `baseUrl` semantics with the
   pagination fragment above (query string allowed).
--->
+*/-->
 <nav th:fragment="pageSizePicker(pageResponse, baseUrl, sizes)" class="pagination page-size-picker"
      th:if="${pageResponse != null and pageResponse.totalElements() > sizes[0]}"
      th:aria-label="#{general.pagination.size.aria}">

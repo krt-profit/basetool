@@ -100,6 +100,26 @@ class StaticResourcesCachingTest {
   }
 
   /**
+   * A page stylesheet (FE-PERF-02) is an ordinary static asset one directory down: served without a
+   * session — the error pages link theirs, and an error page must render for anyone — with the same
+   * year-long {@code immutable} header and no ETag. That header is what makes moving the page CSS
+   * out of the {@code no-store} HTML worth doing at all.
+   *
+   * @throws Exception if the MockMvc request fails
+   */
+  @Test
+  void pageStylesheet_ShouldBePublicAndImmutable() throws Exception {
+    for (String resource : new String[] {"/css/pages/error-404.css", "/css/pages/hangar.css"}) {
+      mockMvc
+          .perform(get(resource))
+          .andExpect(status().isOk())
+          .andExpect(header().string("Cache-Control", containsString("max-age=31536000")))
+          .andExpect(header().string("Cache-Control", containsString("immutable")))
+          .andExpect(header().doesNotExist("ETag"));
+    }
+  }
+
+  /**
    * The web app manifest keeps its ETag: it is publicly cacheable for an hour, so a browser that
    * re-reads it afterwards revalidates with {@code If-None-Match} and gets a body-less {@code 304}.
    *

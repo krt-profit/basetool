@@ -1,0 +1,188 @@
+/* Page stylesheet of templates/materials-profit-calculation.html, moved out of its inline style block
+ * (FE-PERF-02). Linked in the same place the block stood, so the cascade order is
+ * unchanged. */
+
+.filter-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+    align-items: flex-end;
+}
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-width: 250px;
+}
+.filter-group label {
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    text-transform: none;
+}
+.filter-group select,
+.filter-group input:not([type='checkbox']) {
+    width: 100%;
+    background-color: var(--color-surface-input);
+    border: 1px solid var(--color-gray-3);
+    color: var(--color-gray-1);
+    padding: 0.25rem 0.5rem;
+    font-family: var(--font-body);
+    outline: none;
+    height: 32px;
+    box-sizing: border-box;
+    font-size: 0.9rem;
+}
+.filter-group select:hover,
+.filter-group input:not([type='checkbox']):hover {
+    border-color: var(--color-primary);
+}
+
+/*
+ * Table styling matching materials-overview.html. The height is
+ * capped to the space between the sticky page header and the fixed
+ * footer (.krt-footer, position: fixed; bottom: 0) so the wrapper's
+ * horizontal scrollbar never ends up behind the footer.
+ * --krt-footer-height is published by sidebar.html JS (5rem
+ * fallback); the ~25rem reserve covers the header, greeting and
+ * filter row above the table. max(...) floors the height on very
+ * short viewports.
+ */
+.table-wrapper {
+    overflow: auto;
+    /* The viewport term and its dvh fallback are --krt-panel-viewport-rest in
+       styles.css; 25rem is this panel's own reserve for the chrome above it. */
+    max-height: max(16rem, calc(var(--krt-panel-viewport-rest) - 25rem));
+    border: 1px solid var(--color-gray-3);
+    margin-top: 1rem;
+}
+
+.matrix-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    white-space: nowrap;
+    font-family: var(--font-body);
+    margin: 0;
+}
+
+.matrix-table th,
+.matrix-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--color-gray-3);
+    border-right: 1px solid var(--color-gray-3);
+}
+
+.matrix-table th {
+    color: var(--color-gray-1);
+    font-family: var(--font-body);
+    font-weight: bold;
+    font-size: 0.85rem;
+    position: sticky;
+    top: 0;
+    background-color: var(--color-surface-input);
+    z-index: 20;
+    background-clip: padding-box;
+    text-transform: uppercase;
+}
+
+.matrix-table th:first-child,
+.matrix-table td:first-child {
+    position: sticky;
+    left: 0;
+    background-color: var(--color-surface-input);
+    z-index: 11;
+    font-weight: bold;
+    color: var(--color-gray-1);
+    border-right: 2px solid var(--color-primary);
+    background-clip: padding-box;
+    text-align: left;
+}
+
+.matrix-table th:first-child {
+    z-index: 30;
+}
+
+.matrix-table td {
+    color: var(--color-gray-1);
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    font-size: 0.9rem;
+}
+
+.matrix-table tr:hover td {
+    background-color: rgba(231, 126, 35, 0.05);
+}
+
+.matrix-table td.numeric {
+    text-align: right;
+}
+
+.sortable-header {
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.2s;
+}
+
+.sortable-header:hover {
+    color: var(--color-primary);
+}
+
+.sort-icon {
+    margin-left: 0.5rem;
+    color: var(--color-gray-2-text);
+    font-size: 0.8em;
+    display: inline-block;
+    width: 1em;
+    text-align: center;
+}
+
+.system-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+.system-tag {
+    background-color: var(--color-gray-3);
+    color: var(--color-gray-1);
+    padding: 0.2rem 0.5rem;
+    font-size: 0.75rem;
+    border-radius: var(--radius-none);
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+.system-tag .remove {
+    cursor: pointer;
+    color: var(--color-primary);
+    font-weight: bold;
+}
+@media (width <= 768px) {
+    .filter-group {
+        min-width: 100%;
+    }
+}
+/*
+ * Full-width status rows that materials-profit-calculation.js renders into the results
+ * table body (ship-not-selected placeholder, loading, no-data, fetch error). These
+ * replace the former inline style="" attributes on those <td>s: an inline style inside
+ * a JS innerHTML string is blocked by the CSP style-src-attr 'none' pin exactly like a
+ * template one (ADR-0093). The error row additionally keeps the global .text-danger.
+ */
+.profit-msg {
+    text-align: center;
+    padding: 2rem;
+    color: var(--color-gray-2-text);
+}
+.profit-msg-loading {
+    text-align: center;
+    padding: 2rem;
+    color: var(--color-primary);
+}
+.profit-msg-error {
+    text-align: center;
+    padding: 2rem;
+}

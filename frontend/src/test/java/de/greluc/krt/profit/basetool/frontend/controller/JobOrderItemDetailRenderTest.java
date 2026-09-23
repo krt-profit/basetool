@@ -31,7 +31,7 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import de.greluc.krt.profit.basetool.frontend.config.CapabilityFlagsAdvice;
+import de.greluc.krt.profit.basetool.frontend.config.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.model.dto.AggregatedMaterialDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ClaimDto;
@@ -50,6 +50,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionD
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
@@ -100,9 +101,8 @@ class JobOrderItemDetailRenderTest {
     // The logistician caller is a non-admin, so the order-detail profit gate would otherwise
     // redirect to /orders/create. Stub the capability as a profit-eligible viewer so the detail
     // render path runs.
-    when(backendApiClient.get(
-            "/api/v1/me/capabilities", CapabilityFlagsAdvice.CapabilitiesResponse.class))
-        .thenReturn(new CapabilityFlagsAdvice.CapabilitiesResponse(true, true, true));
+    when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.capabilities(true, true, true));
   }
 
   private OAuth2AuthenticationToken logisticianToken(UUID userId) {

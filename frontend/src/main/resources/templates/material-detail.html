@@ -3,46 +3,7 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="${material != null ? material.name : 'Material'} + ' - ' + ${appTitle}">Material Detail - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-<style th:attr="nonce=${cspNonce}">
-        .material-title {
-            font-family: var(--font-body);
-            font-weight: 700;
-            color: var(--color-primary);
-            font-size: 1.5rem;
-            margin: 0;
-            text-transform: uppercase;
-        }
-
-        .data-section {
-            margin-top: 2rem;
-        }
-
-        .number-cell {
-            text-align: right;
-            font-family: var(--font-mono);
-            font-variant-numeric: tabular-nums;
-        }
-
-        .form-group {
-            margin-bottom: 1rem;
-            max-width: 400px;
-        }
-        /* Checkboxes and radios are excluded: width:100% + the padding would stretch the 1.2rem
-           KRT squares (styles.css) full-width. The exclusions sit in :where() so they add ZERO
-           specificity — the rule keeps the plain `.form-group input` weight (0,1,1) and stays
-           below the (0,2,0) combobox rule `.krt-combobox .krt-combobox__input`. No .form-group
-           checkbox/radio exists here today; the exclusion closes the latent trap that broke
-           admin/materials when its flag checkboxes were added later. */
-        .form-group input:where(:not([type='checkbox']):not([type='radio'])) {
-            width: 100%;
-            padding: 0.5rem;
-            background-color: var(--color-surface-input);
-            border: 1px solid var(--color-gray-3);
-            color: var(--color-gray-1);
-            font-family: var(--font-body);
-            box-sizing: border-box;
-        }
-    </style>
+<link rel="stylesheet" th:href="@{/css/pages/material-detail.css}">
     </th:block>
 </head>
 <body>
@@ -145,7 +106,7 @@
     </div>
 </main>
 
-<script th:src="@{/js/autocomplete.js}" th:attr="nonce=${cspNonce}"></script>
-<script th:src="@{/js/material-detail.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/autocomplete.js}" defer th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/material-detail.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

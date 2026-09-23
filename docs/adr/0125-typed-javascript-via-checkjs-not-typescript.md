@@ -134,3 +134,27 @@ and we will not convert the sources to TypeScript.**
 - **Doing nothing and relying on E2E.** The Playwright suite catches DTO drift only where a test
   walks the affected path, and reports it as a UI failure far from the cause. It remains the
   behavioural gate; it is not a substitute for a contract check.
+
+## Amendment 2026-09-23 — `defer`, and still no build step (FE-PERF-05)
+
+"No `<script>` tag changes" held for the type check; the tags did change for load order: every
+external script is now `defer`, except `krt-client-error.js` (REQ-FE-023). That is a markup
+attribute, not a build step, and the sources the checker reads are still byte for byte the files
+the browser receives.
+
+**Comment-stripping minification: considered and declined (owner decision, 2026-09-23).** A
+minification that strips comments without renaming was measured: the eleven head scripts would fall
+from 85 KB to 28 KB gzipped, about 57 KB. It is not built, for five reasons:
+
+- the assets are content-hashed and `immutable`, so the saving applies to a first visit and to the
+  first load after a deploy only;
+- a stripper that misreads a string or regex literal as a comment corrupts production JavaScript
+  silently;
+- the served file must stay the file `typecheckJs`, ESLint and the parity tests read — the premise
+  of this ADR;
+- esbuild would add an npm dependency and reprint the code, so the line numbers in client-error
+  reports would change and sourcemaps would be needed;
+- a custom stripper on the TypeScript scanner is lasting maintenance for a one-off gain.
+
+The transfer saving that matters comes from compression at the edge: it sent JavaScript, CSS and
+JSON uncompressed until PR #2021 added the missing `gzip_types`.

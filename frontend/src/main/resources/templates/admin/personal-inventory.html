@@ -31,14 +31,14 @@
 
     <div class="hud-box krt-personal-inventory mt-2">
 
-        <!-- The member <select> auto-swaps via personal-inventory.js (change -> krtFetch). The
+        <!--/* The member <select> auto-swaps via personal-inventory.js (change -> krtFetch). The
              legacy data-trigger="submit-form" (full reload) is intentionally removed; the page
-             already required JS for this select, so the no-JS baseline is unchanged. -->
+             already required JS for this select, so the no-JS baseline is unchanged. */-->
         <form th:action="@{/admin/personal-inventory}" method="get" class="krt-pi-userform no-track">
             <label for="krt-pi-user-select" th:text="#{admin.personalInventory.userSelect.label}">Mitglied</label>
-            <!-- Server-side searchable combobox (remote-users, #1193): the roster is no longer
+            <!--/* Server-side searchable combobox (remote-users, #1193): the roster is no longer
                  preloaded; only the currently-selected member is seeded so edit mode shows their
-                 name. Typing queries /users/search on demand. -->
+                 name. Typing queries /users/search on demand. */-->
             <select id="krt-pi-user-select" name="userSub" data-krt-combobox="remote-users">
                 <option value="" th:text="#{admin.personalInventory.userSelect.placeholder}">-- bitte waehlen --</option>
                 <option th:if="${selectedUser != null}"
@@ -48,9 +48,9 @@
             </select>
         </form>
 
-        <!-- AJAX swap target (REQ-FE-002): the member select and the search filter re-render only
+        <!--/* AJAX swap target (REQ-FE-002): the member select and the search filter re-render only
              this block via krtFetch; the no-JS GET fallback reloads the page. Row buttons are
-             krtEvents-delegated and modals live outside, so swapped-in rows stay live. -->
+             krtEvents-delegated and modals live outside, so swapped-in rows stay live. */-->
         <div id="pi-results">
         <th:block th:fragment="results">
         <div th:if="${selectedUserSub == null or #strings.isEmpty(selectedUserSub)}" class="krt-pi-empty"
@@ -217,6 +217,6 @@
     };
     /*]]>*/
 </script>
-<script th:src="@{/js/personal-inventory.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/personal-inventory.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

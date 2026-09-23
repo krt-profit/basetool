@@ -3,144 +3,8 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{refineryorder.detail.title} + ' - ' + ${appTitle}">Raffinerieauftrag Details - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-        <style th:attr="nonce=${cspNonce}">
-            .form-group label {
-                display: block;
-                margin-bottom: 0.5rem;
-                font-family: var(--font-body);
-                font-weight: bold;
-                font-size: 0.9rem;
-            }
-            /* Checkboxes and radios are excluded: width:100% + the padding would stretch the
-               1.2rem KRT squares (styles.css) full-width. The exclusions sit in :where() so they
-               add ZERO specificity — the rule keeps the plain `.form-group input` weight (0,1,1)
-               and stays below the (0,2,0) combobox rule `.krt-combobox .krt-combobox__input`.
-               No .form-group checkbox/radio exists here today; the exclusion closes the latent
-               trap that broke admin/materials when its flag checkboxes were added later. */
-            .form-group input:where(:not([type='checkbox']):not([type='radio'])), .form-group select, .form-group textarea {
-                width: 100%;
-                padding: 0.75rem;
-                background-color: var(--color-surface-input);
-                border: 1px solid var(--color-gray-3);
-                color: var(--color-gray-1);
-                font-family: var(--font-body);
-                box-sizing: border-box;
-            }
-            .material-row {
-                display: flex;
-                gap: 1rem;
-                margin-bottom: 1rem;
-                align-items: flex-end;
-            }
-            @media (width <= 768px) {
-                .material-row {
-                    flex-direction: column;
-                    align-items: stretch;
-                }
-            }
-            /* UEX refinery yield bonus/malus next to the output-quantity label.
-               Positive = green (Profit department color), negative = red (danger),
-               zero = muted. Matches the semantic-color palette in styles.css. */
-            .yield-bonus-badge {
-                display: inline-block;
-                margin-left: 0.5rem;
-                padding: 0.05rem 0.4rem;
-                font-family: var(--font-body);
-                font-weight: bold;
-                font-size: 0.75rem;
-                letter-spacing: 0;
-                border-radius: var(--radius-none);
-                text-transform: none;
-            }
-            .yield-bonus-badge.yield-positive {
-                color: var(--color-dept-profit);
-                background-color: rgba(35, 158, 51, 0.12);
-                border: 1px solid var(--color-dept-profit);
-            }
-            .yield-bonus-badge.yield-negative {
-                color: var(--color-danger);
-                background-color: rgba(163, 0, 10, 0.12);
-                border: 1px solid var(--color-danger);
-            }
-            .yield-bonus-badge.yield-zero {
-                color: var(--color-gray-2-text);
-                background-color: var(--color-gray-4);
-                border: 1px solid var(--color-gray-3);
-            }
-            /*
-             * When the output-quantity label contains the yield bonus badge, the
-             * global `.form-group:has([required]) > label::after` asterisk lands
-             * AFTER the badge ("Erwartete Ausgangsmenge (Units) -5% *"), which
-             * reads as if the badge itself were the required marker. Override:
-             * anchor the asterisk to the first <span> (the field name) instead,
-             * and suppress the outer ::after for these labels.
-             */
-            .form-group:has([required]) > label:has(> .yield-bonus-badge) > span:first-child::after {
-                content: " *";
-                color: var(--color-primary);
-            }
-            .form-group:has([required]) > label:has(> .yield-bonus-badge)::after {
-                content: none;
-            }
-            /* Small "Material #N" header at the top of every material entry.
-               Hosts the per-entry Remove button on the right so it never overlaps
-               the input fields (the previously absolute-positioned button sat on
-               top of the input-quantity column once the yield badge was added). */
-            .material-entry-header {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                gap: 0.5rem;
-                margin-bottom: 0.75rem;
-                padding-bottom: 0.5rem;
-                border-bottom: 1px solid var(--color-gray-3);
-            }
-            .material-entry-title {
-                color: var(--color-primary);
-                font-family: var(--font-body);
-                font-weight: bold;
-                font-size: 0.85rem;
-                text-transform: uppercase;
-                letter-spacing: 0.05em;
-            }
-            /* Full-width "add another row" affordance below the materials list.
-               Dashed outline + transparent fill keep it visually subordinate to
-               the solid Speichern/Einlagern/Abbrechen actions further down,
-               while the primary-orange color anchors it to the same form
-               section. The button sits after #materials-container, so it
-               naturally moves down whenever a new material row is appended. */
-            .btn-add-row {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 0.5rem;
-                width: 100%;
-                min-height: 44px;
-                padding: 0.75rem 1rem;
-                margin-bottom: 1rem;
-                background-color: rgba(231, 126, 35, 0.05);
-                border: 1px dashed var(--color-primary);
-                color: var(--color-primary);
-                font-family: var(--font-body);
-                font-weight: 700;
-                font-size: 0.8rem;
-                text-transform: uppercase;
-                letter-spacing: 0.05em;
-                cursor: pointer;
-                transition: background-color 0.15s ease, border-style 0.15s ease;
-            }
-            .btn-add-row:hover {
-                background-color: rgba(231, 126, 35, 0.12);
-                border-style: solid;
-            }
-            .btn-add-row::before {
-                content: "+";
-                font-size: 1.1rem;
-                font-weight: 700;
-                line-height: 1;
-            }
-        </style>
-        <script th:src="@{/js/refinery-yield-badge.js}" th:attr="nonce=${cspNonce}"></script>
+        <link rel="stylesheet" th:href="@{/css/pages/refinery-orders-details.css}">
+        <script th:src="@{/js/refinery-yield-badge.js}" defer th:attr="nonce=${cspNonce}"></script>
     </th:block>
 </head>
 <body>
@@ -170,10 +34,10 @@
             <p th:text="#{__${errorToast}__}">Fehler</p>
         </div>
 
-        <!-- Live-sync / in-place-save seam for the `order` section (REQ-FE-001 / REQ-FE-015): the
+        <!--/* Live-sync / in-place-save seam for the `order` section (REQ-FE-001 / REQ-FE-015): the
              stable swap container stays put while its th:fragment body is re-rendered by
              ?fragment=order. The fragment sits on an inner th:block so a swapped response never
-             re-nests a second #refinery-order-results inside this one. -->
+             re-nests a second #refinery-order-results inside this one. */-->
         <div class="form-container" id="refinery-order-results">
         <th:block th:fragment="refineryOrderSection">
             <form id="refineryOrderMainForm" th:action="@{/refinery-orders/{id}(id=${orderId})}" method="post" th:object="${refineryOrderForm}">
@@ -182,9 +46,9 @@
                 <div class="material-row mt-1-5">
                     <div class="form-group flex-2 mb-0">
                         <label for="ownerId" th:text="#{refineryorder.form.owner}">Besitzer</label>
-                        <!-- Server-side searchable combobox (remote-users, #1193): seed only the
+                        <!--/* Server-side searchable combobox (remote-users, #1193): seed only the
                              current owner; the roster is searched on demand. Non-logisticians keep
-                             the disabled plain select. -->
+                             the disabled plain select. */-->
                         <select id="ownerId" th:field="*{ownerId}" required th:disabled="${!isLogistician}"
                                 th:attr="data-krt-combobox=${isLogistician ? 'remote-users' : null}">
                             <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
@@ -317,10 +181,10 @@
                         <div class="material-row">
                             <div class="form-group flex-2 mb-0">
                                 <label th:for="'inputMaterialId_' + ${stat.index}" th:text="#{refineryorder.form.material.input}">Eingangsmaterial</label>
-                                <!-- Server-side searchable combobox (remote-materials-raw, REQ-FE-016): the raw
+                                <!--/* Server-side searchable combobox (remote-materials-raw, REQ-FE-016): the raw
                                      catalog is searched on demand, so only the row's already-chosen material is
                                      seeded (edit/redisplay path) with the refined-output metadata the enhancer
-                                     harvests; a blank row renders just the placeholder. -->
+                                     harvests; a blank row renders just the placeholder. */-->
                                 <select th:id="'inputMaterialId_' + ${stat.index}" th:field="*{goods[__${stat.index}__].inputMaterialId}" required data-trigger="rod-update-output" data-krt-combobox="remote-materials-raw" th:disabled="${!canEdit}">
                                     <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
                                     <option th:each="mat : ${materials}" th:if="${mat.id == good.inputMaterialId}" th:value="${mat.id}" th:text="${mat.name}" th:attr="data-refined-id=${mat.refinedMaterial != null ? mat.refinedMaterial.id : ''},data-refined-name=${mat.refinedMaterial != null ? mat.refinedMaterial.name : ''}"></option>
@@ -396,11 +260,11 @@
                         th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
             </div>
             
-            <!-- Live-sync seam for the `store` section (REQ-FE-015): the dialog's rows are derived
+            <!--/* Live-sync seam for the `store` section (REQ-FE-015): the dialog's rows are derived
                  from the order's output goods, so a peer's save re-renders them here via
                  ?fragment=store. The modal shell (and its open/closed state) stays outside the
                  swapped region; the fragment sits on an inner th:block so a swap never re-nests a
-                 second #refinery-store-results. -->
+                 second #refinery-store-results. */-->
             <div id="refinery-store-results" class="krt-modal-flow">
             <th:block th:fragment="refineryStoreSection">
             <form id="storeForm" th:action="@{/refinery-orders/{id}/store(id=${orderId})}" method="post" th:object="${storeForm}" data-trigger="rod-disable-submit">
@@ -423,10 +287,10 @@
                                     <span th:text="#{inventory.form.amount}">Menge</span>
                                     <span th:if="*{items[__${stat.index}__].quantityType == 'PIECE'}" th:text="'(' + #{material.quantity.piece} + ')'"></span>
                                     <span th:if="*{items[__${stat.index}__].quantityType == 'SCU'}" th:text="'(' + #{material.quantity.scu} + ')'"></span>
-                                    <!-- SCU-only input hint. th:if must NOT share an element with th:replace: th:replace
+                                    <!--/* SCU-only input hint. th:if must NOT share an element with th:replace: th:replace
                                          (attribute precedence 1) runs BEFORE th:if (3), so a same-element guard is dead
                                          and the hint would render on every row - including PIECE rows. The condition
-                                         gates an outer th:block while th:replace sits alone on the inner one. -->
+                                         gates an outer th:block while th:replace sits alone on the inner one. */-->
                                     <th:block th:if="*{items[__${stat.index}__].quantityType == 'SCU'}">
                                         <th:block th:replace="~{fragments/scu-hint :: scuHint(null, false)}"></th:block>
                                     </th:block>
@@ -448,7 +312,7 @@
                             </div>
                             <div class="form-group flex-1 mb-0">
                                 <label th:for="${isLogistician ? 'storeUser_' + stat.index : 'storeUserFixed_' + stat.index}" th:text="#{refineryorder.store.user}">Mitglied</label>
-                                <!-- Server-side searchable combobox (remote-users, #1193): seed only
+                                <!--/* Server-side searchable combobox (remote-users, #1193): seed only
                                      the current receiver (defaults to the caller); the roster is
                                      searched on demand.
 
@@ -461,7 +325,7 @@
                                      non-logistician is the caller by the ownership check. The id
                                      deliberately does NOT start with `storeUser_`: that prefix is
                                      what duplicateStoreItem() looks for to graft a fresh combobox
-                                     onto a split row, which would put the picker straight back. -->
+                                     onto a split row, which would put the picker straight back. */-->
                                 <select th:if="${isLogistician}" th:id="'storeUser_' + ${stat.index}" th:field="*{items[__${stat.index}__].userId}" required data-krt-combobox="remote-users">
                                     <option th:if="${item.userId != null}" th:value="${item.userId}" th:text="${seedUserNames.get(item.userId)}"></option>
                                 </select>
@@ -484,11 +348,11 @@
                                 <option th:each="jo : ${jobOrders}" th:if="${(item.jobOrderId != null and item.jobOrderId == jo.id) or (jo.requiredMaterialIds != null and #lists.contains(jo.requiredMaterialIds, item.materialId))}" th:value="${jo.id}" th:text="${jo.displayId + ' - ' + (jo.requestingOrgUnit != null ? jo.requestingOrgUnit.name() : '—')}"></option>
                             </select>
                         </div>
-                        <!-- REQ-INV-035: book this output row into the receiver's private pool
+                        <!--/* REQ-INV-035: book this output row into the receiver's private pool
                              instead of the shared squadron stock, mirroring the Einbuchen dialog's
                              marker. Personal stock never carries an earmark, so refinery-orders-
                              details.js disables + clears this row's job-order picker while the box
-                             is ticked and the backend applies no mission earmark to the row. -->
+                             is ticked and the backend applies no mission earmark to the row. */-->
                         <div class="form-group check-row krtm-margin-bottom-0-margin-top-1rem-7579">
                             <input type="checkbox" th:id="'storePersonal_' + ${stat.index}" th:field="*{items[__${stat.index}__].personal}">
                             <div>
@@ -514,24 +378,24 @@
         </div>
     </div>
 
-    <!-- Section-sized inline error for an unknown / failed ?fragment= render (REQ-FE-015): a
+    <!--/* Section-sized inline error for an unknown / failed ?fragment= render (REQ-FE-015): a
          peer-driven refresh that names a section the controller does not know degrades to this
          instead of dumping a whole page into the small swap container. Parked inside a <template>
          so it is inert on the full-page render (the browser never paints template content) while
          Thymeleaf still resolves the th:fragment inside it — a bare <p> here would show as a stray
-         red error line on every normal page load. -->
+         red error line on every normal page load. */-->
     <template id="refinery-fragment-error-tpl">
         <p th:fragment="fragmentError" class="desc krtm-color-danger"
            th:text="#{refineryorder.section.refresh.error}">Abschnitt konnte nicht geladen werden.</p>
     </template>
 
-    <!-- Pristine (un-enhanced) receiver-picker template used by duplicateStoreItem(): cloning the
+    <!--/* Pristine (un-enhanced) receiver-picker template used by duplicateStoreItem(): cloning the
          live, already-enhanced combobox DOM yields a dead control, so a split row replaces the clone
          with a fresh <select data-krt-combobox> from here (id/name stamped per index in JS) and
-         re-enhances it via window.krtEnhanceComboboxes. -->
+         re-enhances it via window.krtEnhanceComboboxes. */-->
     <template id="store-user-select-tpl">
-        <!-- Fresh (un-enhanced) receiver picker for a split row (#1193): no preloaded options — the
-             combobox searches /users/search on demand once krtEnhanceComboboxes upgrades it. -->
+        <!--/* Fresh (un-enhanced) receiver picker for a split row (#1193): no preloaded options — the
+             combobox searches /users/search on demand once krtEnhanceComboboxes upgrades it. */-->
         <select data-krt-combobox="remote-users" required></select>
     </template>
 </main>
@@ -593,6 +457,6 @@
         3: /*[[#{refining.rating.speed.3}]]*/ 'Schnell'
     };
 </script>
-<script th:src="@{/js/refinery-orders-details.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/refinery-orders-details.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

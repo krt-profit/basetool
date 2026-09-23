@@ -27,9 +27,9 @@
 
     <div class="hud-box mt-2">
 
-        <!-- Primary action and the filter toggle share one bar; the filters themselves collapse
+        <!--/* Primary action and the filter toggle share one bar; the filters themselves collapse
              below it (REQ-FE-021). The create link is deliberately OUTSIDE the panel: collapsing a
-             filter block must not take the page's main action with it. -->
+             filter block must not take the page's main action with it. */-->
         <div class="actions-bar">
             <a sec:authorize="isAuthenticated()" th:href="@{/missions/new}" class="btn btn--cta"
                data-testid="missions-create-link" th:text="#{mission.create}">Create New</a>

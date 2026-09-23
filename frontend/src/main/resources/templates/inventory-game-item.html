@@ -3,14 +3,7 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title>Item Details - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-<style th:attr="nonce=${cspNonce}">
-        .actions-bar {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 1rem;
-            flex-wrap: wrap;
-        }
-    </style>
+<link rel="stylesheet" th:href="@{/css/pages/inventory-game-item.css}">
     </th:block>
 </head>
 <body>
@@ -42,18 +35,18 @@
 
         <div class="actions-bar">
             <a th:href="@{/inventory(view='items')}" class="btn btn-ghost">&laquo; <span th:text="#{inventory.items.back}">Zurück zur Übersicht</span></a>
-            <!-- Deliberately NO "navigate to another item" picker here (unlike the material
+            <!--/* Deliberately NO "navigate to another item" picker here (unlike the material
                  drilldown's #materialSelect): the material page preloads its ~150-entry catalog
                  into a local-filter combobox, but the item catalog is thousands of entries —
                  preloading them is off the table. The server-side remote-game-items combobox
                  marker (design §6.6 / REQ-FE-016) ships with the Einbuchen pass; add the
-                 navigate picker here once that registry exists. -->
+                 navigate picker here once that registry exists. */-->
         </div>
 
-        <!-- Live-sync results container (REQ-FE-015): inventory-game-item.js re-fetches this
+        <!--/* Live-sync results container (REQ-FE-015): inventory-game-item.js re-fetches this
              fragment (?fragment=results -> inventoryGameItemResults) when a peer's stock change
              lands in the shared "inventory" room, so the drilldown refreshes in place without a
-             reload (REQ-INV-030). -->
+             reload (REQ-INV-030). */-->
         <div id="inventory-game-item-results">
         <th:block th:fragment="inventoryGameItemResults">
         <h3 class="krtm-font-family-lato-sans-serif-font-weight-700-957b" th:if="${gameItemName != null}" th:text="${gameItemName}">Item</h3>
@@ -80,9 +73,9 @@
             </table>
             </div>
         </div>
-        <!-- Server-side pagination (REQ-INV-033): the pager + size picker live inside the swapped
+        <!--/* Server-side pagination (REQ-INV-033): the pager + size picker live inside the swapped
              fragment, so a page/size click re-renders in place (krtFetch.bindSwap, REQ-FE-005) and
-             a live-sync refresh keeps the pager consistent with the visible page. -->
+             a live-sync refresh keeps the pager consistent with the visible page. */-->
         <div class="pagination-controls" th:if="${inventoryGameItemPage != null}"
              th:with="itemBase=${'/inventory/game-item/' + selectedGameItemId}">
             <nav th:replace="~{fragments/pagination :: pageSizePicker(pageResponse=${inventoryGameItemPage}, baseUrl=${itemBase}, sizes=${pageSizes})}"></nav>
@@ -93,6 +86,6 @@
     </div>
 </main>
 <th:block th:replace="~{fragments/toast :: toast}" />
-<script th:src="@{/js/inventory-game-item.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/inventory-game-item.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

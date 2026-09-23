@@ -3,32 +3,7 @@
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
     <title th:text="#{operations.title} + ' - ' + ${appTitle}">Operations - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
-        <style th:attr="nonce=${cspNonce}">
-            html, body { overflow-x: hidden; }
-            /* Constrain long descriptions so the row never forces horizontal page scroll. */
-            .operations-table {
-                width: 100%;
-                table-layout: auto;
-            }
-            .operations-table td.op-desc,
-            .operations-table th.op-desc {
-                max-width: 40ch;
-                white-space: normal;
-                overflow-wrap: anywhere;
-            }
-            .operations-table td.op-action,
-            .operations-table th.op-action {
-                white-space: nowrap;
-                text-align: right;
-            }
-            .operations-table td.op-action .btn { margin-left: 0.25rem; }
-
-            /* Smartphone: hide the description column to keep the table on screen. */
-            @media (width <= 768px) {
-                .operations-table td.op-desc,
-                .operations-table th.op-desc { display: none; }
-            }
-        </style>
+        <link rel="stylesheet" th:href="@{/css/pages/operations-index.css}">
     </th:block>
 </head>
 <body>
@@ -59,8 +34,8 @@
 
     <div class="hud-box mt-2">
 
-        <!-- Primary action and the filter toggle share one bar; the filters collapse below it
-             (REQ-FE-021). The create action stays OUTSIDE the panel on purpose. -->
+        <!--/* Primary action and the filter toggle share one bar; the filters collapse below it
+             (REQ-FE-021). The create action stays OUTSIDE the panel on purpose. */-->
         <div class="actions-bar">
             <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).MISSION_MANAGER)"
                     type="button" class="btn btn--cta" th:text="#{operation.create}"
@@ -151,7 +126,7 @@
         </div>
     </div>
 
-    <!-- Create Modal -->
+    <!--/* Create Modal */-->
     <div id="create-operation-modal" class="krt-modal-overlay">
         <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{operation.create}">
             <div class="krt-modal-head">
@@ -178,7 +153,7 @@
                         <option value="CANCELED" th:text="#{operation.status.canceled}">CANCELED</option>
                     </select>
                 </div>
-                <!-- R5.d.e owner-picker: hidden when the caller has ≤1 OrgUnit membership. -->
+                <!--/* R5.d.e owner-picker: hidden when the caller has ≤1 OrgUnit membership. */-->
                 <th:block th:replace="~{fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=null, required=false)}"></th:block>
                 </div>
                 <div class="krt-modal-foot">
@@ -189,7 +164,7 @@
         </div>
     </div>
 
-    <!-- Delete Modal -->
+    <!--/* Delete Modal */-->
     <div id="delete-operation-modal" class="krt-modal-overlay">
         <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{general.confirm}">
             <div class="krt-modal-head">
@@ -224,7 +199,7 @@
     };
     /*]]>*/
 </script>
-<script th:src="@{/js/operations-index.js}" th:attr="nonce=${cspNonce}"></script>
+<script th:src="@{/js/operations-index.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script th:src="@{/js/operations.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>
