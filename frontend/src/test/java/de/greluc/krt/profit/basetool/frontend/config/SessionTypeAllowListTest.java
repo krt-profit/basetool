@@ -181,6 +181,23 @@ class SessionTypeAllowListTest {
   }
 
   @Test
+  void theTokenResponsesOrderedMapIsReadUnderEnforce() {
+    // The second 2026-09-23 gap: on a real Keycloak login the stored authorized client carries a
+    // JSON object the Nimbus OAuth 2.0 SDK parsed into its OrderedJSONObject, written with a type
+    // id. Refused under ENFORCE it dropped AUTHORIZED_CLIENTS on every request and the E2E stack's
+    // login looped until the browser gave up (ERR_TOO_MANY_REDIRECTS).
+    com.nimbusds.oauth2.sdk.util.OrderedJSONObject parsed =
+        new com.nimbusds.oauth2.sdk.util.OrderedJSONObject();
+    parsed.put("session_state", "e2e");
+
+    Object back = enforcing.deserialize(enforcing.serialize(new ArrayList<>(List.of(parsed))));
+
+    assertThat(((List<?>) back).getFirst())
+        .isInstanceOf(com.nimbusds.oauth2.sdk.util.OrderedJSONObject.class)
+        .isEqualTo(parsed);
+  }
+
+  @Test
   void theSecurityContextKeepsItsPrincipalAndAuthorities() {
     SecurityContextImpl context =
         (SecurityContextImpl) realisticSession().get("SPRING_SECURITY_CONTEXT");
@@ -249,6 +266,8 @@ class SessionTypeAllowListTest {
     "java.net.InetAddress,false",
     "java.math.BigDecimal,true",
     "com.nimbusds.jose.shaded.gson.internal.LinkedTreeMap,true",
+    "com.nimbusds.oauth2.sdk.util.OrderedJSONObject,true",
+    "com.nimbusds.oauth2.sdk.util.JSONObjectUtils,false",
     "com.nimbusds.jose.shaded.gson.Gson,false",
     "java.util.Collections$UnmodifiableMap,true",
     "java.time.Instant,true",
