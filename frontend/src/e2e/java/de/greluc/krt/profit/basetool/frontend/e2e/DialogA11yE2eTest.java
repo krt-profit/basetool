@@ -45,6 +45,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
@@ -72,8 +73,16 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  *       have been exercised or be listed in {@link #UNREACHED} with the reason a fresh stack cannot
  *       show it.
  * </ul>
+ *
+ * <p><b>Runs second to last</b> ({@code @Order}, see {@code junit-platform.properties}), just
+ * before the touch sweep and for a similar reason: the walk renders every page, and the first
+ * render of some of them freezes a 10-minute frontend catalogue cache (the refinery pages fill
+ * {@code MATERIALS}). A class that seeds a material after that and expects to pick it in a form —
+ * {@code RefineryImportE2eTest}, {@code IngestHandoffE2eTest} — then finds an empty picker. Running
+ * after the CRUD flows means the walk can no longer freeze a cache under them.
  */
 @Tag("e2e")
+@Order(Integer.MAX_VALUE - 1)
 class DialogA11yE2eTest {
 
   /** Provisions (or, in staging mode, targets) the stack for the whole run. */
