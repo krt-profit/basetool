@@ -3,8 +3,8 @@
 > **Doc type:** Operator runbook for **one** release — the move of production (and, through
 > `promote.yml`'s `sync-testing`, the testing host) from **v1.10.0 to v1.11.0**. Written 2026-09-25
 > from a per-PR audit of all 66 PRs between `v1.10.0` and `6076888cd` (the commit release PR #2056
-> was cut from) against the code and the docs on `main`, plus read-only reads of both hosts the same
-> day. **Historical once 1.11.0 is live**: freeze it then and let
+> was cut from), plus #2057 merged after the cut, against the code and the docs on `main`, plus
+> read-only reads of both hosts the same day. **Historical once 1.11.0 is live**: freeze it then and let
 > [`deployment.md`](deployment.md) stay the living truth.
 >
 > **Every step that writes to a host is a production write**: it waits for @greluc's explicit yes,
@@ -139,9 +139,13 @@ same for testing (`--limit testing`) whichever option §2.3 took.
 
 ## 3. Cut the release
 
-1. Merge release PR **#2056** (`chore(release): v1.11.0`). *If a further PR merges to `main` first,
-   it becomes part of 1.11.0 — e.g. #2057 (Gradle 9.8.0, build only, no host step); re-check any
-   such PR against §1–§2 before promoting.*
+1. Merge release PR **#2056** (`chore(release): v1.11.0`) — it is `BEHIND` `main`, so update its
+   branch first; there is no textual conflict, and #2057's CHANGELOG line lands in the 1.11.0
+   section. *Everything on `main` when #2056 merges is part of 1.11.0.* Since the cut that is
+   **#2057** (Gradle wrapper 9.8.0, merged 2026-09-25, `0168cfb39`): build only — the images are
+   built with the new wrapper, nothing on the host changes, and CI, Release Images and the OWASP
+   scan passed on that commit. Re-check any further PR that lands before #2056 against §1–§2
+   before promoting (this runbook's own PR, #2058, is docs plus Loki-rule comments — no host step).
 2. `release-publish.yml` creates the tag **with the `basetool-release` App token** — the first
    publish since the App key was replaced on 2026-09-25 (the token itself is proven by
    refresh-versions run 36127942075 and Release · Prepare run 36128198185). If the tag step fails:
