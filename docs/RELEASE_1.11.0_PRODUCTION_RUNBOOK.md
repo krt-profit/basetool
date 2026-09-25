@@ -293,23 +293,39 @@ failure.
 
 - **Stuck on `docker/acme`.** `/var/iri/code/docker/acme` had been created `root:root` on
   2026-09-22 11:13, while the rest of `code/docker` is `deploy`'s. The bundle changed
-  `publish-loop.sh`, `rsync` could not write, and `deploy.sh` stopped before changing anything —
-  **without recording a failure** (`basetool_deploy_last_failure_timestamp` stayed `0`, so no alert),
-  which is why it took a human reading the log to notice. The §2.5 role run used
+  `publish-loop.sh`, `rsync` could not write, and `deploy.sh` died **without recording a failure**
+  (`basetool_deploy_last_failure_timestamp` stayed `0`, so no alert), which is why it took a human
+  reading the log to notice. The §2.5 role run used
   `--tags deploy,scripts`; the task that reclaims the release-owned subtrees ("Reclaim the subtrees a
   release owns end to end", tag `directories`) was not part of it. *Lesson for the next runbook:*
   before promoting, check `find /var/iri/code/{docker,keycloak-theme,monitoring,quadlet} ! -user
-  deploy` is empty (read-only), or include `directories` in the role run. The silent abort itself
-  is fixed in `deploy.sh` by the follow-up PR from this record.
+  deploy` is empty (read-only), or include `directories` in the role run.
+
+  > **Corrected 2026-09-25.** This bullet first said `deploy.sh` "stopped before changing
+  > anything". It had not: each tick had already mirrored `monitoring/`, `docker/maintenance` and
+  > `docker/edge` before `rsync` exited 23 under `set -euo pipefail` with no trap. And because the
+  > digest pin was written before the config apply, the second failed tick copied the new pin over
+  > `previous-digest-pin.yml` and snapshotted the half-mirrored tree as `config-previous/`, so both
+  > rollback anchors were gone until the 12:40 tick succeeded. #2063 records such a failure, restores
+  > the previous tree, refuses up front on a non-`deploy`-owned directory, and writes the pin after
+  > the config delivery ([`deployment.md`](deployment.md), REQ-OPS-003). It reaches a host only
+  > through the role run `--tags deploy,scripts`.
 - **`/var/iri/secrets` was `root:root`**, the role's target is `iri:iri 0755`
   (`basetool_host_service_user_dirs`). The keystore rotation in `deployment.md` relies on it: step 2
   deletes `keystore.p12`, step 3 has `iri` write the new one there — with a root-owned directory it
   would have failed after the delete. Aligned the same day.
 - **A 3-minute ERROR burst in the frontend** (12:46–12:48, 33 lines,
-  `AsyncRequestNotUsableException` on `GET /notifications/stream`, all anonymous): the one-time
-  sign-out of #2002 — every open tab's `EventSource` reconnected with the old cookie. It stopped on
-  its own and stayed below `LogbackErrorSpike`'s threshold; an anonymous or aborted stream still
-  ends up as "Unexpected frontend error" at `ERROR`, fixed by a follow-up PR.
+  `AsyncRequestNotUsableException` on `GET /notifications/stream`). It stopped on its own and stayed
+  below `LogbackErrorSpike`'s threshold.
+
+  > **Corrected 2026-09-25.** This bullet first read the lines as anonymous stream requests from the
+  > #2002 sign-out wave. They were async results of relays whose browser had already gone: the
+  > frontend `GlobalExceptionHandler` had no handler for the disconnect, so its catch-all logged
+  > `ERROR`. `userId=anonymous` was the logback fallback on an async dispatch, which the MDC filters
+  > skipped. An anonymous stream request already got a clean 401; the sign-out wave caused reconnect
+  > hammering. Fixed by #2060 (disconnect at DEBUG, client backoff) and #2061 (the MDC carries across
+  > the async dispatch); #2062 keeps the `correlationId` on a backend 5xx's access line
+  > (REQ-NOTIF-010, REQ-OBS-001/002).
 - **The images' OCI `org.opencontainers.image.version` label reads `main`**, not `v1.11.0`: the tag
   run re-tags the `main` build (ADR-0137/0210), and `docker/metadata-action` labelled that build
   from its branch. Cosmetic — the version the app shows is baked by `.github/scripts/app_version.py`
