@@ -103,7 +103,7 @@ class MaterialCollectionTransferInPlaceE2eTest {
     // so the row's location dropdown lists it and preselects it as the source.
     String sourceLocationId = seeder.findLocationIdByName(USERNAME, PASSWORD, "E2E Refinery Hub");
     // Ensure a second location exists so the dropdown can always offer a distinct transfer target,
-    // even if this class is the first to warm the frontend's 10-minute location cache.
+    // even if this class is the first to warm the frontend's long-lived location cache.
     seeder.createLocation(USERNAME, PASSWORD, "E2E Collection Transfer Alt Hub");
     String materialId =
         seeder.ensureJobOrderMaterial(USERNAME, PASSWORD, "E2E Collection Transfer Mat");
@@ -158,7 +158,7 @@ class MaterialCollectionTransferInPlaceE2eTest {
         // Move the row's full amount to a different location: POST /inventory/{id}/transfer. The
         // change handler posts in place (krtFetch.write), so the marker must survive. The target is
         // picked from the dropdown's actual options (a freshly seeded location is not guaranteed in
-        // the frontend's 10-minute cached lookup), choosing one distinct from the selected source
+        // the frontend's long-cached lookup), choosing one distinct from the selected source
         // so
         // the change event fires.
         page.waitForResponse(
@@ -211,7 +211,7 @@ class MaterialCollectionTransferInPlaceE2eTest {
   /**
    * Selects, in the given row's location dropdown, the first option whose value differs from the
    * currently selected one and returns that destination id. Picking from the dropdown's actual
-   * options (rather than a freshly seeded id that the frontend's 10-minute location cache may not
+   * options (rather than a freshly seeded id that the frontend's long-lived location cache may not
    * list) makes the change event fire reliably; the bootstrap source hub plus the locations other
    * suites seed guarantee at least one distinct option.
    *

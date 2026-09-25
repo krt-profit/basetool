@@ -34,7 +34,7 @@ Jede Seite der Pfadkataloge wird geladen und vermessen bzw. gescannt.
 
 ## Erwartetes Ergebnis
 
-- **Barrierefreiheit:** Keine Verletzung der Stufen `critical` oder `serious`. Jede Verletzung jeder Stufe wird nach `build/e2e/a11y-<seite>.txt` geschrieben und geloggt.
+- **Barrierefreiheit:** Keine Verletzung der Stufen `critical` oder `serious`. Jede Verletzung jeder Stufe wird nach `build/e2e/a11y-<seite>.txt` geschrieben und geloggt, mit Selektor, Markup und Fehlerbeschreibung jedes betroffenen Knotens (bei `color-contrast` samt Farben und Kontrastwert; bis 2026-09-25 nur die Anzahl der Knoten).
 - **Layout:** Je Seite und Klasse:
   1. Die Seite scrollt nicht seitwärts (breite Tabellen scrollen in ihrem eigenen Container, nicht das Dokument).
   2. Header und — wo angeheftet — Footer belegen zusammen höchstens 33 % der Viewport-Höhe.

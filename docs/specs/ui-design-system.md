@@ -157,10 +157,22 @@ purely decorative glyphs.
 
 **Acceptance**
 
-- [ ] Semantic colour used as small text uses the matching `*-text` tint, not the dark
+- [x] Semantic colour used as small text uses the matching `*-text` tint, not the dark
   canonical hue; the canonical hues stay on fills/borders/tags.
-- [ ] Muted grey used as small text uses `--color-gray-2-text`, not the canonical
+- [x] Muted grey used as small text uses `--color-gray-2-text`, not the canonical
   `--color-gray-2`; the canonical Grau 2 stays on borders/scrollbars/decorative glyphs.
+
+Until 2026-09-25 nothing checked this, and 49 declarations broke it: the item badge in the order
+list (#355DDC, 3.29:1, the `/orders` finding of the a11y smoke that appeared only once another test
+had created an item order), the price column of the materials matrix, the outline danger button,
+error texts, empty-state hints and more, most of them on elements no test had data to render. All
+now take the tints. The two exceptions are the `aria-hidden` glyphs that keep Grau 2 as allowed
+above: the unsorted-column indicator of the material demand table and the blueprint search icon.
+
+**Enforced by:** `AccessibleTextTintTest` (no stylesheet sets `color` to the danger, info or Grau 2
+hue, and no script writes one into `style.color`; the two decorative glyphs are exempted by
+selector) · `AccessibilitySmokeE2eTest` (axe WCAG A/AA on five pages; its report now names every
+failing node with its colours and ratio)
 
 ### REQ-UI-007 — Visual style: square-first sci-fi HUD
 

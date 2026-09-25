@@ -134,6 +134,21 @@ public final class E2eStackExtension implements BeforeAllCallback {
   /** Throwaway admin password matching {@link #E2E_ADMIN_USER} in {@code realm-export.e2e.json}. */
   private static final String E2E_ADMIN_PASSWORD = "test-admin-pw";
 
+  /**
+   * The RAW material the refinery import fixture's first row folds onto; seeded at bootstrap so
+   * every create-form picker offers it (see {@link #bringUpAndSeed}).
+   */
+  static final String PICKER_MATERIAL_IMPORT = "E2E Import Material";
+
+  /** The RAW material the refinery create-form tests pick; seeded at bootstrap. */
+  static final String PICKER_MATERIAL_REFINERY = "E2E Refinery Material";
+
+  /** A RAW material with a refined counterpart, for the keyboard-pick test; seeded at bootstrap. */
+  static final String PICKER_MATERIAL_KEYBOARD_RAW = "E2E Keyboard Pick Raw";
+
+  /** The refined counterpart of {@link #PICKER_MATERIAL_KEYBOARD_RAW}; seeded at bootstrap. */
+  static final String PICKER_MATERIAL_KEYBOARD_REFINED = "E2E Keyboard Pick Refined";
+
   /** Max time to wait for one {@code docker compose up --build --wait} attempt to finish. */
   private static final Duration UP_TIMEOUT = Duration.ofMinutes(12);
 
@@ -281,9 +296,10 @@ public final class E2eStackExtension implements BeforeAllCallback {
    * Performs the one-time ephemeral-stack bring-up: stages the realm/keystore, pulls + {@code up}s
    * the compose stack, registers the one-time teardown on the JUnit root store as soon as it is up
    * (so a failed check or seed still tears it down), checks that it serves this checkout, seeds the
-   * UEX-owned catalog + profit-eligibility + an orderable item, and marks the stack started.
-   * Extracted from {@link #beforeAll} so the caller can remember a failure and fail the remaining
-   * classes fast.
+   * UEX-owned catalog, the refinery picker materials ({@code PICKER_MATERIAL_*}),
+   * profit-eligibility and an orderable item — everything a form picker must offer, before any page
+   * fills the frontend's catalogue caches — and marks the stack started. Extracted from {@link
+   * #beforeAll} so the caller can remember a failure and fail the remaining classes fast.
    *
    * @param context the JUnit extension context whose root store owns the teardown hook
    * @throws Exception if bootstrap or {@code docker compose up} fails
@@ -314,15 +330,29 @@ public final class E2eStackExtension implements BeforeAllCallback {
     // flows.
     BackendSeeder seeder = new BackendSeeder();
     seeder.seedCatalog();
+    // Seed every material a refinery create-form test picks, before any page renders. The
+    // frontend caches the materials catalogue (6 h, evicted only by mutations made THROUGH the
+    // frontend), so the first render of a refinery page fixes the picker's options for the whole
+    // run; a material a class seeds through the backend API afterwards never shows up. Until
+    // 2026-09-23 the three refinery classes each seeded the union of each other's materials and
+    // relied on one of them running before the first create-page render anywhere in the suite —
+    // which a new class that renders every page (DialogA11yE2eTest) broke.
+    seeder.ensureRefineryMaterial(E2E_ADMIN_USER, E2E_ADMIN_PASSWORD, PICKER_MATERIAL_IMPORT);
+    seeder.ensureRefineryMaterial(E2E_ADMIN_USER, E2E_ADMIN_PASSWORD, PICKER_MATERIAL_REFINERY);
+    seeder.ensureRefineryMaterialWithRefinedOutput(
+        E2E_ADMIN_USER,
+        E2E_ADMIN_PASSWORD,
+        PICKER_MATERIAL_KEYBOARD_RAW,
+        PICKER_MATERIAL_KEYBOARD_REFINED);
     // Opt the canonical IRIDIUM Squadron into Job-Order processing exactly once, before any test
-    // page warms the frontend's 10-minute squadrons-catalog cache. Only profit-eligible org units
+    // page warms the frontend's long-lived squadrons-catalog cache. Only profit-eligible org units
     // may be a job order's responsible (processing) unit (V128); without this the create form's
     // responsible picker stays empty and every order-create / handover flow 400s. Seeding it here
     // (not per test class) guarantees the cache never pins a stale not-eligible snapshot.
     seeder.setSquadronProfitEligible(E2E_ADMIN_USER, E2E_ADMIN_PASSWORD, IRIDIUM_SQUADRON_ID, true);
     // Seed one orderable item (a game_item + an active blueprint with a resolved RESOURCE
     // ingredient) so the item-order create form's *frontend-cached* item picker is never empty.
-    // Done here — before any test navigates to /orders/create and warms that 10-minute cache —
+    // Done here — before any test navigates to /orders/create and warms that long-lived cache —
     // for the same reason the profit-eligibility seeding above runs at bootstrap. Non-fatal: only
     // the anonymous item-order flow (UC-12) depends on it, so a seed hiccup must not sink the
     // whole suite's bring-up.

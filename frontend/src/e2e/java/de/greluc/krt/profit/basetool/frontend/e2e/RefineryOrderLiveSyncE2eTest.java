@@ -150,7 +150,7 @@ class RefineryOrderLiveSyncE2eTest {
                         "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics"
                             + " && window.krtLiveSync.subscribedTopics().length > 0)")));
 
-        // The input-material picker is `required`, but its options come from the 10-minute-cached
+        // The input-material picker is `required`, but its options come from the long-cached
         // /api/v1/materials, which need not contain this test's freshly-seeded material — so the
         // row's pre-selected option can be absent, leaving the picker empty. The browser then
         // blocks

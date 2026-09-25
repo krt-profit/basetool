@@ -70,8 +70,8 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * no longer carries the per-entry job-order / mission allocation (Variante C, REQ-INV-027).
  *
  * <p><b>Cache-awareness.</b> The create-form material/location dropdowns come from the frontend's
- * 10-minute cached lookups, so — like {@code JobOrderCreateE2eTest} — the create flow selects
- * whatever the dropdown offers and reads the picked id back for verification rather than assuming a
+ * long-cached lookups, so — like {@code JobOrderCreateE2eTest} — the create flow selects whatever
+ * the dropdown offers and reads the picked id back for verification rather than assuming a
  * freshly-seeded entry is listed. The Umbuchen modal's transfer dropdown is likewise cached, so the
  * same-location edge case anchors its row at the bootstrap-seeded {@code E2E Refinery Hub} (always
  * cached) to make the Umbuchen modal preselect the source as the transfer target. The job-order and

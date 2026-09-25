@@ -59,7 +59,7 @@
     }
 
     .terms-accept-error {
-        color: var(--color-danger);
+        color: var(--color-danger-text);
         font-weight: 700;
     }
 

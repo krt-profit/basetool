@@ -785,11 +785,6 @@
         margin-bottom: 1rem;
     }
     /* 1x */
-    .krtm-color-var-color-danger-font-size-0-8rem-4da5 {
-        color: var(--color-danger);
-        font-size: 0.8rem;
-    }
-    /* 1x */
     .krtm-color-var-color-dept-profit-text-decoration-b5e5 {
         color: var(--color-dept-profit);
         text-decoration: underline;

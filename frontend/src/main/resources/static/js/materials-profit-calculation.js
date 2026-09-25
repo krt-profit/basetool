@@ -197,7 +197,7 @@ function updateSortIndicators(columnIndex, direction) {
                 iconElement.style.color = 'var(--color-primary)';
             } else {
                 iconElement.textContent = '↕';
-                iconElement.style.color = 'var(--color-gray-2)';
+                iconElement.style.color = 'var(--color-gray-2-text)';
             }
         }
     }

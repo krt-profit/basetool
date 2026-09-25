@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.deque.html.axecore.playwright.AxeBuilder;
 import com.deque.html.axecore.results.AxeResults;
+import com.deque.html.axecore.results.CheckedNode;
 import com.deque.html.axecore.results.Rule;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
@@ -186,19 +187,38 @@ class AccessibilitySmokeE2eTest {
   }
 
   /**
-   * Renders one violation as a human-readable block: impact, rule id, help text and the number of
-   * matching DOM nodes.
+   * Renders one violation as a human-readable block: impact, rule id, help text, and for every
+   * matching DOM node its selector, its markup (cut to 200 characters) and axe's failure summary —
+   * for {@code color-contrast} that summary carries the measured colours and ratio.
+   *
+   * <p>Until 2026-09-25 only the node count was printed, so a finding that depended on rows other
+   * test classes had created could not be traced to an element from the report.
    *
    * @param rule the axe violation
    * @return a multi-line description
    */
   private static String describe(Rule rule) {
-    return String.format(
-        Locale.ROOT,
-        "  [%s] %s — %s (%d node(s))%n",
-        rule.getImpact(),
-        rule.getId(),
-        rule.getHelp(),
-        rule.getNodes() == null ? 0 : rule.getNodes().size());
+    StringBuilder out =
+        new StringBuilder(
+            String.format(
+                Locale.ROOT,
+                "  [%s] %s — %s (%d node(s))%n",
+                rule.getImpact(),
+                rule.getId(),
+                rule.getHelp(),
+                rule.getNodes() == null ? 0 : rule.getNodes().size()));
+    if (rule.getNodes() != null) {
+      for (CheckedNode node : rule.getNodes()) {
+        String html = node.getHtml() == null ? "" : node.getHtml().replaceAll("\\s+", " ");
+        out.append(
+            String.format(
+                Locale.ROOT,
+                "      at %s%n        %s%n        %s%n",
+                node.getTarget(),
+                html.length() > 200 ? html.substring(0, 200) + "…" : html,
+                String.valueOf(node.getFailureSummary()).replaceAll("\\s+", " ")));
+      }
+    }
+    return out.toString();
   }
 }
