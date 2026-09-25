@@ -732,6 +732,27 @@ expect_no_call "...and the database is never restarted for somebody else's chang
 # shellcheck disable=SC2016  # expanded by eval inside run_rt, not here
 expect_no_call "an unchanged pin does not restart anything" podman   'RT_PIN_FILE="${WORK}/pin2.yml" RT_UNIT_DIR="${WORK}/units2" rt_pin_apply "backend=ghcr.io/x/backend@sha256:dddd"; RT_CHANGED_SERVICES=""; rt_pin_apply "backend=ghcr.io/x/backend@sha256:dddd"; RT_STACK_SERVICES="backend" rt_apply_stack'   'restart backend.service'
 
+say ""
+say "== waiting out a restart that travelled along Requires= =="
+# After `restart keycloak.service` returns, systemd is still restarting what Requires= keycloak.
+# rt_await_stack is the wait: START each stack unit, so a queued start job is joined rather than
+# stopped and begun again. 2026-09-25: without it the provider-JAR step reported success while
+# frontend and ingest had no container.
+expect_call "every stack unit is started, the last one included" podman \
+  'RT_STACK_SERVICES="keycloak backend ingest frontend" rt_await_stack' 'systemctl --user start frontend.service'
+expect_no_call "...never restarted, even one this run re-defined" podman \
+  'RT_CHANGED_SERVICES="backend frontend"; RT_STACK_SERVICES="keycloak backend ingest frontend" rt_await_stack' 'restart'
+# `rc=1;` and not `rc=1`: the latter is a substring of `rc=127`, which is what a missing function
+# returns -- this assertion passed against a library that had no rt_await_stack at all.
+expect_out "a unit that does not come back fails the wait" podman \
+  'STUB_FAIL="start_frontend.service" RT_STACK_SERVICES="keycloak backend ingest frontend" rt_await_stack; echo "rc=$?;"' 'rc=1;'
+expect_call "...after the others were still waited for" podman \
+  'STUB_FAIL="start_backend.service" RT_STACK_SERVICES="keycloak backend ingest frontend" rt_await_stack' 'systemctl --user start frontend.service'
+expect_call "named services narrow it" podman \
+  'RT_STACK_SERVICES="keycloak backend" rt_await_stack ingest' 'systemctl --user start ingest.service'
+expect_no_call "...to exactly those" podman \
+  'RT_STACK_SERVICES="keycloak backend" rt_await_stack ingest' 'start keycloak.service'
+
 expect_call "podman starts each named unit" podman \
   "$(mon) rt_monitoring_up" 'systemctl --user start prometheus.service'
 expect_call "...all of them, not just the first" podman \

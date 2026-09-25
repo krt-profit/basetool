@@ -334,11 +334,17 @@ config bundle, not on automated provider delivery. The JAR is architecture-indep
 bytecode (it must load under Keycloak's JDK), built once and cosign-signed like the app images.
 
 When the promoted `keycloak-spi` digest moves, `deploy.sh` (after the app stack is healthy) stages
-the JAR into `keycloak/providers/keycloak-spi.jar` and recreates **only** the keycloak container
-(`systemctl --user restart keycloak.service` under Quadlet, whose `--replace` makes a restart a
-recreate; `up -d --no-deps --force-recreate keycloak` under Compose) so its `start` re-runs the provider build and loads
-the new JAR — **health-gated**: on failure the previous JAR is restored, keycloak is brought back,
-and the bad target backs off (the marker is not advanced). A provider-JAR-only change
+the JAR into `keycloak/providers/keycloak-spi.jar` and recreates the keycloak container
+(`systemctl --user restart keycloak.service`, whose `--replace` makes a restart a recreate) so its
+`start` re-runs the provider build and loads the new JAR. systemd restarts **backend, frontend and
+ingest** with it (`Requires=`), so the step is **health-gated on the whole application stack**, not
+on keycloak: after keycloak is healthy, every application service is started — never restarted
+again — and waited for (`rt_await_stack`), and the run records success only once all of them are
+healthy. If keycloak **or** any application service does not return to health, the previous JAR is
+restored, keycloak is recreated and the stack is waited for again, the run is recorded as failed
+(`DeployFailed`), and the bad target backs off (the marker is not advanced). **Expected outage:** one
+keycloak start, then one backend start, then the slower of frontend and ingest — about two minutes
+on production — on top of the app apply's own when both move in one release. A provider-JAR-only change
 **auto-applies**; a combined Keycloak-**image** + provider-JAR change stays operator-gated by the
 postgres/Keycloak carve-out of REQ-OPS-006 (the image change blocks the tick until `--force`). A
 missing/unresolvable `basetool-keycloak-spi` artifact degrades to no provider-JAR change for that
@@ -351,6 +357,13 @@ production 2026-09-25 for a manual restart of the same unit: about two minutes o
 A provider-JAR delivery is therefore a short full-app restart, not a Keycloak-only one:
 `rt_recreate` leaves keycloak's *dependencies* alone, but systemd restarts its *dependents*.)*
 
+*(Corrected 2026-09-25, second time: the gate was keycloak's alone. `systemctl restart
+keycloak.service` returns once keycloak is healthy, while the restarts of backend, frontend and
+ingest are still running — frontend and ingest stopped, with no container, until backend is up. On
+production that day the v1.12.0 deploy logged "deploy successful" at 17:43:17 in that window, and the
+next tick's drift check found frontend and ingest with no container and re-applied. Since then the
+step waits for the whole stack and records success only after it; see the paragraph above.)*
+
 **Acceptance**
 
 - [ ] `release-images.yml` builds, asserts (only the JAR, no secret-shaped file) and cosign-signs
@@ -359,12 +372,15 @@ A provider-JAR delivery is therefore a short full-app restart, not a Keycloak-on
   run-scoped artifact; the job that pushes and signs (`build-keycloak-spi`) runs no Gradle.
 - [ ] `promote.yml` promotes `keycloak-spi` in lock-step with the four other artifacts.
 - [ ] `deploy.sh` resolves + cosign-trusts the `keycloak-spi:stable` digest, stages the JAR into
-  `keycloak/providers/`, and recreates only keycloak (health-gated) when the digest changes.
+  `keycloak/providers/`, and recreates keycloak when the digest changes, gated on keycloak **and**
+  every application service its restart takes down being healthy again.
 - [ ] A provider-JAR-only promotion auto-applies; a combined Keycloak-image + JAR promotion is
   gated until `--force`.
-- [ ] A failed keycloak recreate restores the previous JAR and records the failure for backoff.
+- [ ] A keycloak — or an application service — that does not return to health after the recreate
+  restores the previous JAR, brings the stack back, records the failure for backoff and never
+  reports success.
 
-**Enforced by:** `.github/workflows/release-images.yml` (`keycloak-spi-jar`, `build-keycloak-spi`) · `.github/workflows/promote.yml` (matrix) · `docker/keycloak-spi/Dockerfile` · `scripts/deploy.sh` (`extract_keycloak_spi_jar`, the 5-field marker, the keycloak-recreate + JAR rollback) · **Runbook:** `docs/deployment.md` → *Keycloak provider JAR* · **Decision:** ADR-0055
+**Enforced by:** `.github/workflows/release-images.yml` (`keycloak-spi-jar`, `build-keycloak-spi`) · `.github/workflows/promote.yml` (matrix) · `docker/keycloak-spi/Dockerfile` · `scripts/deploy.sh` (`extract_keycloak_spi_jar`, the 5-field marker, the keycloak-recreate + stack wait + JAR rollback) · `scripts/lib/container-runtime.sh` (`rt_await_stack`) · `scripts/deploy.test.sh` (`scenario_spi_*`) · **Runbook:** `docs/deployment.md` → *Keycloak provider JAR* · **Decision:** ADR-0055
 
 ### REQ-OPS-013 — Idempotence fast-exit only over a verified running stack
 

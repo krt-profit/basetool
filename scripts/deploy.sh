@@ -24,8 +24,10 @@
 # The Keycloak provider JAR (basetool-keycloak-spi) rides the SAME channel as its
 # own SEPARATE artifact — REQ-OPS-005 bars provider JARs from the config bundle,
 # so it gets its own promotable, cosign-signed bundle (ADR-0055). When its digest
-# moves, the JAR is staged into keycloak/providers and ONLY keycloak is recreated
-# (health-gated; the JAR is rolled back on failure). A combined Keycloak-image +
+# moves, the JAR is staged into keycloak/providers and keycloak is recreated —
+# which restarts backend, frontend and ingest with it (Requires=) — and the run
+# succeeds only once all of them are healthy again (the JAR is rolled back on
+# failure). A combined Keycloak-image +
 # provider-JAR change stays operator-gated by the postgres/Keycloak carve-out
 # above — the image change blocks the tick until the operator runs --force.
 #
@@ -111,9 +113,10 @@
 #                                          config-previous/ is not re-snapshotted.
 #   /var/lib/iri/keycloak-spi-previous.jar snapshot of the live provider JAR taken
 #                                          before a provider-JAR swap; restored on
-#                                          rollback if the keycloak recreate is
-#                                          unhealthy (the provider-JAR analogue of
-#                                          previous-digest-pin.yml).
+#                                          rollback if keycloak, or the stack it
+#                                          restarts, does not return to health
+#                                          after the recreate (the provider-JAR
+#                                          analogue of previous-digest-pin.yml).
 #
 # Locking: a single `flock` on /var/lock/iri-deploy.lock prevents the systemd
 # timer and a manual invocation from racing each other.
@@ -2001,13 +2004,26 @@ log "applying (timeout ${HEALTH_TIMEOUT}s)"
 if rt_apply_stack; then
 
   # The app stack is healthy. If the promoted provider JAR moved, swap it in and
-  # recreate ONLY keycloak so its `start` re-runs the provider build and loads the
-  # new JAR — health-gated, with a JAR rollback on failure. A Keycloak IMAGE pin
+  # recreate keycloak so its `start` re-runs the provider build and loads the new
+  # JAR — health-gated, with a JAR rollback on failure. A Keycloak IMAGE pin
   # change is NOT handled here: that arrives via the config bundle and is already
   # operator-gated by the infra_image_pins carve-out above, so a combined
   # image+JAR change never reaches this auto-apply path without --force.
+  #
+  # The recreate is NOT keycloak alone. backend `Requires=` keycloak and frontend
+  # and ingest require backend, so systemd restarts all three with it — and
+  # `systemctl restart keycloak.service` returns once KEYCLOAK is healthy, while
+  # their restarts are still running (rt_await_stack has the reproduction). Until
+  # 2026-09-25 this step wrote the marker and "deploy successful" right there: on
+  # 2026-09-25 17:43:17 production logged success while frontend and ingest had
+  # no container, and the next tick's drift check re-applied. So the step is gated
+  # on the whole application stack being healthy again, not on keycloak, and a
+  # stack that does not come back is a failed JAR like a keycloak that does not.
+  # Expected outage: one keycloak start plus one backend start plus the slower of
+  # frontend and ingest — about two minutes on production — on top of the app
+  # apply's own, because the JAR is swapped only after that apply passed its gate.
   if [[ "${KEYCLOAK_SPI_CHANGED}" == "true" ]]; then
-    log "keycloak-spi changed → staging provider JAR + recreating keycloak"
+    log "keycloak-spi changed → staging provider JAR + recreating keycloak (backend, ingest and frontend restart with it: Requires=)"
     if [[ -f "${KEYCLOAK_SPI_JAR}" ]]; then
       cp -a "${KEYCLOAK_SPI_JAR}" "${KEYCLOAK_SPI_PREVIOUS_JAR}"
       KEYCLOAK_SPI_HAD_PREVIOUS=true
@@ -2017,15 +2033,34 @@ if rt_apply_stack; then
     fi
     extract_keycloak_spi_jar "${KEYCLOAK_SPI_IMAGE}@${KEYCLOAK_SPI_DIGEST}" "${KEYCLOAK_SPI_JAR}"
 
+    KEYCLOAK_SPI_FAILURE=""
     if ! rt_recreate keycloak; then
-      log "keycloak did not become healthy with the new provider JAR — rolling back the JAR"
+      KEYCLOAK_SPI_FAILURE="keycloak did not become healthy with the new provider JAR"
+    else
+      log "keycloak healthy on the new provider JAR — waiting for the application services systemd restarted with it"
+      if ! rt_await_stack; then
+        KEYCLOAK_SPI_FAILURE="keycloak is healthy with the new provider JAR, but the application stack it restarted did not return to health"
+      fi
+    fi
+
+    if [[ -n "${KEYCLOAK_SPI_FAILURE}" ]]; then
+      log "${KEYCLOAK_SPI_FAILURE} — rolling back the JAR"
       if [[ "${KEYCLOAK_SPI_HAD_PREVIOUS}" == "true" ]]; then
         install -D -m 0644 "${KEYCLOAK_SPI_PREVIOUS_JAR}" "${KEYCLOAK_SPI_JAR}"
       else
         rm -f "${KEYCLOAK_SPI_JAR}"
       fi
-      rt_recreate keycloak >/dev/null 2>&1 \
-        || log "WARNING: keycloak did not return to health on the previous JAR — manual check needed"
+      # The rollback's recreate restarts the same dependents again, so it waits for them the same
+      # way -- also when keycloak itself does not come back, so nothing is left stopped that a start
+      # could bring up. A failure here is reported; the run is recorded as failed either way.
+      KEYCLOAK_SPI_ROLLBACK_OK=true
+      rt_recreate keycloak || KEYCLOAK_SPI_ROLLBACK_OK=false
+      rt_await_stack || KEYCLOAK_SPI_ROLLBACK_OK=false
+      if [[ "${KEYCLOAK_SPI_ROLLBACK_OK}" == "true" ]]; then
+        log "keycloak and the application stack are healthy again on the previous provider JAR"
+      else
+        log "WARNING: the application stack did not return to health on the previous provider JAR — manual check needed"
+      fi
 
       # Record the failure so the backoff throttles re-attempts of this exact
       # target, the same mechanism as a failed app deploy. The app images stay on
@@ -2036,7 +2071,7 @@ if rt_apply_stack; then
       write_deploy_metric failure
       exit 1
     fi
-    log "keycloak-spi provider JAR applied"
+    log "keycloak-spi provider JAR applied — keycloak and the application stack are healthy"
   fi
 
   echo "${EXPECTED_MARKER}" > "${LAST_DEPLOYED_FILE}"

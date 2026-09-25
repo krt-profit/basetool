@@ -99,6 +99,11 @@ itself changes only through the Ansible role, which never delivers):
    directory, a failed mirror, a failed pull — is refused up front where it can be, and otherwise
    recorded like any other failed deploy: the host tree and the pin are put back, the target backs
    off, and `DeployFailed` fires (since 2026-09-25; until then it ended the run in silence).
+   A moved **provider JAR** is swapped in only *after* that gate, and restarting keycloak restarts
+   backend, frontend and ingest with it (`Requires=`), so that second step is gated on the whole
+   application stack being healthy again, not on keycloak; a stack that does not come back puts the
+   previous JAR back and fails the run (`REQ-OPS-007`, since 2026-09-25 — until then it reported
+   success while frontend and ingest were still down).
 5. Nothing is promoted automatically: `:stable` moves only by a deliberate act in the promote
    workflow. The deploy is the *consumer* of that decision, never its author.
 
