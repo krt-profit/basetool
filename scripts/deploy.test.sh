@@ -278,48 +278,108 @@ set -euo pipefail
 printf 'systemctl %s\n' "$*" >> "${FAKE_DOCKER_LOG}"
 case "$*" in
   *daemon-reload*) exit 0 ;;
-  *start*|*restart*)
-    # FAKE_UNIT_DOWN_FILE turns on the model of what `Requires=` does, measured under systemd 255 on
-    # 2026-09-25: a `restart` of a unit also stops the units that require it
-    # (FAKE_REQUIRED_BY_<unit>, `-` spelled `_`) and returns once THAT unit is up, while theirs are
-    # still stopped -- listed in the file until something starts them. A `start` or `restart` of a
-    # listed unit brings it back. FAKE_STUCK_UNITS never come back while the live provider JAR says
-    # FAKE_STUCK_WITH_JAR -- a JAR that breaks keycloak, or breaks what logs in through it -- or,
-    # with FAKE_STUCK_AFTER_KEYCLOAK_RESTART=true, from the first keycloak restart on, whatever the
-    # JAR: a failure the JAR rollback cannot heal.
+  *start*|*restart*|*stop*)
+    # FAKE_UNIT_DOWN_FILE turns on the model of what `Requires=` does (FAKE_REQUIRED_BY_<unit>,
+    # `-` spelled `_`, lists every unit that requires <unit>, transitively), measured under systemd
+    # 255 on 2026-09-25:
+    #
+    #   stop U...   stops each U and every unit that requires it; they stay down (listed in the file)
+    #               until something starts them. Nothing is queued to bring them back.
+    #   restart U   recreates U (one container start) and stops the units that require it, with a
+    #               start job QUEUED for each: `restart` returns once U is up, theirs still pending
+    #               (the `.pending` file). systemd then runs those jobs on its own -- modelled as
+    #               completing at the beginning of the NEXT systemctl call, one container start each.
+    #               A restart of a unit that is already back up is a second container start.
+    #   start U     starts U if it is down (one container start); on an up unit it is a no-op.
+    #
+    # Every container start is one line in `.starts`, which is how a scenario counts restart
+    # windows: a unit restarted twice for one release has two lines. FAKE_STUCK_UNITS never come
+    # back while the live provider JAR says FAKE_STUCK_WITH_JAR -- a JAR that breaks keycloak, or
+    # breaks what logs in through it -- or, with FAKE_STUCK_AFTER_KEYCLOAK_RESTART=true, from the
+    # first keycloak stop or restart on, whatever the JAR: a failure no rollback can heal. Each real
+    # keycloak start logs `keycloak-jar-at-start <first line of the live JAR>`.
     if [[ -n "${FAKE_UNIT_DOWN_FILE:-}" ]]; then
-      verb="" unit=""
+      down="${FAKE_UNIT_DOWN_FILE}" pending="${FAKE_UNIT_DOWN_FILE}.pending" starts="${FAKE_UNIT_DOWN_FILE}.starts"
+      live_jar="${IRI_COMPOSE_DIR:-}/keycloak/providers/keycloak-spi.jar"
+      touch "${down}" "${pending}" "${starts}"
+      verb="" units=()
       for a in "$@"; do
         case "$a" in
-          start | restart) verb="$a" ;;
-          *.service) unit="${a%.service}" ;;
+          start | restart | stop) verb="$a" ;;
+          *.service) units+=("${a%.service}") ;;
         esac
       done
-      touch "${FAKE_UNIT_DOWN_FILE}"
-      if [[ "${verb}" == "restart" ]]; then
-        deps_var="FAKE_REQUIRED_BY_${unit//-/_}"
-        for dep in ${!deps_var:-}; do
-          grep -qx "${dep}" "${FAKE_UNIT_DOWN_FILE}" || echo "${dep}" >> "${FAKE_UNIT_DOWN_FILE}"
-        done
-        if [[ "${unit}" == "keycloak" ]]; then touch "${FAKE_UNIT_DOWN_FILE}.keycloak-restarted"; fi
-      fi
-      live_jar="${IRI_COMPOSE_DIR:-}/keycloak/providers/keycloak-spi.jar"
-      stuck=false
-      if [[ " ${FAKE_STUCK_UNITS:-} " == *" ${unit} "* ]]; then
+      is_down() { grep -qx "$1" "${down}"; }
+      mark_down() { is_down "$1" || echo "$1" >> "${down}"; }
+      mark_up() { grep -vx "$1" "${down}" > "${down}.next" || true; mv "${down}.next" "${down}"; }
+      is_stuck_itself() {
+        [[ " ${FAKE_STUCK_UNITS:-} " == *" $1 "* ]] || return 1
         if [[ -n "${FAKE_STUCK_WITH_JAR:-}" && "$(head -n 1 "${live_jar}" 2>/dev/null)" == "${FAKE_STUCK_WITH_JAR}" ]]; then
-          stuck=true
-        elif [[ "${FAKE_STUCK_AFTER_KEYCLOAK_RESTART:-}" == "true" && -f "${FAKE_UNIT_DOWN_FILE}.keycloak-restarted" ]]; then
-          stuck=true
+          return 0
         fi
-      fi
-      if [[ "${stuck}" == "true" ]]; then
-        grep -qx "${unit}" "${FAKE_UNIT_DOWN_FILE}" || echo "${unit}" >> "${FAKE_UNIT_DOWN_FILE}"
-        echo "Job for ${unit}.service failed because the control process exited with error code." >&2
-        exit 1
-      fi
-      grep -vx "${unit}" "${FAKE_UNIT_DOWN_FILE}" > "${FAKE_UNIT_DOWN_FILE}.next" || true
-      mv "${FAKE_UNIT_DOWN_FILE}.next" "${FAKE_UNIT_DOWN_FILE}"
+        [[ "${FAKE_STUCK_AFTER_KEYCLOAK_RESTART:-}" == "true" && -f "${down}.keycloak-restarted" ]]
+      }
+      # A unit whose REQUIRED unit cannot start fails its own start too ("A dependency job for … failed"),
+      # which is what makes a failed keycloak fail backend, ingest and frontend after it.
+      is_stuck() {
+        is_stuck_itself "$1" && return 0
+        local req req_var
+        for req in db-keycloak db-backend redis keycloak backend; do
+          req_var="FAKE_REQUIRED_BY_${req//-/_}"
+          if [[ " ${!req_var:-} " == *" $1 "* ]] && is_stuck_itself "${req}"; then
+            return 0
+          fi
+        done
+        return 1
+      }
+      container_start() {
+        echo "$1" >> "${starts}"
+        if [[ "$1" == "keycloak" ]]; then
+          printf 'keycloak-jar-at-start %s\n' "$(head -n 1 "${live_jar}" 2>/dev/null || echo '<none>')" >> "${FAKE_DOCKER_LOG}"
+        fi
+        mark_up "$1"
+      }
+      # The start jobs a previous restart queued have run by now.
+      while IFS= read -r queued; do
+        [[ -n "${queued}" ]] || continue
+        is_stuck "${queued}" || container_start "${queued}"
+      done < "${pending}"
+      : > "${pending}"
+      case "${verb}" in
+        stop)
+          for unit in "${units[@]}"; do
+            [[ "${unit}" == "keycloak" ]] && touch "${down}.keycloak-restarted"
+            deps_var="FAKE_REQUIRED_BY_${unit//-/_}"
+            for dep in "${unit}" ${!deps_var:-}; do mark_down "${dep}"; done
+          done
+          exit 0
+          ;;
+        restart)
+          unit="${units[0]}"
+          [[ "${unit}" == "keycloak" ]] && touch "${down}.keycloak-restarted"
+          deps_var="FAKE_REQUIRED_BY_${unit//-/_}"
+          for dep in ${!deps_var:-}; do
+            if ! is_down "${dep}"; then mark_down "${dep}"; echo "${dep}" >> "${pending}"; fi
+          done
+          if is_stuck "${unit}"; then
+            mark_down "${unit}"
+            echo "Job for ${unit}.service failed because the control process exited with error code." >&2
+            exit 1
+          fi
+          container_start "${unit}"
+          ;;
+        start)
+          unit="${units[0]}"
+          if is_stuck "${unit}"; then
+            mark_down "${unit}"
+            echo "Job for ${unit}.service failed because the control process exited with error code." >&2
+            exit 1
+          fi
+          if is_down "${unit}"; then container_start "${unit}"; fi
+          ;;
+      esac
     fi
+    [[ "$*" == *stop* ]] && exit 0
     # FAKE_UNHEALTHY_DIGEST models ONE broken release rather than a broken host:
     # the unit whose digest-pin drop-in binds that digest never reports healthy,
     # every other unit does. A flat FAKE_UP_RC=1 would fail the rollback's own
@@ -1949,10 +2009,12 @@ scenario_podman_applies_through_systemd() {
   # There is no --wait to pass: Notify=healthy makes each unit Type=notify, so
   # `systemctl start` does not return until podman reports the container healthy.
   assert_docker "systemctl --user daemon-reload" "podman: the units are re-read before anything starts"
-  # RESTART, not start. The scenario moves the backend's digest, so the deployer re-pins it -- and
-  # `systemctl start` on an already-active unit returns 0 without re-reading anything, which would
-  # leave the old container running the old image. Asserting `start` here is what let that ship.
-  assert_docker "systemctl --user restart backend.service" "podman: a re-pinned service is restarted, so the new image actually lands"
+  # STOPPED, then started -- never only started. The scenario moves the backend's digest, so the
+  # deployer re-pins it -- and `systemctl start` on an already-active unit returns 0 without
+  # re-reading anything, which would leave the old container running the old image. Asserting
+  # `start` alone here is what let that ship. (A per-unit `restart` until 2026-09-25, ADR-0213.)
+  assert_docker "systemctl --user stop backend.service" "podman: a re-pinned service is stopped, so the new image actually lands"
+  assert_docker "systemctl --user start backend.service" "podman: ...and started again"
   assert_docker "systemctl --user start db-backend.service" "podman: ...and an untouched one is only started, so the database stays up"
   assert_no_docker "compose" "podman: compose is never invoked on the apply path"
   if grep -q "${PMARKER}" "${T_STATE_DIR}/last-deployed.digests"; then
@@ -2306,7 +2368,9 @@ scenario_podman_changed_monitoring_and_acme_units_are_restarted() {
   # rt_monitoring_up, and a pipe into sed used to run the first in a subshell that forgot nothing.
   assert_docker "systemctl --user start loki.service" "podman: ...an unchanged one is only started"
   assert_no_docker "systemctl --user restart loki.service" "podman: ...and never recreated for somebody else's change"
-  assert_docker "systemctl --user restart acme.service" "podman: a changed acme unit is restarted with the stack"
+  # The stack's re-defined units are stopped in one call and started again (ADR-0213), not restarted.
+  assert_count '^systemctl --user stop .*acme\.service' 1 "podman: a changed acme unit is recreated (stopped, then started) with the stack"
+  assert_docker "systemctl --user start acme.service" "podman: ...and started again"
   rm -rf "${tmp}"
 }
 
@@ -2324,6 +2388,7 @@ scenario_podman_acme_is_part_of_the_stack() {
   assert_exit 0 "$rc" "podman: a deploy that moves the backend exits 0"
   assert_docker "systemctl --user start acme.service" "podman: an unchanged acme unit is started, so a stopped one comes back"
   assert_no_docker "systemctl --user restart acme.service" "podman: ...and not recreated when its unit did not move"
+  assert_count '^systemctl --user stop .*acme\.service' 0 "podman: ...not stopped either"
   rm -rf "${tmp}"
 }
 
@@ -2738,27 +2803,49 @@ scenario_carve_out_leaves_no_pin_behind() {
 }
 
 # ---------------------------------------------------------------------------
-# The provider-JAR step and the restart it sets off (2026-09-25).
+# A release is ONE restart window, the provider JAR included (ADR-0213, 2026-09-25).
 #
-# The step restarts keycloak after the app stack passed its health gate. backend `Requires=`
-# keycloak, frontend and ingest require backend, so systemd restarts all three with it -- and
-# `systemctl restart keycloak.service` returns when KEYCLOAK is healthy, with backend still starting
-# and frontend and ingest stopped. On production at 17:43:17 the step logged "deploy successful" in
-# exactly that window; the next tick found frontend and ingest with no container. The stub models
-# the propagation (FAKE_UNIT_DOWN_FILE), so these scenarios fail against a deployer that trusts the
-# keycloak restart alone.
+# Until 2026-09-25 the JAR was swapped only after the app apply had passed its health gate, and the
+# keycloak restart that loads it took backend, frontend and ingest down a second time through
+# `Requires=` -- v1.12.0 on production: edge 5xx from 17:39 to 17:43, the second half the JAR's. The
+# app apply itself restarted re-pinned units one by one, and a `restart` of a unit that the previous
+# restart had already brought back (or was bringing back) restarts it again.
+#
+# The stub models both (FAKE_UNIT_DOWN_FILE, see the systemctl stub): every container start is
+# counted, so "one restart window" is asserted as "each unit started exactly once". Against the
+# deployer before ADR-0213 these scenarios count two and three starts.
 # ---------------------------------------------------------------------------
 
 DIG_KCSPI_OLD="$(hexdig 5b0)"
+# The app digests a host runs BEFORE the release under test moves them.
+DIG_BACKEND_OLD="$(hexdig ba5e)"
+DIG_FRONTEND_OLD="$(hexdig f00d)"
+DIG_INGEST_OLD="$(hexdig 0dd)"
 
-# A host on the current release with the PREVIOUS provider JAR live, and the dependency model on.
-# Prints the extra FAKE_* arguments every scenario below passes to run_deploy.
+# spi_host <tmp> <backend> <frontend> <ingest> -- a host whose live release binds the given app
+# digests (drop-ins AND the pin record, so a rollback has an anchor), carries the PREVIOUS provider
+# JAR, and whose marker records exactly that. The registry serves DIG_* and DIG_KCSPI, so passing
+# the current digests models a JAR-only release, the _OLD ones a release that moves all three images.
 spi_host() {
-  local tmp="$1"
+  local tmp="$1" b="$2" f="$3" i="$4" svc ref
   setup_host "${tmp}"
   mkdir -p "${T_COMPOSE_DIR}/keycloak/providers"
   echo "OLD jar" > "${T_COMPOSE_DIR}/keycloak/providers/keycloak-spi.jar"
-  write_marker "${DIG_BACKEND}|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG}|${DIG_KCSPI_OLD}"
+  {
+    printf 'services:\n'
+    for svc in backend frontend ingest; do
+      case "${svc}" in
+        backend) ref="ghcr.io/krt-profit/basetool-backend@${b}" ;;
+        frontend) ref="ghcr.io/krt-profit/basetool-frontend@${f}" ;;
+        ingest) ref="ghcr.io/krt-profit/basetool-ingest@${i}" ;;
+      esac
+      printf '  %s:\n    image: %s\n' "${svc}" "${ref}"
+      mkdir -p "${T_UNIT_DIR}/${svc}.container.d"
+      printf '# Written by deploy.sh. The digest this release pinned; do not edit.\n[Container]\nImage=%s\n' "${ref}" \
+        > "${T_UNIT_DIR}/${svc}.container.d/10-digest-pin.conf"
+    done
+  } > "${T_STATE_DIR}/current-digest-pin.yml"
+  write_marker "${b}|${f}|${i}|${DIG_CONFIG}|${DIG_KCSPI_OLD}"
   T_DOWN="${tmp}/units-down"
 }
 
@@ -2770,11 +2857,11 @@ spi_env() {
     "FAKE_REQUIRED_BY_keycloak=backend ingest frontend" \
     "FAKE_REQUIRED_BY_backend=ingest frontend" \
     "FAKE_REQUIRED_BY_db_keycloak=keycloak backend ingest frontend" \
+    "FAKE_REQUIRED_BY_db_backend=backend ingest frontend" \
     "FAKE_REQUIRED_BY_redis=ingest frontend"
 }
 
-# assert_nothing_down <description> -- no unit is left stopped by a restart that travelled along
-# Requires=.
+# assert_nothing_down <description> -- no unit is left stopped.
 assert_nothing_down() {
   if [[ ! -s "${T_DOWN}" ]]; then
     record 1 "$1"
@@ -2783,15 +2870,27 @@ assert_nothing_down() {
   fi
 }
 
-# assert_started_after_last_keycloak_restart <unit> <description> -- the invocation log has a
-# `start <unit>.service` AFTER the last `restart keycloak.service`, i.e. the deployer waited for it.
-assert_started_after_last_keycloak_restart() {
-  local unit="$1" desc="$2" last
-  last="$(grep -n 'restart keycloak\.service' "${T_DOCKER_LOG}" | tail -n 1 | cut -d: -f1)"
-  if [[ -n "${last}" ]] && tail -n "+${last}" "${T_DOCKER_LOG}" | grep -q "systemctl --user start ${unit}\.service"; then
+# assert_starts <unit> <count> <description> -- the unit's container was started exactly <count>
+# times in this run.
+assert_starts() {
+  local unit="$1" want="$2" desc="$3" got
+  got="$(grep -cx "${unit}" "${T_DOWN}.starts" 2>/dev/null || true)"
+  if [[ "${got:-0}" -eq "${want}" ]]; then
     record 1 "${desc}"
   else
-    record 0 "${desc} (no 'start ${unit}.service' after the last keycloak restart)"
+    record 0 "${desc} (${unit} started ${got:-0} time(s), expected ${want}; starts: $(tr '\n' ' ' < "${T_DOWN}.starts" 2>/dev/null))"
+  fi
+}
+
+# assert_count <pattern> <count> <description> -- the invocation log has exactly <count> lines
+# matching the extended regexp.
+assert_count() {
+  local pattern="$1" want="$2" desc="$3" got
+  got="$(grep -cE -- "${pattern}" "${T_DOCKER_LOG}" || true)"
+  if [[ "${got:-0}" -eq "${want}" ]]; then
+    record 1 "${desc}"
+  else
+    record 0 "${desc} ('${pattern}' matched ${got:-0} time(s), expected ${want})"
   fi
 }
 
@@ -2804,98 +2903,226 @@ assert_marker() {
   fi
 }
 
-scenario_spi_waits_for_what_the_keycloak_restart_took_down() {
-  echo "Scenario: a new provider JAR restarts keycloak, and success waits for backend, ingest and frontend too"
+# assert_pin_binds <svc> <digest> <description> -- the service's drop-in binds that digest.
+assert_pin_binds() {
+  if grep -q "@${2}\$" "${T_UNIT_DIR}/${1}.container.d/10-digest-pin.conf" 2>/dev/null; then
+    record 1 "$3"
+  else
+    record 0 "$3 ($(tail -n 1 "${T_UNIT_DIR}/${1}.container.d/10-digest-pin.conf" 2>/dev/null))"
+  fi
+}
+
+# assert_metric_set <metric> <description> -- deploy.prom carries a non-zero stamp for it.
+assert_metric_set() {
+  if grep -q "^${1} [1-9]" "${T_STATE_DIR}/textfile/deploy.prom" 2>/dev/null; then
+    record 1 "$2"
+  else
+    record 0 "$2 (no ${1} stamp in deploy.prom)"
+  fi
+}
+
+# assert_no_success_stamp <description>
+assert_no_success_stamp() {
+  if grep -q 'basetool_deploy_last_success_timestamp 0$' "${T_STATE_DIR}/textfile/deploy.prom" 2>/dev/null; then
+    record 1 "$1"
+  else
+    record 0 "$1"
+  fi
+}
+
+scenario_spi_and_apps_move_in_one_restart_window() {
+  echo "Scenario: a release that moves the provider JAR AND the app images restarts each unit once, keycloak on the new JAR"
   local tmp rc=0
   tmp="$(mktmp)"
-  spi_host "${tmp}"
+  spi_host "${tmp}" "${DIG_BACKEND_OLD}" "${DIG_FRONTEND_OLD}" "${DIG_INGEST_OLD}"
   mapfile -t fake < <(spi_env)
   run_deploy -- "${fake[@]}" || rc=$?
-  assert_exit 0 "$rc" "spi: the deploy succeeds"
-  assert_contains "keycloak-spi changed" "spi: the moved JAR is noticed"
-  assert_file_says "${T_COMPOSE_DIR}/keycloak/providers/keycloak-spi.jar" "NEW jar" "spi: the new JAR is live"
-  assert_docker "systemctl --user restart keycloak.service" "spi: keycloak is recreated to load it"
-  assert_nothing_down "spi: no application unit is left stopped by the keycloak restart"
-  assert_started_after_last_keycloak_restart backend "spi: backend is waited for after the keycloak restart"
-  assert_started_after_last_keycloak_restart ingest "spi: ingest is waited for after the keycloak restart"
-  assert_started_after_last_keycloak_restart frontend "spi: frontend is waited for after the keycloak restart"
-  assert_contains "keycloak-spi provider JAR applied — keycloak and the application stack are healthy" \
-    "spi: the log says the stack, not keycloak alone, is healthy"
-  assert_contains "deploy successful" "spi: success is reported"
-  assert_marker "${MARKER}" "spi: the marker advances to the new JAR"
+  assert_exit 0 "$rc" "one window: the deploy succeeds"
+  assert_contains "keycloak-spi changed" "one window: the moved JAR is noticed"
+  assert_file_says "${T_COMPOSE_DIR}/keycloak/providers/keycloak-spi.jar" "NEW jar" "one window: the new JAR is live"
+  assert_docker "keycloak-jar-at-start NEW jar" "one window: keycloak starts on the NEW JAR"
+  assert_no_docker "keycloak-jar-at-start OLD jar" "one window: ...and never on the old one"
+  assert_starts keycloak 1 "one window: keycloak is started once"
+  assert_starts backend 1 "one window: backend is started once"
+  assert_starts ingest 1 "one window: ingest is started once, not again after backend's restart"
+  assert_starts frontend 1 "one window: frontend is started once, not again after backend's restart"
+  assert_count '^systemctl --user stop ' 1 "one window: the re-defined units go down in ONE stop"
+  assert_count '^systemctl --user restart (keycloak|backend|ingest|frontend)\.service' 0 \
+    "one window: no stack unit is restarted (a restart travels along Requires= and re-runs dependents)"
+  assert_nothing_down "one window: no application unit is left stopped"
+  assert_contains "release parts: app images [backend frontend ingest]" "one window: the log names the images that move"
+  assert_contains "provider JAR: yes" "one window: ...and the JAR"
+  assert_contains "keycloak-spi provider JAR applied with the release" "one window: the JAR is reported applied with the release"
+  assert_contains "deploy successful" "one window: success is reported"
+  assert_marker "${MARKER}" "one window: the marker advances to the new images AND the new JAR"
   rm -rf "${tmp}"
 }
 
-scenario_spi_dependent_that_does_not_return_rolls_the_jar_back() {
-  echo "Scenario: a service that does not come back after the keycloak restart fails the JAR, never reports success"
+scenario_apps_only_restart_each_unit_once() {
+  echo "Scenario: a release that re-pins backend, frontend and ingest restarts each of them once, and keycloak not at all"
   local tmp rc=0
   tmp="$(mktmp)"
-  spi_host "${tmp}"
+  spi_host "${tmp}" "${DIG_BACKEND_OLD}" "${DIG_FRONTEND_OLD}" "${DIG_INGEST_OLD}"
+  # The JAR does not move: the marker already records the digest the registry serves.
+  write_marker "${DIG_BACKEND_OLD}|${DIG_FRONTEND_OLD}|${DIG_INGEST_OLD}|${DIG_CONFIG}|${DIG_KCSPI}"
   mapfile -t fake < <(spi_env)
-  # Keycloak starts on the new JAR; frontend, which logs in through it, does not.
-  run_deploy -- "${fake[@]}" "FAKE_STUCK_UNITS=frontend" "FAKE_STUCK_WITH_JAR=NEW jar" || rc=$?
-  assert_exit 1 "$rc" "spi: the run fails"
-  assert_excludes "deploy successful" "spi: success is never reported"
-  assert_contains "the application stack it restarted did not return to health — rolling back the JAR" \
-    "spi: the log names the stack, not keycloak, as what failed"
-  assert_file_says "${T_COMPOSE_DIR}/keycloak/providers/keycloak-spi.jar" "OLD jar" "spi: the previous JAR is live again"
-  assert_contains "healthy again on the previous provider JAR" "spi: the rollback waits for the stack as well"
-  assert_nothing_down "spi: after the rollback no application unit is left stopped"
-  assert_failure_metric "spi: the failure metric DeployFailed reads is written"
-  if grep -q 'basetool_deploy_last_success_timestamp 0$' "${T_STATE_DIR}/textfile/deploy.prom" 2>/dev/null; then
-    record 1 "spi: no success timestamp is written"
-  else
-    record 0 "spi: no success timestamp is written"
-  fi
-  if grep -q "|${DIG_KCSPI} 1 " "${T_STATE_DIR}/failed.digests" 2>/dev/null; then
-    record 1 "spi: the failure is recorded for the backoff, against this target"
-  else
-    record 0 "spi: the failure is recorded for the backoff, against this target"
-  fi
-  assert_marker "${DIG_BACKEND}|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG}|${DIG_KCSPI_OLD}" \
-    "spi: the marker stays on the previous JAR, so the next tick retries (backed off)"
+  run_deploy -- "${fake[@]}" || rc=$?
+  assert_exit 0 "$rc" "apps only: the deploy succeeds"
+  assert_starts backend 1 "apps only: backend is started once"
+  assert_starts ingest 1 "apps only: ingest is started once (#2072's finding: it was restarted again after backend)"
+  assert_starts frontend 1 "apps only: frontend is started once (#2072's finding: it was restarted again after backend)"
+  assert_starts keycloak 0 "apps only: an unchanged JAR does not recreate keycloak"
+  assert_no_docker "keycloak.service backend" "apps only: keycloak is not in the stop"
+  assert_no_docker "restart keycloak.service" "apps only: ...and not restarted"
+  assert_no_docker "stop keycloak.service" "apps only: ...and not stopped"
+  assert_file_says "${T_COMPOSE_DIR}/keycloak/providers/keycloak-spi.jar" "OLD jar" "apps only: the JAR is untouched"
+  assert_contains "provider JAR: no" "apps only: the log says the JAR did not move"
+  assert_nothing_down "apps only: no application unit is left stopped"
   rm -rf "${tmp}"
 }
 
-scenario_spi_keycloak_failure_brings_the_stack_back() {
-  echo "Scenario: keycloak failing on the new JAR restores the JAR AND the services its restart stopped"
+scenario_spi_only_is_the_whole_apply() {
+  echo "Scenario: a release that moves only the provider JAR is one keycloak stop and one start of the stack"
   local tmp rc=0
   tmp="$(mktmp)"
-  spi_host "${tmp}"
+  spi_host "${tmp}" "${DIG_BACKEND}" "${DIG_FRONTEND}" "${DIG_INGEST}"
+  mapfile -t fake < <(spi_env)
+  run_deploy -- "${fake[@]}" || rc=$?
+  assert_exit 0 "$rc" "jar only: the deploy succeeds"
+  assert_docker "systemctl --user stop keycloak.service" "jar only: keycloak (and what requires it) is stopped"
+  assert_count '^systemctl --user stop ' 1 "jar only: once"
+  assert_docker "keycloak-jar-at-start NEW jar" "jar only: keycloak starts on the new JAR"
+  assert_starts keycloak 1 "jar only: keycloak is started once"
+  assert_starts backend 1 "jar only: backend comes back once"
+  assert_starts ingest 1 "jar only: ingest comes back once"
+  assert_starts frontend 1 "jar only: frontend comes back once"
+  assert_contains "release parts: app images [none]" "jar only: no image moves"
+  assert_nothing_down "jar only: no application unit is left stopped"
+  assert_marker "${MARKER}" "jar only: the marker advances to the new JAR"
+  rm -rf "${tmp}"
+}
+
+scenario_spi_gate_failure_rolls_back_images_and_jar() {
+  echo "Scenario: keycloak failing on the new JAR rolls back the app images AND the JAR, in one rollback"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  spi_host "${tmp}" "${DIG_BACKEND_OLD}" "${DIG_FRONTEND_OLD}" "${DIG_INGEST_OLD}"
   mapfile -t fake < <(spi_env)
   run_deploy -- "${fake[@]}" "FAKE_STUCK_UNITS=keycloak" "FAKE_STUCK_WITH_JAR=NEW jar" || rc=$?
-  assert_exit 1 "$rc" "spi: the run fails"
-  assert_contains "keycloak did not become healthy with the new provider JAR — rolling back the JAR" \
-    "spi: the log says keycloak failed"
-  assert_file_says "${T_COMPOSE_DIR}/keycloak/providers/keycloak-spi.jar" "OLD jar" "spi: the previous JAR is live again"
-  assert_nothing_down "spi: backend, ingest and frontend are not left stopped by the two keycloak restarts"
-  assert_started_after_last_keycloak_restart frontend "spi: frontend is waited for after the rollback's keycloak restart"
-  assert_excludes "deploy successful" "spi: success is never reported"
-  assert_failure_metric "spi: the failure metric is written"
+  assert_exit 1 "$rc" "rollback: the run fails"
+  assert_excludes "deploy successful" "rollback: success is never reported"
+  assert_contains "did not come up, in start order: [keycloak backend ingest frontend]" \
+    "rollback: the log names what did not come up, keycloak first"
+  assert_contains "KEYCLOAK did not come up, and the provider JAR is the only part of this release that changed keycloak" \
+    "rollback: the log says the JAR is the likely cause"
+  assert_contains "this release changed: app images [backend frontend ingest]" "rollback: ...and what else the release changed"
+  assert_file_says "${T_COMPOSE_DIR}/keycloak/providers/keycloak-spi.jar" "OLD jar" "rollback: the previous JAR is live again"
+  assert_pin_binds backend "${DIG_BACKEND_OLD}" "rollback: backend is bound to the previous image again"
+  assert_pin_binds frontend "${DIG_FRONTEND_OLD}" "rollback: frontend is bound to the previous image again"
+  assert_docker "keycloak-jar-at-start OLD jar" "rollback: keycloak comes back on the previous JAR"
+  assert_contains "rolled back to previous digest pin successfully — the previous app digests + provider JAR are live again" \
+    "rollback: one rollback names both parts"
+  assert_nothing_down "rollback: no application unit is left stopped"
+  assert_metric_set basetool_deploy_last_rollback_timestamp "rollback: the rollback metric is written"
+  assert_no_success_stamp "rollback: no success timestamp is written"
+  if grep -q "^${MARKER} 1 " "${T_STATE_DIR}/failed.digests" 2>/dev/null; then
+    record 1 "rollback: the failure is recorded for the backoff, against the whole target"
+  else
+    record 0 "rollback: the failure is recorded for the backoff, against the whole target ($(cat "${T_STATE_DIR}/failed.digests" 2>/dev/null))"
+  fi
+  assert_marker "${DIG_BACKEND_OLD}|${DIG_FRONTEND_OLD}|${DIG_INGEST_OLD}|${DIG_CONFIG}|${DIG_KCSPI_OLD}" \
+    "rollback: the marker stays on the previous release"
+  rm -rf "${tmp}"
+}
+
+scenario_spi_app_failure_rolls_back_both_and_says_it_cannot_tell() {
+  echo "Scenario: an app unit failing in a release that also moved the JAR rolls both back and says it cannot tell which"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  spi_host "${tmp}" "${DIG_BACKEND_OLD}" "${DIG_FRONTEND_OLD}" "${DIG_INGEST_OLD}"
+  mapfile -t fake < <(spi_env)
+  # Keycloak comes up on the new JAR; frontend, on its new image and logging in through it, does not.
+  run_deploy -- "${fake[@]}" "FAKE_STUCK_UNITS=frontend" "FAKE_STUCK_WITH_JAR=NEW jar" || rc=$?
+  assert_exit 1 "$rc" "app failure: the run fails"
+  assert_contains "keycloak is up on the new provider JAR; the first unit that did not come up is frontend (its image changed: yes)" \
+    "app failure: the log names frontend and that keycloak came up"
+  assert_contains "cannot tell which of them it was" "app failure: ...and says the blame is not exact"
+  assert_file_says "${T_COMPOSE_DIR}/keycloak/providers/keycloak-spi.jar" "OLD jar" "app failure: the JAR is rolled back too"
+  assert_pin_binds frontend "${DIG_FRONTEND_OLD}" "app failure: frontend is bound to the previous image again"
+  assert_nothing_down "app failure: no application unit is left stopped"
+  assert_excludes "deploy successful" "app failure: success is never reported"
+  rm -rf "${tmp}"
+}
+
+scenario_spi_only_failure_blames_the_jar() {
+  echo "Scenario: keycloak failing in a release whose only change is the JAR names the JAR as the cause"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  spi_host "${tmp}" "${DIG_BACKEND}" "${DIG_FRONTEND}" "${DIG_INGEST}"
+  mapfile -t fake < <(spi_env)
+  run_deploy -- "${fake[@]}" "FAKE_STUCK_UNITS=keycloak" "FAKE_STUCK_WITH_JAR=NEW jar" || rc=$?
+  assert_exit 1 "$rc" "jar only, failed: the run fails"
+  assert_contains "the provider JAR is the ONLY change in this release — the JAR is the cause" \
+    "jar only, failed: the log names the JAR"
+  assert_file_says "${T_COMPOSE_DIR}/keycloak/providers/keycloak-spi.jar" "OLD jar" "jar only, failed: the previous JAR is live again"
+  assert_contains "rolled back to previous digest pin successfully" "jar only, failed: the rollback reaches health"
+  assert_nothing_down "jar only, failed: no application unit is left stopped"
+  assert_metric_set basetool_deploy_last_rollback_timestamp "jar only, failed: the rollback metric is written"
+  if grep -q "^${MARKER} 1 " "${T_STATE_DIR}/failed.digests" 2>/dev/null; then
+    record 1 "jar only, failed: the failure is recorded for the backoff"
+  else
+    record 0 "jar only, failed: the failure is recorded for the backoff"
+  fi
   rm -rf "${tmp}"
 }
 
 scenario_spi_rollback_that_does_not_heal_says_so() {
-  echo "Scenario: a service broken whatever the JAR fails the step, and the rollback says it did not heal"
+  echo "Scenario: a unit broken whatever the JAR fails the release, and the rollback says it did not heal"
   local tmp rc=0
   tmp="$(mktmp)"
-  spi_host "${tmp}"
+  spi_host "${tmp}" "${DIG_BACKEND}" "${DIG_FRONTEND}" "${DIG_INGEST}"
   mapfile -t fake < <(spi_env)
   run_deploy -- "${fake[@]}" "FAKE_STUCK_UNITS=ingest" "FAKE_STUCK_AFTER_KEYCLOAK_RESTART=true" || rc=$?
-  assert_exit 1 "$rc" "spi: the run fails"
-  assert_file_says "${T_COMPOSE_DIR}/keycloak/providers/keycloak-spi.jar" "OLD jar" "spi: the previous JAR is live again"
-  assert_contains "WARNING: the application stack did not return to health on the previous provider JAR" \
-    "spi: the log says the rollback did not heal the stack"
-  assert_excludes "healthy again on the previous provider JAR" "spi: and does not claim it did"
-  assert_excludes "deploy successful" "spi: success is never reported"
-  assert_failure_metric "spi: the failure metric is written"
+  assert_exit 1 "$rc" "no heal: the run fails"
+  assert_file_says "${T_COMPOSE_DIR}/keycloak/providers/keycloak-spi.jar" "OLD jar" "no heal: the previous JAR is live again"
+  assert_contains "rollback ALSO failed — did not come up: [ingest]" "no heal: the log says the rollback did not heal, and what"
+  assert_excludes "rolled back to previous digest pin successfully" "no heal: ...and does not claim it did"
+  assert_excludes "deploy successful" "no heal: success is never reported"
+  assert_metric_set basetool_deploy_last_rollback_timestamp "no heal: the rollback metric is written"
   rm -rf "${tmp}"
 }
 
-scenario_spi_waits_for_what_the_keycloak_restart_took_down
-scenario_spi_dependent_that_does_not_return_rolls_the_jar_back
-scenario_spi_keycloak_failure_brings_the_stack_back
+scenario_spi_extraction_failure_is_recorded() {
+  echo "Scenario: a provider JAR that cannot be extracted is a recorded failure, and nothing on the host changes"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  spi_host "${tmp}" "${DIG_BACKEND_OLD}" "${DIG_FRONTEND_OLD}" "${DIG_INGEST_OLD}"
+  mapfile -t fake < <(spi_env)
+  # The image carries no /providers/keycloak-spi.jar: the stub's `podman cp` then streams nothing.
+  run_deploy -- "${fake[@]}" "FAKE_KCSPI_JAR=" || rc=$?
+  assert_exit 1 "$rc" "extraction: the run fails"
+  assert_contains "FATAL: deploy aborted before the health gate — step 'extract the keycloak-spi provider JAR' failed" \
+    "extraction: the log names the step"
+  assert_failure_metric "extraction: the failure metric DeployFailed reads is written (#2072's finding: it was silent)"
+  if grep -q "^${MARKER} 1 " "${T_STATE_DIR}/failed.digests" 2>/dev/null; then
+    record 1 "extraction: the failure is recorded for the backoff"
+  else
+    record 0 "extraction: the failure is recorded for the backoff"
+  fi
+  assert_file_says "${T_COMPOSE_DIR}/keycloak/providers/keycloak-spi.jar" "OLD jar" "extraction: the live JAR is untouched"
+  assert_pin_binds backend "${DIG_BACKEND_OLD}" "extraction: no pin was moved"
+  assert_count '^systemctl --user (start|restart|stop) ' 0 "extraction: no unit was touched"
+  rm -rf "${tmp}"
+}
+
+scenario_spi_and_apps_move_in_one_restart_window
+scenario_apps_only_restart_each_unit_once
+scenario_spi_only_is_the_whole_apply
+scenario_spi_gate_failure_rolls_back_images_and_jar
+scenario_spi_app_failure_rolls_back_both_and_says_it_cannot_tell
+scenario_spi_only_failure_blames_the_jar
 scenario_spi_rollback_that_does_not_heal_says_so
+scenario_spi_extraction_failure_is_recorded
 
 scenario_config_mirror_failure_is_recorded_and_undone
 scenario_config_restore_failure_keeps_the_anchor

@@ -165,10 +165,14 @@ until then the risk is bounded, named and watched, which is the most this layer 
   healthy, before its dependents are, and the provider-JAR step trusted exactly that: on 2026-09-25
   it logged success while frontend and ingest had no container. **Fixed in the repository** the same
   day — the step now waits for the whole stack (`REQ-OPS-007`); it reaches a host with the role's
-  `--tags deploy,scripts` run. What remains is the cost: a release that moves the
-  JAR takes two full-app outages, the app apply's and the JAR's, because the JAR is swapped only
-  after the app passed its gate (ADR-0055, amendment of 2026-09-25, which records why merging them
-  was not done inside the fix).
+  `--tags deploy,scripts` run. **The second outage is closed in the repository** (ADR-0213,
+  2026-09-25): a release that moves the JAR used to take two full-app outages, the app apply's and
+  the JAR's; the JAR now rides the release apply, which stops every re-defined unit once and starts
+  the stack once, so it is one — and ingest and frontend are no longer restarted twice per release.
+  It reaches a host with the role's `--tags deploy,scripts` run. **What remains, by decision:** a
+  failed gate cannot prove whether the JAR or an app image broke it, and a bad JAR rolls back an app
+  release that would have been healthy alone; the deploy log narrows what it can. The runtime-health
+  restart (ADR-0083) still restarts unhealthy services one by one and has the same `Requires=` shape.
 - **A configured Discord precheck can fail open with nobody noticing.** The account-existence
   precheck (REQ-SEC-022) is fail-open by design, and its only witness is a Keycloak `WARN`. On
   production the truststore `.env` named never existed and the warning repeated at every start for

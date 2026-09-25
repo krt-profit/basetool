@@ -24,10 +24,11 @@
 # The Keycloak provider JAR (basetool-keycloak-spi) rides the SAME channel as its
 # own SEPARATE artifact — REQ-OPS-005 bars provider JARs from the config bundle,
 # so it gets its own promotable, cosign-signed bundle (ADR-0055). When its digest
-# moves, the JAR is staged into keycloak/providers and keycloak is recreated —
-# which restarts backend, frontend and ingest with it (Requires=) — and the run
-# succeeds only once all of them are healthy again (the JAR is rolled back on
-# failure). A combined Keycloak-image +
+# moves, the JAR is swapped into keycloak/providers AS PART OF THE RELEASE APPLY
+# (ADR-0213): keycloak is recreated in the same stop-then-start as the app images
+# the release moves, so a release costs one restart window, not two, and it passes
+# one health gate. A failed gate rolls back the app digests, the config tree, the
+# units AND the JAR together. A combined Keycloak-image +
 # provider-JAR change stays operator-gated by the postgres/Keycloak carve-out
 # above — the image change blocks the tick until the operator runs --force.
 #
@@ -111,12 +112,16 @@
 #                                          it (or the restore after a failed
 #                                          one) completed. While it exists,
 #                                          config-previous/ is not re-snapshotted.
+#   /var/lib/iri/keycloak-spi-stage.jar    the promoted provider JAR, extracted
+#                                          before anything on the host changes;
+#                                          swapped into keycloak/providers just
+#                                          before the apply.
 #   /var/lib/iri/keycloak-spi-previous.jar snapshot of the live provider JAR taken
-#                                          before a provider-JAR swap; restored on
-#                                          rollback if keycloak, or the stack it
-#                                          restarts, does not return to health
-#                                          after the recreate (the provider-JAR
-#                                          analogue of previous-digest-pin.yml).
+#                                          before a provider-JAR swap; restored
+#                                          with the rest of the release when the
+#                                          health gate fails or a step before it
+#                                          does (the provider-JAR analogue of
+#                                          previous-digest-pin.yml).
 #
 # Locking: a single `flock` on /var/lock/iri-deploy.lock prevents the systemd
 # timer and a manual invocation from racing each other.
@@ -961,20 +966,59 @@ reconcile_monitoring_reloads() {
   write_prometheus_config_applied_metric
 }
 
-# Extract the promoted Keycloak provider JAR (/providers/keycloak-spi.jar inside
-# the scratch basetool-keycloak-spi image) onto the host as the mounted provider
-# JAR. Like the config bundle the image has no entrypoint/command, so `podman
-# create` needs a placeholder argument; the container is never started. The JAR is
-# installed 0644 (and its parent dir created) so the uid-1000 Keycloak runtime can
-# read it through the providers bind mount.
-extract_keycloak_spi_jar() {
-  local ref="$1" dest_jar="$2" stage
-  stage="${STATE_DIR}/keycloak-spi-stage.jar"
-  rm -f "${stage}"
-  rt_extract_from_image "${ref}" /providers/keycloak-spi.jar "${stage}" /bundle \
+# The Keycloak provider JAR travels in three steps, so that each can fail on its own terms (ADR-0213):
+#
+#   stage_keycloak_spi_jar      extract it into the state directory, before anything on the host
+#                               changes. A failure here is a pre-gate failure like any other: the
+#                               guard records it (FATAL line, backoff, DeployFailed) and there is
+#                               nothing to undo. Until 2026-09-25 the extraction ran AFTER the
+#                               health gate and a failure in it ended the run with `fail`, which
+#                               writes no metric -- recorded nowhere.
+#   swap_in_keycloak_spi_jar    snapshot the live JAR, install the staged one, and mark keycloak as
+#                               re-defined, so the release apply recreates it together with the app
+#                               images. Run last before the apply.
+#   restore_previous_keycloak_spi_jar
+#                               put the snapshot back (or remove the JAR, when there was none) --
+#                               from the pre-gate guard and from the health-gate rollback.
+#
+# Like the config bundle the image has no entrypoint/command, so `podman create` needs a placeholder
+# argument; the container is never started. The JAR is installed 0644 (and its parent dir created)
+# so the uid-1000 Keycloak runtime can read it through the providers bind mount.
+stage_keycloak_spi_jar() {
+  local ref="$1"
+  rm -f "${KEYCLOAK_SPI_STAGE_JAR}"
+  rt_extract_from_image "${ref}" /providers/keycloak-spi.jar "${KEYCLOAK_SPI_STAGE_JAR}" /bundle \
     || fail "cannot extract /providers/keycloak-spi.jar from ${ref}"
-  install -D -m 0644 "${stage}" "${dest_jar}"
-  rm -f "${stage}"
+  # An empty file is a JAR keycloak cannot load, and it would only show as a failed health gate --
+  # one the log would then blame on the whole release rather than on the extraction.
+  [[ -s "${KEYCLOAK_SPI_STAGE_JAR}" ]] \
+    || fail "the provider JAR extracted from ${ref} is empty"
+}
+
+swap_in_keycloak_spi_jar() {
+  if [[ -f "${KEYCLOAK_SPI_JAR}" ]]; then
+    cp -a "${KEYCLOAK_SPI_JAR}" "${KEYCLOAK_SPI_PREVIOUS_JAR}"
+    KEYCLOAK_SPI_HAD_PREVIOUS=true
+  else
+    rm -f "${KEYCLOAK_SPI_PREVIOUS_JAR}"
+    KEYCLOAK_SPI_HAD_PREVIOUS=false
+  fi
+  KEYCLOAK_SPI_TOUCHED=true
+  install -D -m 0644 "${KEYCLOAK_SPI_STAGE_JAR}" "${KEYCLOAK_SPI_JAR}"
+  rm -f "${KEYCLOAK_SPI_STAGE_JAR}"
+  # Keycloak loads a provider only when `kc.sh start` re-runs the provider build, so the container
+  # has to be recreated -- exactly what the apply does for a re-defined unit.
+  rt_note_changed keycloak
+}
+
+# Returns 0 when the previous JAR is back (or, with none before, the new one is gone), 1 otherwise.
+restore_previous_keycloak_spi_jar() {
+  if [[ "${KEYCLOAK_SPI_HAD_PREVIOUS}" == "true" ]]; then
+    install -D -m 0644 "${KEYCLOAK_SPI_PREVIOUS_JAR}" "${KEYCLOAK_SPI_JAR}" || return 1
+  else
+    rm -f "${KEYCLOAK_SPI_JAR}" || return 1
+  fi
+  return 0
 }
 
 # Cosign-verify one resolved `image@digest` against the release-images workflow's
@@ -1218,9 +1262,10 @@ CONFIG_BLOCKED_FILE="${STATE_DIR}/config-blocked.marker"
 # finds it does NOT re-snapshot config-previous/, because the live tree would be a mix of two releases
 # and snapshotting it would overwrite the only consistent rollback anchor with it.
 CONFIG_APPLY_INCOMPLETE_FILE="${STATE_DIR}/config-apply.incomplete"
-# The live Keycloak provider JAR (mounted into the keycloak container) and the
-# rollback snapshot of it taken before a provider-JAR swap.
+# The live Keycloak provider JAR (mounted into the keycloak container), the promoted one extracted
+# ahead of the swap, and the rollback snapshot of the live one taken before the swap.
 KEYCLOAK_SPI_JAR="${COMPOSE_DIR}/keycloak/providers/keycloak-spi.jar"
+KEYCLOAK_SPI_STAGE_JAR="${STATE_DIR}/keycloak-spi-stage.jar"
 KEYCLOAK_SPI_PREVIOUS_JAR="${STATE_DIR}/keycloak-spi-previous.jar"
 # Backoff bookkeeping for the runtime-health targeted restart (see the
 # HEALTH_RESTART_* constants): a fixed 3-field record `marker count epoch`,
@@ -1388,11 +1433,60 @@ record_target_failure() {
   printf '%s %d %d\n' "${EXPECTED_MARKER}" "${FAIL_COUNT}" "$(date +%s)" > "${FAILED_FILE}"
 }
 
+# release_parts — one line naming what this release changes: the app images whose pin moves, the
+# units the config delivery re-defined, whether the config bundle and the provider JAR moved.
+release_parts() {
+  local config=no jar=no
+  [[ "${CONFIG_CHANGED}" == "true" ]] && config=yes
+  [[ "${KEYCLOAK_SPI_CHANGED}" == "true" ]] && jar=yes
+  printf 'app images [%s] · unit definitions [%s] · config bundle: %s · provider JAR: %s' \
+    "${APP_IMAGES_CHANGED:-none}" "${UNITS_REDEFINED:-none}" "${config}" "${jar}"
+}
+
+# explain_gate_failure — what a failed health gate can say about its cause (ADR-0213).
+#
+# Since the provider JAR rides the release apply, one gate covers the app images, the units AND the
+# JAR, and one rollback reverts all of them. What that costs is blame: before, a failed JAR step could
+# only be the JAR. So the log says which units did not come up (RT_FAILED_SERVICES, in start order —
+# the first is usually the cause, the rest require it), what this release changed, and the one
+# inference it CAN make: a keycloak that does not come up when the JAR is the only thing that changed
+# keycloak. Beyond that it says that it cannot tell, rather than guessing.
+explain_gate_failure() {
+  local first="${RT_FAILED_SERVICES%% *}" img=no kc_redefined=false
+  case " ${UNITS_REDEFINED} " in *" keycloak "*) kc_redefined=true ;; esac
+  log "health gate: did not come up, in start order: [${RT_FAILED_SERVICES:-none reported}]"
+  log "health gate: this release changed: $(release_parts)"
+  if [[ -z "${first}" ]]; then
+    log "health gate: every unit started, so it was the stop of the re-defined units that failed (above) — their new definition may not have reached the containers"
+    return 0
+  fi
+  if [[ "${first}" == "keycloak" ]]; then
+    if [[ "${KEYCLOAK_SPI_CHANGED}" == "true" && "${kc_redefined}" != "true" ]]; then
+      if [[ -z "${APP_IMAGES_CHANGED}${UNITS_REDEFINED}" && "${CONFIG_CHANGED}" != "true" ]]; then
+        log "health gate: KEYCLOAK did not come up, and the provider JAR is the ONLY change in this release — the JAR is the cause"
+      else
+        log "health gate: KEYCLOAK did not come up, and the provider JAR is the only part of this release that changed keycloak — the JAR is the likely cause; what failed after keycloak requires it"
+      fi
+    elif [[ "${KEYCLOAK_SPI_CHANGED}" == "true" ]]; then
+      log "health gate: KEYCLOAK did not come up; this release changed both its unit and its provider JAR — either can be the cause"
+    else
+      log "health gate: KEYCLOAK did not come up; its provider JAR did not change in this release"
+    fi
+    return 0
+  fi
+  case " ${APP_IMAGES_CHANGED} " in *" ${first} "*) img=yes ;; esac
+  if [[ "${KEYCLOAK_SPI_CHANGED}" == "true" && " ${RT_FAILED_SERVICES} " != *" keycloak "* ]]; then
+    log "health gate: keycloak is up on the new provider JAR; the first unit that did not come up is ${first} (its image changed: ${img}). A new app image and a new JAR fail the same gate, so this cannot tell which of them it was (ADR-0213) — both are rolled back"
+  else
+    log "health gate: the first unit that did not come up is ${first} (its image changed: ${img})"
+  fi
+}
+
 # --- The pre-gate guard -----------------------------------------------------
 # Everything between the signature verification and the health gate changes the host — the config
-# tree, the units, env.d, the digest pin — and until 2026-09-25 a failure anywhere in it was recorded
-# NOWHERE. The only failure bookkeeping this script had was explicit code on three paths (the health
-# gate, the provider-JAR recreate, the signature check); `fail` writes no metric, and a command that
+# tree, the units, env.d, the digest pin and (since ADR-0213) the provider JAR — and until 2026-09-25
+# a failure anywhere in it was recorded NOWHERE. The only failure bookkeeping this script had was
+# explicit code on three paths (the health gate, the provider-JAR recreate, the signature check); `fail` writes no metric, and a command that
 # failed under `set -e` ended the process without even a FATAL line.
 #
 # That is how v1.11.0 sat undeployed for fifteen minutes on 2026-09-25. /var/iri/code/docker/acme was
@@ -1413,6 +1507,13 @@ PRE_GATE_GUARD=false
 CONFIG_TREE_TOUCHED=false
 PIN_TOUCHED=false
 PIN_HAD_PREVIOUS=false
+# Set by swap_in_keycloak_spi_jar: the live provider JAR is this release's, and a failure from here
+# on puts the previous one back with everything else.
+KEYCLOAK_SPI_TOUCHED=false
+KEYCLOAK_SPI_HAD_PREVIOUS=false
+# What the release changes, filled in just before the pin is written; read by release_parts.
+UNITS_REDEFINED=""
+APP_IMAGES_CHANGED=""
 
 # shellcheck disable=SC2317  # runs indirectly via the EXIT trap armed before the config delivery
 on_pre_gate_exit() {
@@ -1444,6 +1545,14 @@ on_pre_gate_exit() {
       log "digest pin written by this run removed (there was none before it)"
     else
       log "WARNING: could not restore the previous digest pin from ${PIN_FILE_PREVIOUS}"
+    fi
+  fi
+
+  if [[ "${KEYCLOAK_SPI_TOUCHED}" == "true" ]]; then
+    if restore_previous_keycloak_spi_jar; then
+      log "provider JAR restored to the previous one"
+    else
+      log "WARNING: could not restore the previous provider JAR from ${KEYCLOAK_SPI_PREVIOUS_JAR}"
     fi
   fi
 
@@ -1862,6 +1971,17 @@ export RT_PIN_FILE_PREVIOUS="${PIN_FILE_PREVIOUS}"
 trap on_pre_gate_exit EXIT
 PRE_GATE_GUARD=true
 
+# --- Stage the promoted provider JAR ----------------------------------------
+# Extracted FIRST, into the state directory, so a registry or extraction failure is recorded (by the
+# guard just armed) before anything on the host has changed. It is swapped in only after the pull,
+# as the last step before the apply, so keycloak restarts on it inside the release's own restart
+# window (ADR-0213).
+if [[ "${KEYCLOAK_SPI_CHANGED}" == "true" ]]; then
+  log "keycloak-spi changed → staging ${KEYCLOAK_SPI_IMAGE}@${KEYCLOAK_SPI_DIGEST} (applied with this release, one restart)"
+  DEPLOY_STEP="extract the keycloak-spi provider JAR"
+  stage_keycloak_spi_jar "${KEYCLOAK_SPI_IMAGE}@${KEYCLOAK_SPI_DIGEST}"
+fi
+
 # --- Deliver promoted host config -------------------------------------------
 # The units and their sibling host config (the edge and monitoring configuration, the
 # maintenance page, the Keycloak theme) ride the SAME promoted, digest-pinned GHCR channel as the
@@ -1899,6 +2019,7 @@ if [[ "${CONFIG_CHANGED}" == "true" ]]; then
       if [[ -f "${CONFIG_BLOCKED_FILE}" ]] && grep -qFx "${EXPECTED_MARKER}" "${CONFIG_BLOCKED_FILE}"; then
         log "stateful-infra upgrade still operator-gated for this target; skipping tick (run the manual upgrade then --force)"
         PRE_GATE_GUARD=false
+        rm -f "${KEYCLOAK_SPI_STAGE_JAR}"
         exit 0
       fi
       echo "${EXPECTED_MARKER}" > "${CONFIG_BLOCKED_FILE}"
@@ -1908,7 +2029,9 @@ if [[ "${CONFIG_CHANGED}" == "true" ]]; then
       log "  perform the documented manual upgrade (docs/deployment.md → Stateful-infra upgrades), then: deploy.sh --force"
       write_deploy_metric blocked
       # A deliberate refusal, recorded as `blocked` above — not a failure for the guard to record.
+      # Nothing was swapped in yet; only the staged JAR is dropped.
       PRE_GATE_GUARD=false
+      rm -f "${KEYCLOAK_SPI_STAGE_JAR}"
       exit 3
     fi
     # --force through a gated stateful-infra change. Deliberately do NOT clear the
@@ -1969,6 +2092,21 @@ fi
 # then refused (the stateful-infra carve-out) or failed left the NEW app digests bound to the OLD
 # units; and the next tick's rt_pin_save copied that new pin over previous-digest-pin.yml, so the
 # rollback anchor pointed at the release it was meant to roll back from.
+#
+# Before the pin moves, note what this release changes: the units the config delivery re-defined,
+# and the app services whose bound image differs from the target. A failed health gate reports both
+# (explain_gate_failure), because since ADR-0213 one gate covers the app images AND the provider JAR.
+UNITS_REDEFINED="${RT_CHANGED_SERVICES}"
+APP_IMAGES_CHANGED=""
+for img_pair in "backend=${BACKEND_IMAGE}@${BACKEND_DIGEST}" \
+                "frontend=${FRONTEND_IMAGE}@${FRONTEND_DIGEST}" \
+                "ingest=${INGEST_IMAGE}@${INGEST_DIGEST}"; do
+  img_bound="$(sed -n 's/^Image=//p' "$(rt_pin_path "${img_pair%%=*}")" 2>/dev/null || true)"
+  if [[ "${img_bound}" != "${img_pair#*=}" ]]; then
+    APP_IMAGES_CHANGED="${APP_IMAGES_CHANGED}${APP_IMAGES_CHANGED:+ }${img_pair%%=*}"
+  fi
+done
+unset img_pair img_bound
 DEPLOY_STEP="write the digest pin"
 PIN_HAD_PREVIOUS=false
 [[ -f "${PIN_FILE_CURRENT}" ]] && PIN_HAD_PREVIOUS=true
@@ -1998,80 +2136,37 @@ RT_PIN_FILE="${PIN_FILE_CURRENT}" rt_pull \
   "frontend=${FRONTEND_IMAGE}@${FRONTEND_DIGEST}" \
   "ingest=${INGEST_IMAGE}@${INGEST_DIGEST}"
 
+# --- Swap in the provider JAR -----------------------------------------------
+# The last step before the apply, so a release whose JAR moved restarts keycloak INSIDE its own
+# restart window, on the new JAR, together with the app images it moves (ADR-0213, the owner's
+# decision of 2026-09-25: one outage per release, not two). swap_in_keycloak_spi_jar marks keycloak
+# as re-defined; rt_apply_stack then stops it — and with it, through Requires=, backend, frontend and
+# ingest — once, and starts the stack in order. A JAR-only release is exactly that and nothing more.
+#
+# A Keycloak IMAGE change is not this path: it arrives with the config bundle and is operator-gated
+# by the infra_image_pins carve-out above, so a combined image+JAR change never gets here without
+# --force.
+if [[ "${KEYCLOAK_SPI_CHANGED}" == "true" ]]; then
+  DEPLOY_STEP="swap in the keycloak-spi provider JAR"
+  swap_in_keycloak_spi_jar
+  log "provider JAR swapped in — keycloak restarts on it with this release"
+fi
+
+log "release parts: $(release_parts)"
+if [[ -n "${RT_CHANGED_SERVICES}" ]]; then
+  log "one restart window: stopping [${RT_CHANGED_SERVICES}] and what requires them, then starting the stack in order"
+fi
+
 # The health gate records its own outcome — success, or the rollback below — so the guard ends here.
 PRE_GATE_GUARD=false
 log "applying (timeout ${HEALTH_TIMEOUT}s)"
 if rt_apply_stack; then
-
-  # The app stack is healthy. If the promoted provider JAR moved, swap it in and
-  # recreate keycloak so its `start` re-runs the provider build and loads the new
-  # JAR — health-gated, with a JAR rollback on failure. A Keycloak IMAGE pin
-  # change is NOT handled here: that arrives via the config bundle and is already
-  # operator-gated by the infra_image_pins carve-out above, so a combined
-  # image+JAR change never reaches this auto-apply path without --force.
-  #
-  # The recreate is NOT keycloak alone. backend `Requires=` keycloak and frontend
-  # and ingest require backend, so systemd restarts all three with it — and
-  # `systemctl restart keycloak.service` returns once KEYCLOAK is healthy, while
-  # their restarts are still running (rt_await_stack has the reproduction). Until
-  # 2026-09-25 this step wrote the marker and "deploy successful" right there: on
-  # 2026-09-25 17:43:17 production logged success while frontend and ingest had
-  # no container, and the next tick's drift check re-applied. So the step is gated
-  # on the whole application stack being healthy again, not on keycloak, and a
-  # stack that does not come back is a failed JAR like a keycloak that does not.
-  # Expected outage: one keycloak start plus one backend start plus the slower of
-  # frontend and ingest — about two minutes on production — on top of the app
-  # apply's own, because the JAR is swapped only after that apply passed its gate.
+  # Every stack unit is up on its new definition — keycloak on the new JAR when it moved, because it
+  # was started from the stop pass, not restarted after a gate the app had already passed. Until
+  # 2026-09-25 the JAR was swapped only here, after the gate, and its keycloak restart took backend,
+  # frontend and ingest down a SECOND time (about two minutes on production for v1.12.0).
   if [[ "${KEYCLOAK_SPI_CHANGED}" == "true" ]]; then
-    log "keycloak-spi changed → staging provider JAR + recreating keycloak (backend, ingest and frontend restart with it: Requires=)"
-    if [[ -f "${KEYCLOAK_SPI_JAR}" ]]; then
-      cp -a "${KEYCLOAK_SPI_JAR}" "${KEYCLOAK_SPI_PREVIOUS_JAR}"
-      KEYCLOAK_SPI_HAD_PREVIOUS=true
-    else
-      rm -f "${KEYCLOAK_SPI_PREVIOUS_JAR}"
-      KEYCLOAK_SPI_HAD_PREVIOUS=false
-    fi
-    extract_keycloak_spi_jar "${KEYCLOAK_SPI_IMAGE}@${KEYCLOAK_SPI_DIGEST}" "${KEYCLOAK_SPI_JAR}"
-
-    KEYCLOAK_SPI_FAILURE=""
-    if ! rt_recreate keycloak; then
-      KEYCLOAK_SPI_FAILURE="keycloak did not become healthy with the new provider JAR"
-    else
-      log "keycloak healthy on the new provider JAR — waiting for the application services systemd restarted with it"
-      if ! rt_await_stack; then
-        KEYCLOAK_SPI_FAILURE="keycloak is healthy with the new provider JAR, but the application stack it restarted did not return to health"
-      fi
-    fi
-
-    if [[ -n "${KEYCLOAK_SPI_FAILURE}" ]]; then
-      log "${KEYCLOAK_SPI_FAILURE} — rolling back the JAR"
-      if [[ "${KEYCLOAK_SPI_HAD_PREVIOUS}" == "true" ]]; then
-        install -D -m 0644 "${KEYCLOAK_SPI_PREVIOUS_JAR}" "${KEYCLOAK_SPI_JAR}"
-      else
-        rm -f "${KEYCLOAK_SPI_JAR}"
-      fi
-      # The rollback's recreate restarts the same dependents again, so it waits for them the same
-      # way -- also when keycloak itself does not come back, so nothing is left stopped that a start
-      # could bring up. A failure here is reported; the run is recorded as failed either way.
-      KEYCLOAK_SPI_ROLLBACK_OK=true
-      rt_recreate keycloak || KEYCLOAK_SPI_ROLLBACK_OK=false
-      rt_await_stack || KEYCLOAK_SPI_ROLLBACK_OK=false
-      if [[ "${KEYCLOAK_SPI_ROLLBACK_OK}" == "true" ]]; then
-        log "keycloak and the application stack are healthy again on the previous provider JAR"
-      else
-        log "WARNING: the application stack did not return to health on the previous provider JAR — manual check needed"
-      fi
-
-      # Record the failure so the backoff throttles re-attempts of this exact
-      # target, the same mechanism as a failed app deploy. The app images stay on
-      # the new (healthy) version; only the provider JAR was reverted, so the
-      # marker is deliberately NOT written and the next tick retries (backed off).
-      record_target_failure
-      log "recorded keycloak-spi health-check failure #${FAIL_COUNT} for this target"
-      write_deploy_metric failure
-      exit 1
-    fi
-    log "keycloak-spi provider JAR applied — keycloak and the application stack are healthy"
+    log "keycloak-spi provider JAR applied with the release — keycloak and the application stack are healthy on it"
   fi
 
   echo "${EXPECTED_MARKER}" > "${LAST_DEPLOYED_FILE}"
@@ -2125,6 +2220,10 @@ fi
 
 # --- Rollback on health failure --------------------------------------------
 log "health check failed within ${HEALTH_TIMEOUT}s — rolling back"
+# Which parts of the release did not come up, and what the release changed. One gate now covers the
+# app images and the provider JAR, so this is what an operator has to go on (ADR-0213).
+explain_gate_failure
+FORWARD_FAILED_SERVICES="${RT_FAILED_SERVICES}"
 
 # Record this failure so subsequent ticks back off this exact (broken) digest
 # pair instead of re-applying it every 5 minutes (see the backoff block above).
@@ -2153,6 +2252,23 @@ if [[ "${CONFIG_CHANGED}" == "true" ]]; then
   fi
 fi
 
+# The provider JAR goes back with the rest, before anything is started again: the rollback must
+# never run the previous app images on the new JAR, or the new images on the old one — neither pair
+# was ever released. Keycloak stays in RT_CHANGED_SERVICES from the swap, so the rollback's apply
+# recreates it on the previous JAR.
+ROLLBACK_PARTS="app digests"
+if [[ "${CONFIG_CHANGED}" == "true" ]]; then
+  ROLLBACK_PARTS="${ROLLBACK_PARTS} + config tree and units"
+fi
+if [[ "${KEYCLOAK_SPI_TOUCHED}" == "true" ]]; then
+  if restore_previous_keycloak_spi_jar; then
+    ROLLBACK_PARTS="${ROLLBACK_PARTS} + provider JAR"
+    log "provider JAR restored to the previous one"
+  else
+    log "WARNING: could not restore the previous provider JAR from ${KEYCLOAK_SPI_PREVIOUS_JAR} — keycloak comes back on the failed release's JAR"
+  fi
+fi
+
 if [[ ! -f "${PIN_FILE_PREVIOUS}" ]]; then
   log "no previous pin available — manual intervention required"
   write_deploy_metric failure
@@ -2163,9 +2279,9 @@ fi
 rt_pin_rollback
 
 if rt_apply_stack; then
-  log "rolled back to previous digest pin successfully"
+  log "rolled back to previous digest pin successfully — the previous ${ROLLBACK_PARTS} are live again and the stack is healthy"
 else
-  log "rollback ALSO failed — one or more target digests broken or environment problem"
+  log "rollback ALSO failed — did not come up: [${RT_FAILED_SERVICES:-none reported}] (the forward apply: [${FORWARD_FAILED_SERVICES:-none reported}]); one or more target digests broken or environment problem"
 fi
 
 # Either way, this run failed → non-zero exit so the systemd unit reports

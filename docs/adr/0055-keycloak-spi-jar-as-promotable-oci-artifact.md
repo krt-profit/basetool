@@ -1,6 +1,6 @@
 # ADR-0055 — Deliver the Keycloak provider JAR as a separate promotable OCI artifact
 
-- **Status:** Accepted
+- **Status:** Accepted — the *order* (the JAR swapped only after the app apply passed its gate, and reverted alone) and the 2026-09-25 amendment below are superseded by [ADR-0213](0213-a-release-that-moves-the-provider-jar-costs-one-outage.md) (2026-09-25): the JAR now rides the release apply, one restart window, one rollback. The separate artifact, its signing and its lock-step promotion stand.
 - **Date:** 2026-06-30
 - **Deciders:** @greluc
 - **Related:** spec REQ-OPS-007 · REQ-OPS-002/004/005/006 · ADR-0049 · ADR-0030 · ADR-0051 · runbook `docs/deployment.md` → *Keycloak custom providers*
@@ -104,3 +104,6 @@ inside it and a release takes one outage instead of two. It would change what th
 health-gate failure could no longer tell a bad JAR from a bad app release, so the rollback would have
 to revert both, and a bad JAR would roll back a healthy app release. That is an owner decision, and
 it is left open rather than taken inside a fix.
+
+**Taken the same day:** @greluc decided for one outage per release; [ADR-0213](0213-a-release-that-moves-the-provider-jar-costs-one-outage.md)
+records it, with the weaker blame and the combined rollback it accepts.
