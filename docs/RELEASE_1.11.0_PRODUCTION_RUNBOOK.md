@@ -1,5 +1,10 @@
 # Release 1.11.0 — production rollout runbook
 
+> [!note] **Executed 2026-09-25 — now a historical record.** Production runs v1.11.0 since the
+> 12:40 UTC deploy tick; see [§9 Execution record](#9-execution-record-2026-09-25) for what was run,
+> what went wrong on the way and what it taught. The living procedure is
+> [`deployment.md`](deployment.md).
+
 > **Doc type:** Operator runbook for **one** release — the move of production (and, through
 > `promote.yml`'s `sync-testing`, the testing host) from **v1.10.0 to v1.11.0**. Written 2026-09-25
 > from a per-PR audit of all 66 PRs between `v1.10.0` and `6076888cd` (the commit release PR #2056
@@ -256,3 +261,64 @@ production's `.env`; the leftover `/var/iri/code/scripts/lib/container-runtime.s
 - The Temurin runtime bump #2035 (`…@sha256:2ca9adf4…`) skipped the re-check `monitoring/README.md`
   requires; done: `JvmNativeThreadExhaustion` and `JvmStartupCacheRejected` still match the JVM's
   wording on the new digest, recorded in the rule file, the README and `observability.md`.
+
+---
+
+## 9. Execution record (2026-09-25)
+
+Every host write below had the owner's yes in chat for that exact command.
+
+| Time (UTC) | Step | Result |
+|---|---|---|
+| ~11:5x | §2.5 role run, production, `--tags deploy,scripts` (controller mirror of `origin/main` `229b9350e`) | `changed=2`; `deploy.sh`, `backup.sh`, `render-redis-acl.py`, `mint-internal-tls.sh`, `redis-users.acl.tmpl` sha256-equal to `origin/main` |
+| — | §2.5 for testing | **not run**: the WSL controller's `known_hosts` still held a previous machine's keys for `10.9.0.15` (the live ED25519 key matches Windows' `known_hosts`, so no attack — a stale entry); testing is held (option B) anyway |
+| ~12:0x | §2.3 option B: `systemctl stop iri-deploy.timer` on testing | `inactive`; testing stays on v1.10.0 until its realm is provisioned |
+| 12:09 | §3 release PR #2056 merged (`af67518cc`), tag `v1.11.0` created by the `basetool-release` App | first App-token tag since the key rotation — worked |
+| ~12:1x | tag run of `release-images.yml` | re-tagged all three app images, config and keycloak-spi signed |
+| ~12:2x | §4 `promote.yml -f version=1.11.0` (run 36134206306), approved by the owner in GitHub | all six scans green; five artefacts on `:stable`; `sync-testing` moved `:testing` (held host, no effect) |
+| 12:25–12:35 | three deploy ticks | **each aborted in the config apply** — see *Stuck on `docker/acme`* below; production stayed on v1.10.0, healthy |
+| 12:3x | `chown deploy:deploy /var/iri/code/docker/acme` | the only entry in the release-owned subtrees not owned by `deploy` |
+| 12:40–12:46 | deploy tick | config applied, 23 units installed, services restarted and healthy, keycloak recreated for the provider JAR, Prometheus/Alloy/edge recreated; `deploy successful`; next tick "no change" |
+| 12:5x | `chown iri:iri /var/iri/secrets` | aligned with the role (see below) |
+
+**Verified afterwards (§5):** the public page shows v1.11.0; `V245` applied 12:42:13; backend
+"JWT audience check enforced; accepted audiences: [basetool-backend]"; frontend "Session type
+allow-list mode: REPORT", no refused class; ingest gate posture all on; no `Unable to use AOT cache`;
+no `LazyInitializationException`, no pagination failure; `StopTimeout=30`; redis
+`--notify-keyspace-events Egx` and healthy; edge serves CSS gzipped with `Vary`; edge deny probe
+(run 36137345395) green on every row, the `…/participants` rows included; deploy metrics without a
+failure.
+
+**What went wrong, and what it taught:**
+
+- **Stuck on `docker/acme`.** `/var/iri/code/docker/acme` had been created `root:root` on
+  2026-09-22 11:13, while the rest of `code/docker` is `deploy`'s. The bundle changed
+  `publish-loop.sh`, `rsync` could not write, and `deploy.sh` stopped before changing anything —
+  **without recording a failure** (`basetool_deploy_last_failure_timestamp` stayed `0`, so no alert),
+  which is why it took a human reading the log to notice. The §2.5 role run used
+  `--tags deploy,scripts`; the task that reclaims the release-owned subtrees ("Reclaim the subtrees a
+  release owns end to end", tag `directories`) was not part of it. *Lesson for the next runbook:*
+  before promoting, check `find /var/iri/code/{docker,keycloak-theme,monitoring,quadlet} ! -user
+  deploy` is empty (read-only), or include `directories` in the role run. The silent abort itself
+  is fixed in `deploy.sh` by the follow-up PR from this record.
+- **`/var/iri/secrets` was `root:root`**, the role's target is `iri:iri 0755`
+  (`basetool_host_service_user_dirs`). The keystore rotation in `deployment.md` relies on it: step 2
+  deletes `keystore.p12`, step 3 has `iri` write the new one there — with a root-owned directory it
+  would have failed after the delete. Aligned the same day.
+- **A 3-minute ERROR burst in the frontend** (12:46–12:48, 33 lines,
+  `AsyncRequestNotUsableException` on `GET /notifications/stream`, all anonymous): the one-time
+  sign-out of #2002 — every open tab's `EventSource` reconnected with the old cookie. It stopped on
+  its own and stayed below `LogbackErrorSpike`'s threshold; an anonymous or aborted stream still
+  ends up as "Unexpected frontend error" at `ERROR`, fixed by a follow-up PR.
+- **The images' OCI `org.opencontainers.image.version` label reads `main`**, not `v1.11.0`: the tag
+  run re-tags the `main` build (ADR-0137/0210), and `docker/metadata-action` labelled that build
+  from its branch. Cosmetic — the version the app shows is baked by `.github/scripts/app_version.py`
+  and reads v1.11.0.
+- **`podman logs` returns nothing for the Quadlet containers** when run as `iri` here; the logs are
+  in the journal: `journalctl CONTAINER_NAME=<svc> --since … -o cat`. And a script fed to `bash -s`
+  over SSH needs `</dev/null` on every `podman` call — `podman healthcheck run` swallowed the rest of
+  the script once.
+
+**Still open after the deploy (each owner-gated):** the §7 list — above all the Android #182
+release, the host reboot for the pending kernel, and the testing realm (then start testing's
+`iri-deploy.timer` again).
