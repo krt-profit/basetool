@@ -400,8 +400,19 @@ internal CA, so the truststore holds **the CA** instead of a backend certificate
 `/var/iri/secrets/tls/ca.crt` under its own alias (`-alias internal-ca`) next to the old entry
 (alias `backend`) in step 2 of the rollout, and delete the `backend` entry in step 4
 ([`deployment.md` → *Internal TLS*](../deployment.md#internal-tls-per-service-certificates-from-a-private-ca)).
-From then on a re-mint changes the CA, and this truststore with it. Production's store carries both
-entries since 2026-09-25 (it was built with them, step 2f).
+From then on a re-mint changes the CA, and this truststore with it. Production's store was built
+with both entries on 2026-09-25 (step 2f) and holds **only `internal-ca`** since step 4 the same
+evening (~17:58 UTC; the `backend` alias deleted on an `iri`-owned working copy — the installed
+store is root-owned, so `keytool` cannot edit it in place; the command is
+[`deployment.md` → *Step 4*](../deployment.md#step-4--drop-the-old-certificate), 4c).
+
+> [!warning] A release rollback to 1.11.0 or older silently disables the precheck
+> *(added 2026-09-25)* 1.11.0's units put the backend back on the old shared certificate, which this
+> truststore no longer trusts. Nothing goes down: the probe's handshake fails, the login falls
+> through to the PENDING queue, and the only witness is the `Account-existence probe could not
+> reach the backend (…)` `WARN` per first login. Re-import the `backend` alias (the old shared
+> certificate, `/var/iri/secrets/tls/legacy-shared.crt`) — or install production's
+> `backend-truststore.p12.backup-20260925-175805` — and restart keycloak **before** promoting.
 
 ### 7.4 Verify
 
