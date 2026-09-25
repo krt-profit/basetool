@@ -4,6 +4,11 @@
 
 ### Fixed
 
+- **Redis: das Frontend löst beim Start keine ACL-Verweigerung mehr aus.** Mit eigenem ACL-Benutzer
+  (`REDIS_FRONTEND_USERNAME`) prüft es den Session-Store per `PING` statt per `CONFIG GET`, das
+  dieser Benutzer nicht darf; jeder Neustart zählte bisher auf `RedisAclDenials`. Unter `default`
+  bleibt alles wie bisher, ein unerreichbares Redis bricht den Start weiterhin ab.
+
 - **Deploy: ein Fehler beim Einspielen der Host-Konfiguration bleibt nicht mehr stumm.** Scheitert
   `deploy.sh` vor dem Health-Gate (Spiegeln, `env.d`, Units, Pull), schreibt es jetzt eine
   `FATAL`-Zeile mit Schritt und Exit-Code, stellt Konfiguration und Digest-Pin wieder her, setzt den

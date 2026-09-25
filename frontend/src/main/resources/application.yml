@@ -254,10 +254,13 @@ app:
     # class is refused and that one attribute dropped. Lenient: any case, and an unknown value falls
     # back to report with a WARN.
     type-allow-list: ${APP_SESSION_TYPE_ALLOW_LIST:report}
-    # Spring Session's startup CONFIG call for keyspace notifications (RedisSessionConfig). Only the
-    # image build's AOT training run switches it off (docker/app/Dockerfile, IMG-PERF-12), because
-    # it is the one step of the context refresh that opens a Redis connection. Every deployment
-    # keeps true: a frontend that cannot reach its session store must fail its startup (ADR-0084).
+    # Spring Session's startup step against Redis (RedisSessionConfig). Under the shared `default`
+    # user (no spring.data.redis.username) it is the CONFIG GET/SET of keyspace notifications; under
+    # a per-service ACL user it is a PING and no CONFIG, which that user may not run (REQ-SEC-068).
+    # Only the image build's AOT training run switches it off (docker/app/Dockerfile, IMG-PERF-12),
+    # because it is the one step of the context refresh that opens a Redis connection. Every
+    # deployment keeps true: a frontend that cannot reach its session store must fail its startup
+    # (ADR-0084).
     configure-keyspace-notifications: true
   ui:
     notification-duration: 5000

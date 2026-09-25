@@ -113,6 +113,13 @@ public class RedisSessionConfig {
       List.of("org.apache.tomcat.websocket.server.WsHttpSessionBindingListener");
 
   /**
+   * The name of Redis's built-in {@code default} user — the one a password-only {@code AUTH} lands
+   * on, and the only user an application may authenticate as that is allowed {@code CONFIG}
+   * (REQ-SEC-068).
+   */
+  static final String REDIS_DEFAULT_USER = "default";
+
+  /**
    * Raw {@code app.session.type-allow-list} value (default {@code report}), parsed leniently by
    * {@link SessionTypeAllowList.Mode#parse(String)} — see {@link SessionTypeAllowList} for the
    * three modes and why {@code report} is the default (REQ-SEC-067, ADR-0206).
@@ -132,12 +139,26 @@ public class RedisSessionConfig {
    * <p>Only the image build switches it off: its ahead-of-time training run starts the whole
    * application context without lazy initialisation and without a Redis server, and this startup
    * {@code CONFIG GET} is the one step of the refresh that opens a Redis connection (IMG-PERF-12,
-   * ADR-0209). Every real deployment keeps the default -- the server's own {@code
-   * --notify-keyspace-events Egx} makes the call a no-op under the per-service ACL users anyway,
-   * but a frontend that cannot reach its session store must still fail its startup (ADR-0084).
+   * ADR-0209). Every real deployment keeps the default: a frontend that cannot reach its session
+   * store must still fail its startup (ADR-0084), and which command proves that is decided by
+   * {@link #redisUsername}.
    */
   @Value("${app.session.configure-keyspace-notifications:true}")
   private boolean configureKeyspaceNotifications;
+
+  /**
+   * The Redis ACL user the frontend authenticates as ({@code spring.data.redis.username}, fed from
+   * {@code REDIS_USERNAME} and, on the host, from {@code REDIS_FRONTEND_USERNAME}; empty by
+   * default), read by {@link #configureRedisAction()} to pick the startup step (REQ-SEC-068,
+   * ADR-0207).
+   *
+   * <p>Empty or {@code default} means the shared {@code default} user, which may run {@code
+   * CONFIG}; any other name is a per-service user, which may not, and must not be asked to. The
+   * same property is what Spring Boot hands the connection factory, so the switch follows the
+   * credentials actually in use rather than a second flag that could disagree with them.
+   */
+  @Value("${spring.data.redis.username:}")
+  private @Nullable String redisUsername;
 
   /**
    * <em>Anonymous</em> session idle timeout read from {@code app.session.anonymous-timeout}
@@ -527,27 +548,61 @@ public class RedisSessionConfig {
   }
 
   /**
-   * Replaces Spring Session's startup {@code CONFIG SET notify-keyspace-events} with a version that
-   * tolerates a Redis user that may not run {@code CONFIG} (REQ-SEC-068, ADR-0207).
+   * Replaces Spring Session's startup {@code CONFIG SET notify-keyspace-events} with the step that
+   * fits the Redis user the frontend authenticates as (REQ-SEC-068, ADR-0207).
    *
    * <p>{@code @EnableRedisIndexedHttpSession} picks up a {@link ConfigureRedisAction} bean in place
-   * of its default. Under the shared {@code default} user nothing changes: the delegate runs as it
-   * always did. Under the frontend's own ACL user the refusal is logged and the server's {@code
-   * --notify-keyspace-events Egx} is relied on instead.
+   * of its default. See {@link #selectConfigureRedisAction(boolean, String)} for the three cases.
    *
-   * <p>With {@link #configureKeyspaceNotifications} off the action is Spring Session's {@link
-   * ConfigureRedisAction#NO_OP}, so the startup opens no Redis connection at all -- which is what
-   * the image build's AOT training run needs (IMG-PERF-12).
-   *
-   * @return the tolerant action, or {@link ConfigureRedisAction#NO_OP} when the property is off.
+   * @return the action for the configured {@link #configureKeyspaceNotifications} and {@link
+   *     #redisUsername}.
    */
   @NotNull
   @Bean
   public ConfigureRedisAction configureRedisAction() {
-    if (!configureKeyspaceNotifications) {
+    return selectConfigureRedisAction(configureKeyspaceNotifications, redisUsername);
+  }
+
+  /**
+   * Picks Spring Session's startup step from configuration that already exists, never from catching
+   * a refusal.
+   *
+   * <ul>
+   *   <li><strong>Switched off</strong> — Spring Session's {@link ConfigureRedisAction#NO_OP}, so
+   *       the context refresh opens no Redis connection at all, which is what the image build's AOT
+   *       training run needs (IMG-PERF-12, ADR-0209).
+   *   <li><strong>The shared {@code default} user</strong> (no username, or {@code default}) — the
+   *       {@link TolerantKeyspaceNotificationsAction}, i.e. Spring Session's {@code CONFIG GET} /
+   *       {@code CONFIG SET} exactly as before the per-service users; {@code default} holds {@code
+   *       +@all}, so it is never refused there.
+   *   <li><strong>A per-service ACL user</strong> — the {@link
+   *       ServerConfiguredKeyspaceNotificationsAction}, which sends a {@code PING} and no {@code
+   *       CONFIG}. The user is not granted {@code CONFIG}, so asking would be refused on every
+   *       start, each refusal counted towards {@code RedisAclDenials}.
+   * </ul>
+   *
+   * <p>A username lands on {@code default} when there is none at all (a password-only {@code AUTH},
+   * which Redis authenticates as {@code default}) or when it is {@code default} spelled out. Redis
+   * usernames are case-sensitive, so {@code Default} is some other user.
+   *
+   * <p>Every case but the first still fails the startup when Redis cannot be reached or refuses the
+   * credentials (ADR-0084).
+   *
+   * @param enabled {@code app.session.configure-keyspace-notifications}.
+   * @param username {@code spring.data.redis.username}; {@code null} or blank means none.
+   * @return the action Spring Session runs once at startup.
+   */
+  @NotNull
+  static ConfigureRedisAction selectConfigureRedisAction(
+      boolean enabled, @Nullable String username) {
+    if (!enabled) {
       return ConfigureRedisAction.NO_OP;
     }
-    return new TolerantKeyspaceNotificationsAction();
+    String user = username == null ? "" : username.strip();
+    if (user.isEmpty() || REDIS_DEFAULT_USER.equals(user)) {
+      return new TolerantKeyspaceNotificationsAction();
+    }
+    return new ServerConfiguredKeyspaceNotificationsAction(user);
   }
 
   /**
