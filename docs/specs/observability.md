@@ -469,6 +469,20 @@ header themselves, because that filter never runs to echo it on a short-circuite
 error response therefore carries the header, not just the ones that reach the servlet. See
 [`api-conventions.md`](api-conventions.md) REQ-API-004 for the full producer list.
 
+**A 5xx is one correlation id in three places (2026-09-25).** For an unexpected exception (`500`) and
+a suppressed-disclosure `AppException` (`ExternalServiceException` / `ReportGenerationException`), the
+backend's `GlobalExceptionHandler` logs at `ERROR` with the request's `correlationId`, returns the
+same id in the problem body, and the request's access-log line (REQ-OBS-001) carries it too. A
+component that puts `correlationId` (or `userId`) into the MDC only for one log line hands the key
+back exactly as it found it — removes it only when it was absent, restores a prior value otherwise —
+because the key belongs to whoever set it, normally `CorrelationIdFilter` for the whole chain (and,
+on an async dispatch, for the key it re-binds there — see *Async dispatches keep the request's MDC*
+above). Until
+this date both `ERROR` branches removed the key unconditionally, so every line written after them on
+the request thread — the access line for the 5xx above all — had an empty `correlationId` and could
+not be joined to the failure. **Enforced by:** `GlobalExceptionHandlerCorrelationIdTest` (MockMvc
+through the real `CorrelationIdFilter` → `RequestLoggingFilter` order).
+
 ### REQ-OBS-003 — Prod JSON appender
 
 In `prod`, a PII-masking `LogstashEncoder` JSON appender writes `logs/{backend,frontend}.json`;

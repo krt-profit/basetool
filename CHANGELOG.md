@@ -13,6 +13,10 @@
   `userId=anonymous` ohne Korrelations-ID — in Frontend und Backend. Es wird dabei keine neue ID
   erzeugt.
 
+- **Backend-Log: die Zugriffszeile eines Serverfehlers trägt wieder die Korrelations-ID.** Nach
+  einem 500 (oder 502 eines Fremddienstes) verlor sie die ID, weil der Fehler-Handler den MDC-Wert
+  entfernte; jetzt stimmen ERROR-Zeile, Zugriffszeile und Fehlerantwort überein (REQ-OBS-002).
+
 ## [v1.11.0](https://github.com/krt-profit/basetool/releases/tag/v1.11.0) - 2026-09-25
 
 ### Added
