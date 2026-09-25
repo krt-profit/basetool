@@ -77,10 +77,14 @@ Consequences worth stating:
 - **Each service mounts its own keystore and an internal truststore** — `/run/secrets/keystore.p12`
   from `IRI_<SERVICE>_KEYSTORE_HOST_PATH`, `/run/secrets/internal-truststore.p12` from
   `IRI_INTERNAL_TRUSTSTORE_HOST_PATH` (REQ-SEC-070, ADR-0211). The generator bakes all five to
-  the shared `/var/iri/secrets/keystore.p12` until the owner has minted `/var/iri/secrets/tls/` with
-  `mint-internal-tls.sh` (installed by the role, run through the backend image); a later release
-  flips them. `deploy.sh` refuses a release whose units mount any PKCS#12 the host lacks.
-  Production minted the material on 2026-09-25 (rollout step 2); the flip (#2036) is still open.
+  `/var/iri/secrets/tls/`, which the owner minted with `mint-internal-tls.sh` (installed by the
+  role, run through the backend image) in step 2 of the rollout; the release before that baked them
+  to the shared `/var/iri/secrets/keystore.p12`. `deploy.sh` refuses a release whose units mount any
+  PKCS#12 the host lacks. The shared keystore stays on the host as the rollback of that release;
+  no unit of it mounts the file — the REQ-OPS-022 JVM-truststore mount moved to the CA-only
+  `/var/iri/secrets/tls/truststore.p12` as well *(corrected 2026-09-25: this said that mount still
+  defaults to the shared keystore; the units #2036 generated say otherwise)*. Production minted the material on 2026-09-25 (rollout step 2); the
+  flip (#2036) is merged and reaches production with the next promoted release (step 3).
 - **Hand-installed drop-ins live beside the generated units.** `deploy.sh` never touches a
   `<unit>.container.d/` under `/etc/containers/systemd/users/<uid>/`, so what the operator puts there
   survives every release — and is in no bundle and no backup. Production's `keycloak.container.d`
