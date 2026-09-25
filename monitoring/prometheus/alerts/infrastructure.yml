@@ -255,7 +255,8 @@ groups:
       # On release 1.11.0 one refusal is benign: every frontend start runs Spring Session's CONFIG GET
       # (TolerantKeyspaceNotificationsAction), the ACL refuses it by design -- two cmd denials per
       # start on production, 2026-09-25 -- and this rule did not fire for it that day. #2067 sends a
-      # PING instead under a named user, so from the release carrying it no refusal is expected.
+      # PING instead under a named user, so from the release carrying it no refusal is expected --
+      # verified gone on production after the v1.12.0 deploy, 2026-09-25.
       - alert: RedisAclDenials
         expr: >-
           (sum(increase(redis_acl_access_denied_auth_total[5m])) or vector(0))

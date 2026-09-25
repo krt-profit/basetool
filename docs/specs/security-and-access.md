@@ -4731,7 +4731,7 @@ its service does:
   `NOAUTH`, a password-only `AUTH` gets `WRONGPASS … user is disabled`, the health check is
   healthy, `redis_up 1`.)_
 
-**Known on 1.11.0, gone once #2067 is released:** the 1.11.0 frontend's
+**Known on 1.11.0, verified gone on production after the v1.12.0 deploy, 2026-09-25:** the 1.11.0 frontend's
 `TolerantKeyspaceNotificationsAction` still issues `CONFIG GET` at every start, and the ACL refuses
 it — two `ACL LOG` entries per start (`reason=command`, `config|get`, user `basetool-frontend`),
 counted in `redis_acl_access_denied_cmd_total`; `RedisAclDenials` did not fire for it on

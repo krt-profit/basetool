@@ -257,7 +257,7 @@ own users (ingest connects on demand), `REDIS_DEFAULT_USER=off`. Verified: an un
 health check is healthy and the exporter reports `redis_up 1`. A release rollback now needs
 `default` back **on** first (see *Rollback* below).
 
-> [!note] A refused `CONFIG GET` per frontend start — on 1.11.0 only, gone once #2067 is released
+> [!note] A refused `CONFIG GET` per frontend start — on 1.11.0 only, verified gone on production after the v1.12.0 deploy, 2026-09-25
 > On release 1.11.0 the frontend's `TolerantKeyspaceNotificationsAction` still runs Spring
 > Session's `CONFIG GET notify-keyspace-events` at every start under its own user; the ACL refuses it
 > by design and the action carries on. It shows in `ACL LOG` as `reason=command`,
@@ -265,7 +265,9 @@ health check is healthy and the exporter reports `redis_up 1`. A release rollbac
 > 2026-09-25 at a count of **2 per frontend start** — and increments
 > `redis_acl_access_denied_cmd_total`; `RedisAclDenials` did not fire for it that day. #2067
 > (merged 2026-09-25) sends a `PING` instead under a named user, so from the release that carries it
-> **no** refusal is expected at all. Until then that one entry is benign; any other `ACL LOG` entry —
+> **no** refusal is expected at all — verified gone on production after the v1.12.0 deploy, 2026-09-25 (after the frontend's
+> restarts at 17:43, 18:01 and 18:03 UTC `ACL LOG` gained no entry; the only two `config|get`
+> refusals were more than an hour old, from 1.11.0). On 1.11.0 that one entry is benign; any other `ACL LOG` entry —
 > another user, another command, a `key` or `channel` reason, an `auth` refusal — is a real finding.
 
 **Render and apply** (as root, from `/`; `${UCTL}` / `${UPOD}` from
@@ -388,7 +390,7 @@ can be stopped and rolled back on its own.
    LIST' | grep -o 'user=[^ ]*' | sort | uniq -c` shows the three service users and no application
    on `default`; `RedisAclDenials` stays silent; log in, open a mission (live sync), run one
    refinery import. On 1.11.0, `ACL LOG` shows the frontend's refused `config|get` from its
-   restart (see the note above; gone once #2067 is released); nothing else.
+   restart (see the note above; verified gone on production after the v1.12.0 deploy, 2026-09-25); nothing else.
 5. **Switch `default` off**: append `REDIS_DEFAULT_USER=off` to `.env`, render, `ACL LOAD` as
    `admin`. Verify `${UPOD} exec redis sh -c 'redis-cli ping'` answers `NOAUTH`,
    `${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli ping'` (password-only, i.e.
@@ -1544,7 +1546,7 @@ is `0`, the edge serves the app, and in Prometheus
 > /work/truststore.p12` directly against `-v /var/iri/secrets/tls:/work`. On production that failed
 > with `keytool error: java.io.FileNotFoundException: /work/truststore.p12 (Permission denied)`:
 > 2d had made the store `root:root 0644`, and the container's root is `iri` on the host. The rest of
-> the step went through — backups `*.backup-20260925-175805`, `basetool-ca.crt` with one anchor, the
+> the step went through — the three backups (paths in the box below), `basetool-ca.crt` with one anchor, the
 > SPI truststore down to `internal-ca` on a working copy (4c), the edge/Prometheus/blackbox restart
 > and one combined `${UCTL} restart keycloak.service backend.service ingest.service frontend.service`.
 > That restart cost the edge's maintenance page **74, 121 and 7** 5xx answers per minute over
@@ -1581,8 +1583,10 @@ as in 4b/4c (copy the `.crt` into `$W` too; `-importcert -noprompt -storetype PK
 > 3. the `backend` alias (the old shared certificate, `/var/iri/secrets/tls/legacy-shared.crt`)
 >    back into `/var/iri/secrets/backend-truststore.p12`, then restart keycloak.
 >
-> Production's step-4 backups carry the suffix `.backup-20260925-175805` (the SPI one is
-> `backend-truststore.p12.backup-20260925-175805`). A rollback to **1.10.0 or older** also needs
+> Production's step-4 backups are `/var/iri/secrets/tls/truststore.p12.backup-20260925-175805`,
+> `/var/iri/monitoring/certs/basetool-ca.crt.backup-20260925-175805` and
+> `/var/iri/secrets/backend-truststore.p12.backup-20260925-175805` (plus
+> `/var/iri/code/.env.backup-20260925-175805-step4`). A rollback to **1.10.0 or older** also needs
 > `REDIS_DEFAULT_USER` back on ([The Redis ACL](#the-redis-acl)) and the frontend client back to
 > public (`--frontend-client public --apply` through a new provisioner session,
 > [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md)) — then promote.

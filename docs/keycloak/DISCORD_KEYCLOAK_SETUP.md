@@ -412,7 +412,7 @@ store is root-owned, so `keytool` cannot edit it in place; the command is
 > through to the PENDING queue, and the only witness is the `Account-existence probe could not
 > reach the backend (…)` `WARN` per first login. Re-import the `backend` alias (the old shared
 > certificate, `/var/iri/secrets/tls/legacy-shared.crt`) — or install production's
-> `backend-truststore.p12.backup-20260925-175805` — and restart keycloak **before** promoting.
+> `/var/iri/secrets/backend-truststore.p12.backup-20260925-175805` — and restart keycloak **before** promoting.
 
 ### 7.4 Verify
 
