@@ -391,7 +391,7 @@
             div.className = 'stack-entries-status';
             if (isError) div.classList.add('hud-box-error');
             div.style.padding = '1rem 2.5rem';
-            div.style.color = 'var(--color-gray-2)';
+            div.style.color = 'var(--color-gray-2-text)';
             div.textContent = message;
             content.appendChild(div);
         }

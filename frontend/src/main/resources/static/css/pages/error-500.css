@@ -18,7 +18,7 @@
     .error-code {
         font-family: var(--font-headline);
         font-size: 4rem;
-        color: var(--color-danger);
+        color: var(--color-danger-text);
         margin-bottom: 0.5rem;
     }
     .error-title {

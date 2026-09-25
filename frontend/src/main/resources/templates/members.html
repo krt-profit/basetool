@@ -108,7 +108,7 @@
                     </td>
                     <td>
                         <span th:if="${user.inKeycloak}" class="krtm-color-var-color-success-font-size-0-8rem-65c1" th:text="#{members.in_keycloak}">In Keycloak</span>
-                        <span th:if="${!user.inKeycloak}" class="krtm-color-var-color-danger-font-size-0-8rem-4da5" th:text="#{members.not_in_keycloak}">Nicht in Keycloak</span>
+                        <span th:if="${!user.inKeycloak}" class="text-danger krtm-font-size-0-8rem-0fed" th:text="#{members.not_in_keycloak}">Nicht in Keycloak</span>
                     </td>
                     <td>
                         <div class="flex-gap-xs">

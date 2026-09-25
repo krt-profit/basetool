@@ -872,7 +872,7 @@
     }
 
     .assoc-chip--mission {
-        color: var(--color-info);
+        color: var(--color-info-text);
         border-color: var(--color-info);
         background-color: rgb(53 93 220 / 15%);
     }
@@ -904,7 +904,7 @@
         font-size: var(--fs-2xs);
         text-transform: uppercase;
         letter-spacing: 0.06em;
-        color: var(--color-gray-2);
+        color: var(--color-gray-2-text);
         border: 1px dashed var(--color-gray-3);
     }
 
@@ -940,7 +940,7 @@
         font-size: 0.6rem;
         text-transform: uppercase;
         letter-spacing: 0.08em;
-        color: var(--color-gray-2);
+        color: var(--color-gray-2-text);
         font-weight: var(--fw-bold);
     }
 
@@ -1052,7 +1052,7 @@
 
     .herkunft-warn {
         font-size: var(--fs-2xs);
-        color: var(--color-danger);
+        color: var(--color-danger-text);
     }
 
     .herkunft-proceeds {
@@ -1069,7 +1069,7 @@
         font-weight: var(--fw-bold);
         text-transform: uppercase;
         letter-spacing: 0.08em;
-        color: var(--color-info);
+        color: var(--color-info-text);
     }
 
     .herkunft-proceeds-line {
@@ -2576,16 +2576,18 @@
         color: #fff;
     }
 
+    /* The label is text, so it takes the accessible tint (the canonical danger hue read 2.36:1
+   on this fill); the border keeps the canonical hue (DS "Accessible text tints"). */
     .btn-outline-danger {
         background-color: rgb(163 0 10 / 10%);
         border: 1px solid var(--color-danger);
-        color: var(--color-danger);
+        color: var(--color-danger-text);
     }
 
     .btn-outline-danger:hover {
         background-color: rgb(163 0 10 / 20%);
         border-color: var(--color-danger);
-        color: var(--color-danger);
+        color: var(--color-danger-text);
     }
 
     .btn-success {
@@ -2663,7 +2665,7 @@
 
     .btn-quiet-danger:hover {
         background-color: rgb(163 0 10 / 12%);
-        color: var(--color-danger);
+        color: var(--color-danger-text);
         border-color: var(--color-danger);
     }
 
@@ -2996,7 +2998,7 @@
     }
 
     .hud-box-error p {
-        color: var(--color-danger);
+        color: var(--color-danger-text);
         margin: 0;
     }
 
@@ -3140,7 +3142,7 @@
     }
 
     .chip--info {
-        color: var(--color-info);
+        color: var(--color-info-text);
         background-color: rgb(53 93 220 / 15%);
         border-color: var(--color-info);
     }
@@ -3262,7 +3264,7 @@
     }
 
     .notification-toast.error-toast h4 {
-        color: var(--color-danger);
+        color: var(--color-danger-text);
     }
 
     /* Language Switcher Dropdown */
@@ -3867,7 +3869,10 @@
     /* Order-kind chip — distinguishes the two job-order kinds (Material procurement
    vs finished-Item manufacture) in the list and on the detail header. Reuses the
    squadron-badge pill chrome with currentColor borders: Material orders take the
-   brand orange, Item orders the Forschung blue (manufacturing/derivation semantic). */
+   brand orange, Item orders the Forschung blue (manufacturing/derivation semantic).
+   The Item label is small text, so it takes the accessible tint and keeps the
+   canonical blue on its border only: #355DDC as text read 3.29:1 on the table
+   surface, below AA's 4.5:1 (AccessibilitySmokeE2eTest, 2026-09-25). */
     .order-kind-badge {
         display: inline-flex;
         align-items: center;
@@ -3888,7 +3893,8 @@
     }
 
     .order-kind-item {
-        color: var(--color-info);
+        color: var(--color-info-text);
+        border-color: var(--color-info);
     }
 
     /* Caption for the processing unit (Bearbeitende Einheit) shown under the ID +
@@ -4060,6 +4066,8 @@
         font-size: 0.7rem;
     }
 
+    /* Decorative (aria-hidden; the header's aria-sort carries the state), so it keeps the
+   canonical Grau 2 per REQ-UI-006 — AccessibleTextTintTest exempts exactly this selector. */
     .demand-sortable[aria-sort='none'] .demand-sort-indicator {
         color: var(--color-gray-2);
     }

@@ -128,6 +128,10 @@ Two binding rules shape every UI change:
   (`krtModal.layerRoot()`). Every dialog is rendered by `fragments/modal-wrapper :: modal` (one
   shell: `<h2>` and ✕; the page supplies the body), and `DialogA11yE2eTest` runs the contract on
   every dialog it can reach. (REQ-UI-013, ADR-0177, `SingleModalShapeTest`.)
+- **Coloured text takes the accessible tints** (2026-09-25). The canonical danger, info and Grau 2
+  hues fail WCAG AA as text on the dark surfaces; text uses their `-text` tints, and
+  `AccessibleTextTintTest` fails the build on a stylesheet or script that sets one of the canonical
+  hues as a text colour (REQ-UI-006).
 - **The cascade layer decides, not the load order** (FE-MOD-02, 2026-09-23). Every stylesheet
   declares `@layer base, components, page, migration, utilities;` and keeps its rules inside its
   layer: page CSS beats the design system without specificity bumps, a migrated inline class beats

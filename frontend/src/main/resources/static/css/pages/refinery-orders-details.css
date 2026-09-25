@@ -61,7 +61,7 @@
         border: 1px solid var(--color-dept-profit);
     }
     .yield-bonus-badge.yield-negative {
-        color: var(--color-danger);
+        color: var(--color-danger-text);
         background-color: rgba(163, 0, 10, 0.12);
         border: 1px solid var(--color-danger);
     }

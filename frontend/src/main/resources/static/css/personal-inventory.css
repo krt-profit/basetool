@@ -123,7 +123,7 @@
     .krt-pi-table td.krt-pi-empty,
     .data-table td.krt-pi-empty {
         text-align: center;
-        color: var(--color-gray-2);
+        color: var(--color-gray-2-text);
         padding: 1.25rem;
     }
 
@@ -213,7 +213,7 @@
     }
 
     .krt-pi-help {
-        color: var(--color-gray-2);
+        color: var(--color-gray-2-text);
         font-size: var(--fs-xs);
         display: block;
         margin-top: 0.25rem;
@@ -239,7 +239,7 @@
     .krt-pi-error-box ul {
         margin: 0;
         padding-left: 1.25rem;
-        color: var(--color-danger);
+        color: var(--color-danger-text);
     }
 
     /* Typeahead dropdown. */
@@ -284,7 +284,7 @@
         font-weight: var(--fw-bold);
     }
     .krt-pi-typeahead-meta {
-        color: var(--color-gray-2);
+        color: var(--color-gray-2-text);
         font-size: 0.85rem;
         margin-left: auto;
     }
@@ -292,7 +292,7 @@
     .krt-pi-typeahead-loading,
     .krt-pi-typeahead-empty {
         padding: 0.75rem 1rem;
-        color: var(--color-gray-2);
+        color: var(--color-gray-2-text);
         font-style: italic;
     }
 
@@ -436,7 +436,7 @@
     }
 
     .krt-bp-staging-empty {
-        color: var(--color-gray-2);
+        color: var(--color-gray-2-text);
         font-style: italic;
     }
 
@@ -481,7 +481,7 @@
     }
 
     .krt-bp-dash {
-        color: var(--color-gray-2);
+        color: var(--color-gray-2-text);
     }
 
     .krt-bp-edit-product {
@@ -623,12 +623,12 @@
     }
 
     .krt-bp-imp-owned {
-        color: var(--color-gray-2);
+        color: var(--color-gray-2-text);
         font-style: italic;
     }
 
     .krt-bp-imp-date {
-        color: var(--color-gray-2);
+        color: var(--color-gray-2-text);
         font-size: 0.8rem;
     }
 
@@ -746,7 +746,7 @@
 
     .krt-bp-recipe-variants {
         margin: 0 0 0.6rem;
-        color: var(--color-gray-2);
+        color: var(--color-gray-2-text);
         font-size: 0.8rem;
         font-style: italic;
     }
@@ -785,7 +785,7 @@
     .krt-bp-recipe-slot {
         display: block;
         margin-bottom: 0.25rem;
-        color: var(--color-gray-2);
+        color: var(--color-gray-2-text);
         text-transform: uppercase;
         letter-spacing: 0.04em;
         font-size: 0.72rem;
@@ -799,7 +799,7 @@
         margin-top: 0.2rem;
     }
     .krt-bp-recipe-ing-meta {
-        color: var(--color-gray-2);
+        color: var(--color-gray-2-text);
         font-size: 0.8rem;
     }
 
@@ -820,7 +820,7 @@
 
     .krt-bp-recipe-stat-bw {
         margin-left: 0.4rem;
-        color: var(--color-gray-2);
+        color: var(--color-gray-2-text);
         font-size: 0.8rem;
     }
 
@@ -839,7 +839,7 @@
 
     .krt-bp-recipe-end {
         min-width: 2.5rem;
-        color: var(--color-gray-2);
+        color: var(--color-gray-2-text);
         font-size: 0.75rem;
         font-variant-numeric: tabular-nums;
     }
@@ -864,11 +864,11 @@
     }
 
     .krt-bp-recipe-q {
-        color: var(--color-gray-2);
+        color: var(--color-gray-2-text);
         font-variant-numeric: tabular-nums;
     }
     .krt-bp-recipe-arrow {
-        color: var(--color-gray-2);
+        color: var(--color-gray-2-text);
     }
 
     .krt-bp-recipe-val,
@@ -879,19 +879,19 @@
     }
 
     .krt-bp-recipe-dash {
-        color: var(--color-gray-2);
+        color: var(--color-gray-2-text);
     }
 
     .krt-bp-recipe-loading,
     .krt-bp-recipe-empty {
         padding: 0.75rem 1.25rem;
-        color: var(--color-gray-2);
+        color: var(--color-gray-2-text);
         font-style: italic;
     }
 
     .krt-bp-recipe-error {
         padding: 0.75rem 1.25rem;
-        color: var(--color-danger);
+        color: var(--color-danger-text);
         font-style: italic;
     }
 
@@ -982,6 +982,8 @@
         top: 50%;
         transform: translateY(-50%);
         display: inline-flex;
+        /* Decorative (aria-hidden icon beside a labelled field): canonical Grau 2 per REQ-UI-006,
+           exempted by name in AccessibleTextTintTest. */
         color: var(--color-gray-2);
         pointer-events: none;
     }

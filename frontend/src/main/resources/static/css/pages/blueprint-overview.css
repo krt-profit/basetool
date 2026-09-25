@@ -29,7 +29,7 @@
         color: var(--color-gray-2-text);
     }
     .bp-owners-error {
-        color: var(--color-danger);
+        color: var(--color-danger-text);
     }
     .bp-owners-list {
         list-style: none;

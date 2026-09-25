@@ -173,6 +173,11 @@
 
 ### Fixed
 
+- **Besser lesbare Farben für farbige Texte.** Rote, blaue und graue Beschriftungen (etwa das
+  „Item“-Kennzeichen in der Auftragsliste, negative Preise in der Materialübersicht, rote
+  Löschen-Knöpfe, Fehlermeldungen und Hinweise) nutzen jetzt die helleren Farbtöne des Designsystems
+  und erreichen den WCAG-Mindestkontrast.
+
 - **Anmeldung: Discord-Login, der im falschen Browser endet, ist keine Sackgasse mehr.** Kehrt der
   Discord-Login in einer anderen App oder einem anderen Browser zurück (Keycloak `cookie_not_found`),
   erklärt die Fehlerseite jetzt die Ursache und bietet „Zurück zur Applikation“ an; der Link fehlte,

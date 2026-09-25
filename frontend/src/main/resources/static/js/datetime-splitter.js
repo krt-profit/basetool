@@ -93,7 +93,7 @@
         group.dataset.krtDtInitialized = '1';
 
         const errorDiv = document.createElement('div');
-        errorDiv.style.color = 'var(--color-danger)';
+        errorDiv.style.color = 'var(--color-danger-text)';
         errorDiv.style.fontSize = '0.8rem';
         errorDiv.style.marginTop = '0.2rem';
         errorDiv.style.display = 'none';
