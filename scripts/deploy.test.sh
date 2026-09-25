@@ -744,7 +744,11 @@ scenario_unhealthy_drift() {
     "the unhealthy state is reported as drift"
   assert_contains "targeted restart (not a release rollback)" \
     "the run takes the runtime-health path, not a release rollback"
-  assert_docker "systemctl --user restart backend.service" "only the affected service is recreated"
+  # Recreated by a stop and a start, never a restart (ADR-0083 amended 2026-09-25): the restart
+  # returned before what requires backend was back. The per-unit counts are in the heal_* scenarios.
+  assert_docker "systemctl --user stop backend.service" "only the affected service is recreated (stopped...)"
+  assert_docker "systemctl --user start backend.service" "...and started again"
+  assert_no_docker "systemctl --user restart" "...and nothing is restarted"
   assert_contains "health drift resolved" "the targeted restart is reported resolved"
   assert_excludes "re-applying" "the full re-apply path is NOT taken for a health-only drift"
   assert_excludes "rolling back" "no release rollback happens"
@@ -3115,6 +3119,206 @@ scenario_spi_extraction_failure_is_recorded() {
   rm -rf "${tmp}"
 }
 
+# ---------------------------------------------------------------------------
+# The self-heal is ONE restart window too (ADR-0083, amended 2026-09-25).
+#
+# The runtime-health path used to `systemctl --user restart` each unhealthy service in turn. Through
+# `Requires=` a restart of backend restarts ingest and frontend with it, and returns once BACKEND is
+# up -- so the heal wrote "health drift resolved" and the healthy heartbeat while frontend and ingest
+# had no container yet (the 2026-09-25 17:43 shape), and a second unhealthy service restarted after
+# it (frontend) was started twice. The same stub as the release apply counts every container start.
+#
+# heal_host <tmp> -- a host converged on the current release: the marker matches, the pins bind the
+# digests the registry serves, the provider JAR does not move. Every unit is up until the scenario
+# says otherwise (T_DOWN, the stub's list of stopped units).
+# ---------------------------------------------------------------------------
+heal_host() {
+  spi_host "$1" "${DIG_BACKEND}" "${DIG_FRONTEND}" "${DIG_INGEST}"
+  write_marker "${MARKER}"
+}
+
+# assert_health_stamp <metric> <yes|no> <description> -- deploy-health.prom carries (or does not
+# carry) a non-zero stamp for the metric.
+assert_health_stamp() {
+  local metric="$1" want="$2" desc="$3" got=no
+  if grep -q "^${metric} [1-9]" "${T_STATE_DIR}/textfile/deploy-health.prom" 2>/dev/null; then
+    got=yes
+  fi
+  if [[ "${got}" == "${want}" ]]; then
+    record 1 "${desc}"
+  else
+    record 0 "${desc} (${metric} stamped: ${got}, expected ${want})"
+  fi
+}
+
+scenario_heal_unhealthy_backend_restarts_it_and_its_dependents_once() {
+  echo "Scenario: an unhealthy backend is healed in one window -- backend, ingest and frontend start once, keycloak not at all"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  heal_host "${tmp}"
+  mapfile -t fake < <(spi_env)
+  run_deploy -- "${fake[@]}" "FAKE_STATE_backend=running/unhealthy" || rc=$?
+  assert_exit 0 "$rc" "heal backend: the heal succeeds"
+  assert_contains "targeted restart (not a release rollback)" "heal backend: the runtime-health path is taken"
+  assert_starts backend 1 "heal backend: backend is started once"
+  assert_starts ingest 1 "heal backend: ingest, which requires it, is started once"
+  assert_starts frontend 1 "heal backend: frontend, which requires it, is started once"
+  assert_starts keycloak 0 "heal backend: keycloak, which backend requires, is not touched"
+  assert_count '^systemctl --user stop ' 1 "heal backend: one stop"
+  assert_docker "systemctl --user stop backend.service" "heal backend: ...naming backend"
+  assert_no_docker "stop keycloak.service" "heal backend: keycloak is not stopped"
+  assert_count '^systemctl --user restart ' 0 \
+    "heal backend: nothing is restarted (a restart returns before its dependents are back)"
+  assert_nothing_down "heal backend: frontend and ingest are back before success is written (#2072's shape: they had no container)"
+  assert_contains "health drift resolved" "heal backend: resolution is reported"
+  assert_health_stamp basetool_deploy_last_stack_healthy_timestamp yes "heal backend: the healthy heartbeat is stamped"
+  assert_health_stamp basetool_deploy_last_health_restart_failed_timestamp no "heal backend: no restart failure is stamped"
+  assert_no_docker "podman pull" "heal backend: nothing is pulled"
+  assert_no_docker "cosign verify" "heal backend: nothing is re-verified"
+  rm -rf "${tmp}"
+}
+
+scenario_heal_unhealthy_backend_and_frontend_starts_frontend_once() {
+  echo "Scenario: an unhealthy backend AND frontend are healed in one window -- frontend is not started a second time"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  heal_host "${tmp}"
+  mapfile -t fake < <(spi_env)
+  run_deploy -- "${fake[@]}" "FAKE_STATE_backend=running/unhealthy" "FAKE_STATE_frontend=running/unhealthy" || rc=$?
+  assert_exit 0 "$rc" "heal two: the heal succeeds"
+  assert_starts backend 1 "heal two: backend is started once"
+  assert_starts ingest 1 "heal two: ingest is started once"
+  assert_starts frontend 1 "heal two: frontend is started once, not again after backend's restart brought it back"
+  assert_starts keycloak 0 "heal two: keycloak is not touched"
+  assert_count '^systemctl --user stop ' 1 "heal two: both go down in one stop"
+  assert_count '^systemctl --user restart ' 0 "heal two: nothing is restarted"
+  assert_nothing_down "heal two: nothing is left stopped"
+  rm -rf "${tmp}"
+}
+
+scenario_heal_unhealthy_frontend_touches_nothing_it_requires() {
+  echo "Scenario: an unhealthy frontend is healed alone -- backend, keycloak and redis are not restarted"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  heal_host "${tmp}"
+  mapfile -t fake < <(spi_env)
+  run_deploy -- "${fake[@]}" "FAKE_STATE_frontend=running/unhealthy" || rc=$?
+  assert_exit 0 "$rc" "heal frontend: the heal succeeds"
+  assert_starts frontend 1 "heal frontend: frontend is started once"
+  assert_starts backend 0 "heal frontend: backend is not touched"
+  assert_starts keycloak 0 "heal frontend: keycloak is not touched"
+  assert_starts ingest 0 "heal frontend: ingest is not touched"
+  assert_starts redis 0 "heal frontend: redis is not touched"
+  assert_no_docker "stop backend.service" "heal frontend: backend is not stopped"
+  assert_no_docker "stop keycloak.service" "heal frontend: keycloak is not stopped"
+  assert_count '^systemctl --user restart ' 0 "heal frontend: nothing is restarted"
+  assert_nothing_down "heal frontend: nothing is left stopped"
+  rm -rf "${tmp}"
+}
+
+scenario_heal_that_fails_is_recorded_after_the_wait() {
+  echo "Scenario: a heal whose backend does not come back records the failure, names what did not come up, and rolls nothing back"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  heal_host "${tmp}"
+  mapfile -t fake < <(spi_env)
+  # Backend never comes back while the live JAR is the one the host already runs: a runtime fault.
+  run_deploy -- "${fake[@]}" "FAKE_STATE_backend=running/unhealthy" \
+    "FAKE_STUCK_UNITS=backend" "FAKE_STUCK_WITH_JAR=OLD jar" || rc=$?
+  assert_exit 1 "$rc" "heal fails: the run fails"
+  assert_contains "did NOT restore health (attempt #1)" "heal fails: the failure is reported"
+  assert_contains "health drift: did not come up, in start order: [backend ingest frontend]" \
+    "heal fails: the log names what did not come up, in start order"
+  assert_excludes "health drift resolved" "heal fails: resolution is not claimed"
+  assert_excludes "rolling back" "heal fails: no release rollback"
+  assert_health_stamp basetool_deploy_last_health_restart_failed_timestamp yes \
+    "heal fails: the health-restart-failed gauge DeployHealthRestartFailing reads is stamped"
+  assert_health_stamp basetool_deploy_last_stack_healthy_timestamp no "heal fails: the healthy heartbeat is not stamped"
+  if [[ ! -f "${T_STATE_DIR}/textfile/deploy.prom" ]] \
+     || ! grep -q 'basetool_deploy_last_rollback_timestamp [1-9]' "${T_STATE_DIR}/textfile/deploy.prom"; then
+    record 1 "heal fails: no DeployRolledBack metric"
+  else
+    record 0 "heal fails: no DeployRolledBack metric"
+  fi
+  if grep -qF "${MARKER} 1 " "${T_STATE_DIR}/health-restart.digests" 2>/dev/null; then
+    record 1 "heal fails: the heal backoff records attempt 1"
+  else
+    record 0 "heal fails: the heal backoff records attempt 1"
+  fi
+  assert_starts backend 0 "heal fails: backend was never started (stuck)"
+  assert_count '^systemctl --user restart ' 0 "heal fails: nothing is restarted"
+  rm -rf "${tmp}"
+}
+
+scenario_missing_frontend_and_ingest_are_started_not_restarted() {
+  echo "Scenario: frontend and ingest with no container are started once; backend and keycloak are not touched"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  heal_host "${tmp}"
+  printf 'frontend\ningest\n' > "${T_DOWN}"
+  mapfile -t fake < <(spi_env)
+  run_deploy -- "${fake[@]}" "FAKE_PS_frontend=" "FAKE_PS_ingest=" || rc=$?
+  assert_exit 0 "$rc" "missing two: the re-apply succeeds"
+  assert_contains "drift: frontend: no container" "missing two: frontend is reported"
+  assert_contains "re-applying" "missing two: the structural path is taken"
+  assert_starts frontend 1 "missing two: frontend is started once"
+  assert_starts ingest 1 "missing two: ingest is started once"
+  assert_starts backend 0 "missing two: backend, which they require, is not restarted"
+  assert_starts keycloak 0 "missing two: keycloak is not restarted"
+  assert_count '^systemctl --user (stop|restart) ' 0 "missing two: nothing is stopped or restarted"
+  assert_nothing_down "missing two: nothing is left stopped"
+  assert_contains "deploy successful" "missing two: success is reported"
+  assert_health_stamp basetool_deploy_last_stack_healthy_timestamp yes "missing two: the healthy heartbeat is stamped"
+  rm -rf "${tmp}"
+}
+
+scenario_missing_backend_is_started_not_restarted() {
+  echo "Scenario: a backend with no container is started once; nothing else is touched"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  heal_host "${tmp}"
+  # A crashed backend waiting out its Restart= delay: its unit is down, and what requires it keeps
+  # running -- only an EXPLICIT stop travels along Requires=.
+  printf 'backend\n' > "${T_DOWN}"
+  mapfile -t fake < <(spi_env)
+  run_deploy -- "${fake[@]}" "FAKE_PS_backend=" || rc=$?
+  assert_exit 0 "$rc" "missing backend: the re-apply succeeds"
+  assert_contains "drift: backend: no container" "missing backend: backend is reported"
+  assert_starts backend 1 "missing backend: backend is started once"
+  assert_starts ingest 0 "missing backend: ingest is not restarted"
+  assert_starts frontend 0 "missing backend: frontend is not restarted"
+  assert_starts keycloak 0 "missing backend: keycloak is not restarted"
+  assert_count '^systemctl --user (stop|restart) ' 0 "missing backend: nothing is stopped or restarted"
+  assert_nothing_down "missing backend: nothing is left stopped"
+  rm -rf "${tmp}"
+}
+
+scenario_mixed_drift_does_not_stamp_an_unhealthy_stack_healthy() {
+  echo "Scenario: a re-apply for a missing frontend does not stamp the stack healthy while backend is unhealthy"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  heal_host "${tmp}"
+  printf 'frontend\n' > "${T_DOWN}"
+  # Two heals of backend have already failed; this re-apply does not heal it, so it must not reset
+  # that backoff either.
+  printf '%s 2 %d\n' "${MARKER}" "$(( $(date +%s) - 100000 ))" > "${T_STATE_DIR}/health-restart.digests"
+  mapfile -t fake < <(spi_env)
+  run_deploy -- "${fake[@]}" "FAKE_PS_frontend=" "FAKE_STATE_backend=running/unhealthy" || rc=$?
+  assert_exit 0 "$rc" "mixed: the re-apply succeeds"
+  assert_contains "re-applying" "mixed: a structural finding takes the re-apply path (ADR-0083)"
+  assert_starts frontend 1 "mixed: frontend is started once"
+  assert_starts backend 0 "mixed: backend is not restarted by the re-apply"
+  assert_contains "left for the targeted heal of the next tick" "mixed: the log says backend is not healed by this run"
+  assert_health_stamp basetool_deploy_last_stack_healthy_timestamp no \
+    "mixed: the healthy heartbeat is not stamped over an unhealthy backend"
+  if grep -qF "${MARKER} 2 " "${T_STATE_DIR}/health-restart.digests" 2>/dev/null; then
+    record 1 "mixed: the heal backoff of the still-unhealthy backend is kept"
+  else
+    record 0 "mixed: the heal backoff of the still-unhealthy backend is kept"
+  fi
+  rm -rf "${tmp}"
+}
+
 scenario_spi_and_apps_move_in_one_restart_window
 scenario_apps_only_restart_each_unit_once
 scenario_spi_only_is_the_whole_apply
@@ -3123,6 +3327,14 @@ scenario_spi_app_failure_rolls_back_both_and_says_it_cannot_tell
 scenario_spi_only_failure_blames_the_jar
 scenario_spi_rollback_that_does_not_heal_says_so
 scenario_spi_extraction_failure_is_recorded
+
+scenario_heal_unhealthy_backend_restarts_it_and_its_dependents_once
+scenario_heal_unhealthy_backend_and_frontend_starts_frontend_once
+scenario_heal_unhealthy_frontend_touches_nothing_it_requires
+scenario_heal_that_fails_is_recorded_after_the_wait
+scenario_missing_frontend_and_ingest_are_started_not_restarted
+scenario_missing_backend_is_started_not_restarted
+scenario_mixed_drift_does_not_stamp_an_unhealthy_stack_healthy
 
 scenario_config_mirror_failure_is_recorded_and_undone
 scenario_config_restore_failure_keeps_the_anchor

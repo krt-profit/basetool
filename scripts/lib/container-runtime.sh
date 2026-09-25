@@ -94,7 +94,8 @@ RT_HOST_SYSTEMCTL="${RT_HOST_SYSTEMCTL:-}"
 # The services whose DEFINITION this run changed -- a new digest pin, a unit file the release
 # replaced, or (keycloak) a provider JAR the release swapped in. Space separated, appended to by
 # rt_pin_write, install_quadlet_units and deploy.sh's provider-JAR swap, and read by rt_apply_stack
-# to decide which units are stopped before the stack is started.
+# to decide which units are stopped before the stack is started. rt_heal_stack borrows it for the
+# length of one heal: an unhealthy container needs the same recreate a re-defined one does.
 #
 # WHY IT HAS TO EXIST. `systemctl start` on a unit that is ALREADY ACTIVE is a no-op: it returns 0
 # immediately and does not re-read anything. Measured on the testing host 2026-09-18 -- the pin was
@@ -641,11 +642,51 @@ rt_apply_stack() {
 }
 
 # -----------------------------------------------------------------------------
+# rt_heal_stack <service>...
+#
+# The runtime-health heal (ADR-0083, amended 2026-09-25): the named services run
+# the right release but are unhealthy, so recreate them -- in ONE restart window,
+# exactly like a release apply that re-defined them. It is rt_apply_stack with the
+# named services marked as re-defined:
+#
+#   1. one `systemctl stop` naming them, which takes down with them every unit that
+#      `Requires=` them (an unhealthy backend takes ingest and frontend; an unhealthy
+#      frontend takes nothing else) and nothing they require;
+#   2. a `start` of every stack unit in stack order, waited for until healthy. What
+#      pass 1 stopped comes up once; everything else is already active and returns at
+#      once, so it is not restarted. A unit that was down for another reason is
+#      started too -- a heal that leaves part of the stack down is not a heal.
+#
+# Returns 0 only when every stack unit is up again, and names what is not in
+# RT_FAILED_SERVICES. The named services are dropped from RT_CHANGED_SERVICES
+# afterwards: their recreate has happened, and a later apply in the same run must
+# not recreate them again.
+#
+# WHY NOT `rt_recreate` PER SERVICE, which the heal did until 2026-09-25. A restart
+# travels along `Requires=` and returns when the NAMED unit is up: the heal of an
+# unhealthy backend reported "resolved" while ingest and frontend were still stopped
+# with no container, and a second unhealthy service restarted after it (frontend)
+# was started twice -- the shape rt_apply_stack's comment describes for the apply.
+# -----------------------------------------------------------------------------
+rt_heal_stack() {
+  local svc rc=0
+  for svc in "$@"; do
+    rt_note_changed "${svc}"
+  done
+  rt_apply_stack || rc=1
+  for svc in "$@"; do
+    rt_forget_changed "${svc}"
+  done
+  return "${rc}"
+}
+
+# -----------------------------------------------------------------------------
 # rt_recreate <service>
 #
 # Replace one service's container and wait for IT to be healthy: the edge
-# reconcile and the runtime-health restart. (It was also the Keycloak provider-JAR
-# path until 2026-09-25; the JAR now rides the release apply, rt_apply_stack.)
+# reconcile, and nothing else -- no unit `Requires=` the edge. (It was also the
+# Keycloak provider-JAR path and the runtime-health restart until 2026-09-25; the
+# JAR now rides the release apply, rt_apply_stack, and the heal is rt_heal_stack.)
 #
 # A restart IS a recreate: the generated ExecStart carries `--replace --rm`, so
 # the old container is removed and a new one is created from the current unit on
@@ -706,16 +747,6 @@ rt_await_stack() {
     fi
   done
   return "${rc}"
-}
-
-# -----------------------------------------------------------------------------
-# rt_restart <service>
-#
-# The targeted restart for runtime-health drift: the right release, a sick
-# container. Never a release rollback (ADR-0083).
-# -----------------------------------------------------------------------------
-rt_restart() {
-  ${RT_SYSTEMCTL} restart "$1.service"
 }
 
 # -----------------------------------------------------------------------------

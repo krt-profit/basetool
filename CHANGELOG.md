@@ -9,6 +9,10 @@
   neu (auch Frontend und Ingest nicht mehr doppelt); scheitert das Health-Gate, gehen Images,
   Konfiguration und JAR gemeinsam zurück (ADR-0213). Wirkt erst nach einem Lauf der Ansible-Rolle
   (`--tags deploy,scripts`).
+- **Deploy: die Selbstheilung startet jeden betroffenen Dienst genau einmal und meldet erst Erfolg,
+  wenn alle wieder laufen.** Ein ungesunder Dienst wird mit allem, was ihn per `Requires=` braucht,
+  einmal gestoppt und in Reihenfolge wieder gestartet, statt einzeln neu gestartet (ungesundes
+  Frontend: nur Frontend). Wirkt erst nach einem Lauf der Ansible-Rolle (`--tags deploy,scripts`).
 
 ### Fixed
 

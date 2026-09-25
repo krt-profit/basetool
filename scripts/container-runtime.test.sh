@@ -767,6 +767,26 @@ expect_out "...and cleared by the next wait" podman \
   'failed=[]'
 
 say ""
+say "== the runtime-health heal is the same window: one stop of the sick units, then the stack in order =="
+# 2026-09-25 (ADR-0083 amended): the heal was `restart` per unhealthy service, which re-ran what
+# Requires= it and returned before that was back. rt_heal_stack is rt_apply_stack with the sick units
+# marked as re-defined.
+expect_call "the sick units go down in one stop" podman \
+  "${stack5} rt_heal_stack backend frontend" 'systemctl --user stop backend.service frontend.service'
+expect_out "...first, then every stack unit is started in stack order" podman \
+  "${stack5} rt_heal_stack backend frontend; grep -oE '(stop|start) [a-z-]+' \"\${LOG}\" | tr '\n' ' '" \
+  'stop backend start db-backend start keycloak start backend start ingest start frontend '
+expect_no_call "...and nothing is restarted" podman \
+  "${stack5} rt_heal_stack keycloak" 'restart'
+expect_out "a sick keycloak is the one unit stopped -- systemd, not the heal, takes what requires it" podman \
+  "${stack5} rt_heal_stack keycloak; grep ' stop ' \"\${LOG}\" | sed 's/.* stop \(.*\)$/stopped=[\1]/'" 'stopped=[keycloak.service]'
+expect_out "the healed units are forgotten afterwards, so a later apply does not recreate them again" podman \
+  "RT_CHANGED_SERVICES='ingest'; ${stack5} rt_heal_stack backend; echo \"changed=[\${RT_CHANGED_SERVICES}]\"" 'changed=[ingest]'
+expect_out "a unit that does not come back fails the heal, and is named" podman \
+  "STUB_FAIL='start_backend.service' ${stack5} rt_heal_stack backend; echo \"rc=\$?; failed=[\${RT_FAILED_SERVICES}]\"" \
+  'rc=1; failed=[backend]'
+
+say ""
 say "== waiting out a restart that travelled along Requires= =="
 # After `restart keycloak.service` returns, systemd is still restarting what Requires= keycloak.
 # rt_await_stack is the wait: START each stack unit, so a queued start job is joined rather than
