@@ -1,6 +1,6 @@
 # ADR-0083 — Deploy-bot distinguishes runtime-health drift from release drift (targeted restart, not rollback)
 
-- **Status:** Accepted — amended 2026-09-25 (the heal is one restart window; see the amendment below)
+- **Status:** Accepted — amended 2026-09-25 twice (the heal is one restart window; a failed structural re-apply does not roll back — see the amendments below)
 - **Date:** 2026-07-09
 - **Deciders:** @greluc
 - **Related:** `scripts/deploy.sh` · REQ-OPS-016 (`docs/specs/observability.md`) · ADR-0072 (deploy textfile metrics) · ADR-0084 (readiness health-group) · the 2026-07-09 native-thread exhaustion incident
@@ -34,7 +34,9 @@ deploy problem; the second is an application-runtime problem that a rollback can
 
 - **structural** — a service has no container, OR a running container's image does not match the
   target digest. This is a genuine release mismatch; deploy.sh takes the existing full
-  apply → health-gate → rollback path unchanged.
+  apply → health-gate → rollback path unchanged. *(Amended 2026-09-25: the apply and the health
+  gate, yes — the rollback, no. A failed re-apply of the deployed release is recorded like a failed
+  heal; see the second amendment below.)*
 - **health** — a container is present and running the **target** image but is not
   `running/healthy` (unhealthy / restarting / exited / …). The deployed *release* is correct; only
   the runtime is sick.
@@ -143,3 +145,47 @@ chain the stop took down — for an unhealthy backend, backend's start plus the 
 frontend, the same as before but now waited for. Tested by `scripts/deploy.test.sh`
 (`scenario_heal_*`, `scenario_missing_*`, `scenario_mixed_drift_does_not_stamp_an_unhealthy_stack_healthy`)
 and `scripts/container-runtime.test.sh` (`rt_heal_stack`).
+
+## Amendment — 2026-09-25: a structural re-apply is not a release, and a failed one does not roll back
+
+**Context.** The decision above sent a structural divergence down the release path "unchanged",
+rollback included. That path saves the live digest pin as `previous-digest-pin.yml` before it writes
+the new one, and — when it delivers config — snapshots the live tree as `config-previous/`. On a
+re-apply the target is the release already deployed, so both saves copied the deployed release over
+the anchors that named the one before it (the pin on every re-apply; the tree on a host whose unit
+files were gone). A re-apply that then failed its gate "rolled back" to the release it was on,
+stamped `basetool_deploy_last_rollback_timestamp`, and paged `DeployRolledBack` for a release that
+had shipped — the 2026-07-09 fiction this ADR removed from the health path, reached by the structural
+one — while the real previous release was lost as a rollback target. Found in review of #2075.
+
+**Decision.** A run whose target equals the last-deployed marker (a structural re-apply,
+`REAPPLY` in `scripts/deploy.sh`) still verifies, pins, pulls and passes the health gate, but:
+
+1. it rotates **no** rollback anchor — no pin save, no `config-previous/` snapshot, and no
+   `config-apply.incomplete` marker, because it mirrors the deployed release over itself and leaves
+   one release behind even when it stops halfway. The provider-JAR anchor cannot move: a matching
+   marker means the JAR did not change;
+2. when it fails — at the health gate or before it — it rolls **nothing** back and restores nothing:
+   the release stays, the anchors keep naming the release before it;
+3. the failure is recorded as "the running release could not be restored": the bad-digest backoff
+   record (keyed to the deployed target, the backoff this path has always honoured) and
+   `basetool_deploy_last_health_restart_failed_timestamp`, so `DeployHealthRestartFailing` pages.
+   Not `DeployFailed`: that means a promoted release did not ship and clears only on the next
+   successful deploy, so a stack that recovers on its own would have kept it firing, while the
+   heartbeat comparison clears on the next healthy tick. The gauge keeps its name; its meaning widens
+   from "the targeted restart failed" to "restoring the deployed release failed", and the alert text
+   says both.
+
+Only a change of target rotates the anchors and can roll back, so `DeployRolledBack` is again what
+this ADR's first consequence says it is. A structural re-apply's backoff stays the bad-digest one
+(600 s doubling to 6 h), separate from the heal's — sharing the heal's record would let a failed heal
+of one service hold back the re-apply of another service's missing container.
+
+**Consequences.** A failed re-apply leaves production where it was, pages the runtime signal, and
+retries after the backoff (or at once with `--force`); the next release rolls back to the deployed
+release, not past it. Tested by `scripts/deploy.test.sh`
+(`scenario_reapply_that_fails_keeps_the_anchors_and_rolls_nothing_back`,
+`scenario_reapply_that_succeeds_keeps_the_anchors`,
+`scenario_release_after_a_reapply_rotates_the_anchor_to_the_deployed_release`,
+`scenario_reapply_of_lost_units_keeps_config_previous`); against the deployer before it the first,
+second and fourth fail. Specified by REQ-OPS-003 and REQ-OPS-013.

@@ -447,6 +447,15 @@ a privately signed edge, the JVM truststore (`20-jvm-truststore.conf`). `check-c
 | `/var/iri/code/env.d/` | `deploy.sh` via `render-env-d.py` | one rendered environment file per service |
 | `/var/lib/iri/` | `deploy.sh` | digest-pin record and its predecessor, `last-deployed.digests`, backoff records, `config-stage/`, `config-previous/`, `config-blocked.marker`, `config-apply.incomplete` (only while a config apply is unfinished or could not be undone), `edge/` and `monitoring-reload/` snapshots |
 
+The three **rollback anchors** in `/var/lib/iri/` name the release *before* the deployed one, and
+only a change of target moves them (REQ-OPS-003):
+
+| Anchor | Rotated when | Left alone by |
+|---|---|---|
+| `previous-digest-pin.yml` | any run whose target differs from `last-deployed.digests` — copied from `current-digest-pin.yml` before the new pin is written | a drift re-apply (target = marker) |
+| `config-previous/` (the previous units inside it) | such a run whose config digest moved — a snapshot of the live tree before the mirror, unless `config-apply.incomplete` says the live tree is a mix | a drift re-apply, even one that re-delivers the config because the unit files are gone |
+| `keycloak-spi-previous.jar` | such a run whose provider-JAR digest moved | a drift re-apply (the JAR cannot have moved) |
+
 `~iri/.config/containers/systemd/` must stay **empty**: Quadlet searches it before the delivery
 directory, so a unit of the same name there silently shadows every release.
 
@@ -550,7 +559,10 @@ Within about five minutes the timer fires `deploy.sh`, which:
    is running and healthy (or still starting) from the target digest. A converged stack is a no-op
    — plus the edge and monitoring reconciles below. A structural divergence (missing container,
    wrong image) is logged as `drift: …` and re-applied — a missing container is **started**, and
-   nothing it requires is restarted. A sick container on the **right** image gets a targeted
+   nothing it requires is restarted. The re-apply puts back the release already deployed, so it
+   takes steps 3–6 but rotates no rollback anchor, and if it fails it rolls nothing back (step 7
+   does not apply): the release stays, the failure goes into the backoff and
+   `DeployHealthRestartFailing` pages (since 2026-09-25). A sick container on the **right** image gets a targeted
    restart, never a release rollback (ADR-0083): since 2026-09-25 one `systemctl --user stop` of the
    sick service(s) — which takes down what `Requires=` them, and nothing they require — then a
    `start` of the stack in order, each unit waited for. `health drift resolved` is logged, and the
@@ -580,7 +592,10 @@ Within about five minutes the timer fires `deploy.sh`, which:
    previous config tree, the previous units, the previous pin drop-ins **and the previous provider
    JAR** — together, never one without the other — applies them the same way, records an
    exponential backoff for that target (600 s doubling, capped at 6 h; `--force` bypasses it) and
-   exits non-zero — `DeployRolledBack` / `DeployFailed`.
+   exits non-zero — `DeployRolledBack` / `DeployFailed`. Only a new target gets here: a failed drift
+   re-apply logs `health check failed … on a re-apply of the deployed release — not rolling back`,
+   records the same backoff against the deployed target, stamps
+   `basetool_deploy_last_health_restart_failed_timestamp` and exits 1.
 
 **Expected outage per release:** the units the release re-defined and everything that requires them
 are down from the one `stop` until their start completes — for a release that moves an app image or
@@ -597,7 +612,9 @@ provider JAR put back if this run had changed them, the same backoff record, and
 (`DeployFailed`). Nothing has been restarted at that point, so the stack keeps running the previous
 release. If the restore itself fails the log says the tree is **INCONSISTENT**, and
 `/var/lib/iri/config-apply.incomplete` stays, which stops the next tick from snapshotting the
-half-applied tree over `config-previous/`.
+half-applied tree over `config-previous/`. On a drift re-apply a failure here restores nothing and
+leaves no marker — it mirrors the deployed release over itself, so the tree is that release either
+way — and is recorded like a failed re-apply gate (step 7).
 
 > [!warning] Until 2026-09-25 such a failure was silent
 > A command failing under `set -e` ended the run with no FATAL line, no metric, no backoff and no
@@ -648,6 +665,15 @@ sudo -u deploy /var/iri/code/scripts/deploy.sh --force          # bypass the bac
 `gh workflow run promote.yml -f version=1.9.2`. To force a full re-apply of the current target,
 delete `/var/lib/iri/last-deployed.digests` and start `iri-deploy.service`; a missing marker also
 re-stages the config bundle.
+
+> [!warning] Deleting the marker turns the deployed release into a new one *(added 2026-09-25)*
+> Without `last-deployed.digests` the run cannot tell that its target is the deployed release, so it
+> takes the release path: it copies the deployed pin over `previous-digest-pin.yml`, snapshots the
+> deployed tree over `config-previous/` and the deployed JAR over `keycloak-spi-previous.jar` — all
+> three anchors then name the deployed release, and a failed gate "rolls back" to it and fires
+> `DeployRolledBack`. A missing container needs none of this: the drift re-apply brings it back and
+> keeps the anchors. If the full re-apply is really needed, copy the three anchors aside first and
+> put them back afterwards.
 
 > [!warning] Rolling production back past a host switch *(added 2026-09-25)*
 > Some switches applied on production pin the releases that support them, and a rollback below
@@ -1907,6 +1933,7 @@ goes.
 | Stack comes back after a manual stop | `drift:` lines in the deploy log | the drift check (REQ-OPS-013); stop the timer first |
 | `health drift: … did NOT restore health (attempt #N)`, with `health drift: did not come up, in start order: […]`; `DeployHealthRestartFailing` fires | `{app="ops-deploy"} \|~ "health drift"`, `${UCTL} status <first unit named>.service`, `${UPOD} logs --since 10m <first unit named>` | a runtime fault on the deployed release, not a release problem — nothing was rolled back. The heal stopped the unhealthy service(s) and what requires them once, then started the stack in order; the **first** unit named did not come up and the rest require it. Fix the cause, then `sudo -u deploy /var/iri/code/scripts/deploy.sh --force` to skip the heal backoff — or `${UCTL} start <units named>`, which joins anything still queued and restarts nothing. Do not `restart` backend or keycloak to "help": it takes what requires them down again (ADR-0083, amended 2026-09-25). *(Before 2026-09-25 the heal was a `restart` per service and could log `health drift resolved` while frontend and ingest had no container yet.)* |
 | `drift: […] unhealthy on the target image — not part of this re-apply` and `stack-health heartbeat NOT stamped` | the deploy log | a tick found a missing container **and** an unhealthy one; the re-apply brought the missing one back and deliberately left the unhealthy one to the next tick's targeted heal (ADR-0083). Nothing to do unless the next tick's heal fails |
+| `health check failed … on a re-apply of the deployed release — not rolling back` (or a `FATAL … step '…' failed` after `re-applying`), then `recorded re-apply failure #N`; `DeployHealthRestartFailing` fires, `DeployRolledBack` does not | the `drift:` and `health gate: did not come up, in start order: […]` lines, `${UPOD} logs --since 10m <first unit named>`, `${UCTL} status <that unit>.service` | the running stack drifted from the deployed release (a missing container, a wrong image) and putting that same release back did not bring it up. Nothing was rolled back and the anchors still name the release before it — correct, since the target *is* the deployed release (ADR-0083, amended 2026-09-25). Treat it as a runtime fault: read the unit's log, fix the cause, then `sudo -u deploy /var/iri/code/scripts/deploy.sh --force` to skip the backoff (600 s doubling). If the deployed release itself is at fault, roll back by promotion (`promote.yml -f version=…`) |
 | `CARVE-OUT: postgres/Keycloak image pin changed` | the deploy log, `config-blocked.marker` | a gated upgrade — see [Stateful-infra upgrades](#stateful-infra-upgrades) |
 | `health gate: did not come up, in start order: […]` with `provider JAR: yes` in the `this release changed:` line; `DeployRolledBack` fires | the `health gate:` lines of the deploy log, `${UPOD} logs --since 10m <first unit named>`, `${UCTL} status keycloak.service backend.service frontend.service ingest.service` | one release moved the JAR (and possibly images), and the whole of it — pin, config, units, JAR — was rolled back together (ADR-0213); the target backs off. `KEYCLOAK did not come up … the JAR is the likely cause` narrows it to the JAR; `keycloak is up on the new provider JAR; the first unit that did not come up is …` cannot tell a bad image from a bad JAR — read that unit's log. If it then says `rollback ALSO failed — did not come up: […]`, something outside the release is wrong — `${UCTL} start backend.service ingest.service frontend.service` waits for them without restarting anything. *(Before 2026-09-25 the JAR had its own post-gate step, logging `keycloak did not become healthy with the new provider JAR` and `DeployFailed`.)* See [Keycloak provider JAR](#keycloak-provider-jar) |
 | `FATAL: deploy aborted before the health gate — step 'extract the keycloak-spi provider JAR' failed`; `DeployFailed` fires | the deploy log; `skopeo inspect docker://ghcr.io/<owner>/basetool-keycloak-spi:stable` as `deploy` | the promoted provider-JAR image could not be read or carries no `/providers/keycloak-spi.jar`; nothing on the host was changed and the target backs off. Until 2026-09-25 this failed after the gate and recorded nothing |

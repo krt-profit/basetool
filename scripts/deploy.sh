@@ -54,6 +54,12 @@
 #                                          GHCR does NOT silently move the
 #                                          running stack underneath us.
 #   /var/lib/iri/previous-digest-pin.yml   the prior pin, restored on rollback.
+#                                          Rotated ONLY by a change of target: a
+#                                          drift re-apply of the already-deployed
+#                                          target leaves it (and config-previous/
+#                                          and keycloak-spi-previous.jar) alone,
+#                                          so it keeps naming the release BEFORE
+#                                          the deployed one.
 #   /var/lib/iri/last-deployed.digests     idempotence marker — a fixed 5-field
 #                                          record backend|frontend|ingest|config|
 #                                          keycloak-spi. When ALL target digests
@@ -75,7 +81,10 @@
 #                                          with exponential backoff instead of
 #                                          on every tick. Cleared on a
 #                                          successful deploy or when a new
-#                                          digest is promoted to the tag.
+#                                          digest is promoted to the tag. A
+#                                          record keyed to the DEPLOYED target is
+#                                          a failed drift re-apply, which never
+#                                          rolls back (see the re-apply below).
 #   /var/lib/iri/health-restart.digests    backoff bookkeeping for the
 #                                          runtime-health targeted restart: when
 #                                          the running stack is already at the
@@ -114,6 +123,10 @@
 #                                          it (or the restore after a failed
 #                                          one) completed. While it exists,
 #                                          config-previous/ is not re-snapshotted.
+#                                          Never written by a drift re-apply: it
+#                                          re-applies the deployed release over
+#                                          itself, so its tree is one release
+#                                          even when it stops halfway.
 #   /var/lib/iri/keycloak-spi-stage.jar    the promoted provider JAR, extracted
 #                                          before anything on the host changes;
 #                                          swapped into keycloak/providers just
@@ -1391,7 +1404,9 @@ write_deploy_metric() {
 # DeployHealthRestartFailing alert WITHOUT overloading the promotion-outcome
 # metrics: `healthy` stamps basetool_deploy_last_stack_healthy_timestamp (a
 # freshness heartbeat written on every healthy tick), `restart_failed` stamps
-# basetool_deploy_last_health_restart_failed_timestamp. The alert fires while the
+# basetool_deploy_last_health_restart_failed_timestamp — by a failed targeted
+# restart AND, since 2026-09-25, by a failed drift re-apply (record_reapply_failure):
+# both are "the deployed release could not be restored". The alert fires while the
 # failed stamp is newer than the healthy one and self-clears on the next healthy
 # tick. Each write preserves the other gauge. Best-effort; never gates a deploy.
 write_stack_health_metric() {
@@ -1414,7 +1429,7 @@ write_stack_health_metric() {
     echo "# HELP basetool_deploy_last_stack_healthy_timestamp Unix time deploy.sh last observed the running app stack at target and healthy."
     echo "# TYPE basetool_deploy_last_stack_healthy_timestamp gauge"
     echo "basetool_deploy_last_stack_healthy_timestamp ${prev_healthy}"
-    echo "# HELP basetool_deploy_last_health_restart_failed_timestamp Unix time a targeted restart of an unhealthy at-target service last failed to restore health."
+    echo "# HELP basetool_deploy_last_health_restart_failed_timestamp Unix time deploy.sh last failed to restore the deployed release: a targeted restart of an unhealthy at-target service, or a drift re-apply."
     echo "# TYPE basetool_deploy_last_health_restart_failed_timestamp gauge"
     echo "basetool_deploy_last_health_restart_failed_timestamp ${prev_failed}"
   } | write_textfile "$(basename "${f}")" || true
@@ -1517,6 +1532,38 @@ KEYCLOAK_SPI_HAD_PREVIOUS=false
 UNITS_REDEFINED=""
 APP_IMAGES_CHANGED=""
 
+# --- A drift re-apply is not a release ---------------------------------------
+# REAPPLY is true when the target IS the last-deployed release and the running stack drifted from it
+# ("drift: frontend: no container … re-applying"). That run puts the SAME release back. It must not
+# touch what a rollback reads — previous-digest-pin.yml, config-previous/ (the previous units with
+# it), keycloak-spi-previous.jar — because those name the release BEFORE the deployed one, and
+# nothing else on the host remembers it.
+#
+# Until 2026-09-25 it did: the unconditional rt_pin_save copied the deployed pin over the previous
+# one on every re-apply, and a host with no unit files snapshotted the deployed tree over
+# config-previous/. A re-apply whose gate then failed "rolled back" to the release it was already on,
+# stamped basetool_deploy_last_rollback_timestamp — DeployRolledBack, for a release that had shipped
+# — and the real previous release was gone as a rollback anchor.
+#
+# So a failed re-apply rolls nothing back: the deployed release stays, the anchors keep pointing at
+# the one before it, and the failure is recorded as "the running release could not be restored":
+# failed.digests for the backoff (the one the drift path has always honoured), and the heal's
+# DeployHealthRestartFailing signal rather than a promotion outcome (record_reapply_failure).
+REAPPLY=false
+
+# record_reapply_failure <what> — a drift re-apply of the deployed release did not bring it back.
+# Counts it in failed.digests (keyed to the deployed target, so the re-apply backs off like any
+# failed target and a new promotion clears it) and stamps the runtime-health failure gauge that
+# DeployHealthRestartFailing reads. Not write_deploy_metric: rollback and failure there mean "a
+# promoted release did not ship", and this one had shipped.
+record_reapply_failure() {
+  local what="$1"
+  record_target_failure
+  log "${what} — re-apply of the deployed release failed (#${FAIL_COUNT}); nothing is rolled back: the target IS the deployed release, and the rollback anchors keep naming the release before it"
+  log "recorded re-apply failure #${FAIL_COUNT} for the deployed target; the next attempt backs off (--force retries now)"
+  write_stack_health_metric restart_failed
+}
+
 # shellcheck disable=SC2317  # runs indirectly via the EXIT trap armed before the config delivery
 on_pre_gate_exit() {
   local rc=$?
@@ -1527,6 +1574,14 @@ on_pre_gate_exit() {
   # is the part the alerting depends on.
   set +e
   log "FATAL: deploy aborted before the health gate — step '${DEPLOY_STEP:-unknown}' failed (exit ${rc})"
+
+  # A re-apply wrote the deployed release over itself: its config tree, pin and drop-ins are that
+  # release whether the step finished or not. "Restoring" them would put the PREVIOUS release's
+  # config and pin under the deployed one — a rollback without a health gate.
+  if [[ "${REAPPLY}" == "true" ]]; then
+    record_reapply_failure "step '${DEPLOY_STEP:-unknown}' failed"
+    exit "${rc}"
+  fi
 
   if [[ "${CONFIG_TREE_TOUCHED}" == "true" ]]; then
     restore_previous_config_tree
@@ -1808,6 +1863,8 @@ if [[ -f "${LAST_DEPLOYED_FILE}" ]] \
     done <<< "${DRIFT_REPORT}"
     if grep -q '^structural ' <<< "${DRIFT_REPORT}"; then
       DRIFTED=true
+      # The same release again, not a new one: the rollback anchors stay where they are (see REAPPLY).
+      REAPPLY=true
       log "running stack does not match the last-deployed target — re-applying"
       # A `health` finding beside a structural one is NOT healed by the re-apply: its unit is active,
       # and the re-apply's start of an active unit is a no-op. ADR-0083 keeps it that way (a wrong
@@ -1943,6 +2000,8 @@ fi
 # window. We back off exponentially per consecutive failure of the SAME digest
 # pair; promoting a new (fixed) image changes EXPECTED_MARKER, clears the record
 # and deploys at once, so only re-attempts of the known-bad pair are throttled.
+# A drift re-apply that failed is throttled here too: its record is keyed to the
+# deployed target (record_reapply_failure).
 if [[ -f "${FAILED_FILE}" ]]; then
   read -r REC_MARKER REC_COUNT REC_EPOCH _ < "${FAILED_FILE}" || true
   if [[ "${REC_MARKER:-}" != "${EXPECTED_MARKER}" ]] \
@@ -2086,14 +2145,24 @@ if [[ "${CONFIG_CHANGED}" == "true" ]]; then
   # Snapshot the live config tree as the rollback anchor, then swap in the new — unless an earlier
   # apply died halfway and could not be undone: the live tree is then a mix of two releases, and
   # snapshotting it would replace the last consistent anchor with that mix.
-  if [[ -f "${CONFIG_APPLY_INCOMPLETE_FILE}" && -d "${CONFIG_PREVIOUS_DIR}" ]]; then
+  #
+  # And never on a re-apply (a host whose unit files are gone while the marker matches): the live tree
+  # IS the deployed release, and snapshotting it would replace the previous release's tree — the
+  # anchor — with the deployed one. For the same reason the re-apply writes no incomplete-apply
+  # marker: it mirrors the deployed release over itself, so a tree it leaves halfway is still one
+  # release, and a marker would stop the NEXT real release from snapshotting it.
+  if [[ "${REAPPLY}" == "true" ]]; then
+    log "re-applying the deployed release's config — ${CONFIG_PREVIOUS_DIR} keeps the previous release as the rollback anchor"
+  elif [[ -f "${CONFIG_APPLY_INCOMPLETE_FILE}" && -d "${CONFIG_PREVIOUS_DIR}" ]]; then
     log "an earlier config apply did not complete and was not undone — keeping ${CONFIG_PREVIOUS_DIR} as the rollback anchor instead of snapshotting a half-applied tree"
   else
     DEPLOY_STEP="snapshot the live config tree into ${CONFIG_PREVIOUS_DIR}"
     snapshot_config_tree "${CONFIG_PREVIOUS_DIR}"
   fi
   DEPLOY_STEP="apply the config tree"
-  echo "${EXPECTED_MARKER}" > "${CONFIG_APPLY_INCOMPLETE_FILE}"
+  if [[ "${REAPPLY}" != "true" ]]; then
+    echo "${EXPECTED_MARKER}" > "${CONFIG_APPLY_INCOMPLETE_FILE}"
+  fi
   CONFIG_TREE_TOUCHED=true
   apply_config_tree "${CONFIG_STAGE_DIR}" "${COMPOSE_DIR}"
   DEPLOY_STEP="check ${COMPOSE_DIR}/.env after the swap"
@@ -2136,7 +2205,14 @@ DEPLOY_STEP="write the digest pin"
 PIN_HAD_PREVIOUS=false
 [[ -f "${PIN_FILE_CURRENT}" ]] && PIN_HAD_PREVIOUS=true
 PIN_TOUCHED=true
-rt_pin_save
+# Only a change of target rotates the anchor. A re-apply's live pin IS the target, so saving it would
+# copy the deployed release over the previous one — the anchor loss this guards against (REAPPLY).
+# The pin itself is still rewritten below: a lost drop-in is one of the drifts a re-apply repairs.
+if [[ "${REAPPLY}" == "true" ]]; then
+  log "re-applying the deployed release's digest pin — ${PIN_FILE_PREVIOUS} keeps the previous release as the rollback anchor"
+else
+  rt_pin_save
+fi
 rt_pin_apply \
   "backend=${BACKEND_IMAGE}@${BACKEND_DIGEST}" \
   "frontend=${FRONTEND_IMAGE}@${FRONTEND_DIGEST}" \
@@ -2249,6 +2325,19 @@ if rt_apply_stack; then
   # block a prune and we should not fail the deploy over it.
   rt_prune_images 720h
   exit 0
+fi
+
+# --- A failed re-apply is not a rollback ------------------------------------
+# The target is the deployed release, so there is nothing to roll back TO but itself — and rolling
+# further, to previous-digest-pin.yml, would take production back a release because a container went
+# missing. The deployed release stays, its anchors stay, and the failure goes to the backoff and the
+# runtime-health signal (REAPPLY, record_reapply_failure). DeployRolledBack is for a real rollback to
+# a different target only.
+if [[ "${REAPPLY}" == "true" ]]; then
+  log "health check failed within ${HEALTH_TIMEOUT}s on a re-apply of the deployed release — not rolling back"
+  log "health gate: did not come up, in start order: [${RT_FAILED_SERVICES:-none reported}]"
+  record_reapply_failure "the running release could not be restored"
+  exit 1
 fi
 
 # --- Rollback on health failure --------------------------------------------
