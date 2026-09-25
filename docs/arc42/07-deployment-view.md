@@ -193,45 +193,70 @@ two steps did not survive the move: ADR-0194, `docs/archive/PODMAN_MIGRATION_PLA
 ### 7.4b What the timers wait for after a boot, and what they deliberately do not
 
 The four units that reach the containers -- `iri-deploy`, `iri-backup`, `iri-restore-drill`,
-`iri-container-cleanup` -- run as the deploy account and reach the stack through the rootless
-service user. They used to be ordered on `docker.service`, which on this host does not exist: inert,
-and read as if it ordered them on their runtime, so nothing noticed that nothing did.
+`iri-container-cleanup` -- run as the deploy account, in a sandbox (the drop-in
+`10-deploy-account-sandbox.conf` the role installs beside each, OPS-SIMP-03), and reach the stack
+through the rootless service user. They used to be ordered on `docker.service`, which on this host
+does not exist: inert, and read as if it ordered them on their runtime, so nothing noticed that
+nothing did.
 
-The first reboot after the cutover showed what that costs. Three of the timers carry
-`Persistent=true`, so their catch-up runs fired eleven seconds after boot -- one second before
-`user@<uid>.service` came up. All three failed in runtime detection, `SystemdUnitFailed` paged
-critical, and each stayed failed until its next scheduled run: the next night, or the next week.
-The catch-up `Persistent=true` exists for was the run that was lost.
+Two reboots showed what that costs. On 2026-09-22 the backup, drill and cleanup ran eleven seconds
+after boot, one second before `user@<uid>.service`; on 2026-09-25 all four ran in the same second as
+it. Every one failed in runtime detection with "no lingering user could be found", sat `failed`
+until its next scheduled run and could page `SystemdUnitFailed`. The first was attributed to a
+`Persistent=true` catch-up and answered with a wait for the runtime directory to appear; the second
+could not have been a catch-up — nothing was due, and no timer's `LastTrigger` moved — and the wait
+did not engage. Both causes were reproduced on 2026-09-25 in a systemd container on the production
+versions (Rocky 10.2, systemd 257, podman 5.8.2):
 
-Two waits now live in `scripts/lib/container-runtime.sh`, not in the units, because only the script
-knows the service user's uid and only the script can see the signal that matters. (The four units
-share one sandbox, the drop-in `10-deploy-account-sandbox.conf` the role installs beside each —
-OPS-SIMP-03.)
+- **Why the jobs ran at boot.** Every `iri-*.timer` carried `Requires=<its service>`. A timer
+  started by `timers.target` then starts that service at once, without elapsing — the service ran
+  3 ms after its timer while `OnBootSec=5min` and `LastTrigger` stood still. It also turned
+  `systemctl start <timer>` into "run the job now". The six timers now carry only `Unit=`.
+- **Why they could not see the stack.** `ProtectHome=read-only` covers `/run/user` as well as
+  `/home`. A mount namespace built **before** `user-runtime-dir@<uid>` mounts the runtime tmpfs never
+  receives the mount: the job sees the bare, root-owned mount point for its whole life, and podman
+  fails with `lstat /run/user/<uid>/libpod: permission denied`. One built **after** sees the runtime
+  read-only, so podman there cannot set up its user namespace and can only *join* the pause process
+  the manager's first container creates; until then `set sticky bit on: chmod
+  /run/user/<uid>/libpod: read-only file system` — the 2026-09-25 line, reproduced verbatim.
 
-| wait | who | on what | bound |
+Three things now hold the jobs back, each on the signal it can actually see:
+
+| what | who | on what | bound |
 | --- | --- | --- | --- |
-| `rt_detect` | all four | the service user's runtime directory appearing, **only** when it is absent -- a runtime that exists and refuses is a real answer and is not waited on | 120 s |
+| `20-service-user.conf` (role template) | all four | `After=systemd-logind.service user@<uid>.service` — so the sandbox is built after the runtime is mounted. After= only: a Wants= would let a tick start a manager an operator stopped | — |
+| `rt_detect` | all four | the runtime becoming **visible** (the directory owned by the service user, not the bare mount point — podman is not run before), then, if podman refuses while the manager is `initializing`/`starting`/silent, its first container. A refusal from a `running` or `degraded` manager is answered at once, quoting podman | 120 s |
 | `rt_wait_for_startup` | backup, drill, cleanup | the user manager's `is-system-running` leaving `starting` -- `running` or `degraded` | 600 s |
 
-The second exists because the first is not enough. `user@<uid>.service` reports ready as soon as
-the manager runs; measured on the same boot, that was 16:26:03, while the manager's own startup
-finished at 16:27:33. An `After=user@<uid>.service` would have fixed detection and then let the
-backup's quiesce stop the backend while it was still starting.
+The last exists because the others are not enough. `user@<uid>.service` reports ready as soon as
+the manager runs; measured on the 2026-09-22 boot that was 16:26:03, while the manager's own startup
+finished at 16:27:33. The ordering makes detection possible; it would still have let the backup's
+quiesce stop the backend while it was starting.
 
-> [!warning] The waits did not cover the 2026-09-25 reboot
+> [!success] Fixed 2026-09-25 (#2069): the waits did not cover the 2026-09-25 reboot
 > Rebooted for a kernel at 15:56 UTC, production started all four services at 15:57:30 (their timers'
 > `LastTrigger` unchanged) and all four failed within a second:
-> `FATAL: podman is installed but no lingering user could be found that owns the containers (looked in /var/lib/systemd/linger)`
-> — with `/var/lib/systemd/linger/iri` present, logind up at 15:57:27 and `user@<uid>.service`
-> at 15:57:30. The line has no "after waiting" clause, so `rt_detect` did not wait: the runtime
-> directory was already there (or the user lookup failed), and the `podman ps` probe failed
-> regardless — the shape this table deliberately does not wait on. The stack was unaffected and the
-> next regular tick succeeds; the fix is an open follow-up (§11.6).
+> `FATAL: podman is installed but no lingering user could be found that owns the containers (looked in /var/lib/systemd/linger)`.
+> The two causes above explain it; the table is what replaced the old single wait for the runtime
+> directory, which waited for something that was already there and could never become the runtime.
+> Reproduced on a real reboot of the container with the change applied: the job was held until the
+> manager was up, waited 12 s for the first container, and succeeded; with the timer fixed, nothing
+> ran at boot at all.
+
+> [!warning] A sandboxed podman must never be the first podman after a boot
+> In one reproduction a `podman ps` run from the sandbox while the runtime was not visible set up
+> podman's user namespace itself, from the sandbox's read-only view of `/home`. The pause process it
+> left behind was what the manager's containers then joined, and they failed with
+> `storage.lock: read-only file system` — a probe that broke the stack it probed. That is why
+> `rt_detect` runs no podman until the runtime is visible (and, with the ordering, read-only, so
+> podman can only join). Not observed on production.
 
 **`iri-deploy` does not wait for startup, on purpose.** A stack stuck in `starting` because a unit
 will not come up may be exactly what the next release exists to fix, and a deployer that refused to
-act until startup finished could never deliver it. `container-runtime.test.sh` asserts both the
-three calls and the one absence.
+act until startup finished could never deliver it. It does wait, bounded, for the first container
+to exist — without one there is nothing it could reach. Since the timer lost its `Requires=`, its
+first run is five minutes after boot, when that is long done. `container-runtime.test.sh` asserts
+the three calls, the one absence, the timers and the ordering drop-in.
 
 ## 7.5 Delivery
 

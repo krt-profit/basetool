@@ -150,9 +150,12 @@ until then the risk is bounded, named and watched, which is the most this layer 
   `iri-backup`, `iri-restore-drill` and `iri-container-cleanup` all started at boot and failed
   within a second with "no lingering user could be found" — a failure shape §7.4b's boot-time wait
   does not cover. The stack is unaffected and the next regular tick succeeds, but the units sit
-  `failed` until then. The code fix is an open follow-up;
-  [`deployment.md` → host patching](../deployment.md#updating-the-operational-scripts-and-units)
-  records the symptom.
+  `failed` until then. **Fixed in the repository by #2069** (2026-09-25): the timers no longer pull
+  their service in, the four units are ordered after the service user's manager, and `rt_detect`
+  waits for what a sandboxed job can actually see — §7.4b has both causes.
+  **Closes** when the role's `--tags scripts` run has put it on production and a reboot, testing
+  host first, leaves no `iri-*` unit `failed`
+  ([`deployment.md` → host patching](../deployment.md#updating-the-operational-scripts-and-units)).
 - **A Keycloak restart is a full-app restart.** `backend` `Requires=` keycloak and `frontend` /
   `ingest` require backend, so `systemctl --user restart keycloak.service` — by hand or by a
   provider-JAR delivery — takes the app down with it: about two minutes of maintenance page, measured

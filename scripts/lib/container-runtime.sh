@@ -61,8 +61,13 @@ RT_RUNTIME_WAIT="${RT_RUNTIME_WAIT:-120}"
 RT_STARTUP_WAIT="${RT_STARTUP_WAIT:-600}"
 RT_POLL_INTERVAL="${RT_POLL_INTERVAL:-2}"
 
-# Seconds rt_detect actually spent waiting, so its refusal can say so. Not configuration.
+# What rt_detect's last probe saw, so its refusal can say so. Not configuration: the seconds it
+# spent waiting, whether the service user's runtime was ever visible from this process, and the
+# last line podman wrote to stderr (it used to be discarded, which is why the 2026-09-25 refusal
+# named no cause at all).
 RT_RUNTIME_WAITED=0
+RT_RUNTIME_SEEN=0
+RT_PROBE_ERROR=""
 
 # Monitoring services that are HOST services under Podman rather than containers, so a reconcile has
 # to restart the system unit instead of asking the service user's systemd about a unit it has never
@@ -194,8 +199,7 @@ rt_detect() {
       # detection fail with "you are not allowed to set the following environment
       # variables" on the one host whose sudo rule was written properly -- so the
       # wider grant would have been needed for the command that does not need it.
-      rt_wait_for_user_runtime "${u}" "${uid}"
-      if sudo -n -u "${u}" podman ps --format '{{.Names}}' >/dev/null 2>&1; then
+      if rt_probe_service_user "${u}" "${uid}"; then
         RT_CLI="sudo -n -u ${u} podman"
         RT_SYSTEMCTL="sudo -n -u ${u} XDG_RUNTIME_DIR=${RT_RUNTIME_BASE}/${uid} systemctl --user"
         # The SYSTEM manager, for RT_HOST_SERVICES. Running as root already has it; the deploy
@@ -229,63 +233,119 @@ rt_detect() {
         return 0
       fi
     done
-    if (( RT_RUNTIME_WAITED > 0 )); then
-      rt_die "podman is installed but no lingering user could be found that owns the containers (looked in ${RT_LINGER_DIR}, after waiting ${RT_RUNTIME_WAITED}s for a runtime directory under ${RT_RUNTIME_BASE} to appear)"
+    local why=""
+    (( RT_RUNTIME_WAITED > 0 )) && why+=", after waiting ${RT_RUNTIME_WAITED}s for the service user's runtime under ${RT_RUNTIME_BASE} to come up"
+    if (( RT_RUNTIME_WAITED > 0 && RT_RUNTIME_SEEN == 0 )); then
+      # The directory may well exist and still not be the runtime: see rt_runtime_visible.
+      why+="; it never became visible to this process -- a unit that starts before user@<uid>.service never sees it (the 20-service-user.conf ordering drop-in, ansible/roles/basetool_host/tasks/25-scripts.yml)"
     fi
-    rt_die "podman is installed but no lingering user could be found that owns the containers (looked in ${RT_LINGER_DIR})"
+    [[ -n "${RT_PROBE_ERROR}" ]] && why+="; podman said: ${RT_PROBE_ERROR}"
+    rt_die "podman is installed but no lingering user could be found that owns the containers (looked in ${RT_LINGER_DIR}${why})"
   fi
 
   rt_die "this host has no podman"
 }
 
 # -----------------------------------------------------------------------------
-# rt_wait_for_user_runtime <user> <uid>
+# rt_runtime_visible <uid>
 #
-# Wait, bounded, for a lingering user's runtime to come up -- but ONLY when its
-# runtime directory does not exist yet. That is the one shape of "podman ps
-# failed" that is worth waiting for: the user has declared it runs services, and
-# its manager simply has not started yet. Every other failure is a real answer
-# and is returned at once, as before.
+# Whether the service user's runtime -- the tmpfs systemd mounts at
+# /run/user/<uid> for its manager -- is visible FROM THIS PROCESS. Not the same
+# question as "does the directory exist", and the difference is the whole of the
+# 2026-09-22 and 2026-09-25 boot failures.
 #
-# WHY IT EXISTS. Measured on the production host 2026-09-22, the first reboot
-# after the cutover:
+# user-runtime-dir@<uid>.service creates the directory and then mounts a tmpfs
+# owned by the user on it. The four deploy-account units run in their own mount
+# namespace (ProtectHome=read-only, which covers /run/user as well as /home), and
+# a mount made on the host AFTER that namespace was set up does not reach it.
+# Reproduced 2026-09-25 on Rocky 10.2 / systemd 257 / podman 5.8.2: a sandboxed
+# unit started before the user's manager saw /run/user/<uid> as the bare,
+# root-owned mount point for its whole life, and every `podman ps` failed with
+# "lstat /run/user/<uid>/libpod: permission denied". Waiting for the directory to
+# APPEAR, which is what this function replaced, waited for something that was
+# already there and could never become the runtime.
 #
-#   16:25:51  boot
-#   16:26:02  iri-backup, iri-container-cleanup and iri-restore-drill start --
-#             their timers carry Persistent=true, so each catch-up run fires
-#             at once -- and all three die here with "no lingering user could
-#             be found"
-#   16:26:03  user@994.service becomes active
-#
-# They lost the race by one second. A failed oneshot is not "one retry" -- it
-# puts the unit into `failed`, SystemdUnitFailed pages CRITICAL, and it stays
-# failed until the next scheduled run: the next night for the backup, the next
-# WEEK for the other two. And the run that was lost is exactly the catch-up
-# Persistent=true exists to provide.
-#
-# Only the directory is tested before sudo, because only the directory is
-# visible to the account this runs as: /run/user is 0755, the directory under
-# it is 0700 and owned by the service user, so the deploy account can stat it
-# and cannot look inside.
-#
-# Returns 0 whatever happens. The caller's own `podman ps` decides.
+# So visible means: the directory exists and the service user owns it. The
+# bare mount point is root's. The deploy account can stat both; it can look into
+# neither.
 # -----------------------------------------------------------------------------
-rt_wait_for_user_runtime() {
-  local u="$1" uid="$2" waited=0
-  [[ -d "${RT_RUNTIME_BASE}/${uid}" ]] && return 0
-  echo "container-runtime: ${u} lingers but ${RT_RUNTIME_BASE}/${uid} does not exist yet --" \
-       "waiting up to ${RT_RUNTIME_WAIT}s for its manager to start" >&2
-  while (( waited < RT_RUNTIME_WAIT )); do
+rt_runtime_visible() {
+  local dir="${RT_RUNTIME_BASE}/$1" owner
+  [[ -d "${dir}" ]] || return 1
+  owner="$(stat -c '%u' "${dir}" 2>/dev/null)" || return 1
+  [[ "${owner}" == "$1" ]]
+}
+
+# -----------------------------------------------------------------------------
+# rt_probe_service_user <user> <uid>
+#
+# Can this process reach <user>'s containers? `podman ps` through the sudo bridge
+# answers, and a refusal is waited on, bounded by RT_RUNTIME_WAIT, in exactly two
+# shapes -- both of them a manager that is still coming up:
+#
+#   * the runtime is not visible yet (rt_runtime_visible). podman is NOT run
+#     then: with no runtime to find, rootless podman falls back to a directory of
+#     its own and sets up a user namespace from inside this sandbox. Reproduced
+#     2026-09-25, that once left the service user's pause process born in the
+#     sandbox's read-only view of /home, after which the user manager's own
+#     container failed with "storage.lock: read-only file system" -- a probe that
+#     broke the stack it was probing.
+#   * the runtime is visible, podman refuses, and the manager's own state is
+#     `initializing`, `starting` or no answer. A sandboxed podman cannot set up
+#     the rootless namespace itself -- the runtime is read-only in here -- it can
+#     only JOIN the pause process the manager's first container creates. Until
+#     that exists every call fails with "set sticky bit on: chmod
+#     /run/user/<uid>/libpod: read-only file system". Reproduced 2026-09-25: this
+#     is the 2026-09-25 production refusal, verbatim, and it cleared as soon as
+#     one container ran.
+#
+# A refusal while the manager is `running` or `degraded` (or `stopping`, ...) is
+# a real answer and is returned at once, as before -- a genuine misconfiguration
+# must not become two minutes slower. So is the self-test's preset backend.
+#
+# A normal tick pays one stat: the runtime is visible and podman answers first
+# time, so nothing here waits and the manager is never asked.
+#
+# Returns 0 when podman answered, 1 when it did not. Leaves RT_RUNTIME_WAITED,
+# RT_RUNTIME_SEEN and RT_PROBE_ERROR for rt_detect's refusal.
+# -----------------------------------------------------------------------------
+rt_probe_service_user() {
+  local u="$1" uid="$2" waited=0 err state announced=""
+  RT_PROBE_ERROR=""
+  while :; do
+    if rt_runtime_visible "${uid}"; then
+      RT_RUNTIME_SEEN=1
+      # stdout to /dev/null, stderr captured: the order of the two redirections is what does that.
+      if err="$(sudo -n -u "${u}" podman ps --format '{{.Names}}' 2>&1 >/dev/null)"; then
+        (( waited > 0 )) && echo "container-runtime: ${u}'s runtime answered after ${waited}s" >&2
+        return 0
+      fi
+      err="${err%$'\n'}"
+      RT_PROBE_ERROR="${err##*$'\n'}"
+      # `|| true`: a manager that is not answering yet makes systemctl exit non-zero, and the
+      # callers run under `set -e`. The environment goes to systemctl, not to podman -- see the
+      # comment in rt_detect for why the asymmetry is measured.
+      state="$(sudo -n -u "${u}" XDG_RUNTIME_DIR="${RT_RUNTIME_BASE}/${uid}" systemctl --user is-system-running 2>/dev/null)" || true
+      case "${state}" in
+        initializing|starting|"") ;;
+        *) return 1 ;;
+      esac
+    fi
+    (( waited >= RT_RUNTIME_WAIT )) && return 1
+    if [[ -z "${announced}" ]]; then
+      announced=1
+      if (( RT_RUNTIME_SEEN )); then
+        echo "container-runtime: ${u}'s manager is '${state:-not answering}' and its runtime refuses yet --" \
+             "waiting up to ${RT_RUNTIME_WAIT}s for its first container" >&2
+      else
+        echo "container-runtime: ${u} lingers but its runtime ${RT_RUNTIME_BASE}/${uid} is not up yet --" \
+             "waiting up to ${RT_RUNTIME_WAIT}s for its manager to start" >&2
+      fi
+    fi
     sleep "${RT_POLL_INTERVAL}"
     waited=$(( waited + RT_POLL_INTERVAL ))
     RT_RUNTIME_WAITED=${waited}
-    if [[ -d "${RT_RUNTIME_BASE}/${uid}" ]] \
-       && sudo -n -u "${u}" podman ps --format '{{.Names}}' >/dev/null 2>&1; then
-      echo "container-runtime: ${u}'s runtime answered after ${waited}s" >&2
-      return 0
-    fi
   done
-  return 0
 }
 
 # -----------------------------------------------------------------------------
@@ -297,13 +357,15 @@ rt_wait_for_user_runtime() {
 # answers" is not enough: the manager answers within a second of boot and the
 # stack is not up for another minute and a half.
 #
-# Measured on the same boot: user@994.service was ACTIVE at 16:26:03 -- its
+# Measured on the 2026-09-22 boot: user@994.service was ACTIVE at 16:26:03 -- its
 # Type=notify-reload reports ready as soon as the manager runs -- while the
-# manager itself logged "Startup finished in 1min 30.765s" at 16:27:33. Ordering
-# the units after user@<uid>.service would therefore have fixed the detection and
-# then let backup.sh QUIESCE the backend, frontend and ingest while they were
-# still starting. That is why this is not a unit dependency: the signal that
-# matters is the manager's own state, not whether its unit is up.
+# manager itself logged "Startup finished in 1min 30.765s" at 16:27:33. The
+# units ARE ordered after user@<uid>.service since 2026-09-25 (the role's
+# 20-service-user.conf), but that ordering exists so the runtime is mounted
+# before a unit's sandbox is built (rt_runtime_visible). It says nothing about
+# the stack: it would let backup.sh QUIESCE the backend, frontend and ingest
+# while they were still starting. The signal that matters here is the manager's
+# own state, not whether its unit is up.
 #
 # `running` and `degraded` both mean startup is over -- degraded is merely that
 # some unit failed, which podman's transient healthcheck units do routinely.

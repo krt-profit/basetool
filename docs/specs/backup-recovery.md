@@ -38,6 +38,8 @@ nothing is pulled or exposed), consistent with the pull-only host posture of REQ
 **Acceptance**
 
 - [ ] `iri-backup.timer` fires `backup.sh` daily at 04:15; `Persistent=true` catches up a missed run.
+  That catch-up is the only run at boot — the timer does not pull the service in — and it waits for
+  the service user's manager instead of failing (REQ-OPS-016, since 2026-09-25).
 - [ ] The repository is a restic repo (client-side encrypted, deduplicated); the storage target
   (Nextcloud over rclone WebDAV) only ever receives encrypted blobs.
 - [ ] After each upload the job runs `restic forget --keep-daily 7 --keep-weekly 4 --keep-monthly 6

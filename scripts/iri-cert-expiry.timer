@@ -12,7 +12,10 @@
 [Unit]
 Description=Profit Basetool — certificate expiry metrics, daily
 Documentation=https://github.com/krt-profit/basetool/blob/main/scripts/cert-expiry-metrics.py
-Requires=iri-cert-expiry.service
+; No Requires= on the service: a timer only TRIGGERS it, through Unit= below. A Requires= also
+; starts the service whenever the timer itself starts -- at every boot, when timers.target pulls the
+; timer in -- without the timer elapsing (docs/arc42/07-deployment-view.md §7.4b). Guarded by
+; scripts/container-runtime.test.sh.
 
 [Timer]
 ; Once shortly after boot as well: a freshly provisioned or rebooted host should not wait until the

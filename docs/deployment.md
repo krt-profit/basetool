@@ -685,7 +685,9 @@ systemctl start iri-deploy.timer
 
 **Reboot.** `iri` lingers and every unit is `WantedBy=default.target`, so the stack starts at boot
 without a login; haproxy and the timers are enabled. The first deploy tick follows five minutes
-later. Expect four failed `iri-*` units right after the boot — see *Host patching* in
+later. A backup, drill or cleanup that fell due while the host was down runs once at boot
+(`Persistent=true`), waits for `iri`'s manager and then for its startup, and succeeds; nothing else
+runs at boot. Until #2069 all four `iri-*` jobs ran at boot and failed — see *Host patching* in
 [Updating the operational scripts and units](#updating-the-operational-scripts-and-units).
 
 ### Logs
@@ -967,21 +969,31 @@ units are `WantedBy=default.target` and `iri` lingers. The runtime (podman, crun
 aardvark-dns, containers-common, passt) is updated by hand, testing host first:
 `dnf upgrade --security podman crun conmon netavark aardvark-dns containers-common passt`.
 
-> [!warning] Known after-reboot effect: four failed `iri-*` units (open follow-up)
+> [!success] Fixed by #2069 (2026-09-25): four failed `iri-*` units after a reboot
 > Production was rebooted for kernel 6.12.0-211.58.1 on 2026-09-25 at 15:56 UTC; all 18 containers
 > were back healthy by 15:59 and `basetool_host_reboot_required` went to 0. But at 15:57:30 the
 > **services** `iri-deploy`, `iri-backup`, `iri-restore-drill` and `iri-container-cleanup` were
-> started — their timers' `LastTrigger` did not move, and all four timers are `Persistent=yes` — and
-> each failed within a second. `deploy.sh` logged
-> `FATAL: podman is installed but no lingering user could be found that owns the containers (looked in /var/lib/systemd/linger)`,
-> although `/var/lib/systemd/linger/iri` has existed since 2026-09-18; logind came up at 15:57:27
-> and `user@<iri uid>.service` at 15:57:30. The line carries no "after waiting …" clause, so
-> `rt_detect` did not wait: read against `scripts/lib/container-runtime.sh`, either the runtime
-> directory already existed and the `podman ps` probe failed anyway, or the user lookup failed —
-> neither is a case the boot-time wait covers (arc42 §7.4b). The root cause is not established. **The stack is unaffected**; the
-> units stay `failed` (and `SystemdUnitFailed` may page) until their next regular tick, which
-> succeeds. The code fix is an open follow-up; until it lands, after a reboot check
-> `systemctl --failed` and read the four logs before assuming anything else broke.
+> started — their timers' `LastTrigger` did not move — and each failed within a second with
+> `FATAL: podman is installed but no lingering user could be found that owns the containers (looked in /var/lib/systemd/linger)`.
+> Two causes, both reproduced in a Rocky 10.2 / systemd 257 / podman 5.8.2 container
+> (arc42 §7.4b):
+>
+> - **Why they ran at all:** every `iri-*.timer` carried `Requires=<its service>`, which starts the
+>   service whenever the *timer* starts — at every boot — without the timer elapsing. Nothing was
+>   due; not a `Persistent=` catch-up. The timers no longer pull their service in.
+> - **Why they failed:** the jobs run in a sandbox (`ProtectHome=read-only`, which covers `/run/user`
+>   too). A job started before `user@<iri uid>.service` mounted `/run/user/<uid>` never sees that
+>   mount; one started just after sees it read-only and cannot reach a container until the manager's
+>   first one runs (podman: `set sticky bit on: chmod /run/user/<uid>/libpod: read-only file system`).
+>   The jobs are now ordered after the manager (`20-service-user.conf`, templated by the role), and
+>   `rt_detect` waits, bounded, while that manager is still starting — and quotes podman when it
+>   refuses.
+>
+> What a reboot looks like now is under **Reboot** in [Driving the stack](#driving-the-stack).
+> **Starting a timer no longer runs its job.** `systemctl start iri-backup.timer` arms it for 04:15;
+> run a job now with `systemctl start iri-backup.service`. (`iri-deploy.timer` still fires at once on
+> a host that has been up more than five minutes, because its `OnBootSec` has passed.) Reaches a host
+> only through the role: `--tags scripts`.
 
 Confirm by content, never by mtime:
 `sha256sum /var/iri/code/scripts/deploy.sh` against `git show origin/main:scripts/deploy.sh | sha256sum`.
@@ -1653,6 +1665,8 @@ goes.
 | `login to ghcr.io failed` / `cannot resolve …:stable` | the same log | expired or revoked token, or `deploy` cannot read it — see [Token rotation](#token-rotation) |
 | `SECURITY: cosign signature verification failed` | the same log, it quotes cosign | Sigstore/GHCR outage (it retried three times), or a genuinely untrusted digest — treat as a supply-chain incident until disproved |
 | `no lingering user could be found` / `cannot chdir to /root` | the command's own output | run from `/`; `iri` must linger (`ls /var/lib/systemd/linger`) |
+| `no lingering user …; it never became visible to this process` | the job's log | the unit started before `iri`'s manager and its sandbox cannot see `/run/user/<uid>`: the `20-service-user.conf` drop-in is missing — `systemctl show iri-backup.service -p After` must name `user@<uid>.service`; re-run the role, `--tags scripts` |
+| `no lingering user …; podman said: … /run/user/<uid>/libpod: read-only file system` | the job's log | `iri`'s manager is up but no container of its has run since boot, so there is no podman pause process for the sandboxed job to join; start the stack (`systemctl --user start` as `iri`) and run the job again |
 | Health check fails, rollback | `${UPOD} ps`, `${UPOD} logs <svc>`, `${UCTL} status <svc>.service` | a broken release — inspect the rolled-back container's logs |
 | Container never starts, `statfs …: no such file or directory` | `${UCTL} status <svc>.service` | a missing bind-mount source — see [Secrets and host-only files](#secrets-and-host-only-files) |
 | keycloak cannot read `/run/secrets/keystore.p12` | `${UPOD} logs keycloak`, `getfacl -p /var/iri/secrets/keystore.p12` | the ACL for uid 100999 is missing — re-apply step 4 of the [rotation](#internal-keystore-and-certificate-rotation) |

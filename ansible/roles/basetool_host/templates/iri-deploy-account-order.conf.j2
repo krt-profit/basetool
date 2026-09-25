@@ -1,0 +1,27 @@
+{{ ansible_managed | comment }}
+;
+; Installed by the Ansible role (tasks/25-scripts.yml) as
+;   /etc/systemd/system/<unit>.d/20-service-user.conf
+; beside iri-deploy, iri-backup, iri-restore-drill and iri-container-cleanup. A template and not a
+; file under scripts/ for one reason: the rootless service user's uid is known here and nowhere
+; else, and a unit name cannot be looked up at run time.
+;
+; WHY THE ORDERING. These jobs run in a mount namespace of their own (the shared sandbox drop-in,
+; ProtectHome=read-only, which covers /run/user as well as /home). systemd builds that namespace
+; when the job starts, and a mount made on the host afterwards does not reach it. The service
+; user's runtime is exactly such a mount: user-runtime-dir@<uid>.service creates /run/user/<uid>
+; and mounts a tmpfs on it just before user@<uid>.service starts. A job started first sees the
+; bare, root-owned mount point for its whole run, and podman cannot reach a single container.
+; Reproduced 2026-09-25 on Rocky 10.2 / systemd 257 / podman 5.8.2; with this drop-in the same
+; boot held the job back until the manager was up (docs/arc42/07-deployment-view.md §7.4b).
+;
+; systemd-logind.service is named as well because that is what queues user@<uid>.service at boot
+; for a lingering user: ordering on a unit that has no job yet orders nothing, and once logind is up
+; the manager's start job is in the queue.
+;
+; After= ONLY, never Wants= or Requires=. Pulling the manager in would make a deploy tick or a
+; backup START a service user an operator had deliberately stopped -- and with it every container.
+; When the manager is already up, as on every tick but the first after a boot, this orders nothing.
+
+[Unit]
+After=systemd-logind.service user@{{ basetool_host_service_uid }}.service
