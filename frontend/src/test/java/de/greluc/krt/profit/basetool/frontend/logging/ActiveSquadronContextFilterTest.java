@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.logging;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.frontend.controller.MeFrontendController;
+import jakarta.servlet.DispatcherType;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
@@ -99,6 +100,58 @@ class ActiveSquadronContextFilterTest {
 
     assertThat(MDC.get(ActiveSquadronContextFilter.ORG_UNIT_ID_MDC_KEY)).isNull();
     assertThat(ActiveSquadronContext.get()).isNull();
+  }
+
+  @Test
+  void asyncDispatchRebindsTheStashedOrgUnitButNeitherTheSessionNorTheScopeHolder()
+      throws Exception {
+    UUID stashed = UUID.randomUUID();
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.setDispatcherType(DispatcherType.ASYNC);
+    request.setAttribute(ActiveSquadronContextFilter.ORG_UNIT_ID_ATTRIBUTE, stashed.toString());
+    request
+        .getSession()
+        .setAttribute(MeFrontendController.ACTIVE_ORG_UNIT_SESSION_KEY, UUID.randomUUID());
+    AtomicReference<String> mdcInsideChain = new AtomicReference<>();
+    AtomicReference<UUID> scopeInsideChain = new AtomicReference<>();
+
+    filter.doFilter(
+        request,
+        new MockHttpServletResponse(),
+        (req, res) -> {
+          mdcInsideChain.set(MDC.get(ActiveSquadronContextFilter.ORG_UNIT_ID_MDC_KEY));
+          scopeInsideChain.set(ActiveSquadronContext.get());
+        });
+
+    assertThat(mdcInsideChain.get()).isEqualTo(stashed.toString());
+    assertThat(scopeInsideChain.get())
+        .as("the async pass restores a log field, not the outbound data scope")
+        .isNull();
+    assertThat(MDC.get(ActiveSquadronContextFilter.ORG_UNIT_ID_MDC_KEY)).isNull();
+  }
+
+  @Test
+  void asyncDispatchWithoutAStashLeavesTheKeyUnbound() throws Exception {
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.setDispatcherType(DispatcherType.ASYNC);
+    AtomicReference<String> mdcInsideChain = new AtomicReference<>("unset");
+
+    filter.doFilter(
+        request,
+        new MockHttpServletResponse(),
+        (req, res) -> mdcInsideChain.set(MDC.get(ActiveSquadronContextFilter.ORG_UNIT_ID_MDC_KEY)));
+
+    assertThat(mdcInsideChain.get()).isNull();
+  }
+
+  @Test
+  void initialDispatchStashesTheBoundValue() throws Exception {
+    MockHttpServletRequest request = new MockHttpServletRequest();
+
+    filter.doFilter(request, new MockHttpServletResponse(), (req, res) -> {});
+
+    assertThat(request.getAttribute(ActiveSquadronContextFilter.ORG_UNIT_ID_ATTRIBUTE))
+        .isEqualTo(ActiveSquadronContextFilter.NO_ACTIVE_ORG_UNIT);
   }
 
   /**

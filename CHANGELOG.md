@@ -8,6 +8,10 @@
   Sekunden an.** Er prüft die Sitzung, beendet den Stream bei einem 401 und schickt zur Anmeldung;
   wiederholte Fehlversuche warten zunehmend länger. Ein Browser, der einen offenen Stream verlässt,
   erzeugt im Log kein `ERROR` mehr.
+- **Logs: Zeilen aus einem asynchronen Dispatch (z. B. Ende oder Fehler eines Live-Streams) tragen
+  wieder `correlationId`, `userId` und `orgUnitId` der ursprünglichen Anfrage** statt
+  `userId=anonymous` ohne Korrelations-ID — in Frontend und Backend. Es wird dabei keine neue ID
+  erzeugt.
 
 ## [v1.11.0](https://github.com/krt-profit/basetool/releases/tag/v1.11.0) - 2026-09-25
 

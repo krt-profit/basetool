@@ -387,7 +387,9 @@ takes it (and Tomcat's `ClientAbortException`) at `DEBUG` with a `void` return, 
 into the dead response; before it existed the exception reached the `Exception` catch-all, which
 logged `ERROR` and then made Tomcat log a second line when the error page could not be rendered
 (33 lines in two minutes right after the v1.11.0 deploy). Those lines read `userId=anonymous`
-because an async dispatch runs without the request thread's MDC, not because the caller was.
+because the async dispatch then ran without the request's MDC, not because the caller was; since
+2026-09-25 the async dispatch carries the request's `correlationId`, `userId` and `orgUnitId`
+([`observability.md`](observability.md) REQ-OBS-001).
 
 **A stream refused for a missing session stops reconnecting.** An anonymous `GET
 /notifications/stream` meets the entry point like every background call: `401` + `X-Reauthenticate`,
