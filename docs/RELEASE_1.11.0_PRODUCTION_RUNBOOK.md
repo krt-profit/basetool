@@ -270,7 +270,8 @@ production's `.env`; the leftover `/var/iri/code/scripts/lib/container-runtime.s
 >   restarted with it. The runbooks now warn at every Keycloak restart.
 > - **APPSEC-04 steps 2–5** — ~15:47–15:51 UTC with `iri-deploy.timer` stopped; `REDIS_DEFAULT_USER=off`.
 >   From now on a rollback to 1.10.0 needs `default` back on first (§6). The frontend's refused
->   `CONFIG GET` at each start is expected (`deployment.md` → *The Redis ACL*).
+>   `CONFIG GET` at each start is expected on 1.11.0 and gone once #2067 is released
+>   (`deployment.md` → *The Redis ACL*).
 > - **Tidy-ups** — the duplicate `IRI_BACKEND_EXPECTED_AUDIENCES` line removed from `.env` (inode
 >   kept); `container-runtime.sh.bak-2026-09-22` deleted.
 > - **Host reboot** for kernel 6.12.0-211.58.1 at 15:56 UTC — all 18 containers healthy by 15:59,
@@ -291,8 +292,14 @@ production's `.env`; the leftover `/var/iri/code/scripts/lib/container-runtime.s
 >
 > **Still open:** APPSEC-05 `enforce` (not before 2026-10-02, once both report queries are empty);
 > the host's `realm-export.json` seed for the confidential client (a host write); ING-SEC-04 step 3 (the `PATH_VARS` release, #2036)
-> and step 4; #1992, the `Internal=true` networks — testing first, and the testing host is still
-> held; the Android release (basetool-android #182).
+> and step 4; the Android release (basetool-android #182).
+>
+> **Later the same evening:** #1992 was applied on **production** directly (owner's choice, testing
+> skipped): the five data networks are `internal=true` since 16:24 UTC after a ~2.5-minute
+> maintenance ([`deployment.md` → Network changes](deployment.md#network-changes-are-installed-not-applied));
+> the testing host still has the old networks. The frontend's refused `CONFIG GET` noted above
+> disappears with the release that carries #2067. The Android release v0.3.1 (versionCode 16) was
+> tagged; the served-version floor moves to 16 only once it is published.
 
 ---
 

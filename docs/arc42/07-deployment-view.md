@@ -68,7 +68,8 @@ Consequences worth stating:
 - **The data networks have no egress.** `net-db-*` and `net-redis-*` are `Internal=true` in the
   units, so the two databases and Redis, which sit on nothing else, cannot reach the internet
   (ADR-0162, extended 2026-09-22). Compose keeps them non-internal for the local `-dev` twins, which
-  publish their ports there.
+  publish their ports there. *Applied on production on 2026-09-25 (the networks recreated, a
+  ~2.5-minute maintenance); the testing host still runs the old, non-internal networks.*
 - **Redis's ACL is rendered, not written.** `/var/iri/redis/users.acl` comes from
   `scripts/redis-users.acl.tmpl` through `render-redis-acl.py` (installed by the role), one user per
   service and SHA-256 hashes only, and is applied live with `ACL LOAD` (REQ-SEC-068, ADR-0207).

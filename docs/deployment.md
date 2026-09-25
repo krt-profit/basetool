@@ -257,15 +257,16 @@ own users (ingest connects on demand), `REDIS_DEFAULT_USER=off`. Verified: an un
 health check is healthy and the exporter reports `redis_up 1`. A release rollback now needs
 `default` back **on** first (see *Rollback* below).
 
-> [!note] One refused `CONFIG GET` per frontend start is expected — do not chase it
-> "No longer needs" is not "no longer tries". The frontend's `TolerantKeyspaceNotificationsAction`
-> still runs Spring Session's `CONFIG GET notify-keyspace-events` at every start, the ACL refuses it
-> by design, and the action logs an `INFO` line and carries on. It shows in `ACL LOG` as
-> `reason=command`, `context=toplevel`, object `config|get`, user `basetool-frontend` — measured on
-> production 2026-09-25 at a count of **2 per frontend start** — and it increments
-> `redis_acl_access_denied_cmd_total`. `RedisAclDenials` (`increase[5m] > 0` held `for: 5m`) did not
-> fire for it on 2026-09-25. Any other `ACL LOG` entry — another user, another command, a `key` or
-> `channel` reason, an `auth` refusal — is a real finding.
+> [!note] A refused `CONFIG GET` per frontend start — on 1.11.0 only, gone once #2067 is released
+> On release 1.11.0 the frontend's `TolerantKeyspaceNotificationsAction` still runs Spring
+> Session's `CONFIG GET notify-keyspace-events` at every start under its own user; the ACL refuses it
+> by design and the action carries on. It shows in `ACL LOG` as `reason=command`,
+> `context=toplevel`, object `config|get`, user `basetool-frontend` — measured on production
+> 2026-09-25 at a count of **2 per frontend start** — and increments
+> `redis_acl_access_denied_cmd_total`; `RedisAclDenials` did not fire for it that day. #2067
+> (merged 2026-09-25) sends a `PING` instead under a named user, so from the release that carries it
+> **no** refusal is expected at all. Until then that one entry is benign; any other `ACL LOG` entry —
+> another user, another command, a `key` or `channel` reason, an `auth` refusal — is a real finding.
 
 **Render and apply** (as root, from `/`; `${UCTL}` / `${UPOD}` from
 [Shell conventions](#shell-conventions-used-below)):
@@ -386,8 +387,8 @@ can be stopped and rolled back on its own.
    Verify: `${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin CLIENT
    LIST' | grep -o 'user=[^ ]*' | sort | uniq -c` shows the three service users and no application
    on `default`; `RedisAclDenials` stays silent; log in, open a mission (live sync), run one
-   refinery import. `ACL LOG` shows the frontend's refused `config|get` from its restart — expected,
-   see the note above; nothing else.
+   refinery import. On 1.11.0, `ACL LOG` shows the frontend's refused `config|get` from its
+   restart (see the note above; gone once #2067 is released); nothing else.
 5. **Switch `default` off**: append `REDIS_DEFAULT_USER=off` to `.env`, render, `ACL LOAD` as
    `admin`. Verify `${UPOD} exec redis sh -c 'redis-cli ping'` answers `NOAUTH`,
    `${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli ping'` (password-only, i.e.
@@ -847,6 +848,15 @@ settings until it is removed and recreated. `deploy.sh` does not do that on its 
 full-stack outage behind an automatic tick). Take it as a maintenance, testing host first, with the
 members of the changed networks stopped. For the 2026-09-22 change that made the data networks
 `Internal=true` (ADR-0162):
+
+> [!note] Applied on production 2026-09-25 (#1992), testing host not yet
+> The owner chose production directly. The block below ran as written: members stopped 16:21:46 UTC,
+> all five networks recreated `internal=true`, everything up again 16:24:00 — a full outage of about
+> **2.5 minutes** (the edge served 166 maintenance-page 5xx). Checked afterwards: all ten members
+> healthy; `db-backend`, `db-keycloak` and `redis` have no default route (`/proc/net/route`), while
+> `backend` and `keycloak` keep theirs through their other networks (Keycloak still reaches Discord);
+> `backend` resolves `db-backend`; both exporters report `pg_up 1` / `redis_up 1`. The testing host
+> still runs the old networks.
 
 ```bash
 systemctl stop iri-deploy.timer
