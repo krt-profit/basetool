@@ -80,8 +80,20 @@ Consequences worth stating:
   `/var/iri/secrets/tls/`, which the owner minted with `mint-internal-tls.sh` (installed by the
   role, run through the backend image) in step 2 of the rollout; the release before that baked them
   to the shared `/var/iri/secrets/keystore.p12`. `deploy.sh` refuses a release whose units mount any
-  PKCS#12 the host lacks. The shared keystore stays on the host: the REQ-OPS-022 JVM-truststore
-  mount still defaults to it.
+  PKCS#12 the host lacks. The shared keystore stays on the host as the rollback of that release;
+  no unit of it mounts the file — the REQ-OPS-022 JVM-truststore mount moved to the CA-only
+  `/var/iri/secrets/tls/truststore.p12` as well *(corrected 2026-09-25: this said that mount still
+  defaults to the shared keystore; the units #2036 generated say otherwise)*. Production minted the material on 2026-09-25 (rollout step 2); the
+  flip (#2036) is merged and reaches production with the next promoted release (step 3).
+- **Hand-installed drop-ins live beside the generated units.** `deploy.sh` never touches a
+  `<unit>.container.d/` under `/etc/containers/systemd/users/<uid>/`, so what the operator puts there
+  survives every release — and is in no bundle and no backup. Production's `keycloak.container.d`
+  holds `30-log-driver.conf` and, since 2026-09-25, `50-backend-truststore.conf`, which mounts the
+  Discord precheck's truststore (REQ-SEC-022).
+- **A restart travels along `Requires=`.** `backend` requires `db-backend` and `keycloak`,
+  `frontend` requires `backend`, `keycloak` and `redis`, `ingest` requires `backend` and `redis` — so
+  restarting keycloak restarts the whole app (about two minutes, measured 2026-09-25), and
+  restarting redis restarts frontend and ingest.
 - **Podman features go through Quadlet keys, not raw arguments** — `RunInit=`, `Ulimit=` and the
   network's `Options=` since 2026-09-22. Only `--cpus` and `--oom-score-adj`, which have no key in
   podman 5.8, remain `PodmanArgs=`.
@@ -204,6 +216,16 @@ The second exists because the first is not enough. `user@<uid>.service` reports 
 the manager runs; measured on the same boot, that was 16:26:03, while the manager's own startup
 finished at 16:27:33. An `After=user@<uid>.service` would have fixed detection and then let the
 backup's quiesce stop the backend while it was still starting.
+
+> [!warning] The waits did not cover the 2026-09-25 reboot
+> Rebooted for a kernel at 15:56 UTC, production started all four services at 15:57:30 (their timers'
+> `LastTrigger` unchanged) and all four failed within a second:
+> `FATAL: podman is installed but no lingering user could be found that owns the containers (looked in /var/lib/systemd/linger)`
+> — with `/var/lib/systemd/linger/iri` present, logind up at 15:57:27 and `user@<uid>.service`
+> at 15:57:30. The line has no "after waiting" clause, so `rt_detect` did not wait: the runtime
+> directory was already there (or the user lookup failed), and the `podman ps` probe failed
+> regardless — the shape this table deliberately does not wait on. The stack was unaffected and the
+> next regular tick succeeds; the fix is an open follow-up (§11.6).
 
 **`iri-deploy` does not wait for startup, on purpose.** A stack stuck in `starting` because a unit
 will not come up may be exactly what the next release exists to fix, and a deployer that refused to

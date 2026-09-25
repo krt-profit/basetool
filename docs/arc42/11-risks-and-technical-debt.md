@@ -143,7 +143,28 @@ until then the risk is bounded, named and watched, which is the most this layer 
   `node_pressure_*` series. `HostMemoryPressureStalled`, `HostCpuPressure` and `HostIoPressure` are
   therefore dead, and five panels on dashboard 01-host read **No data** — on a host whose *designed*
   failure mode is memory pressure. The role sets the parameter and deliberately does **not** reboot;
-  **closes** when a window allows one and `ls /proc/pressure` answers.
+  **closes** when a window allows one and `ls /proc/pressure` answers. *(2026-09-25: production was
+  rebooted at 15:56 UTC for kernel 6.12.0-211.58.1; whether `/proc/pressure` now answers was not
+  recorded — re-check before closing this.)*
+- **After a reboot, the four `iri-*` jobs fail once.** On the 2026-09-25 reboot, `iri-deploy`,
+  `iri-backup`, `iri-restore-drill` and `iri-container-cleanup` all started at boot and failed
+  within a second with "no lingering user could be found" — a failure shape §7.4b's boot-time wait
+  does not cover. The stack is unaffected and the next regular tick succeeds, but the units sit
+  `failed` until then. The code fix is an open follow-up;
+  [`deployment.md` → host patching](../deployment.md#updating-the-operational-scripts-and-units)
+  records the symptom.
+- **A Keycloak restart is a full-app restart.** `backend` `Requires=` keycloak and `frontend` /
+  `ingest` require backend, so `systemctl --user restart keycloak.service` — by hand or by a
+  provider-JAR delivery — takes the app down with it: about two minutes of maintenance page, measured
+  on production 2026-09-25. Documented at every restart in the runbooks
+  ([`deployment.md` → *Driving the stack*](../deployment.md#driving-the-stack)); whether those
+  dependencies should stay `Requires=` is not decided.
+- **A configured Discord precheck can fail open with nobody noticing.** The account-existence
+  precheck (REQ-SEC-022) is fail-open by design, and its only witness is a Keycloak `WARN`. On
+  production the truststore `.env` named never existed and the warning repeated at every start for
+  at least seven days before a rollout step found it (2026-09-25, fixed the same day). No alert reads
+  that line — `KeycloakErrorRateHigh`, whose comment names this very path, counts `ERROR` lines, and
+  this is one `WARN` per start. The runbook's verify step now reads it; an alert is not built.
 
 ## 11.7 Security hardening decided but not yet carried out
 
@@ -157,7 +178,9 @@ not happened.
   production switch is two owner steps with no login window —
   [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md). Until
   then the frontend client carries PKCE `S256` as the interim state. Closed when the provisioner
-  reports `basetool-frontend` confidential in production.
+  reports `basetool-frontend` confidential in production. *(2026-09-25: step 1 is applied — the
+  production frontend holds the secret and logs itself `CONFIDENTIAL`; Keycloak's client is still
+  public until step 2.)*
 - **Three of the twelve Keycloak hardening steps are open** —
   [`KEYCLOAK_HARDENING_RUNBOOK.md`](../KEYCLOAK_HARDENING_RUNBOOK.md): step 2 (decide *Forgot
   password* on Keycloak's own SMTP; `resetPasswordAllowed` was still on at the last recorded
@@ -174,12 +197,13 @@ not happened.
   **production on 2026-09-23**, so they are gone there; the **testing realm is not provisioned
   yet**, which is an owner-gated write (and, since 1.11.0's audience gate, a precondition for the
   testing backend to start).
-- **Redis still has one all-powerful user in production until the per-service rollout.** Backend,
-  frontend and ingest share `default` (`~* &* +@all`) and one password, so any one of them could
-  read every session's OAuth2 tokens. REQ-SEC-068 / ADR-0207 shipped the per-service users, the
-  renderer and the E2E proof; the switch is the owner's five-step rollout in
-  [`deployment.md` → *The Redis ACL*](../deployment.md#the-redis-acl). Closed when `REDIS_DEFAULT_USER`
-  is `off` in production.
+- ~~**Redis still has one all-powerful user in production until the per-service rollout.**~~ —
+  **closed 2026-09-25.** Backend, frontend and ingest shared `default` (`~* &* +@all`) and one
+  password, so any one of them could read every session's OAuth2 tokens. REQ-SEC-068 / ADR-0207
+  shipped the per-service users; the owner ran rollout steps 2–5 on production on 2026-09-25 and
+  `REDIS_DEFAULT_USER` is `off` there
+  ([`deployment.md` → *The Redis ACL*](../deployment.md#the-redis-acl)). Left behind: a release
+  rollback to 1.10.0 or older now needs `default` switched back on first.
 - **One internal TLS key is every service's identity until the per-service rollout.** Backend,
   frontend, ingest and Keycloak serve the same self-signed `keystore.p12`, which is also the anchor
   every client pins — so the internet-facing ingest container holds the backend's and Keycloak's
@@ -188,7 +212,10 @@ not happened.
   per-service test material; the switch is the owner's four-step rollout in
   [`deployment.md` → *Internal TLS*](../deployment.md#internal-tls-per-service-certificates-from-a-private-ca).
   Closed when step 4 has run: the units mount `/var/iri/secrets/tls/<service>.p12`,
-  `INTERNAL_TLS_VERIFY_HOSTNAME=true`, and no anchor carries the old certificate.
+  `INTERNAL_TLS_VERIFY_HOSTNAME=true`, and no anchor carries the old certificate. *(2026-09-25:
+  steps 1 and 2 are done on production — hostname verification is on and every anchor already
+  trusts the new CA; the shared key is still every service's identity until step 3, the release
+  flipping `PATH_VARS` (#2036), and step 4.)*
 
 ## 11.8 Smaller, known, and deliberately left
 

@@ -8,6 +8,13 @@
 **Status:** the **code part is done** and inert; the **production rollout is open** and needs the
 owner's yes for each write below. Until then production's `basetool-frontend` is a public client
 (PKCE `S256`, hardening step 6) and the frontend runs without `KEYCLOAK_FRONTEND_CLIENT_SECRET`.
+
+> [!note] Production, 2026-09-25: step 1 applied, step 2 pending
+> **Step 1 is applied** (owner-approved): `KEYCLOAK_FRONTEND_CLIENT_SECRET` was generated on the
+> host, the frontend restarted, and its log reads `OAuth2 client 'keycloak' is CONFIDENTIAL`. The
+> frontend sends the secret; Keycloak's `basetool-frontend` is **still public** and ignores it.
+> **Step 2** — switching Keycloak with the same secret — is **not done yet**. Until it is, the
+> paragraph above describes Keycloak's side correctly, but not the frontend's.
 **Audit findings:** M-6 (security audit 2026-05-20), APPSEC-07 (improvement audit 2026-09-22).
 
 > [!warning] Corrected 2026-09-23 — the migration is no longer a maintenance window

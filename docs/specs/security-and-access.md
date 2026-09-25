@@ -1218,6 +1218,10 @@ from masquerading as an application outage (the failure mode that drove the fron
   auto-configured decoder in place instead of failing the context at boot.
 - [x] The backend's production environment passes `KEYCLOAK_JWK_SET_URI`, empty unless the host
   sets `IRI_BACKEND_KEYCLOAK_JWK_SET_URI` (`JwkSetUriNamespaceTest`).
+- [x] Production fetches the JWKS internally. _(2026-09-25 ~15:38 UTC, owner-approved, per
+  [`deployment.md` → *Internal JWKS for the backend*](../deployment.md#internal-jwks-for-the-backend):
+  only `env.d/backend.env` changed, the backend was healthy in 11 s, no JWKS/PKIX/SAN line, an
+  authenticated `/api/v1/users/me` answered `200` and no `401` followed.)_
 - [ ] A JWKS timeout / 5xx / DNS failure yields `503` + `Retry-After` (not `500`), logged at WARN
   and counted on `basetool_http_error_total{code="SERVICE_UNAVAILABLE"}`.
 - [ ] An expired/invalid bearer token still yields `401`; a caller lacking the required role still
@@ -4714,6 +4718,17 @@ its service does:
 - [ ] The committed E2E ACL equals the template rendered with the E2E passwords, and the E2E stack
   runs every application on its own user with `default` off.
 - [ ] Refusals are alerted on (`RedisAclDenials`).
+- [x] Production runs every application on its own user with `default` off. _(2026-09-25, rollout
+  steps 2–5 at ~15:47–15:51 UTC, owner-approved: six users; backend and frontend connected as their
+  own users, ingest connects on demand; `REDIS_DEFAULT_USER=off` — an unauthenticated `PING` gets
+  `NOAUTH`, a password-only `AUTH` gets `WRONGPASS … user is disabled`, the health check is
+  healthy, `redis_up 1`.)_
+
+**Known and expected:** the frontend's `TolerantKeyspaceNotificationsAction` still issues `CONFIG
+GET` at every start, and the ACL refuses it — two `ACL LOG` entries per start (`reason=command`,
+`config|get`, user `basetool-frontend`), counted in `redis_acl_access_denied_cmd_total`.
+`RedisAclDenials` did not fire for it on 2026-09-25. A release rollback to 1.10.0 or older now
+needs `REDIS_DEFAULT_USER=on` first.
 
 **Enforced by:** `RedisAclFrontendIntegrationTest` (real Spring Session, live sync, handoff, the
 `ACL DRYRUN` matrix for all users, the committed E2E ACL, the startup step's refusal count),
@@ -4758,6 +4773,12 @@ pattern is **PKCE + client secret**, never one instead of the other.
   variable is refused and writes nothing; `confidential` with it switches once and never rewrites the
   secret; `public` switches back without sending one.
 - [ ] Every E2E login goes through the confidential client.
+- [x] Production rollout step 1: the frontend holds the secret. _(2026-09-25, owner-approved:
+  `KEYCLOAK_FRONTEND_CLIENT_SECRET` generated on the host, frontend restarted, log `OAuth2 client
+  'keycloak' is CONFIDENTIAL`.)_
+- [ ] Production rollout step 2: Keycloak's `basetool-frontend` is confidential with the same
+  secret. _(Pending as of 2026-09-25 —
+  [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md).)_
 
 **Enforced by:** `FrontendClientAuthenticationConfigTest` (Boot's real OAuth2 client
 auto-configuration, both modes, blank secret) · `CurrentRegistrationAuthorizedClientRepositoryTest`
@@ -4810,6 +4831,13 @@ production rollout reaches step by step:
   point; the deploy pre-flight refuses a release whose units mount any PKCS#12 the host lacks.
 - [ ] The E2E stack serves each app on its own leaf, and the seeder reaches the backend through the
   CA-only truststore with the hostname checked.
+
+**Production rollout (2026-09-25, owner-approved):** step 1 (`INTERNAL_TLS_VERIFY_HOSTNAME=true`,
+all four services `Verification: OK` beforehand) ~15:40 UTC; step 2 (mint, the widened
+truststore and `basetool-ca.crt` with two anchors) ~15:52 UTC, and with it the Keycloak SPI
+truststore, which turned out never to have existed (REQ-SEC-022's production note). **Open:** step 3,
+the release that flips `PATH_VARS` (#2036, merged the same day, not yet promoted), and step 4. Until step 3 every service still serves the
+shared certificate.
 
 **Enforced by:** `scripts/mint-internal-tls.test.sh` (`repo-lint.yml`) · `RestClientConfigTest`
 (ingest) · `BackendHostnameVerificationTest` · `BackendHealthIndicatorHostnameTest` ·

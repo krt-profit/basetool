@@ -344,6 +344,13 @@ postgres/Keycloak carve-out of REQ-OPS-006 (the image change blocks the tick unt
 missing/unresolvable `basetool-keycloak-spi` artifact degrades to no provider-JAR change for that
 tick (the manual-staging fallback in the runbook still applies).
 
+*(Corrected 2026-09-25: "recreates **only** the keycloak container" holds under Compose's
+`--no-deps`, not under Quadlet. `backend` `Requires=` keycloak, and `frontend` and `ingest` require
+backend, so `systemctl --user restart keycloak.service` restarts all three with it — measured on
+production 2026-09-25 for a manual restart of the same unit: about two minutes of maintenance page.
+A provider-JAR delivery is therefore a short full-app restart, not a Keycloak-only one:
+`rt_recreate` leaves keycloak's *dependencies* alone, but systemd restarts its *dependents*.)*
+
 **Acceptance**
 
 - [ ] `release-images.yml` builds, asserts (only the JAR, no secret-shaped file) and cosign-signs
@@ -1980,8 +1987,9 @@ there.
   the testing realm keeps them until it is provisioned.
 - **`basetool-frontend` carries `baseUrl` = `<--public-origin>/`** (2026-09-25, ADR-0202
   amendment 3, `REQ-SEC-071`) — an added field, not in the 2026-09-22 production snapshot, so that
-  Keycloak's error pages for the web login link back to the app. Production gets it on the owner's
-  next apply.
+  Keycloak's error pages for the web login link back to the app. *(Updated 2026-09-25: production
+  carries it — the owner set Home URL `https://profit-base.online/` by hand in the Admin Console,
+  not through an `--apply`; it equals what the provisioner converges to.)*
 - **The DPoP write order holds** (`REQ-SEC-030`): when the Android client or the DPoP profile has to
   change, the policy is detached first and re-attached last, and both client-policy lists are merged
   by name so no other policy or profile is lost.
