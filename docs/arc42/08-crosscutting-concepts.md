@@ -176,6 +176,11 @@ One access-log line per request; MDC carrying `correlationId`, `userId` and `org
 across module boundaries; JSON logging in production. Business metrics are `basetool_*` with
 bounded labels. **Never log names, e-mail addresses or tokens** — unconditionally.
 
+The MDC is a `ThreadLocal`, so it is bound per **dispatch**, not per request: a servlet async
+dispatch (an SSE stream's completion, a `DeferredResult`) runs on another container thread, and
+the filters that own the fields re-bind there what the initial dispatch resolved, from request
+attributes, without resolving anything afresh (since 2026-09-25, `REQ-OBS-001`).
+
 Monitoring moves with every feature: a new scheduled job needs task metrics, a new audited area its
 event counter, a new status enum its queue gauge, a new public surface its probe. A renamed or
 removed metric that breaks a dashboard or an alert rule is an incomplete change.

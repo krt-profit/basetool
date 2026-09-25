@@ -63,9 +63,26 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * <p>Only the OrgUnit <b>UUID</b> is ever put into the MDC, never its name: a Staffel / SK name is
  * squadron-identifying free text and is out of bounds for a log line under REQ-OBS-004, and the
  * UUID is what correlates against the backend's identically-named field anyway.
+ *
+ * <p><b>Async dispatches re-bind the MDC field only (2026-09-25).</b> Like {@link
+ * CorrelationIdFilter}, the initial dispatch stashes the value it bound as a request attribute and
+ * an async dispatch of the same request ({@code SseEmitter}, {@code DeferredResult}, {@code
+ * Callable}) binds it again for its own duration, so a line logged there keeps its {@code
+ * orgUnitId}. The async pass re-reads neither the session nor anything the client sent. It
+ * deliberately does <b>not</b> re-bind {@link ActiveSquadronContext}: that holder decides the scope
+ * of outbound backend calls, and restoring it on the async pass would be a data-scope change rather
+ * than a log-attribution one — the async pass stays exactly as scoped as it was before.
  */
 @Component
 public class ActiveSquadronContextFilter extends OncePerRequestFilter implements Ordered {
+
+  /**
+   * Request attribute carrying the {@code orgUnitId} MDC value the initial dispatch bound, for the
+   * async dispatch of the same request to re-bind. Namespaced by this class so no other component's
+   * attribute can collide with it; set server-side only, so no client can forge it.
+   */
+  static final String ORG_UNIT_ID_ATTRIBUTE =
+      ActiveSquadronContextFilter.class.getName() + ".orgUnitId";
 
   /**
    * MDC key carrying the caller's active OrgUnit pin. Matches the {@code %X{orgUnitId:-}} slot in
@@ -102,16 +119,64 @@ public class ActiveSquadronContextFilter extends OncePerRequestFilter implements
       @NotNull HttpServletResponse response,
       @NotNull FilterChain chain)
       throws ServletException, IOException {
+    if (isAsyncDispatch(request)) {
+      rebindForAsyncDispatch(request, response, chain);
+      return;
+    }
     UUID active = readActiveSquadron(request);
     if (active != null) {
       ActiveSquadronContext.set(active);
     }
-    MDC.put(ORG_UNIT_ID_MDC_KEY, active == null ? NO_ACTIVE_ORG_UNIT : active.toString());
+    String orgUnitId = active == null ? NO_ACTIVE_ORG_UNIT : active.toString();
+    MDC.put(ORG_UNIT_ID_MDC_KEY, orgUnitId);
+    // Stashed for a later async dispatch of this same request, which runs on another thread.
+    request.setAttribute(ORG_UNIT_ID_ATTRIBUTE, orgUnitId);
     try {
       chain.doFilter(request, response);
     } finally {
       MDC.remove(ORG_UNIT_ID_MDC_KEY);
       ActiveSquadronContext.clear();
+    }
+  }
+
+  /**
+   * Opts this filter into async dispatches, which {@link OncePerRequestFilter} skips by default, so
+   * {@link #doFilterInternal} can re-bind the stashed {@code orgUnitId} there.
+   *
+   * @return always {@code false}
+   */
+  @Override
+  protected boolean shouldNotFilterAsyncDispatch() {
+    return false;
+  }
+
+  /**
+   * Runs the async dispatch of a request with the {@code orgUnitId} its initial dispatch bound put
+   * back into the MDC, and removes it once the chain returns so it cannot survive on the container
+   * thread. Without a stashed value (the initial dispatch never passed this filter) the key stays
+   * unbound rather than being derived afresh.
+   *
+   * @param request the request being dispatched asynchronously
+   * @param response the response of the same request
+   * @param chain the remaining filter chain
+   * @throws ServletException if a downstream filter or the servlet fails
+   * @throws IOException if writing the response fails
+   */
+  private static void rebindForAsyncDispatch(
+      @NotNull HttpServletRequest request,
+      @NotNull HttpServletResponse response,
+      @NotNull FilterChain chain)
+      throws ServletException, IOException {
+    if (!(request.getAttribute(ORG_UNIT_ID_ATTRIBUTE) instanceof String orgUnitId)
+        || orgUnitId.isBlank()) {
+      chain.doFilter(request, response);
+      return;
+    }
+    MDC.put(ORG_UNIT_ID_MDC_KEY, orgUnitId);
+    try {
+      chain.doFilter(request, response);
+    } finally {
+      MDC.remove(ORG_UNIT_ID_MDC_KEY);
     }
   }
 

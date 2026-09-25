@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-23.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-25.
 > **Owner area:** OBS · **Related:** [`security-and-access.md`](security-and-access.md), [ADR-0204](../adr/0204-backend-and-ingest-call-http-through-restclient-without-webflux.md) (outbound clients of backend and ingest), [`org-unit-tenancy.md`](org-unit-tenancy.md), [ADR-0072](../adr/0072-monitoring-stack-prometheus-grafana.md), [ADR-0095](../adr/0095-ship-app-container-stdout-to-loki.md), [ADR-0162](../adr/0162-edge-is-native-nginx-with-a-separate-acme-client.md) (native edge, NPM retired), [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md) (rootless Podman), monitoring epic [#936](https://github.com/krt-profit/basetool/issues/936) · **Operator doc:** [`monitoring/README.md`](../../monitoring/README.md)
 >
 > **Runtime.** Since the 2026-09-22 cutover production runs rootless Podman under Quadlet on Rocky
@@ -103,11 +103,11 @@ write to, and attempting to write one is what produced the second line. **The fr
 handler since 2026-09-25**, for the notification relay (`/notifications/stream`) and for Tomcat's
 `ClientAbortException` on a plain response: its catch-all logged `ERROR` and then tried to render the
 error page into the dead response, so Tomcat added `Servlet.service() … threw exception` — 33 lines in
-two minutes after the v1.11.0 deploy. Such lines carry `userId=anonymous` whatever the caller was: an
-async dispatch runs without the request thread's MDC (`CorrelationIdFilter` is a
-`OncePerRequestFilter` and skips async dispatches), so the field is not evidence of an unauthenticated
-request. **Enforced by:** backend `GlobalExceptionHandlerTest`, frontend
-`DisconnectedClientHandlingTest`.
+two minutes after the v1.11.0 deploy. Those lines carried `userId=anonymous` and no `correlationId`
+for a logged-in member, because the async dispatch ran without the request's MDC; **since 2026-09-25
+it carries the request's fields** (see *Async dispatches keep the request's MDC* below), so in a line
+logged after that fix `anonymous` means an unauthenticated request again. **Enforced by:** backend
+`GlobalExceptionHandlerTest`, frontend `DisconnectedClientHandlingTest`.
 
 The frontend's `GlobalExceptionHandler` applies the same expected-noise demotion to **asset-shaped
 path-variable type mismatches**: when a request path whose final segment carries a filename
@@ -254,6 +254,29 @@ Both Logback text patterns (console + file, `[%X{orgUnitId:-}]` after `userId`, 
 request keeps the column as an empty bracket pair) and the prod `PiiMaskingLogstashEncoder` carry the
 field. The ingest carve-out above is unchanged: the gateway relays drafts and owns no
 squadron-scoped data.
+
+**Async dispatches keep the request's MDC (2026-09-25).** A request whose handler returns an
+`SseEmitter`, a `DeferredResult` or a `Callable` is dispatched a second time — `DispatcherType.ASYNC`,
+on another container thread — when its async result arrives, and a `OncePerRequestFilter` skips that
+pass by default. Until 2026-09-25 every line logged there (a stream's completion, an async error
+resolved by `GlobalExceptionHandler`) therefore carried **no** `correlationId`, `orgUnitId` or
+`userId` — rendered as the logback fallback `userId=anonymous` — whoever the caller was, and the
+backend's catch-all even minted a fresh id for its `ERROR` line that no other line of the request
+shared. It misattributed the frontend's `/notifications/stream` `ERROR` burst after the v1.11.0
+deploy to anonymous traffic. Now the filters that own the fields stash the values they bound as
+**request attributes** on the initial dispatch and bind them again for the async dispatch's own
+duration, removing them in that pass's own `finally`: the frontend `CorrelationIdFilter`
+(`correlationId`, `userId`) and `ActiveSquadronContextFilter` (`orgUnitId`), and the backend
+`CorrelationIdFilter` (all three). The async pass resolves **nothing** afresh — it mints no id, reads
+no header (a header is the client's; a request attribute is server-side state no client can set),
+consults neither the security context nor the session nor the database, and writes no response
+header. Without a stashed value the key stays unbound rather than invented. The frontend's
+`ActiveSquadronContext` (the outbound org-unit **scope**) is deliberately *not* restored on the
+async pass: that would be a data-scope change, not a log-attribution one. The ingest gateway has no
+async endpoint and is unchanged. **Enforced by:** frontend `AsyncDispatchMdcTest` (both real filters,
+a `DeferredResult` whose async error is logged on the async dispatch, with the security context,
+session pin and header changed in between), `CorrelationIdFilterTest`,
+`ActiveSquadronContextFilterTest`; backend `CorrelationIdFilterTest`.
 
 **A filter-level rejection names its subject.** The two backend rejections that short-circuit before
 the servlet is reached — `SecurityProblemResponseHandler` (the Spring Security 401/403) and
@@ -422,7 +445,11 @@ and `unhandledrejection` and POSTs to **`POST /internal/client-error`**
 `APP_LOGGING_CORRELATION_ID_HEADER`) or a generated UUID, and is echoed in the response
 header. The frontend's `WebClientLoggingFilter` propagates the same id to outbound backend
 calls so both modules share one id per user interaction. `userId` is the JWT `sub`, or
-`anonymous`.
+`anonymous`. **One request keeps one id across its async dispatch (2026-09-25):** the id is resolved
+once, on the initial dispatch, and an async dispatch of the same request re-binds that value from a
+request attribute — it is never minted again and the inbound header is never re-read on that pass
+(REQ-OBS-001, *Async dispatches keep the request's MDC*). The frontend also restores
+`CorrelationContext` for the async pass, so a backend call made there carries the same id outbound.
 
 All three modules bind these settings from the same `app.logging.*` keys through a `@Validated`
 `LoggingProperties` — `correlation-id-header`, `correlation-id-mdc-key`, `user-id-mdc-key`,
