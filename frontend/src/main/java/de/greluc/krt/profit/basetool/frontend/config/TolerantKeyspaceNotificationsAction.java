@@ -44,6 +44,12 @@ import org.springframework.session.data.redis.config.ConfigureRedisAction;
  * with {@code NOPERM}. Anything else — Redis unreachable, a timeout — is rethrown, so a frontend
  * that cannot reach its session store still fails its startup exactly as before (ADR-0084: Redis is
  * mandatory for the frontend).
+ *
+ * <p>Since 2026-09-25 this action runs only under the shared {@code default} user: a frontend
+ * configured with its own ACL user gets {@link ServerConfiguredKeyspaceNotificationsAction} instead
+ * ({@code RedisSessionConfig.selectConfigureRedisAction}), because every refused {@code CONFIG GET}
+ * is counted by Redis and fed {@code RedisAclDenials} on each restart. The {@code NOPERM} tolerance
+ * stays as a safety net for a {@code default} user that has been narrowed by hand.
  */
 @Slf4j
 @RequiredArgsConstructor

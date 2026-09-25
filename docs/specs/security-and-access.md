@@ -4689,8 +4689,17 @@ its service does:
   `REDIS_<SVC>_USERNAME` is set; empty, it sends a password-only `AUTH` with the shared
   `REDIS_PASSWORD`, which is `default`, exactly as before.
 - **Nothing depends on the ACL state that must not.** The server carries `--notify-keyspace-events
-  Egx` (the frontend's `TolerantKeyspaceNotificationsAction` logs a `CONFIG` refusal instead of
-  failing), and the health probe is an unauthenticated `PING` accepting `NOAUTH`.
+  Egx`, and the health probe is an unauthenticated `PING` accepting `NOAUTH`.
+- **A correctly configured service sends no command its user is refused — at startup included.**
+  The frontend picks Spring Session's startup step from `spring.data.redis.username`: with none (or
+  `default`) it runs the `CONFIG GET` / `CONFIG SET` of before (`TolerantKeyspaceNotificationsAction`,
+  which still only logs a `NOPERM`); with its own user it sends a `PING` and **no `CONFIG`**
+  (`ServerConfiguredKeyspaceNotificationsAction`). Either way an unreachable store or a refused
+  credential fails the start (ADR-0084), and with
+  `app.session.configure-keyspace-notifications=false` (the image build's AOT run) nothing is sent.
+  So a refusal counted by `RedisAclDenials` is always a finding, never a restart. *(Added
+  2026-09-25: until then the frontend's `CONFIG GET` was refused on every start under its own user,
+  which production's `ACL LOG` showed as `config|get` for `basetool-frontend` after the rollout.)*
 - A new key prefix or channel is a template change, re-rendered and `ACL LOAD`ed on the host.
 
 **Acceptance**
@@ -4700,6 +4709,9 @@ its service does:
   publishes and receives on both channels; a handoff is consumed; `SCAN` and `INFO` answer.
 - [ ] The backend's notification fan-out and live-sync channel work under its user; the gateway's
   real staging, cap eviction included, works under its user.
+- [ ] The frontend's startup step under its own user leaves `acl_access_denied_cmd` unchanged and
+  sends no `CONFIG`; under `default` it still sends `CONFIG GET`; switched off it sends nothing; a
+  wrong password still fails it.
 - [ ] `ACL DRYRUN` refuses, per user, every foreign key, foreign channel, `CONFIG`, `KEYS`,
   `FLUSHALL`/`FLUSHDB`, `SCAN` for backend, ingest and monitoring, and `ACL` for every non-admin user.
 - [ ] A password-only `AUTH` works while `default` is on and fails once it is off.
@@ -4719,11 +4731,14 @@ GET` at every start, and the ACL refuses it — two `ACL LOG` entries per start 
 needs `REDIS_DEFAULT_USER=on` first.
 
 **Enforced by:** `RedisAclFrontendIntegrationTest` (real Spring Session, live sync, handoff, the
-`ACL DRYRUN` matrix for all users, the committed E2E ACL), `RedisAclBackendIntegrationTest`,
+`ACL DRYRUN` matrix for all users, the committed E2E ACL, the startup step's refusal count),
+`RedisSessionConfigTest`, `ServerConfiguredKeyspaceNotificationsActionTest`,
+`RedisAclBackendIntegrationTest`,
 `RedisAclIngestIntegrationTest`, `render-redis-acl.py --selftest` (`repo-lint.yml`), the E2E suite
 (`docker-compose.e2e.yml`, `E2eStackExtension`, `IngestHandoffE2eTest`) ·
 `monitoring/prometheus/tests/redis_acl_denials_test.yml` · **Code:** `scripts/redis-users.acl.tmpl`,
-`scripts/render-redis-acl.py`, `TolerantKeyspaceNotificationsAction`, the three apps'
+`scripts/render-redis-acl.py`, `RedisSessionConfig.selectConfigureRedisAction`,
+`ServerConfiguredKeyspaceNotificationsAction`, `TolerantKeyspaceNotificationsAction`, the three apps'
 `spring.data.redis.username` · **Monitoring:** `RedisAclDenials` · **Runbook:**
 [`deployment.md` → *The Redis ACL*](../deployment.md#the-redis-acl) · **ADR:** [ADR-0207](../adr/0207-each-service-reaches-redis-as-its-own-acl-user.md) ·
 **Related:** REQ-SEC-025, REQ-OPS-018

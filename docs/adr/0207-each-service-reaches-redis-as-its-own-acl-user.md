@@ -51,6 +51,19 @@ have restarted Redis in a loop.
    on its own command line; the frontend's `TolerantKeyspaceNotificationsAction` runs Spring
    Session's step and logs a `NOPERM` instead of failing (any other failure still fails the start).
    The health probe is an unauthenticated `PING` that accepts `NOAUTH`.
+
+   > **Amended 2026-09-25.** Tolerating the refusal was not enough: Redis still counts it. After
+   > the production rollout, `ACL LOG` showed a `config|get` refusal for `basetool-frontend` on
+   > every frontend start, each one feeding `redis_acl_access_denied_cmd_total` and so
+   > `RedisAclDenials` — an alert that must mean "an ACL is wrong", not "the frontend restarted".
+   > The frontend now picks the step from `spring.data.redis.username`, i.e. from the credentials it
+   > actually uses, never from catching the refusal: with no username (or `default`) the
+   > `CONFIG` step above, unchanged; with its own user `ServerConfiguredKeyspaceNotificationsAction`,
+   > which sends a `PING` (allowed by `+@connection`) and no `CONFIG`, so a store that cannot be
+   > reached or refuses the credentials still fails the start (ADR-0084). The AOT training run's
+   > `NO_OP` (IMG-PERF-12) is untouched. Rejected: granting `basetool-frontend` `CONFIG GET` alone —
+   > harmless in itself, but it widens the one user that holds every session to buy a read whose
+   > answer the server's own command line already fixes.
 5. **Proven where it runs.** Testcontainers suites in all three modules run the real Spring Session
    repository, the real fan-outs and the real handoff staging under their users against the
    template, plus an `ACL DRYRUN` matrix; the E2E stack loads the template rendered with throwaway
