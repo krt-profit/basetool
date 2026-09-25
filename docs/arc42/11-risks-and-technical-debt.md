@@ -178,7 +178,9 @@ not happened.
   production switch is two owner steps with no login window —
   [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md). Until
   then the frontend client carries PKCE `S256` as the interim state. Closed when the provisioner
-  reports `basetool-frontend` confidential in production.
+  reports `basetool-frontend` confidential in production. *(2026-09-25: step 1 is applied — the
+  production frontend holds the secret and logs itself `CONFIDENTIAL`; Keycloak's client is still
+  public until step 2.)*
 - **Three of the twelve Keycloak hardening steps are open** —
   [`KEYCLOAK_HARDENING_RUNBOOK.md`](../KEYCLOAK_HARDENING_RUNBOOK.md): step 2 (decide *Forgot
   password* on Keycloak's own SMTP; `resetPasswordAllowed` was still on at the last recorded

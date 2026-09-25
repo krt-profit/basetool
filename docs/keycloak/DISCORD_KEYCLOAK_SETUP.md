@@ -351,21 +351,26 @@ On the **production** (rootless Podman) host the mount is a Quadlet **drop-in** 
 unit — `deploy.sh` never touches a unit's `.container.d/` directory, so it survives every release
 (production's keycloak drop-in directory also holds `30-log-driver.conf`). The truststore holds only
 public certificates, so it may be world-readable; Keycloak reads it as container uid 1000 (host uid
-100999). Production's form, as installed 2026-09-25:
+100999). The install and the drop-in, **as run on production 2026-09-25** (as root; `$W` is the
+scratch directory the store was built in, `IRI_UID=$(id -u iri)`):
 
 ```bash
-install -o root -g root -m 0644 backend-truststore.p12 /var/iri/secrets/backend-truststore.p12
+install -o root -g root -m 0644 "$W/backend-truststore.p12" /var/iri/secrets/backend-truststore.p12
 restorecon -F /var/iri/secrets/backend-truststore.p12
-D=/etc/containers/systemd/users/$(id -u iri)/keycloak.container.d
-install -d -o deploy -g deploy -m 0755 "$D"
-printf '[Container]\nVolume=/var/iri/secrets/backend-truststore.p12:/run/secrets/backend-truststore.p12:ro\n' \
-  > "$D/50-backend-truststore.conf"
+rm -rf "$W"
+D=/etc/containers/systemd/users/${IRI_UID}/keycloak.container.d
+printf '[Container]\nVolume=/var/iri/secrets/backend-truststore.p12:/run/secrets/backend-truststore.p12:ro\n' > "$D/50-backend-truststore.conf"
 chown deploy:deploy "$D/50-backend-truststore.conf"; chmod 0644 "$D/50-backend-truststore.conf"
-${UCTL} daemon-reload && ${UCTL} restart keycloak.service   # ~2 min FULL outage, see §3d
+${UCTL} daemon-reload && ${UCTL} restart keycloak.service   # restarts backend, frontend, ingest too (Requires=) -- ~2 min outage, see §3d
 ```
 
-The host has no JDK: build the store through the backend image's `keytool`, as
-[`deployment.md` → *Step 2f*](../deployment.md#step-2f--the-keycloak-spi-prechecks-truststore) shows.
+`$D` already existed on production (it holds `30-log-driver.conf`); on a host where it does not,
+create it first with `install -d -o deploy -g deploy -m 0755 "$D"`. Afterwards
+`${UPOD} exec keycloak ls /run/secrets` lists `backend-truststore.p12`.
+
+The host has no JDK: the store is built through the backend image's `keytool` in a scratch
+directory the rootless container can write to. The full block as run, build included, is
+[`deployment.md` → *Step 2f*](../deployment.md#step-2f--the-keycloak-spi-prechecks-truststore).
 **Neither the store nor the drop-in is captured by `backup.sh`**; a host rebuilt from backup needs
 this section again.
 

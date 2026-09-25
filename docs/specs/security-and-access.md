@@ -4758,6 +4758,12 @@ pattern is **PKCE + client secret**, never one instead of the other.
   variable is refused and writes nothing; `confidential` with it switches once and never rewrites the
   secret; `public` switches back without sending one.
 - [ ] Every E2E login goes through the confidential client.
+- [x] Production rollout step 1: the frontend holds the secret. _(2026-09-25, owner-approved:
+  `KEYCLOAK_FRONTEND_CLIENT_SECRET` generated on the host, frontend restarted, log `OAuth2 client
+  'keycloak' is CONFIDENTIAL`.)_
+- [ ] Production rollout step 2: Keycloak's `basetool-frontend` is confidential with the same
+  secret. _(Pending as of 2026-09-25 —
+  [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md).)_
 
 **Enforced by:** `FrontendClientAuthenticationConfigTest` (Boot's real OAuth2 client
 auto-configuration, both modes, blank secret) · `CurrentRegistrationAuthorizedClientRepositoryTest`

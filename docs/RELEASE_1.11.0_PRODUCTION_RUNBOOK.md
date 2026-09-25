@@ -278,8 +278,12 @@ production's `.env`; the leftover `/var/iri/code/scripts/lib/container-runtime.s
 >   second ("no lingering user could be found"); the stack was unaffected and the next regular tick
 >   succeeds. The code fix is an open follow-up (`deployment.md` → host patching, arc42 §7.4b).
 >
+> - **APPSEC-07 step 1** — `KEYCLOAK_FRONTEND_CLIENT_SECRET` generated on the host, frontend
+>   restarted, log `OAuth2 client 'keycloak' is CONFIDENTIAL`; Keycloak's client still public.
+>
 > **Still open:** APPSEC-05 `enforce` (not before 2026-10-02, once both report queries are empty);
-> APPSEC-07, the confidential frontend client; ING-SEC-04 step 3 (the `PATH_VARS` release, #2036)
+> APPSEC-07 step 2, switching Keycloak's client to confidential (§6's rollback hazard applies once it
+> is done); ING-SEC-04 step 3 (the `PATH_VARS` release, #2036)
 > and step 4; #1992, the `Internal=true` networks — testing first, and the testing host is still
 > held; the Android release (basetool-android #182).
 

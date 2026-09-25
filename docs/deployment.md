@@ -1316,39 +1316,47 @@ journalctl CONTAINER_NAME=keycloak --since -7d -o cat | grep -c 'Failed to load 
 **If the store is missing**, build it with both entries — alias `backend` = the current shared
 certificate (what the backend serves until step 3), alias `internal-ca` = the new CA (what it
 serves from step 3) — through the backend image's `keytool`, with the password `.env` already
-holds. Build it in `/var/iri/secrets/tls` (writable by the container's root, which is `iri`), then
-install it root-owned:
+holds, in a scratch directory the rootless container can write to, then install it root-owned.
+**As run on production 2026-09-25 (~15:52 UTC)**, as root from `/`, after step 2, with `IRI_UID`,
+`UCTL` and `UPOD` from the prelude:
 
 ```bash
+T=/var/iri/secrets/tls
+# a scratch dir the rootless container (root in it = iri on the host) can write into; /root is not traversable for iri
+W=$(mktemp -d /var/iri/secrets/.kc-trust.XXXXXX)
+cp "$T/legacy-shared.crt" "$T/ca.crt" "$W/"; chown -R iri:iri "$W"; chmod 0700 "$W"; chmod 0644 "$W"/*.crt
 IMG=$(${UPOD} container inspect backend --format '{{.ImageName}}')
 export KRT_TS_PASSWORD="$(sed -n 's/^KRT_BACKEND_TRUSTSTORE_PASSWORD=//p' /var/iri/code/.env | tail -1)"
+[ -n "$KRT_TS_PASSWORD" ] || { echo "KRT_BACKEND_TRUSTSTORE_PASSWORD is empty"; exit 1; }
 for a in backend:legacy-shared.crt internal-ca:ca.crt; do
   sudo --preserve-env=KRT_TS_PASSWORD -u iri podman run --rm --user 0 -e KRT_TS_PASSWORD \
-    --entrypoint keytool -v /var/iri/secrets/tls:/work "${IMG}" \
-    -importcert -noprompt -alias "${a%%:*}" -file "/work/${a#*:}" \
-    -keystore /work/backend-truststore.p12 -storetype PKCS12 -storepass:env KRT_TS_PASSWORD
+    --entrypoint keytool -v "$W":/work "${IMG}" -importcert -noprompt -storetype PKCS12 \
+    -alias "${a%%:*}" -file "/work/${a##*:}" -keystore /work/backend-truststore.p12 \
+    -storepass:env KRT_TS_PASSWORD
 done
 unset KRT_TS_PASSWORD
-install -o root -g root -m 0644 /var/iri/secrets/tls/backend-truststore.p12 /var/iri/secrets/backend-truststore.p12
-rm /var/iri/secrets/tls/backend-truststore.p12
+install -o root -g root -m 0644 "$W/backend-truststore.p12" /var/iri/secrets/backend-truststore.p12
 restorecon -F /var/iri/secrets/backend-truststore.p12
-
-# The mount target is whatever KRT_BACKEND_TRUSTSTORE_PATH names -- on production /run/secrets/backend-truststore.p12.
+rm -rf "$W"
 D=/etc/containers/systemd/users/${IRI_UID}/keycloak.container.d
-T=$(sed -n 's/^KRT_BACKEND_TRUSTSTORE_PATH=//p' /var/iri/code/.env | tail -1)
-install -d -o deploy -g deploy -m 0755 "$D"
-printf '[Container]\nVolume=/var/iri/secrets/backend-truststore.p12:%s:ro\n' "$T" > "$D/50-backend-truststore.conf"
+printf '[Container]\nVolume=/var/iri/secrets/backend-truststore.p12:/run/secrets/backend-truststore.p12:ro\n' > "$D/50-backend-truststore.conf"
 chown deploy:deploy "$D/50-backend-truststore.conf"; chmod 0644 "$D/50-backend-truststore.conf"
-${UCTL} daemon-reload
-${UCTL} restart keycloak.service     # ~2 min FULL outage: backend, frontend, ingest restart with it
+${UCTL} daemon-reload && ${UCTL} restart keycloak.service   # restarts backend, frontend, ingest too (Requires=) -- ~2 min outage
 ```
 
+Output on production: `Certificate was added to keystore` twice; the drop-in landed beside the
+existing `30-log-driver.conf`. Two things the block takes for granted that another host may not
+have: the drop-in directory `$D` already existed on production (create it first with
+`install -d -o deploy -g deploy -m 0755 "$D"` where it does not), and the mount target
+`/run/secrets/backend-truststore.p12` is production's `KRT_BACKEND_TRUSTSTORE_PATH` — on any host
+it must be exactly what that variable names.
+
 **If the store exists**, add only the CA the same way (one `-importcert` with `-alias internal-ca`
-on a working copy, then `install` it back), and restart keycloak.
+on a working copy in such a scratch directory, then `install` it back), and restart keycloak.
 
 Verify: `journalctl CONTAINER_NAME=keycloak --since -5m -o cat | grep -c 'Failed to load the backend truststore'`
-is `0`, and `${UPOD} container inspect keycloak --format '{{range .Mounts}}{{.Destination}} {{end}}'`
-lists the target path. The drop-in survives every release (`deploy.sh` never touches a
+is `0`, and `${UPOD} exec keycloak ls /run/secrets` lists `backend-truststore.p12` (both held on
+production since 2026-09-25). The drop-in survives every release (`deploy.sh` never touches a
 `.container.d/`), but **neither it nor the store is in the backup**. **Rollback:** remove the
 drop-in, `daemon-reload`, restart keycloak — the precheck fails open again, which is where it was.
 
