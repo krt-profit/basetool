@@ -99,7 +99,15 @@ routine thing an SSE endpoint experiences — and a `WARN` from Spring itself, b
 `text/event-stream`. In one 16-hour production window those two were **30 of the 50** WARN/ERROR lines
 the backend produced. `GlobalExceptionHandler.handleDisconnectedClient` takes it at `DEBUG`, and its
 `void` return type is the second half of the fix rather than an oversight: there is no socket left to
-write to, and attempting to write one is what produced the second line.
+write to, and attempting to write one is what produced the second line. **The frontend has the same
+handler since 2026-09-25**, for the notification relay (`/notifications/stream`) and for Tomcat's
+`ClientAbortException` on a plain response: its catch-all logged `ERROR` and then tried to render the
+error page into the dead response, so Tomcat added `Servlet.service() … threw exception` — 33 lines in
+two minutes after the v1.11.0 deploy. Such lines carry `userId=anonymous` whatever the caller was: an
+async dispatch runs without the request thread's MDC (`CorrelationIdFilter` is a
+`OncePerRequestFilter` and skips async dispatches), so the field is not evidence of an unauthenticated
+request. **Enforced by:** backend `GlobalExceptionHandlerTest`, frontend
+`DisconnectedClientHandlingTest`.
 
 The frontend's `GlobalExceptionHandler` applies the same expected-noise demotion to **asset-shaped
 path-variable type mismatches**: when a request path whose final segment carries a filename
