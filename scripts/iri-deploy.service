@@ -34,13 +34,16 @@ Description=Profit Basetool — pull and apply latest GHCR images
 Documentation=https://github.com/krt-profit/basetool/blob/main/docs/deployment.md
 Wants=network-online.target
 After=network-online.target
-# No dependency on the container runtime. What the job needs is the rootless service user's manager
-# FINISHED starting, and only the script can wait on that signal -- rt_detect and
-# rt_wait_for_startup in scripts/lib/container-runtime.sh. Measured on the first reboot after the
-# 2026-09-22 cutover: the timers' Persistent=true catch-up fired eleven seconds after boot, one
-# second before user@<uid>.service came up, and an `After=user@<uid>.service` would still have let
-# the backup quiesce a stack that was starting. (These units carried `After=docker.service` until
-# then, which ordered them on nothing on a Podman host.)
+# Ordered after the rootless service user's manager by the drop-in 20-service-user.conf, which the
+# Ansible role writes beside this unit because only the role knows that user's uid
+# (ansible/roles/basetool_host/templates/iri-deploy-account-order.conf.j2): After= only, never
+# Wants=, so a job never starts a manager an operator stopped. It exists for this unit's SANDBOX,
+# not for the stack: a mount namespace built before user@<uid>.service mounts /run/user/<uid> never
+# sees that mount, and the job could not reach the containers for its whole run (reproduced
+# 2026-09-25). What the job needs beyond that -- the manager's first container, and for the
+# maintenance jobs its startup FINISHED -- only the script can wait on: rt_detect and
+# rt_wait_for_startup in scripts/lib/container-runtime.sh. (These units carried
+# `After=docker.service` until 2026-09-22, which ordered them on nothing on a Podman host.)
 
 [Service]
 Type=oneshot

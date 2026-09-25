@@ -176,6 +176,40 @@
   loop: "{{ basetool_host_deploy_account_units }}"
   notify: Reload systemd for the operational units
 
+# The service user's uid, looked up HERE and not taken from 22-deploy-user.yml's fact: this file is
+# tagged [scripts], and `--tags scripts` alone skips that file and would leave the variable
+# undefined -- the same trap, and the same fix, as 27-observability.yml's lookup.
+- name: Read the service user's uid for the ordering drop-in
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ basetool_host_service_user }}"
+  check_mode: false
+
+- name: Refuse if the service user does not exist yet
+  ansible.builtin.assert:
+    that: basetool_host_service_user in ansible_facts.getent_passwd
+    fail_msg: >-
+      {{ basetool_host_service_user }} does not exist on this host, so the deploy-account units
+      have no manager to be ordered after. Run the role without a tag limit -- 20-user.yml creates it.
+
+- name: Name the uid the ordering drop-in needs
+  ansible.builtin.set_fact:
+    basetool_host_service_uid: "{{ ansible_facts.getent_passwd[basetool_host_service_user][1] }}"
+
+- name: Order the deploy-account units after the service user's manager
+  # So each job's sandbox is built after the service user's runtime is mounted, and can see it.
+  # Measured 2026-09-25: a job that started first saw the bare mount point for its whole run and
+  # failed "no lingering user could be found"; the reasoning, and why After= alone, is in the
+  # template. A drop-in per unit for the same reason as the sandbox above.
+  ansible.builtin.template:
+    src: iri-deploy-account-order.conf.j2
+    dest: "/etc/systemd/system/{{ item }}.d/20-service-user.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ basetool_host_deploy_account_units }}"
+  notify: Reload systemd for the operational units
+
 - name: Install the log rotation the units write for
   ansible.builtin.copy:
     src: "{{ basetool_host_scripts_src }}/{{ item.src }}"
@@ -218,7 +252,8 @@
   # directive, a missing User=, a group that does not exist. Installing four units
   # and discovering at the first timer firing that one of them refuses to start is
   # exactly the failure this whole file exists to prevent.
-  # The drop-in above is read with the unit, so this also proves the shared sandbox parses.
+  # The drop-ins above are read with the unit, so this also proves the shared sandbox and the
+  # ordering on the service user's manager parse.
   ansible.builtin.command: "systemd-analyze verify /etc/systemd/system/{{ item }}"
   register: basetool_host_unit_verify
   changed_when: false

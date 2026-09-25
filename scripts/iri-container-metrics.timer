@@ -13,7 +13,10 @@
 [Unit]
 Description=Profit Basetool — container metrics every 30s
 Documentation=https://github.com/krt-profit/basetool/blob/main/scripts/cgroup-container-metrics.py
-Requires=iri-container-metrics.service
+; No Requires= on the service: a timer only TRIGGERS it, through Unit= below. A Requires= also
+; starts the service whenever the timer itself starts -- at every boot, when timers.target pulls the
+; timer in -- without the timer elapsing, which defeated the OnBootSec=30s below on every boot until
+; 2026-09-25 (docs/arc42/07-deployment-view.md §7.4b). Guarded by scripts/container-runtime.test.sh.
 
 [Timer]
 ; The first run 30s after boot, not immediately: at boot the container units are still starting and

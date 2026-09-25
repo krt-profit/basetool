@@ -127,7 +127,7 @@ say "== detecting the runtime, which is where this class of bug lives =="
 # detection.
 MINIMAL="${WORK}/coreutils"
 mkdir -p "$MINIMAL"
-for util in bash sh env id basename getent cut ls sudo sleep; do
+for util in bash sh env id basename getent cut ls sudo sleep stat; do
   util_path="$(command -v "$util" 2>/dev/null)" || continue
   ln -sf "$util_path" "${MINIMAL}/${util}" 2>/dev/null     || cp "$util_path" "${MINIMAL}/${util}" 2>/dev/null || true
 done
@@ -250,25 +250,58 @@ say "== the boot race: a lingering user whose runtime is not up YET =="
 # seconds after boot, and all three died in detection -- user@994.service became active at 16:26:03.
 # They lost by one second, stayed `failed` and paged SystemdUnitFailed critical.
 #
+# And again on 2026-09-25, with the wait for the directory in place: all four jobs started in the
+# same second as user@994.service and died at once, because the directory was there and podman
+# still refused. Reproduced the same day in a systemd container (Rocky 10.2, systemd 257, podman
+# 5.8.2), which is where the two shapes below come from:
+#
+#   * a sandboxed job started BEFORE the runtime tmpfs was mounted never sees the mount -- the
+#     directory it finds is the bare, root-owned mount point, for the job's whole life;
+#   * a job that does see the runtime (read-only, ProtectHome) cannot set up podman's user
+#     namespace itself and can only JOIN the pause process the manager's first container creates:
+#     until then "set sticky bit on: chmod /run/user/<uid>/libpod: read-only file system".
+#
 # These cases run detection through the SUDO BRIDGE, which is the path production takes: the jobs
 # run as the deploy account, which does not linger, and reach the service user through sudo.
 BRIDGE="${WORK}/bridge"; mkdir -p "$BRIDGE"
 cp "${BIN}/podman" "$BRIDGE/"
 REAL_ID="$(command -v id)"
 ABS_BASH="$(command -v bash)"
-# `id -u svcuser` answers a fixed uid; every other form is the real id, because detection also
-# asks `id -un` for the CURRENT user and that answer has to be true.
-# shellcheck disable=SC2016  # "$1", "$2" and "$@" belong to the stub being written, not to this shell
-printf '#!%s\nif [ "$1" = "-u" ] && [ "$2" = "svcuser" ]; then echo 4242; exit 0; fi\nexec "%s" "$@"\n' \
-  "$ABS_BASH" "$REAL_ID" > "${BRIDGE}/id"
-# `sudo -n -u svcuser podman ps` succeeds only once the fixture's runtime directory exists -- the
-# same thing that decides it on a host. Any other sudo call succeeds.
-# shellcheck disable=SC2016  # "$*" and the variable belong to the stub being written, not to this shell
-printf '#!%s\ncase "$*" in *"podman ps"*) [ -d "${STUB_READY_DIR:-/nonexistent}" ] || exit 1 ;; esac\nexit 0\n' \
-  "$ABS_BASH" > "${BRIDGE}/sudo"
+# The service user's uid is the CURRENT user's by default, so a fixture directory this test creates
+# is owned by "the service user" -- which is what a mounted runtime looks like from the job
+# (rt_runtime_visible). STUB_SVC_UID set to anything else makes the same directory the bare mount
+# point of a runtime this job cannot see. Every other form of id is the real one, because
+# detection also asks `id -un` for the current user and that answer has to be true.
+MY_UID="$("$REAL_ID" -u)"
+# shellcheck disable=SC2016  # "$1", "$2", "$@" and the variables belong to the stub being written
+printf '#!%s\nif [ "$1" = "-u" ] && [ "$2" = "svcuser" ]; then echo "${STUB_SVC_UID:-%s}"; exit 0; fi\nexec "%s" "$@"\n' \
+  "$ABS_BASH" "$MY_UID" "$REAL_ID" > "${BRIDGE}/id"
+# The sudo bridge. Every call is logged, so a case can prove podman was NOT run.
+#   `podman ps`             succeeds once STUB_READY_DIR exists -- on a host, once the manager's
+#                           first container has created the pause process podman joins; otherwise
+#                           it fails the way the sandbox makes it fail, on stderr
+#   `is-system-running`     answers STUB_MANAGER_STATE (default running); "-" is no answer at all
+# Any other sudo call succeeds.
+cat > "${BRIDGE}/sudo" <<STUB
+#!${ABS_BASH}
+printf '%s\n' "\$*" >> "${WORK}/sudo.log"
+case "\$*" in
+  *"podman ps"*)
+    [ -d "\${STUB_READY_DIR:-/nonexistent}" ] && exit 0
+    echo 'Error: set sticky bit on: chmod /run/user/4242/libpod: read-only file system' >&2
+    exit 1 ;;
+  *"is-system-running"*)
+    state="\${STUB_MANAGER_STATE:-running}"
+    [ "\${state}" = "-" ] && exit 1
+    printf '%s\n' "\${state}"
+    [ "\${state}" = "running" ] ;;
+esac
+exit 0
+STUB
 chmod +x "${BRIDGE}/id" "${BRIDGE}/sudo"
 LINGER_SVC="${WORK}/linger-svc"; mkdir -p "$LINGER_SVC"; : > "${LINGER_SVC}/svcuser"
 RUNBASE="${WORK}/run-user"; mkdir -p "$RUNBASE"
+RUNDIR="${RUNBASE}/${MY_UID}"
 
 # Prints "<backend>|<cli>", or nothing when detection refused. $1 = RT_RUNTIME_WAIT.
 detect_bridge() {
@@ -276,6 +309,7 @@ detect_bridge() {
   # The subshell IS the isolation, as in detect_detail; the RT_* names are read by the library.
   (
     set +e
+    : > "${WORK}/sudo.log"
     PATH="${BRIDGE}:${MINIMAL}"
     unset RT_BACKEND RT_CLI RT_SYSTEMCTL RT_UNIT_DIR
     RT_LINGER_DIR="${LINGER_SVC}"
@@ -289,10 +323,11 @@ detect_bridge() {
     printf '%s|%s' "${RT_BACKEND}" "${RT_CLI}"
   )
 }
+detect_err() { tr '\n' ' ' < "${WORK}/detect.err"; }
 
-rm -rf "${RUNBASE:?}/4242"
-export STUB_READY_DIR="${RUNBASE}/4242"
-( sleep 3; mkdir -p "${RUNBASE}/4242" ) &
+rm -rf "${RUNDIR:?}"
+export STUB_READY_DIR="${RUNDIR}"
+( sleep 3; mkdir -p "${RUNDIR}" ) &
 started=$SECONDS
 got="$(detect_bridge 15)"
 elapsed=$(( SECONDS - started ))
@@ -300,33 +335,94 @@ wait
 if [[ "$got" == "podman|sudo -n -u svcuser podman" && $elapsed -ge 2 ]]; then
   ok "a runtime that comes up late is waited for, and then found (${elapsed}s)"
 else
-  bad "the boot race is not waited out: got '${got}' after ${elapsed}s -- $(tr '\n' ' ' < "${WORK}/detect.err")"
+  bad "the boot race is not waited out: got '${got}' after ${elapsed}s -- $(detect_err)"
 fi
 
 # The bound matters as much as the wait. A runtime that never appears must still end in the
 # refusal detection always gave -- later, and saying that it waited.
-rm -rf "${RUNBASE:?}/4242"
+rm -rf "${RUNDIR:?}"
 started=$SECONDS
 got="$(detect_bridge 3)"
 elapsed=$(( SECONDS - started ))
-if [[ -z "$got" && $elapsed -ge 3 && $elapsed -lt 10 ]] && grep -q "after waiting" "${WORK}/detect.err"; then
-  ok "...and the wait is bounded: it refuses after ${elapsed}s and says it waited"
+if [[ -z "$got" && $elapsed -ge 3 && $elapsed -lt 10 ]] && grep -q "after waiting" "${WORK}/detect.err" \
+   && grep -q "never became visible" "${WORK}/detect.err"; then
+  ok "...and the wait is bounded: it refuses after ${elapsed}s, says it waited and that the runtime never showed"
 else
-  bad "a runtime that never comes up was not refused within the bound: got '${got}' after ${elapsed}s"
+  bad "a runtime that never comes up was not refused within the bound: got '${got}' after ${elapsed}s -- $(detect_err)"
 fi
 
-# The opposite case must NOT wait. A runtime directory that exists belongs to a manager that is up,
-# so a podman that refuses is a real answer -- waiting there would only make every genuine refusal
-# two minutes slower.
-mkdir -p "${RUNBASE}/4242"
+# THE 2026-09-25 SHAPE, first half: the directory EXISTS but is not the service user's -- the bare
+# mount point a job sees when its sandbox was built before the runtime was mounted. The old wait
+# looked only for the directory, found it, and let podman refuse at once. Now it is not taken for a
+# runtime: podman is never run against it (with no runtime to find, podman sets up a namespace of
+# its own inside the sandbox, which once left a pause process that broke the stack), and the
+# refusal names the missing ordering.
+mkdir -p "${RUNBASE}/4242"       # exists, and is not owned by the (stubbed) service uid 4242
+export STUB_READY_DIR="${RUNBASE}/4242"
+started=$SECONDS
+got="$(STUB_SVC_UID=4242 detect_bridge 3)"
+elapsed=$(( SECONDS - started ))
+rm -rf "${RUNBASE:?}/4242"
+if [[ -z "$got" && $elapsed -ge 3 ]] && ! grep -q "podman" "${WORK}/sudo.log" \
+   && grep -q "20-service-user.conf" "${WORK}/detect.err"; then
+  ok "a runtime directory the service user does not own is not a runtime: no podman, and the refusal names the ordering"
+else
+  bad "the bare mount point was taken for a runtime: got '${got}' after ${elapsed}s, sudo calls: $(tr '\n' ';' < "${WORK}/sudo.log") -- $(detect_err)"
+fi
+
+# Second half, and the case that FAILED on the code before this: the runtime is visible and podman
+# refuses because the manager has not run its first container yet. The manager says `starting`, so
+# that refusal is waited out -- and ends the moment podman can join.
+mkdir -p "${RUNDIR}"                # the runtime is up and visible from here on
+export STUB_READY_DIR="${WORK}/first-container"
+rm -rf "${STUB_READY_DIR:?}"
+( sleep 3; mkdir -p "${WORK}/first-container" ) &
+started=$SECONDS
+got="$(STUB_MANAGER_STATE=starting detect_bridge 15)"
+elapsed=$(( SECONDS - started ))
+wait
+if [[ "$got" == "podman|sudo -n -u svcuser podman" && $elapsed -ge 2 && $elapsed -lt 10 ]]; then
+  ok "a visible runtime that refuses while its manager is STARTING is waited out, and then found (${elapsed}s)"
+else
+  bad "the 2026-09-25 boot shape is not waited out: got '${got}' after ${elapsed}s -- $(detect_err)"
+fi
+rm -rf "${WORK}/first-container"
+
+# ...bounded as well, and this time the refusal carries podman's own words: the 2026-09-25 line
+# named no cause, because podman's stderr was thrown away.
 export STUB_READY_DIR="${WORK}/never-ready"
 started=$SECONDS
-got="$(detect_bridge 15)"
+got="$(STUB_MANAGER_STATE=- detect_bridge 3)"
 elapsed=$(( SECONDS - started ))
-if [[ -z "$got" && $elapsed -lt 3 ]]; then
-  ok "a runtime that EXISTS but refuses is answered at once, not waited on (${elapsed}s)"
+if [[ -z "$got" && $elapsed -ge 3 && $elapsed -lt 10 ]] && grep -q "after waiting" "${WORK}/detect.err" \
+   && grep -q "podman said: Error: set sticky bit on" "${WORK}/detect.err"; then
+  ok "...bounded too, for a manager that never answers, and the refusal quotes podman"
 else
-  bad "detection waited on a runtime that was already up: got '${got}' after ${elapsed}s"
+  bad "a manager that never finishes coming up was not refused within the bound: got '${got}' after ${elapsed}s -- $(detect_err)"
+fi
+
+# The opposite case must NOT wait. A runtime whose manager says it is RUNNING (or degraded) is up,
+# so a podman that refuses is a real answer -- waiting there would only make every genuine refusal
+# two minutes slower.
+for state in running degraded; do
+  started=$SECONDS
+  got="$(STUB_MANAGER_STATE=${state} detect_bridge 15)"
+  elapsed=$(( SECONDS - started ))
+  if [[ -z "$got" && $elapsed -lt 3 ]] && grep -q "podman said:" "${WORK}/detect.err"; then
+    ok "a runtime whose manager is ${state} but refuses is answered at once, with podman's reason (${elapsed}s)"
+  else
+    bad "detection waited on a runtime that was already ${state}: got '${got}' after ${elapsed}s -- $(detect_err)"
+  fi
+done
+
+# And the steady state -- every tick but the first after a boot -- costs nothing new: podman answers
+# first time, so the manager is never asked and nothing waits.
+export STUB_READY_DIR="${RUNDIR}"
+got="$(detect_bridge 15)"
+if [[ "$got" == "podman|sudo -n -u svcuser podman" ]] && ! grep -q "is-system-running" "${WORK}/sudo.log"; then
+  ok "a runtime that answers is used at once, without asking the manager anything"
+else
+  bad "the steady-state probe changed: got '${got}', sudo calls: $(tr '\n' ';' < "${WORK}/sudo.log")"
 fi
 unset STUB_READY_DIR
 
@@ -406,6 +502,58 @@ if grep -q '^[[:space:]]*rt_wait_for_startup' "${HERE}/deploy.sh"; then
   bad "deploy.sh waits for startup -- it must not; it may be the fix for a stuck one"
 else
   ok "...and deploy.sh deliberately does not"
+fi
+
+say ""
+say "== what starts the jobs at boot, and what they are ordered after =="
+# Every iri-*.timer carried `Requires=<its service>` until 2026-09-25. That makes starting the TIMER
+# start the service -- at every boot, when timers.target pulls the timers in -- without the timer
+# elapsing and without LastTrigger moving. It is why all four deploy-account jobs ran one second
+# into the 2026-09-25 reboot although none was due, and why iri-deploy's OnBootSec=5min never held.
+# Reproduced in a systemd container the same day: the service started 3 ms after its timer.
+# A directive in a comment does not count, so only lines that start with the key are read.
+timers=0
+for timer in "${HERE}"/iri-*.timer; do
+  [[ -e "${timer}" ]] || continue
+  timers=$((timers + 1))
+  name="$(basename "${timer}")"
+  if grep -Eq '^[[:space:]]*(Requires|Wants|BindsTo|Requisite|Upholds)[[:space:]]*=' "${timer}"; then
+    bad "${name} pulls a unit in -- a timer only triggers, through Unit=; a pull-in runs the job at every boot"
+  else
+    ok "${name} pulls nothing in"
+  fi
+  if grep -Eq "^Unit=${name%.timer}\.service$" "${timer}"; then
+    ok "${name} triggers ${name%.timer}.service through Unit="
+  else
+    bad "${name} does not name ${name%.timer}.service in Unit="
+  fi
+done
+(( timers >= 6 )) || bad "expected the six iri-*.timer files beside this suite, found ${timers}"
+
+# The ordering drop-in: the four deploy-account units wait for the service user's manager, so their
+# sandbox is built after the runtime is mounted -- a sandbox built before it never sees it. After=
+# only: a Wants= would make a tick start a manager an operator had stopped, and every container
+# with it. The uid is the role's to fill in, so the template and the task are what is checked.
+ROLE="${HERE}/../ansible/roles/basetool_host"
+ORDER_TMPL="${ROLE}/templates/iri-deploy-account-order.conf.j2"
+if grep -Eq '^After=.*systemd-logind\.service' "${ORDER_TMPL}" 2>/dev/null \
+   && grep -Eq '^After=.*user@\{\{ basetool_host_service_uid \}\}\.service' "${ORDER_TMPL}"; then
+  ok "the ordering drop-in orders after systemd-logind and user@<service uid>"
+else
+  bad "the ordering drop-in (${ORDER_TMPL}) does not order after systemd-logind.service and user@<uid>.service"
+fi
+if grep -Eq '^[[:space:]]*(Requires|Wants|BindsTo|Requisite|Upholds)[[:space:]]*=' "${ORDER_TMPL}" 2>/dev/null; then
+  bad "the ordering drop-in pulls a unit in -- it must only order"
+else
+  ok "...and pulls nothing in"
+fi
+if awk '/src: iri-deploy-account-order\.conf\.j2/ { t = 1 }
+        t && /dest: .*\{\{ item \}\}\.d\/20-service-user\.conf/ { d = 1 }
+        t && d && /loop: "\{\{ basetool_host_deploy_account_units \}\}"/ { found = 1; exit }
+        END { exit !found }' "${ROLE}/tasks/25-scripts.yml"; then
+  ok "the role installs it beside every deploy-account unit"
+else
+  bad "tasks/25-scripts.yml no longer installs 20-service-user.conf beside basetool_host_deploy_account_units"
 fi
 
 say ""

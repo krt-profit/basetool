@@ -4,6 +4,11 @@
 
 ### Fixed
 
+- **Server: nach einem Neustart schlagen Deploy, Backup, Restore-Drill und Cleanup nicht mehr
+  fehl.** Die Timer starten ihren Job nicht mehr bei jedem Boot mit, die vier Jobs warten auf den
+  Service-User `iri` und seinen ersten Container, und eine Verweigerung nennt jetzt den
+  podman-Fehler. Wirkt erst nach einem Lauf der Ansible-Rolle (`--tags scripts`).
+
 - **Redis: das Frontend löst beim Start keine ACL-Verweigerung mehr aus.** Mit eigenem ACL-Benutzer
   (`REDIS_FRONTEND_USERNAME`) prüft es den Session-Store per `PING` statt per `CONFIG GET`, das
   dieser Benutzer nicht darf; jeder Neustart zählte bisher auf `RedisAclDenials`. Unter `default`

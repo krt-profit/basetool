@@ -14,7 +14,10 @@
 [Unit]
 Description=Profit Basetool — weekly container housekeeping (Sat 02:00 UTC)
 Documentation=https://github.com/krt-profit/basetool/blob/main/docs/deployment.md
-Requires=iri-container-cleanup.service
+; No Requires= on the service: a timer only TRIGGERS it, through Unit= below. A Requires= also
+; starts the service whenever the timer itself starts -- at every boot, when timers.target pulls the
+; timer in -- whether or not a cleanup was due (docs/arc42/07-deployment-view.md §7.4b). Guarded by
+; scripts/container-runtime.test.sh.
 
 [Timer]
 OnCalendar=Sat *-*-* 02:00:00 UTC

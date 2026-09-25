@@ -20,11 +20,18 @@
 [Unit]
 Description=Profit Basetool — periodic deploy check (every 5 minutes)
 Documentation=https://github.com/krt-profit/basetool/blob/main/docs/deployment.md
-Requires=iri-deploy.service
+; No Requires= on the service, on purpose: a timer only TRIGGERS its unit, through Unit= below.
+; A Requires= also starts the service whenever the timer itself starts -- at every boot, when
+; timers.target pulls the timer in -- without the timer elapsing and without LastTrigger moving.
+; That is what ran all four deploy-account jobs one second into the 2026-09-25 reboot, where each
+; failed (docs/arc42/07-deployment-view.md §7.4b); it also made the OnBootSec below a fiction.
+; Reproduced in a systemd container the same day: service start 3 ms after its timer's, timer never
+; elapsed. Guarded by scripts/container-runtime.test.sh.
 
 [Timer]
 ; First run 5 minutes after boot — gives the container units + the network stack time to
-; settle before we hit GHCR.
+; settle before we hit GHCR. (True only since the Requires= above went.) Started by hand on a host
+; that has been up longer, the timer fires at once: OnBootSec has already passed.
 OnBootSec=5min
 
 ; Repeat every 5 minutes thereafter. Idempotent: no-op when nothing changed

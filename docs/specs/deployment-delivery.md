@@ -778,6 +778,17 @@ The deploy path is hardened at the host layer, beyond running as an unprivileged
   rootless call with `cannot chdir to /root`, which runtime detection reported as "no lingering user
   could be found". It changes to `/` right after resolving its own directory (since 2026-09-22), as
   `container-cleanup.sh` already did. The timer was never affected: systemd starts a service in `/`.
+- **The sandboxed jobs start only when they can see the stack, and only when they are due**
+  (since 2026-09-25). A timer only *triggers* its service (`Unit=`); none of the `iri-*.timer`
+  files pulls it in with `Requires=`/`Wants=`, which started all four deploy-account jobs at every
+  boot without the timer elapsing. The four units are ordered
+  `After=systemd-logind.service user@<service uid>.service` by the role's drop-in
+  `20-service-user.conf` — ordering only, never a pull-in — because their sandbox
+  (`ProtectHome=read-only` covers `/run/user`) never sees a runtime mounted after it was built.
+  `rt_detect` runs no podman before the service user's runtime is visible, waits (bounded, 120 s)
+  while a visible runtime refuses and its manager is still `initializing`/`starting`, answers a
+  refusal from a `running`/`degraded` manager at once, and quotes podman's error in its refusal.
+  A normal tick is unchanged: the runtime is visible and podman answers first time.
 - **Token expiry is monitored (opt-in).** When the pull token **expires**, `deploy.sh` emits
   `basetool_ghcr_token_expiry_timestamp` from an operator-recorded `${TOKEN_FILE}.expiry` on every
   tick (incl. the no-op); `GhcrPullTokenExpiring` (warning, <14 d) and `GhcrPullTokenExpired`
@@ -797,10 +808,20 @@ The deploy path is hardened at the host layer, beyond running as an unprivileged
 - [ ] `deploy.sh` writes `basetool_ghcr_token_expiry_timestamp` when `${TOKEN_FILE}.expiry` exists
   (and nothing when it does not); `ops-automation.yml` alerts on <14 d / expired only — **not** on
   absence, so a non-expiring token is not false-warned.
+- [ ] No `scripts/iri-*.timer` carries `Requires=`/`Wants=`/`BindsTo=`/`Requisite=`/`Upholds=`, and
+  each names its service in `Unit=`; the role installs `20-service-user.conf` beside every unit in
+  `basetool_host_deploy_account_units`, with `After=systemd-logind.service user@<uid>.service` and no
+  pull-in (`container-runtime.test.sh`). On a host, `systemctl show iri-backup.service -p After`
+  names `user@<uid>.service`.
+- [ ] `rt_detect` runs no podman while the runtime is not visible, waits out a refusal while the
+  manager is starting, refuses at once for a running/degraded one, and its refusal carries podman's
+  last error line (`container-runtime.test.sh`). After a reboot no `iri-*` unit is `failed`.
 
 **Enforced by:** `scripts/iri-deploy.service` (sandbox) · `scripts/deploy.sh` (`write_token_expiry_metric`,
 `HOME` for the cosign cache) · `monitoring/prometheus/alerts/ops-automation.yml` (token alerts) ·
 `ansible/roles/basetool_host/tasks/22-deploy-user.yml` (the sudoers bridge) ·
+`scripts/iri-*.timer`, `ansible/roles/basetool_host/templates/iri-deploy-account-order.conf.j2`,
+`scripts/lib/container-runtime.sh` (`rt_runtime_visible`, `rt_probe_service_user`) ·
 **Runbook:** `docs/deployment.md` → *Accounts and what runs where*, *Internal keystore and
 certificate rotation*, *Token rotation*
 

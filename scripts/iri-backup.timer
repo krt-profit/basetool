@@ -11,7 +11,11 @@
 [Unit]
 Description=Profit Basetool — nightly backup (04:15)
 Documentation=https://github.com/krt-profit/basetool/blob/main/docs/backup.md
-Requires=iri-backup.service
+; No Requires= on the service: a timer only TRIGGERS it, through Unit= below. A Requires= also
+; starts the service whenever the timer itself starts -- at every boot, when timers.target pulls the
+; timer in -- whether or not a run was due (docs/arc42/07-deployment-view.md §7.4b). The catch-up
+; below is the only boot-time run this job is meant to have. Guarded by
+; scripts/container-runtime.test.sh.
 
 [Timer]
 OnCalendar=*-*-* 04:15:00
