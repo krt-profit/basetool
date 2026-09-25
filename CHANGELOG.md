@@ -38,6 +38,9 @@
 
 ### Changed
 
+- **Build: Gradle 9.8.0.** Der Wrapper steht auf 9.8.0 (eingebettetes Kotlin 2.4.10, JaCoCo
+  0.8.15 als Standard). Rein intern, keine Auswirkung auf die Oberfläche.
+
 - **Dialoge verhalten sich überall gleich.** Jeder Dialog schließt jetzt mit Escape, setzt den
   Fokus beim Öffnen in sein erstes Eingabefeld und gibt ihn beim Schließen an den auslösenden
   Knopf zurück; die Seite dahinter ist gesperrt, solange er offen ist (native `<dialog>`-Elemente).

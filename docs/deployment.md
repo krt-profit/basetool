@@ -255,27 +255,41 @@ accepts `NOAUTH`, so it does not care which users exist.
 ```bash
 cd /
 cp -p /var/iri/redis/users.acl /var/iri/redis/users.acl.backup-$(date +%Y%m%d-%H%M%S)
+# Render NEXT TO the live file, never onto it -- see "Why .new and cat" below.
 /var/iri/code/scripts/render-redis-acl.py --env /var/iri/code/.env \
-  --template /var/iri/code/scripts/redis-users.acl.tmpl --out /var/iri/redis/users.acl
-chown root:root /var/iri/redis/users.acl && chmod 0644 /var/iri/redis/users.acl
-restorecon -F /var/iri/redis/users.acl
-grep -c '^user default ' /var/iri/redis/users.acl                 # must be 1
-grep -c '>' /var/iri/redis/users.acl                               # must be 0: hashes only
+  --template /var/iri/code/scripts/redis-users.acl.tmpl --out /var/iri/redis/users.acl.new
+grep -c '^user default ' /var/iri/redis/users.acl.new             # must be 1
+grep -c '>' /var/iri/redis/users.acl.new                           # must be 0: hashes only
+cat /var/iri/redis/users.acl.new > /var/iri/redis/users.acl && rm /var/iri/redis/users.acl.new
+stat -c '%U:%G %a' /var/iri/redis/users.acl                        # root:root 644, unchanged
 # live and atomic -- a malformed file is rejected and the running ACL stays. As `admin` once the
 # rendered file has been loaded at least once; the very first load authenticates as `default`
 # (drop `--user admin`), because the hand-written file before it has no admin user.
 ${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin ACL LOAD'   # OK
+${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin ACL USERS'  # the users the render printed
 ```
 
 `ACL LOAD` needs no restart and signs nobody out. `check-conformance.py --only redis-requires-auth`
 still proves an unauthenticated `PING` is refused.
+
+**Why `.new` and `cat`** *(corrected 2026-09-25)*. The unit mounts the single file
+(`Volume=/var/iri/redis/users.acl:/etc/redis/users.acl:ro`), and a single-file bind mount follows
+the **inode**, not the name. `render-redis-acl.py` writes atomically — a temporary file renamed over
+the target, i.e. a **new** inode — so rendering straight onto the live path would leave the
+container on the old inode, and `ACL LOAD` would quietly reload the **old** rules (the same reason
+`grafana.crt` needs an edge restart after a re-mint). Writing the checked result into the existing
+file with `cat … >` keeps the inode, its owner, mode and SELinux label, so no `chown`/`restorecon`
+is needed and the running container sees the new content. The `ACL USERS` line is the proof: if it
+still lists the old set, the content did not reach the container — `${UCTL} restart redis.service`
+then loads it from the mount (it also restarts `frontend` and `ingest`, which `Requires=` redis;
+sessions survive in the AOF).
 
 > [!warning] Read the ACL log by field, never whole
 > `redis-cli ACL LOG` answers what was refused and by whom — and its `object` field is the key or
 > channel, which for a session key **is a session id**. Print the usernames and reasons only:
 > `${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin ACL LOG 20' | awk 'p{print; p=0} /^(username|reason|context)$/{printf "%s: ", $0; p=1}'`.
 
-**Rotating a password** is `.env` + render + `ACL LOAD` + restarting the one service that uses it
+**Rotating a password** is `.env` + render (the `.new` + `cat` block above) + `ACL LOAD` + restarting the one service that uses it
 (`render-env-d.py` first, so its `env.d` file carries the new value). Rotating `REDIS_PASSWORD`
 touches `default`/`admin` and the redis unit's own environment: render both, `ACL LOAD`, then
 `${UCTL} restart redis.service` so the container sees the new `REDIS_PASSWORD` for the next `ACL
@@ -291,6 +305,19 @@ can be stopped and rolled back on its own.
 1. **Install the renderer** (from WSL): `ansible-playbook site.yml --limit production --tags scripts
    --check --diff`, then without `--check --diff`. Verify
    `ls -l /var/iri/code/scripts/render-redis-acl.py /var/iri/code/scripts/redis-users.acl.tmpl`.
+
+> [!warning] Steps 2–4 are one sitting, with the deploy timer stopped *(corrected 2026-09-25)*
+> Step 2 is **not** inert. The env templates pick each service's password with
+> `REDIS_PASSWORD=${REDIS_<SVC>_PASSWORD:-${REDIS_PASSWORD…}}` — whether or not its
+> `REDIS_<SVC>_USERNAME` is set. So from the moment the three passwords are in `.env`, **any**
+> `env.d/` render hands each application its new password with no username: a password-only `AUTH`
+> as `default` with the wrong password, `WRONGPASS`, and the service goes unhealthy on its next
+> restart. `deploy.sh` re-renders `env.d/` on every config change, so a deploy tick between step 2
+> and step 4 is exactly that render. Hence: `systemctl stop iri-deploy.timer` before step 2, run
+> steps 2–4 back to back, and `systemctl start iri-deploy.timer` only after step 4 verified (or after
+> a rollback). And never add the three passwords before the release carrying REQ-SEC-068 (1.11.0)
+> is live.
+
 2. **Three new passwords into `.env`**, generated on the host so they never cross a terminal:
 
    ```bash
@@ -305,6 +332,12 @@ can be stopped and rolled back on its own.
 
 3. **Render with `default` still on, and load it** — the block above, first load without `--user
    admin`. Nothing changes for the applications yet; `admin` and the three service users now exist.
+   Before rendering, confirm that `.env`'s `REDIS_EXPORTER_PASSWORD` is the password the hand-written
+   file gives `monitoring` — the render re-derives that user's hash from `.env`, and a mismatch takes
+   `redis-exporter` down (`redis_up == 0`). Compare digests, never the values:
+   `grep '^user monitoring ' /var/iri/redis/users.acl | grep -o '>[^ ]*' | cut -c2- | tr -d '\n' | sha256sum`
+   against `sed -n 's/^REDIS_EXPORTER_PASSWORD=//p' /var/iri/code/.env | tr -d '"\n' | sha256sum` —
+   the two sums must be equal; if they differ, stop and settle which one is right first.
    Check: `${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin ACL
    USERS'` lists all six.
 4. **Move the applications**, one at a time, watching each come back healthy:
@@ -330,10 +363,14 @@ can be stopped and rolled back on its own.
    and `redis-exporter` still scrapes (`redis_up == 1`).
 
 **Rollback**, from any step: step 5 — set `REDIS_DEFAULT_USER=on` (or delete the line), render,
-`ACL LOAD`. Step 4 — delete the three `REDIS_*_USERNAME` lines, render `env.d/`, restart the three
-services: they are back on `default`. Step 3 — `cp -p` the `users.acl.backup-*` back and `ACL LOAD`
-(authenticating as `default`). The passwords may stay in `.env`; nothing reads them without the
-usernames.
+`ACL LOAD`. Step 4 — delete the three `REDIS_*_USERNAME` lines **and** the three
+`REDIS_{FRONTEND,BACKEND,INGEST}_PASSWORD` lines, render `env.d/`, restart the three services: they
+are back on `default` with the shared password. Step 3 — `cat` the `users.acl.backup-*` back into
+`users.acl` (keeping the inode, as above) and `ACL LOAD` (authenticating as `default`); step 2 —
+delete the three password lines. *(Corrected 2026-09-25: this used to say the passwords may stay in
+`.env` because nothing reads them without the usernames — the templates read them either way, see
+the warning above.)* **A release rollback** to a version before REQ-SEC-068 (1.10.0 or older) needs
+`default` **on** first: its health check and its applications authenticate as `default`.
 
 ---
 
@@ -439,6 +476,11 @@ rest.
 Nothing is deployed yet: `:stable` still names the previous release.
 
 ### Promoting to production
+
+> [!note] A release whose PRs need more than this path gets its own runbook
+> When a release carries host steps, ordering constraints or switches beyond the promotion below,
+> they are collected per release from an audit of its PRs: **1.11.0** →
+> [`RELEASE_1.11.0_PRODUCTION_RUNBOOK.md`](RELEASE_1.11.0_PRODUCTION_RUNBOOK.md).
 
 ```bash
 gh workflow run promote.yml -f version=1.9.3
@@ -875,8 +917,11 @@ step 3). Since 2026-09-23 the edge can verify that hop too, pinning that very ce
 Grafana upstream's only anchor and checking the name `grafana` (`include/upstream-grafana-tls.conf`,
 REQ-OBS-008). It is behind **`EDGE_GRAFANA_UPSTREAM_VERIFY`**, `off` by default, so the release that
 carries it changes nothing but one read-only mount: the edge now mounts `grafana.crt`, the same file
-Grafana itself needs to start, and `deploy.sh` refuses a release whose edge unit names a missing
-one.
+Grafana itself needs to start. `deploy.sh`'s mount pre-flight reads the units **already installed**
+at the start of a tick (before the tick installs the incoming bundle's), so it does not stop the
+release that *adds* this mount: with the file missing, that release fails at the edge's start and
+the health gate rolls it back; only later ticks refuse it up front *(corrected 2026-09-25)*. The
+file exists wherever Grafana runs, and on production it was confirmed on 2026-09-25.
 
 **Precondition** (read-only): the certificate names `grafana`.
 
@@ -1035,7 +1080,9 @@ ansible-playbook site.yml --limit production --tags scripts --check --diff
 ansible-playbook site.yml --limit production --tags scripts
 ```
 
-Expected: `mint-internal-tls.sh`, `deploy.sh`, `backup.sh` changed under `/var/iri/code/scripts/`.
+Expected: `mint-internal-tls.sh`, `deploy.sh`, `backup.sh` changed under `/var/iri/code/scripts/`,
+plus `render-redis-acl.py` and `redis-users.acl.tmpl` if the Redis ACL renderer
+([The Redis ACL](#the-redis-acl)) was not installed before — the same run installs both.
 Rollback: re-run the role from the previous commit.
 
 ### Step 1 — check the names (independent of everything else)
@@ -1132,8 +1179,12 @@ may stay, nothing mounts it yet.
 ### Step 3 — serve the new certificates
 
 Merge and promote the follow-up release that bakes the step-2 files into the units (`PATH_VARS`) —
-its `deploy.sh` pre-flight refuses the release if any of the files is missing, before anything is
-applied. The deploy recreates backend, frontend, ingest and Keycloak on their own leaves; the
+**only after step 2 has put every file in place**. The `deploy.sh` mount pre-flight reads the units
+already installed at the start of the tick, not the incoming ones, so it does **not** refuse this
+release before applying it: a missing file makes the containers fail to start and the health gate
+roll the release back (and later ticks then refuse it). Check the files by hand first
+(`ls -l /var/iri/secrets/tls/`) *(corrected 2026-09-25: this used to say the pre-flight refuses the
+release before anything is applied)*. The deploy recreates backend, frontend, ingest and Keycloak on their own leaves; the
 truststore still carries the old certificate, so the restart order does not matter.
 
 Verify:

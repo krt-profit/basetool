@@ -170,8 +170,10 @@ not happened.
   `keycloak-config-snapshot.sql` diff. It also encodes production **as it is**, so what it marks
   `PROD-AS-IS` travels into every realm it shapes. Three such entries were decided on 2026-09-22 and
   now converge away (the extractor's unused code flow, the ingest scopes on the app, the
-  compose-internal frontend origin — ADR-0202 amendment 1), but **production keeps them until the
-  provisioner is applied there**, which is an owner-gated write.
+  compose-internal frontend origin — ADR-0202 amendment 1). The provisioner was applied to
+  **production on 2026-09-23**, so they are gone there; the **testing realm is not provisioned
+  yet**, which is an owner-gated write (and, since 1.11.0's audience gate, a precondition for the
+  testing backend to start).
 - **Redis still has one all-powerful user in production until the per-service rollout.** Backend,
   frontend and ingest share `default` (`~* &* +@all`) and one password, so any one of them could
   read every session's OAuth2 tokens. REQ-SEC-068 / ADR-0207 shipped the per-service users, the
