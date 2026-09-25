@@ -22,7 +22,7 @@ server {
     allow 172.28.3.1;
     allow 172.28.4.1;
     allow 172.28.7.1;
-    allow 172.28.13.1;
+    allow 172.28.13.1;${EDGE_ADMIN_ALLOW_EXTRA}
     deny all;
 
     include /etc/nginx/edge/include/upstream-keycloak.conf;

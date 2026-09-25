@@ -1,4 +1,3 @@
-
 logging {
 	level  = "info"
 	format = "logfmt"
@@ -197,6 +196,7 @@ discovery.relabel "containers" {
 		target_label  = "app"
 		replacement   = "mon-$1"
 	}
+
 	rule {
 		source_labels = ["__journal_container_name"]
 		regex         = "db-backend"
@@ -217,12 +217,14 @@ discovery.relabel "containers" {
 		target_label  = "app"
 		replacement   = "$1"
 	}
+
 	rule {
 		source_labels = ["__journal_container_name"]
 		regex         = "(backend|frontend|ingest)"
 		target_label  = "app"
 		replacement   = "$1-stdout"
 	}
+
 	rule {
 		source_labels = ["__journal_container_name"]
 		regex         = "keycloak"
