@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.logging;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.frontend.config.LoggingProperties;
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -109,5 +110,64 @@ class CorrelationIdFilterTest {
     filter.doFilter(req, res, chain);
 
     assertThat(seen[0]).isEqualTo("anonymous");
+  }
+
+  @Test
+  void initialDispatchStashesWhatItBoundForALaterAsyncDispatch() throws Exception {
+    MockHttpServletRequest req = new MockHttpServletRequest("GET", "/notifications/stream");
+    req.addHeader("X-Correlation-Id", "stash-me");
+
+    filter.doFilter(req, new MockHttpServletResponse(), new MockFilterChain());
+
+    assertThat(req.getAttribute(CorrelationIdFilter.CORRELATION_ID_ATTRIBUTE))
+        .isEqualTo("stash-me");
+    assertThat(req.getAttribute(CorrelationIdFilter.USER_ID_ATTRIBUTE)).isEqualTo("anonymous");
+  }
+
+  @Test
+  void asyncDispatchRebindsTheStashedValuesAndRemovesThemAfterwards() throws Exception {
+    MockHttpServletRequest req = new MockHttpServletRequest("GET", "/notifications/stream");
+    req.setDispatcherType(DispatcherType.ASYNC);
+    req.setAttribute(CorrelationIdFilter.CORRELATION_ID_ATTRIBUTE, "from-initial");
+    req.setAttribute(CorrelationIdFilter.USER_ID_ATTRIBUTE, "member-sub");
+    req.addHeader("X-Correlation-Id", "client-sent-on-async");
+    MockHttpServletResponse res = new MockHttpServletResponse();
+    final String[] seen = new String[3];
+    FilterChain chain =
+        (request, response) -> {
+          seen[0] = MDC.get("correlationId");
+          seen[1] = MDC.get("userId");
+          seen[2] = CorrelationContext.get();
+        };
+
+    filter.doFilter(req, res, chain);
+
+    assertThat(seen).containsExactly("from-initial", "member-sub", "from-initial");
+    assertThat(res.getHeader("X-Correlation-Id"))
+        .as("the async pass leaves the response header to the initial dispatch")
+        .isNull();
+    assertThat(MDC.get("correlationId")).isNull();
+    assertThat(MDC.get("userId")).isNull();
+    assertThat(CorrelationContext.get()).isNull();
+  }
+
+  @Test
+  void asyncDispatchWithoutAStashMintsNothingAndTrustsNoHeader() throws Exception {
+    MockHttpServletRequest req = new MockHttpServletRequest("GET", "/notifications/stream");
+    req.setDispatcherType(DispatcherType.ASYNC);
+    req.addHeader("X-Correlation-Id", "client-sent-on-async");
+    MockHttpServletResponse res = new MockHttpServletResponse();
+    final String[] seen = new String[3];
+    FilterChain chain =
+        (request, response) -> {
+          seen[0] = MDC.get("correlationId");
+          seen[1] = MDC.get("userId");
+          seen[2] = CorrelationContext.get();
+        };
+
+    filter.doFilter(req, res, chain);
+
+    assertThat(seen).containsOnlyNulls();
+    assertThat(res.getHeader("X-Correlation-Id")).isNull();
   }
 }

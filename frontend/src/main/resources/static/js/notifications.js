@@ -111,6 +111,12 @@
      * @returns {any} the parsed body, or the fallback
      */
     function readJson(res, fallback) {
+        if (res.status === 401) {
+            // The session is gone (logout in another tab, expiry, a renamed session cookie after a
+            // deploy). The stream cannot find that out for itself — see startSse — so it is told
+            // here, before the re-auth helper takes the window (or declines to, inside its loop guard).
+            stopSse();
+        }
         if (window.krtReauth && window.krtReauth.check(res)) {
             return fallback;
         }
@@ -631,11 +637,16 @@
     // pool (#1130 / #1110). The polling fallback above is the guaranteed correctness path, so SSE
     // never needs to be reliable.
     const SSE_RECONNECT_BASE_MS = 3000;
+    // Consecutive refused connects double the reconnect delay up to 2^3 x the base (24–48 s), so a
+    // stream the server keeps refusing is retried at a walking pace rather than every few seconds.
+    const SSE_MAX_BACKOFF_STEPS = 3;
     /** @type {EventSource | null} */
     let sseSource = null;
     /** @type {number | null} */
     let sseReconnectTimer = null;
     let sseStopped = false;
+    // Connects refused in a row (an `error` before any `open`); reset by the next `open`.
+    let sseRefusals = 0;
 
     function scheduleSseReconnect() {
         // One pending reconnect at a time; never reconnect after a `reauth` handoff (the page is
@@ -643,13 +654,41 @@
         if (sseReconnectTimer !== null || sseStopped) {
             return;
         }
-        // Full jitter in [base, 2*base): spreads reconnects across a ~3 s window instead of firing
-        // every tab on the same tick, matching the decorrelation the mission-presence reconnect uses.
-        const delay = SSE_RECONNECT_BASE_MS + Math.floor(Math.random() * SSE_RECONNECT_BASE_MS);
+        // Full jitter in [base, 2*base): spreads reconnects across a window instead of firing every
+        // tab on the same tick, matching the decorrelation the mission-presence reconnect uses. The
+        // base grows with consecutive refusals (see SSE_MAX_BACKOFF_STEPS).
+        const base =
+            SSE_RECONNECT_BASE_MS * Math.pow(2, Math.min(sseRefusals, SSE_MAX_BACKOFF_STEPS));
+        const delay = base + Math.floor(Math.random() * base);
         sseReconnectTimer = window.setTimeout(function () {
             sseReconnectTimer = null;
-            startSse();
+            // The session probe of a refused connect may have stopped the stream while this waited.
+            if (!sseStopped) {
+                startSse();
+            }
         }, delay);
+    }
+
+    /**
+     * Stops the push stream for good on this page: no open source, no pending reconnect. Called
+     * when a read learns that the session is gone, because the stream itself cannot (see startSse).
+     * The badge poll stays; it is what hands the window to the login.
+     */
+    function stopSse() {
+        sseStopped = true;
+        if (sseReconnectTimer !== null) {
+            window.clearTimeout(sseReconnectTimer);
+            sseReconnectTimer = null;
+        }
+        if (sseSource !== null) {
+            try {
+                sseSource.close();
+            } catch (_error) {
+                /* already closed */
+            }
+            sseSource = null;
+        }
+        clearSseWatchdog();
     }
 
     function startSse() {
@@ -672,9 +711,12 @@
         try {
             const source = new EventSource('/notifications/stream');
             sseSource = source;
+            let opened = false;
             // Connection established → push is live: mark healthy (backs the poll off to the slow
             // keepalive on the flip) and arm the liveness watchdog.
             source.addEventListener('open', function () {
+                opened = true;
+                sseRefusals = 0;
                 markSseHealthy();
             });
             // Stream dropped → fall back to the fast poll and reconnect ourselves after a jittered
@@ -689,6 +731,15 @@
                 }
                 if (sseSource === source) {
                     sseSource = null;
+                }
+                if (!opened) {
+                    // Refused before it ever opened. An EventSource reads no status, so a 401 from
+                    // a session that has ended looks exactly like a network blip, and a tab would
+                    // reconnect against it every few seconds for as long as it stayed open — hidden
+                    // tabs too, where the badge poll is paused. The badge read can see the status:
+                    // on a 401 readJson stops this stream and hands the window to the login.
+                    sseRefusals += 1;
+                    refreshUnreadCount();
                 }
                 scheduleSseReconnect();
             });
