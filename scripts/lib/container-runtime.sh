@@ -479,7 +479,9 @@ rt_apply() {
 # arm wanted. The pair keeps that mistake unrepresentable.
 #
 # A failed pull IS fatal, by way of `set -e` at the call site, and that is
-# deliberate: these three images ARE the release. What must not be fatal is a
+# deliberate: these three images ARE the release. Since 2026-09-25 deploy.sh's
+# pre-gate guard records that exit as a deploy failure and puts the config tree
+# and the pin back (on_pre_gate_exit). What must not be fatal is a
 # third-party registry hiccup, and that is handled by not pulling infra here at
 # all rather than by swallowing errors.
 # -----------------------------------------------------------------------------

@@ -95,7 +95,10 @@ itself changes only through the Ansible role, which never delivers):
    untrusted digest is rejected here — which is what makes a blind `:stable` pull safe.
 4. Verified content is unpacked, `env.d` files are rendered from `.env` by `render-env-d.py`, and
    the Quadlet units are reconciled through the service user's systemd instance, behind a health
-   gate that rolls back on failure (`REQ-OPS-003`).
+   gate that rolls back on failure (`REQ-OPS-003`). A failure *before* the gate — an unwritable
+   directory, a failed mirror, a failed pull — is refused up front where it can be, and otherwise
+   recorded like any other failed deploy: the host tree and the pin are put back, the target backs
+   off, and `DeployFailed` fires (since 2026-09-25; until then it ended the run in silence).
 5. Nothing is promoted automatically: `:stable` moves only by a deliberate act in the promote
    workflow. The deploy is the *consumer* of that decision, never its author.
 

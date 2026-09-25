@@ -410,7 +410,7 @@ a privately signed edge, the JVM truststore (`20-jvm-truststore.conf`). `check-c
 | `/var/iri/code/scripts/` | the role | `deploy.sh`, `backup.sh`, `restore-drill.sh`, `container-cleanup.sh`, `lib/container-runtime.sh`, `render-env-d.py`, `render-redis-acl.py`, `mint-internal-tls.sh`, the two collectors — `root:root 0755`, so `deploy` cannot rewrite its own deployer |
 | `/etc/containers/systemd/users/<iri-uid>/` | `deploy.sh` | the 39 units, plus `<svc>.container.d/10-digest-pin.conf` (the release's digest) and the role's host drop-ins |
 | `/var/iri/code/env.d/` | `deploy.sh` via `render-env-d.py` | one rendered environment file per service |
-| `/var/lib/iri/` | `deploy.sh` | digest-pin record and its predecessor, `last-deployed.digests`, backoff records, `config-stage/`, `config-previous/`, `config-blocked.marker`, `edge/` and `monitoring-reload/` snapshots |
+| `/var/lib/iri/` | `deploy.sh` | digest-pin record and its predecessor, `last-deployed.digests`, backoff records, `config-stage/`, `config-previous/`, `config-blocked.marker`, `config-apply.incomplete` (only while a config apply is unfinished or could not be undone), `edge/` and `monitoring-reload/` snapshots |
 
 `~iri/.config/containers/systemd/` must stay **empty**: Quadlet searches it before the delivery
 directory, so a unit of the same name there silently shadows every release.
@@ -517,20 +517,40 @@ Within about five minutes the timer fires `deploy.sh`, which:
    wrong image) is logged as `drift: …` and re-applied. A sick container on the **right** image gets
    a targeted restart of that service only, never a release rollback (ADR-0083);
 3. otherwise **cosign-verifies every digest** (REQ-OPS-015) — a failure aborts before anything is
-   pulled or staged — and writes the digest-pin record and the per-service pin drop-ins;
+   pulled or staged;
 4. if the config digest moved: extracts the bundle, asserts it carries no secret, applies the
-   stateful-infra gate (below), snapshots the live tree to `config-previous/`, mirrors the new tree
-   into `/var/iri/code`, **renders `env.d/`**, installs changed units and stops-then-removes units
-   the release no longer names;
-5. pulls the three app images, restarts every application service whose pin or unit changed,
-   starts the rest of the application stack, and waits for health; then stages a moved provider
-   JAR and restarts keycloak alone;
+   stateful-infra gate (below), **checks that `deploy` owns and can write every directory it is
+   about to mirror into** (and the compose directory, the unit directory and `env.d/`), snapshots
+   the live tree to `config-previous/`, mirrors the new tree into `/var/iri/code`, **renders
+   `env.d/`**, installs changed units and stops-then-removes units the release no longer names;
+5. writes the digest-pin record and the per-service pin drop-ins — after the config, so a release
+   the stateful-infra gate holds back leaves no pin behind — pulls the three app images, restarts
+   every application service whose pin or unit changed, starts the rest of the application stack,
+   and waits for health; then stages a moved provider JAR and restarts keycloak alone;
 6. on success writes the marker, clears the failure records, reconciles the monitoring units and
    the edge (config drift or renewed certificates → edge recreate), and prunes dangling images older
    than 30 days;
 7. on a health failure restores the previous config tree, the previous units **and** the previous
    pin drop-ins, restarts, records an exponential backoff for that target (600 s doubling, capped
    at 6 h; `--force` bypasses it) and exits non-zero — `DeployRolledBack` / `DeployFailed`.
+
+A failure in steps 4–5 **before** the health gate — the pre-flight, the extraction, a mirror, the
+`env.d` render, the unit install, the pull — is recorded the same way: a `FATAL: deploy aborted
+before the health gate — step '…' failed (exit N)` line, the previous config tree, units and pin put
+back if this run had changed them, the same backoff record, and `basetool_deploy_last_failure_timestamp`
+(`DeployFailed`). Nothing has been restarted at that point, so the stack keeps running the previous
+release. If the restore itself fails the log says the tree is **INCONSISTENT**, and
+`/var/lib/iri/config-apply.incomplete` stays, which stops the next tick from snapshotting the
+half-applied tree over `config-previous/`.
+
+> [!warning] Until 2026-09-25 such a failure was silent
+> A command failing under `set -e` ended the run with no FATAL line, no metric, no backoff and no
+> restore. With v1.11.0 a root-owned `/var/iri/code/docker/acme` failed the acme mirror (`rsync …
+> mkstemp … Permission denied (13)`, exit 23) on every tick from 12:25 to 12:35 after three other
+> subtrees had already been mirrored; `deploy.prom` kept `basetool_deploy_last_failure_timestamp 0`,
+> `DeployFailed` never fired, and production stayed on the old release until someone looked. The
+> second of those ticks also snapshotted the half-mirrored tree as `config-previous/` and saved the
+> first tick's new pin as the rollback anchor.
 
 Read the result in `/var/log/iri-deploy.log`, or off-host in Grafana → Explore → Loki with
 `{app="ops-deploy"}`. **Not** `journalctl -u iri-deploy.service`: the unit's `StandardOutput=append:`
@@ -638,6 +658,14 @@ theme, `monitoring/` or `quadlet/` rides the same path as an app release: regene
 compose changed (`generate-quadlet.py`), merge, cut a release, promote. The next tick stages the
 bundle, installs the changed units and restarts exactly the application services whose definition
 moved. Dependabot's image-pin bumps take this path too.
+
+The subtrees a release owns — `docker/` (edge, acme, maintenance), `keycloak-theme/`, `monitoring/`
+and `quadlet/` under `/var/iri/code` — must be owned by `deploy` all the way down, because the mirror
+(`rsync -rlpt --delete`) creates a temp file in every directory it updates and sets each directory's
+mode and mtime. A directory created by hand as root blocks every config change. Since 2026-09-25
+`deploy.sh` checks this before it changes anything and refuses with one line naming the directory
+(`PRE-FLIGHT: … is not owned or not writable by deploy`); the fix is in
+[Troubleshooting](#troubleshooting). The role's `--tags directories` reclaims exactly these four.
 
 > [!note] Monitoring and `acme` units are restarted like the rest — fixed 2026-09-22
 > Every unit a release re-defines is **restarted**, every other one merely **started**: the nine
@@ -1442,6 +1470,7 @@ goes.
 | nothing answers on 80/443 | `systemctl status haproxy`, `firewall-cmd --list-all` | haproxy not started (fresh host), or a firewall layer — probe from a third machine |
 | Stack comes back after a manual stop | `drift:` lines in the deploy log | the drift check (REQ-OPS-013); stop the timer first |
 | `CARVE-OUT: postgres/Keycloak image pin changed` | the deploy log, `config-blocked.marker` | a gated upgrade — see [Stateful-infra upgrades](#stateful-infra-upgrades) |
+| Deploy stuck on a config apply: `PRE-FLIGHT: … is not owned or not writable by deploy`, or `FATAL: deploy aborted before the health gate — step 'mirror …' failed (exit 23)` after an `rsync: … mkstemp … Permission denied (13)`; `DeployFailed` fires, then `target failed Nx; in backoff window` | the deploy log, `find /var/iri/code/{docker,keycloak-theme,monitoring,quadlet} ! -user deploy` | a release-owned subtree (here `docker/acme`, 2026-09-25) was created or copied as root. Fix the owner — `chown -R deploy:deploy /var/iri/code/docker` (or the subtree named), or the role with `--tags directories` — then `sudo -u deploy /var/iri/code/scripts/deploy.sh --force` to skip the backoff. If the log also says **INCONSISTENT**, the restore failed too: the same fix, then `--force`; `config-previous/` was kept |
 | A promoted unit change is ignored | `ls ~iri/.config/containers/systemd/` | a hand-placed unit of the same name shadows the delivered one |
 | Monitoring config changes never load | the deploy log (`IRI_MONITORING_ENABLED != 'true'`) | set `IRI_MONITORING_ENABLED=true` in `.env`; `MonitoringReconcileDisabled` fires meanwhile |
 
