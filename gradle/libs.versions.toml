@@ -27,11 +27,12 @@ openapi-generator = { id = "org.openapi.generator", version.ref = "openapiGenera
 # Pinned to the SAME version the Android app's `core/contract` runs (ADR-0161 8.2): the two
 # generate from one document, and a skew between them would produce two readings of one contract.
 openapiGenerator = "7.25.0"
-# Held at 4.1.1 on purpose: the only newer build refreshVersions sees is a 4.2.0 MILESTONE.
-# The marker below stays so the next sweep does not have to re-derive that -- clear it when
-# 4.2.0 goes GA, not before.
+# Held at 4.1.1 on purpose: the only newer builds refreshVersions sees are 4.2.0 MILESTONES (M1,
+# and M2 since the 2026-09-25 sweep). The markers below stay so the next sweep does not have to
+# re-derive that -- clear them when 4.2.0 goes GA, not before.
 springBoot = "4.1.1"
 ##      ⬆ = "4.2.0-M1"
+##      ⬆ = "4.2.0-M2"
 springDependencyManagement = "1.1.7"
 cyclonedx = "3.4.1"
 licensee = "1.14.1"
@@ -74,7 +75,24 @@ testcontainers = "2.0.5"
 # databricks-jdbc bumps are for drivers not on this classpath, RgCompare is the schema-comparison
 # engine behind `flyway check`, and "remove unnecessary executable files from JRE package" is the
 # CLI distribution's bundled JRE, not a Maven artifact at all.
-flyway = "13.7.0"
+# 13.8.0 (2026-09-24): the first release since 13.5.0 that touches the PostgreSQL path, and it still
+# reaches nothing here -- checked against the 13.7.0...13.8.0 source diff, not the notes alone. Its
+# PostgreSQL items (the connection identifying as "Redgate_Flyway" instead of "Flyway by Redgate",
+# `application_name` now actually being sent, pgjdbc `assumeMinServerVersion=9.1`) all live in
+# `PostgreSQLDatabaseType.setDefaultConnectionProps`, which only Flyway's own `DriverDataSource` calls
+# when Flyway opens connections from a URL. DatabaseMigrationConfig hands Flyway the Hikari
+# `DataSource` instead, so the migration keeps running on pool connections that identify as
+# `PostgreSQL JDBC Driver` -- the `%a` the postgres `log_line_prefix` in docker-compose.yml relies on
+# is unchanged. The one visible change is the startup line: `Database: ********` becomes
+# `Database: jdbc:postgresql:********` (the redaction now keeps the URL scheme; host, credentials and
+# parameters stay masked, and no alert or log pipeline matches that line). Everything else is surface
+# this repo does not use: Databricks and Snowflake support, drift results for Flyway Pipelines,
+# provisioner and `testConnection` fixes, and RgCompare (`flyway check`). CockroachDB's matching
+# `application_name` fix sits in the same `setDefaultConnectionProps` path; its module is on the
+# classpath only as a dependency of `flyway-database-postgresql`, as it was at 13.7.0. The Jackson
+# property bumps (3.1.7, legacy 2.22.3) are in the parent POM; Boot's dependency management still
+# picks every Jackson version on the backend classpath (`jackson-annotations` 2.22 -> 2.21).
+flyway = "13.8.0"
 # Held at 1.6.3 on purpose: the only newer builds refreshVersions sees are 1.7.0 BETAS. The markers
 # below are left in place so the next sweep does not have to re-derive that — clear them when 1.7.0
 # goes final, not before.
@@ -102,7 +120,12 @@ resilience4j = "2.4.0"
 bucket4j = "8.20.0"
 semver4j = "6.0.0"
 logstashLogback = "9.0"
-archunit = "1.5.0"
+# 1.5.1 (2026-09-25): test-only, two core fixes. `java.lang.IO` joins ACCESS_STANDARD_STREAMS, and a
+# caught exception type now counts as a type dependency of the catching class -- the one change that
+# could turn a rule red, because a `catch` of a class a layer rule forbids is now a violation where it
+# was invisible before. None appeared: every ArchUnit test in backend, frontend and ingest passes
+# unchanged against it. The third item (an `archunit-junit-relocation` artifact) is publishing only.
+archunit = "1.5.1"
 # 3.1.1 is a SECURITY release (eight advisories). Two of them can reach this deployment and are
 # why it is taken rather than deferred: the per-locale OpenAPI cache was unbounded, so
 # `Accept-Language` could grow it without limit (now capped by `springdoc.cache.max-entries`,
@@ -180,8 +203,9 @@ junit = "6.1.3"
 # `./gradlew :backend:dependencyInsight --configuration compileClasspath --dependency org.projectlombok:lombok`.
 # refreshVersions proposes **1.18.48** (published 2026-09-01) and it is REFUSED for that equality
 # rule alone, not for anything in the release: Boot 4.1.1 still manages 1.18.46, re-verified with the
-# command above on 2026-09-21. Taking it would put 1.18.48 on keycloak-spi and 1.18.46 on every other
-# module, which is the two-readings-of-`lombok.config` split this pin exists to prevent. The marker
+# command above on 2026-09-21 and again on 2026-09-25 (held on that sweep too). Taking it would put
+# 1.18.48 on keycloak-spi and 1.18.46 on every other module, which is the
+# two-readings-of-`lombok.config` split this pin exists to prevent. The marker
 # below stays so the next sweep does not re-derive this -- clear it together with the Boot bump that
 # moves the managed version, not before.
 lombok = "1.18.46"
@@ -191,7 +215,15 @@ lombok = "1.18.46"
 # `keycloak-spi/build.gradle.kts` until 2026-09-21, where `./gradlew refreshVersions` could not see
 # it and reported it as a dependency "that might have hardcoded versions" on every sweep. Moved here
 # at the same version, so the next sweep annotates it like everything else.
-mockito = "5.23.0"
+# 5.24.0 (2026-09-23): taken on the first sweep that annotated it. Test-only and consumed by
+# keycloak-spi alone -- backend, frontend and ingest keep Boot's managed Mockito, and the SPI module
+# shares no classpath with them, so a different number here is harmless, exactly as with `junit`.
+# The release is additive (`spyStatic`, a `mockMaker` option on `@Spy`, static-initializer
+# suppression) plus fixes this module's tests do not lean on (a stubbing data race, `mockSingleton`
+# and `clearInlineMocks` fixes, subclass-mock-maker flakiness); the one change a test can see is a
+# failure message, which now prints an argument's fields by reflection when it has no `toString()`.
+# No breaking change and no deprecation; keycloak-spi's tests run green on it, agent attached.
+mockito = "5.24.0"
 # netty 4.1.x floor for the keycloak-spi module ONLY, imported there as a platform on the compileOnly
 # and test classpaths. Keycloak 26.7.4 -> Quarkus 3.33.3.2 drags netty 4.1.136.Final onto them, and
 # that version carries CVE-2026-75595 (critical, SNI-mTLS bypass) and CVE-2026-75596 (high, ClientHello
@@ -202,7 +234,42 @@ mockito = "5.23.0"
 # re-reporting fixed ones. A BOM floor, not a strict pin: a Keycloak bump that brings a newer 4.1.x wins.
 # Drop it once the catalog's `keycloak` resolves netty >= this version on its own (Quarkus 3.33.3.3
 # manages 4.1.138.Final; no Keycloak release uses it yet as of 2026-09-22).
+# HELD on the 2026-09-25 sweep: every proposal below is the 4.2 line, and this floor exists for
+# Keycloak's 4.1 line (Quarkus 3.33.3.2 / vertx-core 4.5.31 still ask for 4.1.136.Final, re-verified
+# with `:keycloak-spi:dependencyInsight` that day). A 4.2 BOM would move the scanned classpath to a
+# netty major Keycloak never runs, so the scan would stop describing the deployed provider. No newer
+# 4.1.x exists to take -- refreshVersions proposes none. The markers stay so the next sweep does not
+# re-derive this; clear them when the floor is dropped.
 netty41 = "4.1.138.Final"
+##   ⬆ = "4.2.0.Alpha1"
+##   ⬆ = "4.2.0.Alpha2"
+##   ⬆ = "4.2.0.Alpha3"
+##   ⬆ = "4.2.0.Alpha4"
+##   ⬆ = "4.2.0.Alpha5"
+##   ⬆ = "4.2.0.Beta1"
+##   ⬆ = "4.2.0.RC1"
+##   ⬆ = "4.2.0.RC2"
+##   ⬆ = "4.2.0.RC3"
+##   ⬆ = "4.2.0.RC4"
+##   ⬆ = "4.2.0.Final"
+##   ⬆ = "4.2.1.Final"
+##   ⬆ = "4.2.2.Final"
+##   ⬆ = "4.2.3.Final"
+##   ⬆ = "4.2.4.Final"
+##   ⬆ = "4.2.5.Final"
+##   ⬆ = "4.2.6.Final"
+##   ⬆ = "4.2.7.Final"
+##   ⬆ = "4.2.8.Final"
+##   ⬆ = "4.2.9.Final"
+##   ⬆ = "4.2.10.Final"
+##   ⬆ = "4.2.11.Final"
+##   ⬆ = "4.2.12.Final"
+##   ⬆ = "4.2.13.Final"
+##   ⬆ = "4.2.14.Final"
+##   ⬆ = "4.2.15.Final"
+##   ⬆ = "4.2.16.Final"
+##   ⬆ = "4.2.17.Final"
+##   ⬆ = "4.2.18.Final"
 # protobuf-java 3.x floor for the keycloak-spi module ONLY, the same construction as `netty41` above:
 # imported as a platform on the compileOnly and test classpaths, so it adds version constraints and
 # nothing reaches the provider JAR, its runtimeClasspath or its SBOM. Keycloak 26.7.4 -> Quarkus
@@ -211,7 +278,80 @@ netty41 = "4.1.138.Final"
 # alert #12), fixed in 3.25.5. 3.25.9 is the newest patch on the 3.25 line grpc 1.65 was built for,
 # so the floor stays on that line rather than jumping to 4.x. Drop it once `keycloak` resolves
 # protobuf-java >= 3.25.5 on its own (2026-09-23).
+# HELD on the 2026-09-25 sweep: every proposal below is 4.x, and grpc-protobuf is still 1.65.0 on
+# this classpath (re-verified with `:keycloak-spi:dependencyInsight` that day), so the reason above
+# stands. 3.25.9 is still the newest 3.25 patch -- refreshVersions proposes no 3.x. The markers stay
+# so the next sweep does not re-derive this; clear them when the floor is dropped.
 protobuf3 = "3.25.9"
+##     ⬆ = "4.0.0-rc-1"
+##     ⬆ = "4.0.0-rc-2"
+##     ⬆ = "4.26.0-RC1"
+##     ⬆ = "4.26.0-RC2"
+##     ⬆ = "4.26.0-RC3"
+##     ⬆ = "4.26.0"
+##     ⬆ = "4.26.1"
+##     ⬆ = "4.27.0-RC1"
+##     ⬆ = "4.27.0-RC2"
+##     ⬆ = "4.27.0-RC3"
+##     ⬆ = "4.27.0"
+##     ⬆ = "4.27.1"
+##     ⬆ = "4.27.2"
+##     ⬆ = "4.27.3"
+##     ⬆ = "4.27.4"
+##     ⬆ = "4.27.5"
+##     ⬆ = "4.28.0-RC1"
+##     ⬆ = "4.28.0-RC2"
+##     ⬆ = "4.28.0-RC3"
+##     ⬆ = "4.28.0"
+##     ⬆ = "4.28.1"
+##     ⬆ = "4.28.2"
+##     ⬆ = "4.28.3"
+##     ⬆ = "4.29.0-RC1"
+##     ⬆ = "4.29.0-RC2"
+##     ⬆ = "4.29.0-RC3"
+##     ⬆ = "4.29.0"
+##     ⬆ = "4.29.1"
+##     ⬆ = "4.29.2"
+##     ⬆ = "4.29.3"
+##     ⬆ = "4.29.4"
+##     ⬆ = "4.29.5"
+##     ⬆ = "4.29.6"
+##     ⬆ = "4.30.0-RC1"
+##     ⬆ = "4.30.0-RC2"
+##     ⬆ = "4.30.0"
+##     ⬆ = "4.30.1"
+##     ⬆ = "4.30.2"
+##     ⬆ = "4.31.0-RC1"
+##     ⬆ = "4.31.0-RC2"
+##     ⬆ = "4.31.0"
+##     ⬆ = "4.31.1"
+##     ⬆ = "4.32.0-RC1"
+##     ⬆ = "4.32.0-RC2"
+##     ⬆ = "4.32.0"
+##     ⬆ = "4.32.1"
+##     ⬆ = "4.33.0-RC1"
+##     ⬆ = "4.33.0-RC2"
+##     ⬆ = "4.33.0"
+##     ⬆ = "4.33.1"
+##     ⬆ = "4.33.2"
+##     ⬆ = "4.33.3"
+##     ⬆ = "4.33.4"
+##     ⬆ = "4.33.5"
+##     ⬆ = "4.33.6"
+##     ⬆ = "4.34.0-RC1"
+##     ⬆ = "4.34.0-RC2"
+##     ⬆ = "4.34.0"
+##     ⬆ = "4.34.1"
+##     ⬆ = "4.34.2"
+##     ⬆ = "4.35.0-RC1"
+##     ⬆ = "4.35.0-RC2"
+##     ⬆ = "4.35.0"
+##     ⬆ = "4.35.1"
+##     ⬆ = "4.36.0-RC1"
+##     ⬆ = "4.36.0-RC2"
+##     ⬆ = "4.36.0"
+##     ⬆ = "4.36.1"
+##     ⬆ = "4.36.2"
 # OpenTelemetry API/SDK floor for the keycloak-spi module ONLY, same construction again. Keycloak
 # 26.7.4 -> keycloak-server-spi-private and quarkus-opentelemetry pull the 1.57.0 family, and
 # opentelemetry-api <= 1.61.0 carries CVE-2026-45292 (W3C/Jaeger/OT baggage extraction without a
@@ -220,7 +360,16 @@ protobuf3 = "3.25.9"
 # one opentelemetry-api. The `-alpha` artifacts (opentelemetry-api-incubator 1.57.0-alpha) are not
 # in this BOM and stay where Keycloak puts them; no advisory names them. Drop the floor once
 # `keycloak` resolves >= 1.62.0 on its own (2026-09-23).
+# HELD on the 2026-09-25 sweep at 1.62.0 for the one-opentelemetry-api reason above: the Boot 4.1.1
+# BOM still selects 1.62.0 on the backend runtime classpath (re-verified with `dependencyInsight`
+# that day), so taking 1.66.0 here would split the build into two versions for no advisory -- the
+# floor only has to clear CVE-2026-45292, which 1.62.0 does. Move it together with the Boot bump
+# that moves the managed version. The markers stay so the next sweep does not re-derive this.
 opentelemetry = "1.62.0"
+##         ⬆ = "1.63.0"
+##         ⬆ = "1.64.0"
+##         ⬆ = "1.65.0"
+##         ⬆ = "1.66.0"
 # Build-classpath overrides, NOT dependencies of any module: each forces a transitive of a Gradle
 # plugin on the buildscript classpath that loads it (constraint blocks in the named build scripts).
 # Nothing here ships or reaches an SBOM; they exist because the dependency-submission workflow puts
