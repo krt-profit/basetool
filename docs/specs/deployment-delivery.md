@@ -589,7 +589,9 @@ container at all — production runs `start` without `--import-realm`, so the fi
 **The data networks carry no egress** (since 2026-09-22, ADR-0162 as extended). `net-db-backend`,
 `net-db-keycloak` and the three `net-redis-*` networks are `Internal=true` in the Quadlet units, so
 `db-backend`, `db-keycloak` and `redis` — which are on nothing else — have no outbound path.
-**The compose file keeps all five non-internal, deliberately** (accepted by @greluc on 2026-09-22):
+*(Status 2026-09-25: applied on production — the five networks recreated `internal=true`, verified
+by the missing default route in all three containers; the testing host still runs the old networks,
+see `deployment.md` → Network changes are installed, not applied.)* **The compose file keeps all five non-internal, deliberately** (accepted by @greluc on 2026-09-22):
 it also runs the local stacks, where the `-dev` twins publish `127.0.0.1:15432`, `:15433` and `:6379`
 on these very networks for a developer's `bootRun`, and an internal network carries no DNAT — so
 `internal: true` in compose would break every local database and Redis connection with no error at

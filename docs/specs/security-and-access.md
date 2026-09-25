@@ -4724,11 +4724,12 @@ its service does:
   `NOAUTH`, a password-only `AUTH` gets `WRONGPASS … user is disabled`, the health check is
   healthy, `redis_up 1`.)_
 
-**Known and expected:** the frontend's `TolerantKeyspaceNotificationsAction` still issues `CONFIG
-GET` at every start, and the ACL refuses it — two `ACL LOG` entries per start (`reason=command`,
-`config|get`, user `basetool-frontend`), counted in `redis_acl_access_denied_cmd_total`.
-`RedisAclDenials` did not fire for it on 2026-09-25. A release rollback to 1.10.0 or older now
-needs `REDIS_DEFAULT_USER=on` first.
+**Known on 1.11.0, gone once #2067 is released:** the 1.11.0 frontend's
+`TolerantKeyspaceNotificationsAction` still issues `CONFIG GET` at every start, and the ACL refuses
+it — two `ACL LOG` entries per start (`reason=command`, `config|get`, user `basetool-frontend`),
+counted in `redis_acl_access_denied_cmd_total`; `RedisAclDenials` did not fire for it on
+2026-09-25. The rule above (#2067) removes it. A release rollback to 1.10.0 or older now needs
+`REDIS_DEFAULT_USER=on` first.
 
 **Enforced by:** `RedisAclFrontendIntegrationTest` (real Spring Session, live sync, handoff, the
 `ACL DRYRUN` matrix for all users, the committed E2E ACL, the startup step's refusal count),
@@ -4776,8 +4777,10 @@ pattern is **PKCE + client secret**, never one instead of the other.
 - [x] Production rollout step 1: the frontend holds the secret. _(2026-09-25, owner-approved:
   `KEYCLOAK_FRONTEND_CLIENT_SECRET` generated on the host, frontend restarted, log `OAuth2 client
   'keycloak' is CONFIDENTIAL`.)_
-- [ ] Production rollout step 2: Keycloak's `basetool-frontend` is confidential with the same
-  secret. _(Pending as of 2026-09-25 —
+- [x] Production rollout step 2: Keycloak's `basetool-frontend` is confidential with the same
+  secret. _(2026-09-25 16:15 UTC, owner-approved: the provisioner's `--frontend-client confidential`
+  dry run planned only `publicClient: true -> false` and the secret, `--apply` succeeded and a
+  second run planned nothing; no `invalid_client` since and a fresh login works —
   [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md).)_
 
 **Enforced by:** `FrontendClientAuthenticationConfigTest` (Boot's real OAuth2 client

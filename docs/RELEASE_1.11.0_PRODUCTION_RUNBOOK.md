@@ -270,7 +270,8 @@ production's `.env`; the leftover `/var/iri/code/scripts/lib/container-runtime.s
 >   restarted with it. The runbooks now warn at every Keycloak restart.
 > - **APPSEC-04 steps 2–5** — ~15:47–15:51 UTC with `iri-deploy.timer` stopped; `REDIS_DEFAULT_USER=off`.
 >   From now on a rollback to 1.10.0 needs `default` back on first (§6). The frontend's refused
->   `CONFIG GET` at each start is expected (`deployment.md` → *The Redis ACL*).
+>   `CONFIG GET` at each start is expected on 1.11.0 and gone once #2067 is released
+>   (`deployment.md` → *The Redis ACL*).
 > - **Tidy-ups** — the duplicate `IRI_BACKEND_EXPECTED_AUDIENCES` line removed from `.env` (inode
 >   kept); `container-runtime.sh.bak-2026-09-22` deleted.
 > - **Host reboot** for kernel 6.12.0-211.58.1 at 15:56 UTC — all 18 containers healthy by 15:59,
@@ -279,13 +280,26 @@ production's `.env`; the leftover `/var/iri/code/scripts/lib/container-runtime.s
 >   succeeds. The code fix is an open follow-up (`deployment.md` → host patching, arc42 §7.4b).
 >
 > - **APPSEC-07 step 1** — `KEYCLOAK_FRONTEND_CLIENT_SECRET` generated on the host, frontend
->   restarted, log `OAuth2 client 'keycloak' is CONFIDENTIAL`; Keycloak's client still public.
+>   restarted, log `OAuth2 client 'keycloak' is CONFIDENTIAL`.
+> - **APPSEC-07 step 2** — 16:15 UTC, through a temporary `basetool-provisioner` session the owner
+>   opened: the `--frontend-client confidential` dry run planned only `publicClient: true -> false`
+>   and the secret, `--apply` succeeded, a second run planned nothing; no `invalid_client` since, a
+>   private-window login works. Session file, rollback basis and scripts removed afterwards.
+>   **§6 now applies:** a rollback to 1.10.0 needs `--frontend-client public --apply` first, and
+>   that needs a new provisioner session. The table's "**no** `--frontend-client`" for the #2053 run
+>   is superseded too: every provisioner run now passes `--frontend-client confidential` with the
+>   secret ([`INGEST_KEYCLOAK_SETUP.md`](INGEST_KEYCLOAK_SETUP.md#new-or-out-of-date-realm-run-the-provisioner)).
 >
 > **Still open:** APPSEC-05 `enforce` (not before 2026-10-02, once both report queries are empty);
-> APPSEC-07 step 2, switching Keycloak's client to confidential (§6's rollback hazard applies once it
-> is done); ING-SEC-04 step 3 (the `PATH_VARS` release, #2036)
-> and step 4; #1992, the `Internal=true` networks — testing first, and the testing host is still
-> held; the Android release (basetool-android #182).
+> the host's `realm-export.json` seed for the confidential client (a host write); ING-SEC-04 step 3 (the `PATH_VARS` release, #2036)
+> and step 4; the Android release (basetool-android #182).
+>
+> **Later the same evening:** #1992 was applied on **production** directly (owner's choice, testing
+> skipped): the five data networks are `internal=true` since 16:24 UTC after a ~2.5-minute
+> maintenance ([`deployment.md` → Network changes](deployment.md#network-changes-are-installed-not-applied));
+> the testing host still has the old networks. The frontend's refused `CONFIG GET` noted above
+> disappears with the release that carries #2067. The Android release v0.3.1 (versionCode 16) was
+> tagged; the served-version floor moves to 16 only once it is published.
 
 ---
 
