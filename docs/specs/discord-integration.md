@@ -272,7 +272,10 @@ truststore, and a TLS failure simply fails open.
 > keycloak drop-in; no warning since. Runbook:
 > [`DISCORD_KEYCLOAK_SETUP.md` §7.3](../keycloak/DISCORD_KEYCLOAK_SETUP.md#73-truststore-for-the-backend-certificate),
 > whose §7.4 now checks the startup log. The fail-open is by design; what was missing was any
-> signal that the configured check was not running.
+> signal that the configured check was not running. Since the internal-TLS step 4 (~17:58 UTC the
+> same day, REQ-SEC-070) the store holds only `internal-ca`, so a release rollback to 1.11.0 or
+> older — which puts the backend back on the old shared certificate — makes the precheck fail open
+> again unless the `backend` alias is restored first (§7.3).
 
 **Enforced by:** `BackendAccountCheckerTest` (fail-open HTTP matrix) · `DiscordGuildRoleGateAuthenticatorTest` (deny-on-exists with the right message key, allow-on-not-exists, fail-open on unknown, skip on linking / unconfigured / non-HTTPS) · `DiscordAccountExistenceServiceTest` (candidate normalisation + name/e-mail split + empty-candidate short-circuit) · `DiscordAccountExistenceControllerTest` (shared-secret gate: 503 unconfigured / 401 bad / 200 exists) · `DiscordSpiPrecheckPropertiesTest` (blank secret valid, <32-char secret rejected, ≥32-char secret valid) · **Code:** `DiscordGuildRoleGateAuthenticator`, `BackendAccountChecker`, `BackendTrustSupport`, `DiscordGuildRoleGateAuthenticatorFactory`, `DiscordAccountExistenceController`, `DiscordAccountExistenceService`, `DiscordSpiPrecheckProperties`, `UserRepository#existsByLowerUsernameOrDisplayNameIn` / `#existsByLowerEmail`, krt-theme `messages_*.properties` · **Decision:** ADR-0051
 

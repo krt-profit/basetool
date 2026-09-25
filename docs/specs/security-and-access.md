@@ -3319,7 +3319,8 @@ A new session attribute of a type outside the list is a change to this table, in
 - `enforce` — a class outside the list is refused; `FaultTolerantSessionSerializer` drops that one
   attribute (REQ-SEC-049/050 — it is repaired on the same request), the member keeps the rest of the
   session. Production is switched to it by the owner once the report counter has stayed at zero
-  ([`deployment.md` → *Session type allow-list*](../deployment.md#session-type-allow-list-report-then-enforce)).
+  ([`deployment.md` → *Session type allow-list*](../deployment.md#session-type-allow-list-report-then-enforce));
+  it runs `enforce` since 2026-09-25 (see the last acceptance item).
 
 The mode governs **reading** only: what is written is identical in all three, so a mode switch
 touches no stored session and needs no migration.
@@ -3339,6 +3340,12 @@ touches no stored session and needs no migration.
 - [ ] A mistyped mode falls back to `report`, never to a failed startup.
 - [ ] The E2E stack runs with `enforce`, so every login, refresh, flash redirect and live-sync
   handshake in the suite is a session read under the strictest mode.
+- [x] Production runs `enforce`. _(2026-09-25, 17:58 UTC, owner-approved: `APP_SESSION_TYPE_ALLOW_LIST=enforce`
+  appended to `.env`, only `frontend.env` changed, the frontend logged `Session type allow-list mode:
+  ENFORCE` and no refusal. The owner switched after about five hours of `report` with zero
+  refusals since 1.11.0 went live at 12:40 UTC — not the week the runbook asks for; the watch for
+  what those days would have shown is `SessionTypeOutsideAllowList` and `SessionValueDropsSustained`.
+  [`deployment.md` → *Session type allow-list*](../deployment.md#session-type-allow-list-report-then-enforce).)_
 
 **Enforced by:** `SessionTypeAllowListTest` (parity over a realistic session, gadget refusal before
 construction, report/off reading, package boundaries, metrics, mode parsing) ·
@@ -4724,7 +4731,7 @@ its service does:
   `NOAUTH`, a password-only `AUTH` gets `WRONGPASS … user is disabled`, the health check is
   healthy, `redis_up 1`.)_
 
-**Known on 1.11.0, gone once #2067 is released:** the 1.11.0 frontend's
+**Known on 1.11.0, verified gone on production after the v1.12.0 deploy, 2026-09-25:** the 1.11.0 frontend's
 `TolerantKeyspaceNotificationsAction` still issues `CONFIG GET` at every start, and the ACL refuses
 it — two `ACL LOG` entries per start (`reason=command`, `config|get`, user `basetool-frontend`),
 counted in `redis_acl_access_denied_cmd_total`; `RedisAclDenials` did not fire for it on
@@ -4838,9 +4845,14 @@ production rollout reaches step by step:
 **Production rollout (2026-09-25, owner-approved):** step 1 (`INTERNAL_TLS_VERIFY_HOSTNAME=true`,
 all four services `Verification: OK` beforehand) ~15:40 UTC; step 2 (mint, the widened
 truststore and `basetool-ca.crt` with two anchors) ~15:52 UTC, and with it the Keycloak SPI
-truststore, which turned out never to have existed (REQ-SEC-022's production note). **Open:** step 3,
-the release that flips `PATH_VARS` (#2036, merged the same day, not yet promoted), and step 4. Until step 3 every service still serves the
-shared certificate.
+truststore, which turned out never to have existed (REQ-SEC-022's production note); step 3 with
+**v1.12.0** (#2036; promoted 17:39 UTC, deployed 17:38–17:44 UTC) — every service serves its own
+leaf and all four verify against the CA alone with the name checked; step 4 17:58–18:03 UTC —
+`basetool-ca.crt`, the internal truststore and the SPI truststore carry only the CA, and
+`iri-cert-expiry` reports the CA's expiry (2036). **Steps 0–4 are done: the target shape holds on
+production.** The documented step-4 command failed on the root-owned truststore and was redone on
+a working copy; the runbook now carries that form. A release rollback to 1.11.0 or older needs step
+4 undone first. *(Updated 2026-09-25 evening; this paragraph said steps 3 and 4 were open.)*
 
 **Enforced by:** `scripts/mint-internal-tls.test.sh` (`repo-lint.yml`) · `RestClientConfigTest`
 (ingest) · `BackendHostnameVerificationTest` · `BackendHealthIndicatorHostnameTest` ·

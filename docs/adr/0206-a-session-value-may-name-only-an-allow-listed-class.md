@@ -1,6 +1,6 @@
 # ADR-0206 — A session value may name only an allow-listed class
 
-- **Status:** Accepted — shipped in `report` mode; `enforce` in production awaits the owner's rollout
+- **Status:** Accepted — shipped in `report` mode; production runs `enforce` since 2026-09-25 (owner's switch after ~5 h of `report` with zero refusals, not a week — see `deployment.md`)
 - **Date:** 2026-09-23
 - **Deciders:** @greluc
 - **Requirement:** [REQ-SEC-067](../specs/security-and-access.md)

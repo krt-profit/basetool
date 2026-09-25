@@ -85,7 +85,8 @@ Consequences worth stating:
   no unit of it mounts the file — the REQ-OPS-022 JVM-truststore mount moved to the CA-only
   `/var/iri/secrets/tls/truststore.p12` as well *(corrected 2026-09-25: this said that mount still
   defaults to the shared keystore; the units #2036 generated say otherwise)*. Production minted the material on 2026-09-25 (rollout step 2); the
-  flip (#2036) is merged and reaches production with the next promoted release (step 3).
+  flip (#2036) reached it with v1.12.0 the same day (step 3), and step 4 left the CA as the only
+  anchor.
 - **Hand-installed drop-ins live beside the generated units.** `deploy.sh` never touches a
   `<unit>.container.d/` under `/etc/containers/systemd/users/<uid>/`, so what the operator puts there
   survives every release — and is in no bundle and no backup. Production's `keycloak.container.d`
