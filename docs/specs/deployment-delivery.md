@@ -137,6 +137,31 @@ this run and `start` for the rest, and the wait is structural — `Notify=health
 Compose path only). A rollback that restored the record without re-materialising the drop-ins would
 roll forward into the failed release, so both move together, together with the previous unit files.
 
+**A failure before the health gate is a deploy failure too, and is recorded as one.** Between the
+signature verification and the health gate `deploy.sh` extracts the config bundle, mirrors it onto
+the host, renders `env.d`, installs the units, writes the pin and pulls the images. A failure
+anywhere in that window — a `fail`, a mirror's rsync, an errexit, a pull — must leave the same
+evidence as a failed health gate: a `FATAL` line naming the step and the exit code, the previous
+config tree, units and pin restored if the run had changed them, a bad-digest backoff record for the
+target, and `basetool_deploy_last_failure_timestamp` (`DeployFailed`). An EXIT trap armed for exactly
+that window (`on_pre_gate_exit`) is what guarantees it, because errexit ends the process without
+passing through any code that could record it. Where the cause can be seen beforehand it is refused
+**before anything changes**: every directory in a subtree the apply mirrors must be owned and
+writable by the deploy account, and the compose directory, the unit directory and `env.d` writable
+(`assert_config_tree_writable`). The pin is written only after the config delivery, so a release
+the stateful-infra gate holds back (REQ-OPS-006) leaves no pin behind. A restore that fails itself
+is reported as an inconsistent tree, and `config-apply.incomplete` stops the next tick from
+snapshotting that tree over `config-previous/`.
+
+> [!bug] Added 2026-09-25 — this path was silent until then
+> v1.11.0 met a root-owned `/var/iri/code/docker/acme`. Every tick from 12:25 to 12:35 mirrored three
+> subtrees, died on rsync exit 23 inside `mirror_dir`, and ended under `set -e` with no FATAL line, no
+> backoff record, no restore and no metric; `DeployFailed` could not fire and production stayed on
+> the old release for fifteen minutes. The second tick also snapshotted the half-mirrored tree as
+> `config-previous/` and copied the first tick's new pin over the rollback anchor. This paragraph and
+> the last three acceptance criteria were written for that incident; `scripts/deploy.test.sh` replays
+> it (`scenario_config_mirror_failure_is_recorded_and_undone` and the four scenarios after it).
+
 **Acceptance**
 
 - [ ] A `:stable` tag flip in GHCR mid-deploy cannot partially apply: the deploy applies a
@@ -153,10 +178,20 @@ roll forward into the failed release, so both move together, together with the p
   well below the 5 s HEALTHCHECK timeout — ADR-0114). A slow/stalled dependency therefore yields a
   fast, truthful `DOWN`, so the health gate and the deploy `--wait` see a real, timely signal
   instead of a probe that never completed.
+- [ ] A failure between the signature verification and the health gate writes a `FATAL` line that
+  names the step and the exit code, a bad-digest backoff record for the target, and
+  `basetool_deploy_last_failure_timestamp`; the next tick inside the backoff window skips.
+- [ ] Such a failure after part of the config tree was mirrored restores `config-previous/` and the
+  previous units, and rolls back the pin if it had been written; a failed restore is reported and
+  leaves `config-apply.incomplete`, and a tick that finds it does not re-snapshot `config-previous/`.
+- [ ] A directory the apply would mirror into that the deploy account does not own or cannot write
+  is refused before the snapshot and before any mirror, with a line naming the path; a release held
+  back by the stateful-infra gate writes no digest pin.
 
-**Enforced by:** `scripts/deploy.sh` (rollback block) · `scripts/lib/container-runtime.sh`
+**Enforced by:** `scripts/deploy.sh` (rollback block, `on_pre_gate_exit`, `assert_config_tree_writable`,
+`restore_previous_config_tree`) · `scripts/lib/container-runtime.sh`
 (`rt_pin_apply`, `rt_pin_rollback`, `rt_apply_stack`) · `frontend/src/main/resources/application.yml`
-(`spring.data.redis.timeout` / `connect-timeout`, ADR-0114) · **Runbook:** `docs/deployment.md` → *What happens on the host*
+(`spring.data.redis.timeout` / `connect-timeout`, ADR-0114) · `scripts/deploy.test.sh` · **Runbook:** `docs/deployment.md` → *What happens on the host*, *Troubleshooting*
 
 ### REQ-OPS-004 — Host configuration delivered as a promotable, digest-pinned artifact
 

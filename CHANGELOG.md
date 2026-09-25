@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Deploy: ein Fehler beim Einspielen der Host-Konfiguration bleibt nicht mehr stumm.** Scheitert
+  `deploy.sh` vor dem Health-Gate (Spiegeln, `env.d`, Units, Pull), schreibt es jetzt eine
+  `FATAL`-Zeile mit Schritt und Exit-Code, stellt Konfiguration und Digest-Pin wieder her, setzt den
+  Backoff und löst `DeployFailed` aus; ein nicht beschreibbares Verzeichnis wird vorab abgelehnt.
+  Wirkt erst nach einem Lauf der Ansible-Rolle (`--tags deploy,scripts`).
+
 ## [v1.11.0](https://github.com/krt-profit/basetool/releases/tag/v1.11.0) - 2026-09-25
 
 ### Added
