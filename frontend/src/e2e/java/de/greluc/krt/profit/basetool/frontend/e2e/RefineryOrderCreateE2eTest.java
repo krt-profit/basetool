@@ -55,10 +55,12 @@ class RefineryOrderCreateE2eTest {
   private static final String PASSWORD = System.getProperty("e2e.password", "test-admin-pw");
 
   /** Manual RAW input material used by the keyboard-pick test; refines into the material below. */
-  private static final String KEYBOARD_RAW_MATERIAL = "E2E Keyboard Pick Raw";
+  private static final String KEYBOARD_RAW_MATERIAL =
+      E2eStackExtension.PICKER_MATERIAL_KEYBOARD_RAW;
 
   /** REFINED output the keyboard-pick test expects the form to derive from the input above. */
-  private static final String KEYBOARD_REFINED_MATERIAL = "E2E Keyboard Pick Refined";
+  private static final String KEYBOARD_REFINED_MATERIAL =
+      E2eStackExtension.PICKER_MATERIAL_KEYBOARD_REFINED;
 
   private static Playwright playwright;
   private static Browser browser;
@@ -73,18 +75,12 @@ class RefineryOrderCreateE2eTest {
       BackendSeeder seeder = new BackendSeeder();
       seeder.ensureIridiumMembership(USERNAME, PASSWORD);
       // Location + refining method come from the SQL catalog seed (E2eStackExtension.seedCatalog);
-      // the input material is a manual RAW material, creatable via the admin API. Get-or-create:
-      // RefineryImportE2eTest pre-seeds this material before it opens the create page, because
-      // that first render freezes the frontend's 10-minute materials-lookup cache for the suite.
-      materialId = seeder.ensureRefineryMaterial(USERNAME, PASSWORD, "E2E Refinery Material");
-      // A SECOND input material, this one carrying a refined output, for the keyboard-pick test:
-      // the material above has no refined counterpart, so its output display stays at "-" whether
-      // the metadata mirror works or not.
-      seeder.ensureRefineryMaterialWithRefinedOutput(
-          USERNAME, PASSWORD, KEYBOARD_RAW_MATERIAL, KEYBOARD_REFINED_MATERIAL);
-      // Mirror-seed the sibling class's material in case THIS class runs first (class order is
-      // an implementation detail) — same cache rationale, union of all dropdown materials.
-      seeder.ensureRefineryMaterial(USERNAME, PASSWORD, "E2E Import Material");
+      // the input material, and the second one with a refined output for the keyboard-pick test,
+      // are seeded by E2eStackExtension before any page renders, because the picker's catalogue is
+      // cached from the first render on. This only looks the first one's id up.
+      materialId =
+          seeder.ensureRefineryMaterial(
+              USERNAME, PASSWORD, E2eStackExtension.PICKER_MATERIAL_REFINERY);
     }
   }
 

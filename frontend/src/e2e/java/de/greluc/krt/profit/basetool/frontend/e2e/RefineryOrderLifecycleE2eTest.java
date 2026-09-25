@@ -117,7 +117,7 @@ class RefineryOrderLifecycleE2eTest {
         E2eSupport.navigate(page, baseUrl + "/refinery-orders/" + orderId);
         page.waitForLoadState();
         // The input-material picker (a searchable combobox — its id stays on the enhancer's hidden
-        // input) is required, but its options come from the 10-minute-cached /api/v1/materials,
+        // input) is required, but its options come from the long-cached /api/v1/materials,
         // which need not contain this test's freshly-seeded material — so the order's pre-selected
         // option can be absent, leaving the picker empty and blocking the submit with a validation
         // bubble. Pick whatever RAW material the combobox offers (it renders no placeholder option)

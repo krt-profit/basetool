@@ -279,8 +279,9 @@ public final class BackendSeeder {
    * Resolves the id of an existing {@code Location} by its (unique) name via {@code GET
    * /api/v1/locations/lookup}, so a test can anchor an inventory row at a location it did NOT
    * create itself — notably the bootstrap catalog location {@code E2E Refinery Hub}, which (unlike
-   * a freshly {@link #createLocation}d one) is guaranteed to be present in the frontend's 10-minute
-   * locations-lookup cache and therefore preselectable in the book-out transfer dropdown.
+   * a freshly {@link #createLocation}d one) is guaranteed to be present in the frontend's
+   * long-lived locations-lookup cache and therefore preselectable in the book-out transfer
+   * dropdown.
    *
    * @param username the Keycloak username of the (authenticated) test user
    * @param password the Keycloak password of the test user
