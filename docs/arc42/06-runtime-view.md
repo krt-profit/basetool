@@ -9,6 +9,8 @@ view, and because each one has burned somebody at least once.
    served under `/auth` on the same origin (ADR-0166).
 2. Keycloak authenticates — either directly, or through the **Discord identity provider** in
    `keycloak-spi`.
+   The Discord path is the one hop that leaves the origin (`discord.com`); a callback that returns
+   in another browser context cannot be resumed and ends on a recoverable error page (REQ-SEC-071).
 3. On the Discord path the guild/role gate runs: guild membership and an in-guild role are checked
    **fail-closed**. If Discord cannot be reached, the login is refused rather than allowed.
 4. A new sign-up that passes the gate lands in the **approval queue** instead of the application:

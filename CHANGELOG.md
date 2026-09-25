@@ -173,6 +173,11 @@
 
 ### Fixed
 
+- **Anmeldung: Discord-Login, der im falschen Browser endet, ist keine Sackgasse mehr.** Kehrt der
+  Discord-Login in einer anderen App oder einem anderen Browser zurück (Keycloak `cookie_not_found`),
+  erklärt die Fehlerseite jetzt die Ursache und bietet „Zurück zur Applikation“ an; der Link fehlte,
+  weil `basetool-frontend` keine `baseUrl` hatte (Realm-Provisioner, wirkt nach dem nächsten Apply).
+
 - **Mein Inventar: die Gruppen-Checkbox ist auf Handy und Tablet wieder groß genug.** Seit der
   Umstellung auf CSS-Layer war das Kästchen „alle auswählen“ einer Gruppe dort nur 26 statt 32 Pixel
   hoch; jetzt gilt wieder die Mindestgröße für Touch-Bedienung.

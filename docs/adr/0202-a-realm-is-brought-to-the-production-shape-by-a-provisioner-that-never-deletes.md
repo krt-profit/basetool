@@ -124,3 +124,22 @@ that flips the client — over kcadm's stdin, never printed, refused when the va
 one secret this script ever sends, and only on the switch; a later run never rewrites it.
 `public` is the rollback and sends none. Pinned by cases 9–12 of
 `scripts/provision-keycloak-realm.test.sh`.
+
+## Amendment 3 — 2026-09-25: the frontend gets a `baseUrl`
+
+- **Deciders:** proposed by Claude with the investigation of a production `cookie_not_found` event;
+  takes effect as the owner's decision when @greluc merges it and applies the provisioner
+
+Production's `basetool-frontend` has an empty `baseUrl` (and `rootUrl`). Keycloak's `error.ftl`
+renders its *"« Zurück zur Applikation"* link only when `client.baseUrl` has content, so every
+Keycloak error page for this client ended without a way back — above all `cookie_not_found`, whose
+own text (*'Klicken Sie auf "Zurück zur Anwendung" um einen neuen Anmeldevorgang zu starten.'*,
+quoted verbatim) tells the member to click exactly that link. Verified against the Keycloak 26.7.4 sources
+(`SessionCodeChecks.initialVerifyAuthSession`, `theme/base/login/error.ftl`) on 2026-09-25.
+
+The provisioner now converges `baseUrl` to `<--public-origin>/`. It is an **added** field, not a
+retirement, and it is environment-specific like the redirect URIs, so no production hostname is
+written into another realm. `baseUrl` affects only where Keycloak *links* to the client (error and
+info pages, the account console's application list) — it is not a redirect-URI allowance and widens
+nothing. Production gets it on the owner's next `--apply`. Requirement: `REQ-SEC-071`; pinned by
+cases 2 and 5 of `scripts/provision-keycloak-realm.test.sh`.

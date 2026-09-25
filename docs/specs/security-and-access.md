@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-25.
 > **Owner area:** AUTH/SEC · **Related ADRs:** [ADR-0001](../adr/0001-frontend-confidential-oauth2-client.md) · **Role matrix:** [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md)
 
 # Security & access control
@@ -11,15 +11,17 @@ read/write is isolated to the calling user unless the caller is privileged.
 
 ## Requirements
 
-> [!note] Where the rest of the `REQ-SEC` namespace lives — checked 2026-09-22
-> Five `REQ-SEC` ids are specified in [`discord-integration.md`](discord-integration.md), not here:
+> [!note] Where the rest of the `REQ-SEC` namespace lives — checked 2026-09-25
+> Six `REQ-SEC` ids are specified in [`discord-integration.md`](discord-integration.md), not here:
 > **REQ-SEC-016** (fail-closed guild + membership gate), **REQ-SEC-017** (a `PENDING` registration
 > holds no authority), **REQ-SEC-019** (Discord-link indicator in member management),
-> **REQ-SEC-022** (colliding Discord first-login precheck) and **REQ-SEC-026** (admin-mediated
-> linking of a registration). The mission finance-entry scope below shared `REQ-SEC-019` with the
+> **REQ-SEC-022** (colliding Discord first-login precheck), **REQ-SEC-026** (admin-mediated
+> linking of a registration) and **REQ-SEC-071** (a Discord login that returns to the wrong browser
+> ends on a page with a way back). The mission finance-entry scope below shared `REQ-SEC-019` with the
 > Discord-link indicator until 2026-09-22, when it was renumbered to **REQ-SEC-065** on the owner's
 > decision (see the renumbering table in [`INDEX.md`](INDEX.md)). **REQ-SEC-054** was never
-> allocated. The next free id is **REQ-SEC-070** — re-check `origin/main` and open PRs before
+> allocated. The next free id is **REQ-SEC-072** (corrected 2026-09-25: this note still said
+> REQ-SEC-070 after REQ-SEC-070 had been allocated below) — re-check `origin/main` and open PRs before
 > claiming it. Requirements are grouped by subject, not strictly by number.
 
 ### REQ-SEC-001 — OIDC topology

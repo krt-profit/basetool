@@ -485,6 +485,8 @@ assert_eq "$(query "$state" "client('basetool-android')['redirectUris']")" \
   "['https://testing.example/app/callback']" "the app's callback comes from --public-origin"
 assert_eq "$(query "$state" "client('basetool-frontend')['attributes']['post.logout.redirect.uris']")" \
   "https://testing.example/*##https://testing.example" "the post-logout list comes from --public-origin"
+assert_eq "$(query "$state" "client('basetool-frontend')['baseUrl']")" \
+  "https://testing.example/" "the frontend's baseUrl comes from --public-origin (REQ-SEC-071)"
 assert_not_contains "$(cat "${state}/state.json")" "profit-base.online" "no production hostname is written into another realm"
 assert_eq "$(query "$state" "sorted(r['name'] for r in d['client_scope_mappings'][client('basetool-android')['id']])")" \
   "['Admin', 'Bank Employee', 'Bank Management', 'KRT Member', 'Officer']" "the app's realm-role scope is exactly the member list"
@@ -599,6 +601,10 @@ assert_contains "$output" "basetool-frontend: default scope 'basic' is not in th
 assert_eq "$(query "$state" "client('backend-service')['directAccessGrantsEnabled']")" "False" \
   "backend-service's direct grants are turned off, as in production"
 assert_eq "$(query "$state" "client('backend-service')['frontchannelLogout']")" "True" "a managed flag converges"
+assert_contains "$output" "~ baseUrl: <absent> -> https://testing.example/" \
+  "a frontend without baseUrl is planned to get one (REQ-SEC-071)"
+assert_eq "$(query "$state" "client('basetool-frontend')['baseUrl']")" "https://testing.example/" \
+  "and gets it, so Keycloak's error pages link back to the app"
 assert_eq "$(query "$state" "client('backend-service')['secret']")" "$SECRET_MARKER" "the existing secret is untouched"
 if [[ -e "${state}/SECRET_SENT_BACK" ]]; then fail "no client secret is sent back in an update"; else
   pass "no client secret is sent back in an update"; fi
