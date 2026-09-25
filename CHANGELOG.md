@@ -2,29 +2,8 @@
 
 ## [Unreleased]
 
-### Security
+## [v1.11.0](https://github.com/krt-profit/basetool/releases/tag/v1.11.0) - 2026-09-25
 
-- **Edge: die Verbindung zu Grafana lässt sich jetzt prüfen.** Mit
-  `EDGE_GRAFANA_UPSTREAM_VERIFY=on` prüft der Edge Grafanas Zertifikat wie bei allen anderen
-  Diensten; ohne die Variable bleibt alles wie bisher.
-
-- **Redis: jeder Dienst bekommt einen eigenen ACL-Benutzer.** Backend, Webtool und Ingest können
-  Redis künftig mit eigenen, eng begrenzten Zugängen nutzen statt mit einem gemeinsamen
-  Vollzugriff. Neue Variablen `REDIS_<DIENST>_USERNAME`/`_PASSWORD` und `REDIS_DEFAULT_USER`;
-  ohne sie bleibt alles wie bisher. Die ACL-Datei enthält nur noch Hashwerte.
-
-- **Interne TLS-Verbindungen: jeder Dienst kann ein eigenes Zertifikat bekommen.** Backend, Webtool,
-  Ingest und Keycloak lassen sich auf eigene, von einer internen CA signierte Zertifikate umstellen,
-  und `INTERNAL_TLS_VERIFY_HOSTNAME` lässt Webtool und Ingest zusätzlich den Namen des Backends
-  prüfen. Ohne Umstellung bleibt alles wie bisher; für Mitglieder unsichtbar.
-
-### Removed
-
-- **API: die 17 veralteten Einsatz-Schnittstellen sind vorzeitig entfernt.** Angekündigt war der
-  Sunset 2026-10-20; per Entscheidung vom 22.09.2026 fielen sie schon mit diesem Release weg. Ersatz
-  sind die `/slim`-Endpunkte und der versionierte Besitzerwechsel. App-Versionen älter als der
-  07.09.2026 müssen aktualisiert werden.
-  
 ### Added
 
 - **Backend: der interne Schlüsselabruf bei Keycloak lässt sich jetzt einschalten.** Neue
@@ -72,11 +51,10 @@
   aus. Im Auftrag schließen Eintragung, Notiz, Übergabe, Item-Übergabe und Produktion jetzt auch
   über das ✕ und mit Escape; beides tat dort bisher nichts.
 
-
 - **Webtool ↔ Backend: keine gzip-Kompression mehr auf der internen Verbindung.** Gemessen kostete
   sie auf dem internen Weg mehr Zeit, als die kleineren Antworten sparten; das Webtool fragt sie
   deshalb nicht mehr an. Für Aufrufer von außen ändert sich nichts (ADR-0161).
-  
+
 - **App-Live-Sync: ein hängendes Handy bremst niemanden mehr aus.** Das Backend schreibt
   Änderungsmeldungen an die App jetzt pro Verbindung im Hintergrund statt im Request dessen, der die
   Änderung gemacht hat. Eine Verbindung, die nicht mehr liest, verliert höchstens eigene Meldungen
@@ -90,12 +68,12 @@
   Anmeldesitzung zwischengespeichert statt pro Zugriffstoken, sodass die alle fünf Minuten
   erneuerten Tokens sie nicht mehr jedes Mal neu laden. Eine in Keycloak entzogene Rolle wirkt
   weiterhin beim nächsten Token (ADR-0174).
-  
 
 - **Backend: Datenbankzugriffe laden nur noch, was sie brauchen.** Verknüpfte Datensätze (z. B.
   Schiffstyp, Besitzer, Material-Kategorie) werden nicht mehr bei jedem Laden automatisch
   mitgeholt, sondern gezielt dort, wo eine Ansicht sie anzeigt. Das entlastet vor allem die
   UEX-Abgleiche und Listen; sichtbar ändert sich nichts.
+
 - **Intern: eine gemeinsame Log-Bereinigung für Backend, Webtool und Ingest.** Maskierung von
   Tokens und E-Mail-Adressen sowie der Schutz gegen gefälschte Logzeilen liegen jetzt einmal im
   neuen Modul `logging-support` statt dreifach kopiert (ADR-0205). Keine Funktionsänderung.
@@ -170,6 +148,13 @@
 - **Betrieb: Das Ingest-Gateway meldet, welche Client-Sperren wirklich greifen.** Neue Metrik
   `basetool_ingest_gate_enforcing{gate}`, eine Zeile im Startlog, ein Dashboard-Panel und der Alarm
   `IngestAudienceGateOff`, solange die Audience-Prüfung aus ist.
+
+### Removed
+
+- **API: die 17 veralteten Einsatz-Schnittstellen sind vorzeitig entfernt.** Angekündigt war der
+  Sunset 2026-10-20; per Entscheidung vom 22.09.2026 fielen sie schon mit diesem Release weg. Ersatz
+  sind die `/slim`-Endpunkte und der versionierte Besitzerwechsel. App-Versionen älter als der
+  07.09.2026 müssen aktualisiert werden.
 
 ### Fixed
 
@@ -280,6 +265,22 @@
 - **Ingest-Konfiguration nannte die falsche Audience.** Der Kommentar in `application.yml` empfahl
   noch `basetool-backend`, was Browser-Sitzungstokens durchließe; richtig ist `basetool-ingest`. Ein
   neuer Repo-Lint-Check verhindert, dass der Wert wieder auftaucht.
+
+### Security
+
+- **Edge: die Verbindung zu Grafana lässt sich jetzt prüfen.** Mit
+  `EDGE_GRAFANA_UPSTREAM_VERIFY=on` prüft der Edge Grafanas Zertifikat wie bei allen anderen
+  Diensten; ohne die Variable bleibt alles wie bisher.
+
+- **Redis: jeder Dienst bekommt einen eigenen ACL-Benutzer.** Backend, Webtool und Ingest können
+  Redis künftig mit eigenen, eng begrenzten Zugängen nutzen statt mit einem gemeinsamen
+  Vollzugriff. Neue Variablen `REDIS_<DIENST>_USERNAME`/`_PASSWORD` und `REDIS_DEFAULT_USER`;
+  ohne sie bleibt alles wie bisher. Die ACL-Datei enthält nur noch Hashwerte.
+
+- **Interne TLS-Verbindungen: jeder Dienst kann ein eigenes Zertifikat bekommen.** Backend, Webtool,
+  Ingest und Keycloak lassen sich auf eigene, von einer internen CA signierte Zertifikate umstellen,
+  und `INTERNAL_TLS_VERIFY_HOSTNAME` lässt Webtool und Ingest zusätzlich den Namen des Backends
+  prüfen. Ohne Umstellung bleibt alles wie bisher; für Mitglieder unsichtbar.
 
 ## [v1.10.0](https://github.com/krt-profit/basetool/releases/tag/v1.10.0) - 2026-09-22
 
