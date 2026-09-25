@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Benachrichtigungen: ein Tab mit abgelaufener Sitzung fragt den Live-Stream nicht mehr alle paar
+  Sekunden an.** Er prüft die Sitzung, beendet den Stream bei einem 401 und schickt zur Anmeldung;
+  wiederholte Fehlversuche warten zunehmend länger. Ein Browser, der einen offenen Stream verlässt,
+  erzeugt im Log kein `ERROR` mehr.
+
 ## [v1.11.0](https://github.com/krt-profit/basetool/releases/tag/v1.11.0) - 2026-09-25
 
 ### Added

@@ -379,6 +379,27 @@ the error through the MVC `@ExceptionHandler` and log a spurious ERROR per drop 
 stream failure never inflates the frontend error log (the dominant frontend ERROR source during a
 backend/Keycloak blip); the browser reconnects and the poll keeps the badge fresh.
 
+**A browser that leaves an open stream is not an error either (2026-09-25).** When the relay
+completes an emitter whose client has already gone — a navigation, a closed tab, a window handed to
+the login — Spring flushes a response that already failed, raises `AsyncRequestNotUsableException`
+and dispatches it as the async result. The frontend `GlobalExceptionHandler.handleDisconnectedClient`
+takes it (and Tomcat's `ClientAbortException`) at `DEBUG` with a `void` return, so nothing is written
+into the dead response; before it existed the exception reached the `Exception` catch-all, which
+logged `ERROR` and then made Tomcat log a second line when the error page could not be rendered
+(33 lines in two minutes right after the v1.11.0 deploy). Those lines read `userId=anonymous`
+because an async dispatch runs without the request thread's MDC, not because the caller was.
+
+**A stream refused for a missing session stops reconnecting.** An anonymous `GET
+/notifications/stream` meets the entry point like every background call: `401` + `X-Reauthenticate`,
+never a login redirect (REQ-SEC-012; `Accept: text/event-stream` and `Sec-Fetch-Mode: cors` are both
+background signals). An `EventSource` cannot read that status — it fires the same `error` as for a
+network blip — so a tab whose session ended used to reconnect every 3–6 s for as long as it stayed
+open, hidden tabs included. `notifications.js` now treats an `error` before `open` as a refused
+connect: it probes the session once through the unread-count read, and a `401` there stops the stream
+for the page (no open source, no pending reconnect) before the shared re-auth helper takes the window
+to the login. Consecutive refusals double the jittered reconnect delay up to 24–48 s; the next `open`
+resets it.
+
 **The frontend relay commits its response on the request thread (ADR-0113).** Right after resolving
 the bearer and before wiring the reactor `sseWebClient` subscription, the relay sends an immediate
 initial SSE **comment** from the request thread. This is load-bearing, not decoration: the relay's
@@ -425,14 +446,22 @@ Hikari connection (#1152).
 - [x] The frontend SSE relay uses a dedicated connection pool (`frontend-sse-pool`) sized well above
   the expected concurrent-viewer count, so many simultaneous viewers (200+) each keep their live push
   instead of the surplus blocking on the request pool's connection ceiling (ADR-0078).
+- [x] A client that leaves an open stream logs no `ERROR` on the frontend and gets nothing written
+  into the dead response.
+- [x] An anonymous `EventSource` request to the stream answers `401` + `X-Reauthenticate`, never a
+  login redirect, and logs no `ERROR`.
+- [x] A connect refused before `open` probes the session; a `401` stops the stream for the page, and
+  consecutive refusals back off.
 
 **Enforced by:** `NotificationStreamServiceTest` (named `connected`/`heartbeat`/`notification`
-events + clean timeout completion), full build (bean wiring), frontend lint gate · **Code:**
+events + clean timeout completion), `DisconnectedClientHandlingTest`,
+`AnonymousSurfaceSweepMvcTest#anonymousEventSourceGets401`,
+`NotificationStreamReconnectContractTest`, full build (bean wiring), frontend lint gate · **Code:**
 `service/NotificationStreamService`, `service/NotificationFanout` / `RedisNotificationFanout` /
 `LocalNotificationFanout`, `support/NotificationFanoutProperties`,
 `controller/NotificationController#stream`, frontend
 `controller/NotificationPageController#stream`, `config/WebClientConfig#sseWebClient`,
-`static/js/notifications.js`
+`exception/GlobalExceptionHandler#handleDisconnectedClient`, `static/js/notifications.js`
 
 ### REQ-NOTIF-011 — UC2/UC3: notify on the bank booking-request lifecycle
 

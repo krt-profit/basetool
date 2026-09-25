@@ -381,4 +381,59 @@ class AnonymousSurfaceSweepMvcTest {
                 + " session; a 403 means the CSRF filter answered before the gate did.")
         .isEmpty();
   }
+
+  /**
+   * The notification stream, asked for exactly the way a browser's {@code EventSource} asks: {@code
+   * Accept: text/event-stream}, once with the Fetch Metadata every current engine sends ({@code
+   * Sec-Fetch-Mode: cors}) and once without it (an older client, where the {@code Accept} header is
+   * the only signal).
+   *
+   * <p>The sweep above covers this path only in the {@code application/json} shape, which no {@code
+   * EventSource} ever sends. After the v1.11.0 deploy renamed the session cookie (2026-09-25),
+   * every open tab reconnected its stream without a session, and the question was whether that
+   * reconnect met a login redirect — a 302 an {@code EventSource} cannot follow, which would also
+   * have overwritten the session's one saved OAuth2 authorization request (#1137). It does not: the
+   * entry point answers {@code 401} + {@code X-Reauthenticate}, and nothing on the way logs an
+   * {@code ERROR}. This pins both, so the shape a real browser uses stays covered.
+   *
+   * @throws Exception when the request could not be performed
+   */
+  @Test
+  @DisplayName(
+      "an anonymous EventSource on the notification stream gets 401, never a login redirect")
+  void anonymousEventSourceGets401() throws Exception {
+    ch.qos.logback.classic.Logger root =
+        (ch.qos.logback.classic.Logger)
+            org.slf4j.LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
+    ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> appender =
+        new ch.qos.logback.core.read.ListAppender<>();
+    appender.start();
+    root.addAppender(appender);
+    try {
+      for (boolean withFetchMetadata : new boolean[] {true, false}) {
+        MockHttpServletRequestBuilder request =
+            MockMvcRequestBuilders.get("/notifications/stream").accept(MediaType.TEXT_EVENT_STREAM);
+        if (withFetchMetadata) {
+          request = request.header("Sec-Fetch-Mode", "cors");
+        }
+        org.springframework.mock.web.MockHttpServletResponse response =
+            mockMvc.perform(request).andReturn().getResponse();
+
+        Assertions.assertThat(response.getStatus())
+            .as("Sec-Fetch-Mode present: %s", withFetchMetadata)
+            .isEqualTo(401);
+        Assertions.assertThat(response.getRedirectedUrl())
+            .as("an EventSource cannot follow a redirect into the login")
+            .isNull();
+        Assertions.assertThat(response.getHeader("X-Reauthenticate"))
+            .as("the re-auth contract the badge poll acts on (REQ-SEC-012)")
+            .isEqualTo("/oauth2/authorization/keycloak");
+      }
+    } finally {
+      root.detachAppender(appender);
+    }
+    Assertions.assertThat(appender.list)
+        .as("a refused stream is a client condition, not an error (REQ-OBS-001)")
+        .noneMatch(event -> event.getLevel() == ch.qos.logback.classic.Level.ERROR);
+  }
 }
