@@ -843,16 +843,12 @@
     function handleBankSuccess(form) {
         const modal = form.closest('.krt-modal-overlay');
         if (modal) {
-            // Close via the shared class toggle, NOT an inline style.display. The shared
-            // open-modal-display handler (common-handlers.js) shows a `.krt-modal-overlay` by adding
-            // the `krtm-modal-open` class (display:flex, inline-migration.css). An inline
-            // `style="display:none"` outranks that class rule, so a modal closed here with an inline
-            // style could never be re-opened by a later trigger without a full page reload — the bank
-            // staffer who decided one request and then clicked the confirm/reject button on a second
-            // one got a dead button. Mirror the shared close-modal-display handler so the reused
-            // modal opens again.
-            modal.classList.remove('krtm-modal-open');
-            modal.classList.add('krtm-hidden');
+            // Close through the shared contract, NOT an inline style.display: an inline
+            // `style="display:none"` outranks the class rule the shared open uses, so a modal closed
+            // that way could never be re-opened without a full page reload — the bank staffer who
+            // decided one request and then clicked the confirm/reject button on a second one got a
+            // dead button. window.krtModal.close also ends the modal state of the <dialog>.
+            window.krtModal.close(modal);
         }
         const main = document.querySelector('main[data-bank-saved]');
         const savedMessage = main ? main.getAttribute('data-bank-saved') : null;
@@ -1921,7 +1917,8 @@
         const a = document.createElement('a');
         a.href = objectUrl;
         a.download = filename;
-        document.body.appendChild(a);
+        // Inside an open modal <dialog> the body is inert; append where a click still lands.
+        window.krtModal.layerRoot().appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(objectUrl);

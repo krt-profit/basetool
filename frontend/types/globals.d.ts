@@ -56,6 +56,28 @@ type KrtElementRef = Element | string | null;
 // -------------------------------------------------------- cross-file helpers
 
 /**
+ * The one open/close contract for every `.krt-modal-overlay` dialog (`krt-modal.js`,
+ * FE-SIMP-04/04b). Every overlay is a native `<dialog>`: `open` shows it modally
+ * (top layer, inert background) and moves focus in, `close` returns focus to where
+ * it was; the `krtm-modal-open` / `krtm-hidden` classes follow either way.
+ */
+interface KrtModalApi {
+    /** Opens an overlay (element or id); `focus` overrides the default focus target. */
+    open(
+        ref: Element | string | null | undefined,
+        options?: { focus?: Element | null },
+    ): HTMLElement | null;
+    /** Closes an overlay (element or id) and restores the focus it took. */
+    close(ref: Element | string | null | undefined): HTMLElement | null;
+    /** Whether an overlay is currently displayed, however it was opened. */
+    isOpen(ref: Element | string | null | undefined): boolean;
+    /** The topmost open overlay, or null. */
+    topmost(): HTMLElement | null;
+    /** Where a toast, confirm or download link must be appended to stay usable: the open modal, else the body. */
+    layerRoot(): HTMLElement;
+}
+
+/**
  * Escapes `&`, `<`, `>`, `"`, `'` and `/` so a value can be interpolated into
  * `innerHTML` or a template literal. Returns the empty string for null and
  * undefined. Installed by `escape-html.js`.
@@ -719,7 +741,9 @@ interface Window {
         cancelLabel?: string,
     ) => Promise<boolean>;
 
-    // --- modal open/close (class-based visibility, ADR-0093)
+    // --- modal open/close: the one contract (krt-modal.js, FE-SIMP-04, ADR-0177)
+    krtModal: KrtModalApi;
+    /** Kept as aliases of `krtModal.open` / `krtModal.close` for the mission page. */
     krtModalOpen?: (overlay: HTMLElement | null) => void;
     krtModalClose?: (overlay: HTMLElement | null) => void;
     openModal?: (...args: any[]) => void;

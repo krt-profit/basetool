@@ -40,12 +40,12 @@ document.addEventListener('DOMContentLoaded', function () {
     const deleteForm = document.getElementById('announcement-delete-form');
 
     function closeDeleteModal() {
-        if (deleteModal) deleteModal.style.display = 'none';
+        if (deleteModal) window.krtModal.close(deleteModal);
     }
 
     if (triggerDeleteBtn && deleteModal) {
         triggerDeleteBtn.onclick = function () {
-            deleteModal.style.display = 'flex';
+            window.krtModal.open(deleteModal);
         };
     }
 

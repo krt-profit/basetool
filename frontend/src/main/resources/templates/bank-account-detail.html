@@ -331,13 +331,9 @@
          bank administration's holder menu (REQ-BANK-031). */-->
 
     <!--/* Reversal confirm (management only). */-->
-    <div class="krt-modal-overlay" id="bank-reverse-modal" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)">
-        <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.reverse.title}">
-            <div class="krt-modal-head">
-                <h3 th:text="#{bank.modal.reverse.title}">Buchung stornieren</h3>
-                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="bank-reverse-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_MANAGEMENT)">
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bank-reverse-modal', titleKey='bank.modal.reverse.title', variant='krt-modal--danger', body=~{::bank-reverse-modal-body})}">
+        <th:block th:ref="bank-reverse-modal-body">
             <form class="bank-ajax-form no-track" data-refresh="accountBody"
                   data-livesync="bank:@account/account,bookings,chart bank/grid orgunit-bank/orgUnitBank"
                   th:data-livesync-account="${acct.id()}"
@@ -359,17 +355,13 @@
                             th:text="#{bank.action.reverse}">Stornieren</button>
                 </div>
             </form>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
+    </th:block>
 
     <!--/* Statement export (REQ-BANK-014): period picker -> PDF blob download via the proxy. */-->
-    <div class="krt-modal-overlay" id="bank-statement-modal">
-        <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.statement.title}">
-            <div class="krt-modal-head">
-                <h3 th:text="#{bank.modal.statement.title}">Kontoauszug exportieren</h3>
-                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="bank-statement-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bank-statement-modal', titleKey='bank.modal.statement.title', body=~{::bank-statement-modal-body})}">
+        <th:block th:ref="bank-statement-modal-body">
             <form class="bank-download-form no-track"
                   th:attr="data-endpoint='/api/proxy/bank/accounts/' + ${acct.id()} + '/statement',data-filename='kontoauszug-' + ${acct.accountNo()} + '.pdf',data-period-required=#{bank.error.periodRequired}">
                 <div class="krt-modal-body">
@@ -405,8 +397,8 @@
                             th:text="#{bank.modal.statement.submit}">PDF herunterladen</button>
                 </div>
             </form>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
     </th:block>
     </div>
 </main>

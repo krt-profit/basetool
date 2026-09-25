@@ -145,6 +145,22 @@ sequence, and the fact that the Android app must ship the matching build, are in
 > /auth on the web host*) was removed when `docs/deployment.md` was rewritten for the rootless-Podman
 > host. It can still be read at `git show v1.9.2:docs/deployment.md` (the last release that carries it).
 
+> **Correction (2026-09-25):** *"Every navigation of both flows is now same-origin"* is true of the
+> credential login and the logout, **not of the Discord login.** Brokering through Discord goes
+> `/auth/realms/iri/broker/discord/login` → `discord.com/…/oauth2/authorize` → back to
+> `/auth/realms/iri/broker/discord/endpoint`, and the middle hop leaves the origin by necessity — no
+> edge route can put Discord's authorize page on our host. So an installed app on iOS still depends
+> on Apple's OAuth heuristic for that one hop, and Discord itself may finish its authorization in the
+> Discord app or another browser. Whenever the callback lands in a browser context that does not
+> hold Keycloak's `AUTH_SESSION_ID` / `KC_RESTART` cookies, Keycloak 26.7 logs
+> `IDENTITY_PROVIDER_LOGIN_ERROR … error="cookie_not_found"` and shows an error page — reproduced
+> locally with the 26.7.4 distribution on 2026-09-25 (the login started in one cookie jar, the
+> callback replayed from an empty one gives exactly that event). This cannot be fixed server-side:
+> the broker's `state` is bound to the browser that started the login. What `REQ-SEC-071` does is
+> make the failure recoverable — an actionable message and a working "back to the app" link. Which
+> of the triggers produced the production event of 2026-09-25 04:28 UTC is **not known**; the log
+> line does not say.
+
 **Production is still the only place the full arrangement exists.** The test stack has no edge, so it
 cannot reproduce the same-*origin* half — it runs Keycloak on its own port as before. It does run the
 same `/auth` **path**, which is the half that configuration gets wrong, and the e2e login exercises it

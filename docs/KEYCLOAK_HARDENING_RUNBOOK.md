@@ -24,7 +24,8 @@ breaks if it is wrong.
 ## Status
 
 Nine of the twelve are applied; three are open, plus a thirteenth finding (decided 2026-09-22,
-not yet applied to production) and the clean-up. The
+applied to production by `scripts/provision-keycloak-realm.py` on 2026-09-23 with the owner's yes;
+the testing realm is not provisioned yet) and the clean-up. The
 evidence is the sanitized realm export regenerated from production on **2026-09-09**
 ([`docs/keycloak/realm-config.reference.json`](keycloak/realm-config.reference.json), commit
 `72b9b1b2b`, which recorded "steps 1 and 3–10 applied, 11 not, 2 and 12 open"), and for step 4 a
@@ -660,7 +661,8 @@ about clearing the redirect lists they never use). PKCE has nothing to protect t
 > Re-read on `basetool-sc-extractor` `main` (`c6de57ff4`) that day: `DeviceGrantClient` sends only
 > the `device_code` and `refresh_token` grants. The change is applied by
 > `scripts/provision-keycloak-realm.py` — its target is `standardFlowEnabled: false` with no
-> redirect URI — not by hand; production carries the flow until the owner applies it there.
+> redirect URI — not by hand. Applied to production on 2026-09-23 (the provisioner's dry run
+> planned exactly the #2007 changes; a second dry run afterwards was empty).
 
 ---
 

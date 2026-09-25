@@ -105,7 +105,7 @@
             modalRoleGroup.style.display = 'none';
         }
         lastTrigger = trigger;
-        modal.style.display = 'flex';
+        window.krtModal.open(modal);
         // Reuse the modalUser resolved above (same open call, the control is not replaced in between).
         if (modalUser) {
             // Focus the visible combobox textbox (the resolved element is the hidden input).
@@ -121,7 +121,7 @@
         if (!modal) {
             return;
         }
-        modal.style.display = 'none';
+        window.krtModal.close(modal);
         modalContext = null;
         if (lastTrigger && typeof lastTrigger.focus === 'function') {
             lastTrigger.focus();
@@ -169,7 +169,7 @@
                 openModal(opener);
                 return;
             }
-            if (e.target.closest('[data-leitung-cancel]')) {
+            if (e.target.closest('[data-leitung-cancel], .leitung-modal-close')) {
                 closeModal();
                 return;
             }

@@ -145,13 +145,9 @@
     </div>
 
     <!--/* Ship Modal */-->
-    <div id="ship-modal" class="krt-modal-overlay" th:data-title-add="#{hangar.ship.add}" th:data-title-edit="#{hangar.ship.edit}">
-        <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{hangar.ship.modal_title}">
-            <div class="krt-modal-head">
-                <h2 id="modal-title" th:text="#{hangar.ship.modal_title}">Schiff</h2>
-                <button type="button" class="krt-modal-close close-ship-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
-            <form id="ship-form" data-testid="hangar-ship-form" method="post" th:object="${shipForm}" th:action="${modalAction != null} ? ${modalAction} : @{/hangar}">
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='ship-modal', titleKey='hangar.ship.modal_title', variant='krt-modal--wide', titleId='modal-title', closeTrigger='', closeClass='close-ship-modal', body=~{::ship-modal-body})}">
+        <th:block th:ref="ship-modal-body">
+            <form id="ship-form" data-testid="hangar-ship-form" th:data-title-add="#{hangar.ship.add}" th:data-title-edit="#{hangar.ship.edit}" method="post" th:object="${shipForm}" th:action="${modalAction != null} ? ${modalAction} : @{/hangar}">
                 <input type="hidden" id="ship-version" name="version" th:value="*{version}">
                 <div class="krt-modal-body">
                 <div class="form-group">
@@ -204,8 +200,8 @@
                     <button type="submit" class="btn btn--cta" data-testid="hangar-ship-submit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{hangar.ship.save}">Speichern</span></button>
                 </div>
             </form>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
 
     <!--/* Fleetview Import Section */-->
     <div class="hud-box mt-2 import-section">
@@ -239,12 +235,8 @@
     </div>
 
     <!--/* Fleetview Import Result Modal */-->
-    <div id="import-result-modal" class="krt-modal-overlay krtm-display-none-z-index-3200-e00a">
-        <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{hangar.import.result.title}">
-            <div class="krt-modal-head">
-                <h2 id="import-result-title" th:text="#{hangar.import.result.title}">Import-Ergebnis</h2>
-                <button type="button" class="krt-modal-close" id="import-result-close-x" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='import-result-modal', titleKey='hangar.import.result.title', variant='krt-modal--wide', titleId='import-result-title', closeId='import-result-close-x', closeTrigger='', body=~{::import-result-modal-body})}">
+        <th:block th:ref="import-result-modal-body">
             <div class="krt-modal-body">
             <div class="stat-row">
                 <span th:text="#{hangar.import.result.imported}">Importiert</span>
@@ -270,17 +262,12 @@
             <div class="krt-modal-foot">
                 <button id="import-result-close" class="btn btn-ghost" type="button" th:text="#{hangar.import.result.close}">Schließen</button>
             </div>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
 
     <!--/* Delete All Ships Confirmation Modal */-->
-    <div id="delete-all-confirm-modal" class="krt-modal-overlay krtm-display-none-z-index-3300-c2c8">
-        <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{hangar.delete_all.modal.title}">
-            <div class="krt-modal-head">
-                <h2 th:text="#{hangar.delete_all.modal.title}">Hangar leeren</h2>
-                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="delete-all-confirm-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='delete-all-confirm-modal', titleKey='hangar.delete_all.modal.title', variant='krt-modal--danger', body=~{::delete-all-confirm-modal-body})}">
+        <th:block th:ref="delete-all-confirm-modal-body">
             <div class="krt-modal-body">
                 <p th:text="#{hangar.delete_all.modal.body}" class="m-0">Alle eigenen Schiffe wirklich löschen?</p>
             </div>
@@ -288,16 +275,12 @@
                 <button type="button" id="delete-all-cancel-btn" class="btn btn-ghost" th:text="#{general.cancel}">Abbrechen</button>
                 <button type="button" id="delete-all-confirm-btn" class="btn btn-danger" th:text="#{hangar.delete_all.modal.confirm}">Ja, alle löschen</button>
             </div>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
 
     <!--/* Set Home Location Modal */-->
-    <div id="home-location-modal" class="krt-modal-overlay krtm-display-none-z-index-3300-c2c8">
-        <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{hangar.home_location.modal.title}">
-            <div class="krt-modal-head">
-                <h2 th:text="#{hangar.home_location.modal.title}">Home-Location setzen</h2>
-                <button type="button" class="krt-modal-close close-modal-home" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='home-location-modal', titleKey='hangar.home_location.modal.title', variant='krt-modal--wide', closeTrigger='', closeClass='close-modal-home', body=~{::home-location-modal-body})}">
+        <th:block th:ref="home-location-modal-body">
 
             <form th:unless="${#lists.isEmpty(homeLocations)}" id="home-location-form" method="post"
                   th:action="@{/hangar/home-location}" class="m-0">
@@ -325,16 +308,12 @@
                     <button type="button" class="btn btn-ghost close-home-cancel" th:text="#{general.cancel}">Abbrechen</button>
                 </div>
             </th:block>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
 
     <!--/* Delete Confirmation Modal */-->
-    <div id="delete-confirm-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
-        <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{info.delete.confirm.title}">
-            <div class="krt-modal-head">
-                <h2 th:text="#{info.delete.confirm.title}">Löschen bestätigen</h2>
-                <button type="button" class="krt-modal-close close-delete-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='delete-confirm-modal', titleKey='info.delete.confirm.title', variant='krt-modal--danger', closeTrigger='', closeClass='close-delete-modal', body=~{::delete-confirm-modal-body})}">
+        <th:block th:ref="delete-confirm-modal-body">
             <div class="krt-modal-body">
                 <p th:text="#{hangar.ship.delete_confirm}" class="m-0">Schiff wirklich löschen?</p>
             </div>
@@ -344,8 +323,8 @@
                     <button type="submit" class="btn btn-danger" th:text="#{hangar.ship.delete}">Löschen</button>
                 </form>
             </div>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
 </main>
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">

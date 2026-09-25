@@ -242,9 +242,13 @@
                         </tbody>
                     </table>
                 </div>
+            </div>
                 <!--/* EDIT MODALS (REQ-BANK-056), one per still-editable request. Rendered here,
                      AFTER the table, because a modal inside <tbody> is invalid HTML and the browser
-                     hoists it out of the table, detaching it from the row it belongs to.
+                     hoists it out of the table, detaching it from the row it belongs to. And after the Antr&auml;ge
+                     panel rather than inside it: a dialog inside a `hidden` panel opens in the top
+                     layer but renders nothing, and DialogA11yE2eTest opens each one wherever the
+                     page happens to stand.
 
                      One modal per row rather than a single primed singleton: the Empf&auml;nger
                      picker is a REMOTE combobox, which seeds itself from a `selected` option but
@@ -254,15 +258,9 @@
                      `version` correct after every fragment swap, and needs no new JS. The type is
                      fixed per row, so each modal renders exactly the fields that request kind
                      carries - no client-side gating either. */-->
-                <div th:each="r : ${ownRequests}"
-                     th:if="${r.status() == 'PENDING' and !r.ownerApprovalGranted()}"
-                     class="krt-modal-overlay" th:id="'ou-req-edit-' + ${r.id()}">
-                    <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.request.edit.title}">
-                        <div class="krt-modal-head">
-                            <h3 th:text="#{bank.request.edit.title}">Antrag bearbeiten</h3>
-                            <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                                    th:attr="data-modal-id='ou-req-edit-' + ${r.id()}" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-                        </div>
+                <th:block th:each="r : ${ownRequests}" th:if="${r.status() == 'PENDING' and !r.ownerApprovalGranted()}">
+                <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='ou-req-edit-' + ${r.id()}, titleKey='bank.request.edit.title', body=~{::ou-req-edit-body})}">
+                    <th:block th:ref="ou-req-edit-body">
                         <form class="bank-ajax-form no-track" data-refresh="orgUnitBank" data-livesync="bank/requestQueue orgunit-bank/orgUnitBank"
                               data-endpoint="/api/proxy/org-units/bank/requests/{id}" data-method="PUT">
                             <div class="krt-modal-body">
@@ -356,9 +354,9 @@
                                         th:text="#{general.save}">Speichern</button>
                             </div>
                         </form>
-                    </div>
-                </div>
-            </div>
+                    </th:block>
+                </th:block>
+                </th:block>
 
             <!--/* FREMDE ANTRÄGE: every request raised against the accounts the caller is responsible
                  for (REQ-BANK-041). Over-limit pending requests carry a "grant approval" action that
@@ -480,13 +478,9 @@
          (deposits may target any of them, REQ-BANK-042); the JS narrows it to the caller's
          request-capable accounts when a withdrawal/transfer is chosen. Shown whenever any active
          account exists (canRequestAny). */-->
-    <div class="krt-modal-overlay" id="org-unit-request-modal" th:if="${canRequestAny}">
-        <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.request.modal.title}">
-            <div class="krt-modal-head">
-                <h3 th:text="#{bank.request.modal.title}">Ein-/Auszahlung beantragen</h3>
-                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="org-unit-request-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <th:block th:if="${canRequestAny}">
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='org-unit-request-modal', titleKey='bank.request.modal.title', body=~{::org-unit-request-modal-body})}">
+        <th:block th:ref="org-unit-request-modal-body">
             <form class="bank-ajax-form no-track" data-refresh="orgUnitBank" data-livesync="bank/requestQueue orgunit-bank/orgUnitBank"
                   data-endpoint="/api/proxy/org-units/bank/requests" data-method="POST">
                 <div class="krt-modal-body">
@@ -604,8 +598,9 @@
                             th:text="#{bank.request.action.submit}">Antrag stellen</button>
                 </div>
             </form>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
+    </th:block>
 </main>
 
 <th:block th:replace="~{fragments/toast :: toast}" />

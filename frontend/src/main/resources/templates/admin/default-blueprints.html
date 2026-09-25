@@ -105,12 +105,8 @@
 </main>
 
 <!--/* Remove confirmation modal */-->
-<div id="krt-dbp-delete-modal" class="krt-modal-overlay">
-    <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{admin.defaultBlueprints.modal.remove.title}">
-        <div class="krt-modal-head">
-            <h2 th:text="#{admin.defaultBlueprints.modal.remove.title}">Standard-Blueprint entfernen</h2>
-            <button type="button" class="krt-modal-close" data-trigger="dbp-close-delete" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-        </div>
+<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='krt-dbp-delete-modal', titleKey='admin.defaultBlueprints.modal.remove.title', variant='krt-modal--danger', closeTrigger='dbp-close-delete', body=~{::krt-dbp-delete-modal-body})}">
+    <th:block th:ref="krt-dbp-delete-modal-body">
         <div class="krt-modal-body">
             <p id="krt-dbp-delete-message" class="m-0" th:text="#{admin.defaultBlueprints.modal.remove.body}">Wirklich entfernen?</p>
         </div>
@@ -118,8 +114,8 @@
             <button type="button" class="btn btn-ghost" data-trigger="dbp-close-delete" th:text="#{personalInventory.action.cancel}">Abbrechen</button>
             <button type="button" id="krt-dbp-delete-confirm" class="btn krt-danger" th:text="#{admin.defaultBlueprints.action.remove}">Entfernen</button>
         </div>
-    </div>
-</div>
+    </th:block>
+</th:block>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">

@@ -106,6 +106,13 @@ and read it before applying. Keycloak now demands the secret, and the frontend a
 - After step 1: delete the `KEYCLOAK_FRONTEND_CLIENT_SECRET` line (or leave it), render `env.d`,
   `${UCTL} restart frontend.service` — the frontend is the public client again.
 
+> [!warning] A release rollback needs the public client first *(added 2026-09-25)*
+> A frontend older than this change (1.10.0 and before) is hard-wired to
+> `client-authentication-method: none` and its `env.d` template carries no secret. Once step 2 has
+> made `basetool-frontend` confidential in Keycloak, promoting such a release breaks **every** web
+> login and token refresh with `invalid_client`. Before any rollback to 1.10.0 or older, run the
+> step-2 rollback (`--frontend-client public --apply`) first, then promote.
+
 **Rotation** cannot simply repeat step 1: a confidential client refuses the old secret the moment
 Keycloak holds the new one, and the frontend cannot switch at that same instant. So rotate through
 the public state, which accepts both: `--frontend-client public --apply`, then a new value into

@@ -50,7 +50,7 @@ because a quality goal nobody measures is a preference, and a gate that cannot f
   and Loki configuration files (each checked by its own tool in the pinned image), log masking, the Keycloak issuer,
   Quadlet drift (which also checks the edge's trusted-address pins), the container runtime, the
   logging facade, PID-1 reaping, probes against the API allow-list, ansible-lint, shellcheck,
-  actionlint, zizmor, hadolint, gitleaks, SBOM coverage, the E2E device matrix and the cosign
+  actionlint, zizmor, hadolint, gitleaks, SBOM coverage and freshness (each BOM proved against the resolved runtime classpath), the E2E device matrix and the cosign
   signer identity (every copy anchored and identical).
 - **A conformance suite** ([`check-conformance.py`](../../scripts/check-conformance.py)) that
   asserts invariants against a **running host** rather than against configuration — the recurring

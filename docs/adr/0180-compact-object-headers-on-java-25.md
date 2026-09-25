@@ -41,6 +41,9 @@ stand even if it were. Checked on 2026-09-15, the day of its GA:
   `eclipse-temurin:27-*` tag, so the digest-pinned base images cannot move.
 - **Gradle 9.7.1 refuses it** — "JVM 27 and later versions are not yet supported", daemon 17–26,
   toolchains to 26. Support arrives in 9.8.0, which exists only as RC1 (2026-09-08).
+  *(2026-09-25: the wrapper is on 9.8.0 GA now, which runs on and compiles for JDK 27 and makes
+  JaCoCo 0.8.15 the default — so neither this point nor the JaCoCo half of the Lombok point below
+  blocks JDK 27 any more. The Temurin, Spring Boot, Lombok and LTS points are unchanged.)*
 - **Spring Boot 4.1.1 is "compatible with versions up to and including Java 26."**
 - Boot's BOM pins **Lombok 1.18.46** (JDK 26); JDK 27 support landed in 1.18.48. Gradle's default
   **JaCoCo 0.8.14** cannot read class-file 71; 0.8.15 calls that support experimental.

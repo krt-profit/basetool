@@ -200,7 +200,7 @@ function openDeleteModal(id) {
         '/operations/' + id + '/delete',
         deleteForm.action,
     );
-    document.getElementById('delete-operation-modal').style.display = 'flex';
+    window.krtModal.open(document.getElementById('delete-operation-modal'));
 }
 
 document.addEventListener('DOMContentLoaded', function () {

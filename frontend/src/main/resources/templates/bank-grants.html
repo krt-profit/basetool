@@ -153,13 +153,8 @@
     </div>
 
     <!--/* Create grant */-->
-    <div class="krt-modal-overlay" id="bank-grant-create-modal">
-        <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.grant.title}">
-            <div class="krt-modal-head">
-                <h3 th:text="#{bank.modal.grant.title}">Berechtigung erteilen</h3>
-                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="bank-grant-create-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bank-grant-create-modal', titleKey='bank.modal.grant.title', body=~{::bank-grant-create-modal-body})}">
+        <th:block th:ref="bank-grant-create-modal-body">
             <form class="bank-ajax-form no-track" data-refresh="grantsMatrix"
                   data-livesync="bank/grants"
                   data-endpoint="/api/proxy/bank/grants" data-method="POST">
@@ -213,17 +208,12 @@
                             th:text="#{bank.modal.grant.submit}">Erteilen</button>
                 </div>
             </form>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
 
     <!--/* Revoke grant */-->
-    <div class="krt-modal-overlay" id="bank-grant-revoke-modal">
-        <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.revoke.title}">
-            <div class="krt-modal-head">
-                <h3 th:text="#{bank.modal.revoke.title}">Berechtigung entziehen</h3>
-                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="bank-grant-revoke-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bank-grant-revoke-modal', titleKey='bank.modal.revoke.title', variant='krt-modal--danger', body=~{::bank-grant-revoke-modal-body})}">
+        <th:block th:ref="bank-grant-revoke-modal-body">
             <form class="bank-ajax-form no-track" data-refresh="grantsMatrix"
                   data-livesync="bank/grants"
                   data-endpoint="/api/proxy/bank/grants/{userId}/{accountId}" data-method="DELETE">
@@ -243,8 +233,8 @@
                             th:text="#{bank.grants.revoke}">Entziehen</button>
                 </div>
             </form>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
 </main>
 
 <th:block th:replace="~{fragments/toast :: toast}" />

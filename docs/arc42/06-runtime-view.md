@@ -9,6 +9,8 @@ view, and because each one has burned somebody at least once.
    served under `/auth` on the same origin (ADR-0166).
 2. Keycloak authenticates — either directly, or through the **Discord identity provider** in
    `keycloak-spi`.
+   The Discord path is the one hop that leaves the origin (`discord.com`); a callback that returns
+   in another browser context cannot be resumed and ends on a recoverable error page (REQ-SEC-071).
 3. On the Discord path the guild/role gate runs: guild membership and an in-guild role are checked
    **fail-closed**. If Discord cannot be reached, the login is refused rather than allowed.
 4. A new sign-up that passes the gate lands in the **approval queue** instead of the application:
@@ -93,7 +95,10 @@ itself changes only through the Ansible role, which never delivers):
    untrusted digest is rejected here — which is what makes a blind `:stable` pull safe.
 4. Verified content is unpacked, `env.d` files are rendered from `.env` by `render-env-d.py`, and
    the Quadlet units are reconciled through the service user's systemd instance, behind a health
-   gate that rolls back on failure (`REQ-OPS-003`).
+   gate that rolls back on failure (`REQ-OPS-003`). A failure *before* the gate — an unwritable
+   directory, a failed mirror, a failed pull — is refused up front where it can be, and otherwise
+   recorded like any other failed deploy: the host tree and the pin are put back, the target backs
+   off, and `DeployFailed` fires (since 2026-09-25; until then it ended the run in silence).
 5. Nothing is promoted automatically: `:stable` moves only by a deliberate act in the promote
    workflow. The deploy is the *consumer* of that decision, never its author.
 

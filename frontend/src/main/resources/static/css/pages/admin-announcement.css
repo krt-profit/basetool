@@ -2,12 +2,16 @@
  * (FE-PERF-02). Linked in the same place the block stood, so the cascade order is
  * unchanged. */
 
-.form-group textarea {
-    width: 100%;
-    padding: 0.5rem;
-    background-color: var(--color-surface-input);
-    border: 1px solid var(--color-gray-3);
-    color: var(--color-gray-1);
-    font-family: var(--font-body);
-    box-sizing: border-box;
+@layer base, components, page, migration, utilities;
+
+@layer page {
+    .form-group textarea {
+        width: 100%;
+        padding: 0.5rem;
+        background-color: var(--color-surface-input);
+        border: 1px solid var(--color-gray-3);
+        color: var(--color-gray-1);
+        font-family: var(--font-body);
+        box-sizing: border-box;
+    }
 }

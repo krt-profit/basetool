@@ -475,13 +475,9 @@
     </div>
 
     <!--/* Statement export (REQ-BANK-038): period picker -> Halter-redacted PDF via the org-unit proxy. */-->
-    <div class="krt-modal-overlay" id="org-unit-statement-modal" th:if="${detail.canExportStatement()}">
-        <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.statement.title}">
-            <div class="krt-modal-head">
-                <h3 th:text="#{bank.modal.statement.title}">Kontoauszug exportieren</h3>
-                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="org-unit-statement-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <th:block th:if="${detail.canExportStatement()}">
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='org-unit-statement-modal', titleKey='bank.modal.statement.title', body=~{::org-unit-statement-modal-body})}">
+        <th:block th:ref="org-unit-statement-modal-body">
             <form class="bank-download-form no-track"
                   th:attr="data-endpoint='/api/proxy/org-units/bank/accounts/' + ${acct.id()} + '/statement',data-filename='kontoauszug-' + ${acct.accountNo()} + '.pdf',data-period-required=#{bank.error.periodRequired}">
                 <div class="krt-modal-body">
@@ -517,8 +513,9 @@
                             th:text="#{bank.modal.statement.submit}">PDF herunterladen</button>
                 </div>
             </form>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
+    </th:block>
 </main>
 
 <th:block th:replace="~{fragments/toast :: toast}" />

@@ -17,53 +17,56 @@
    scrolls horizontally on narrow screens with a KRT-styled scrollbar.
    ============================================================================ */
 
-/* The chart is far wider than the global 1200px reading column, so on this page
+@layer base, components, page, migration, utilities;
+
+@layer page {
+    /* The chart is far wider than the global 1200px reading column, so on this page
    <main> drops the cap and uses the full viewport width — large screens then show
    the whole tree without panning. The title block and toolbar stay capped and
    centred so the header keeps a readable measure. */
-main.oc-page {
-    max-width: none;
-}
+    main.oc-page {
+        max-width: none;
+    }
 
-main.oc-page .greeting {
-    max-width: var(--content-max);
-    margin-inline: auto;
-}
+    main.oc-page .greeting {
+        max-width: var(--content-max);
+        margin-inline: auto;
+    }
 
-/* The title box carries the inline-editor toggle on its trailing edge: the heading + subtitle are
+    /* The title box carries the inline-editor toggle on its trailing edge: the heading + subtitle are
    the leading text column, the "Bearbeiten" button is pushed to the right (margin-inline-start:auto)
    and vertically centred. flex-wrap lets the button drop below the text on a narrow viewport instead
    of crushing the heading; it stays right-aligned on its own line. */
-main.oc-page .oc-greeting {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    flex-wrap: wrap;
-}
+    main.oc-page .oc-greeting {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
 
-main.oc-page .oc-greeting .oc-edit-toggle {
-    flex: 0 0 auto;
-    margin-inline-start: auto;
-}
+    main.oc-page .oc-greeting .oc-edit-toggle {
+        flex: 0 0 auto;
+        margin-inline-start: auto;
+    }
 
-.oc-chart {
-    --oc-line: var(--color-gray-2);
-    --oc-line-w: 2px;
-    --oc-gap: 1.25rem;
-    --oc-col-gap: 1.5rem;
-    --oc-unit-gap: 3.5rem;
-    --oc-box-w: 200px;
+    .oc-chart {
+        --oc-line: var(--color-gray-2);
+        --oc-line-w: 2px;
+        --oc-gap: 1.25rem;
+        --oc-col-gap: 1.5rem;
+        --oc-unit-gap: 3.5rem;
+        --oc-box-w: 200px;
 
-    overflow-x: auto;
-    padding-bottom: 1rem;
-    margin-top: 1.5rem;
-}
+        overflow-x: auto;
+        padding-bottom: 1rem;
+        margin-top: 1.5rem;
+    }
 
-/* The horizontal scrollbar intentionally inherits the global HUD scrollbar from
+    /* The horizontal scrollbar intentionally inherits the global HUD scrollbar from
    styles.css — the previous local override pre-dated and diverged from the
    design-system spec (size + hover colour). */
 
-/* --- sticky horizontal scrollbar (REQ-ORG-013) ------------------------------
+    /* --- sticky horizontal scrollbar (REQ-ORG-013) ------------------------------
    A wide chart is usually also tall, so its own horizontal scrollbar sits at the bottom of the
    chart — far down the page, often below the fixed footer, so panning means scrolling the whole page
    down first. #oc-scrollbar is a proxy scrollbar org-chart.js pins just above the footer and keeps
@@ -71,20 +74,20 @@ main.oc-page .oc-greeting .oc-edit-toggle {
    by the JS (hidden until the chart overflows); while it is active the chart's own bar is suppressed
    (.oc-chart--proxied) so there is never a duplicate. Pinned above the fixed footer via the shared
    --krt-footer-height and kept just under it in the stacking order. */
-.oc-scrollbar {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: var(--krt-footer-height, 5rem);
-    z-index: 998;
-    display: none;
-    height: 14px;
-    overflow: auto hidden;
-    background: var(--color-bg-dark-gray);
-    border-top: 1px solid var(--color-gray-3);
-}
+    .oc-scrollbar {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: var(--krt-footer-height, 5rem);
+        z-index: 998;
+        display: none;
+        height: 14px;
+        overflow: auto hidden;
+        background: var(--color-bg-dark-gray);
+        border-top: 1px solid var(--color-gray-3);
+    }
 
-/* On the phone class the footer is `position: static` and scrolls with the page, so
+    /* On the phone class the footer is `position: static` and scrolls with the page, so
    `--krt-footer-height` publishes 0 and the bar above would sit at `bottom: 0` — painting over the
    legal links once the reader reaches the end, with the footer's own `z-index: 999` no longer
    applying because a static element has no stacking position. `sticky` keeps the same
@@ -95,625 +98,626 @@ main.oc-page .oc-greeting .oc-edit-toggle {
    AFTER the rule it overrides. A media query adds no specificity: written before it, the two
    `.oc-scrollbar` selectors tied and `position: fixed` won on the very class this block exists
    for, so the 14px proxy bar sat at `bottom: 0` over the legal links at z-index 998. */
-@media (width <= 768px) {
-    .oc-scrollbar {
-        position: sticky;
-        bottom: 0;
+    @media (width <= 768px) {
+        .oc-scrollbar {
+            position: sticky;
+            bottom: 0;
+        }
     }
-}
 
-.oc-scrollbar--active {
-    display: block;
-}
+    .oc-scrollbar--active {
+        display: block;
+    }
 
-.oc-scrollbar-track {
-    height: 1px;
-}
+    .oc-scrollbar-track {
+        height: 1px;
+    }
 
-.oc-chart--proxied {
-    scrollbar-width: none;
-}
+    .oc-chart--proxied {
+        scrollbar-width: none;
+    }
 
-.oc-chart--proxied::-webkit-scrollbar {
-    display: none;
-}
+    .oc-chart--proxied::-webkit-scrollbar {
+        display: none;
+    }
 
-.oc-caption {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 1.25rem;
-}
+    .oc-caption {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 1.25rem;
+    }
 
-.oc-caption-title {
-    font-family: var(--font-headline);
-    font-weight: var(--fw-bold);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--color-white);
-    font-size: 1rem;
-}
+    .oc-caption-title {
+        font-family: var(--font-headline);
+        font-weight: var(--fw-bold);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--color-white);
+        font-size: 1rem;
+    }
 
-/* --- connector primitives --------------------------------------------------- */
-.oc-tree {
-    display: flex;
-    /* `safe` keeps the tree centred when it fits, but falls back to start-aligned
+    /* --- connector primitives --------------------------------------------------- */
+    .oc-tree {
+        display: flex;
+        /* `safe` keeps the tree centred when it fits, but falls back to start-aligned
        once it is wider than the viewport. Plain `center` pushes the overflowing
        left half into negative scroll space that the scrollbar can never reach,
        so the leftmost Staffel/Kommando columns become unscrollable. */
-    justify-content: safe center;
-    min-width: 100%;
-}
+        justify-content: safe center;
+        min-width: 100%;
+    }
 
-/* a centred column: spine, unit column, command column */
-.oc-col {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
+    /* a centred column: spine, unit column, command column */
+    .oc-col {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
 
-/* vertical link: occupies exactly one --oc-gap, hairline centred down its
+    /* vertical link: occupies exactly one --oc-gap, hairline centred down its
    middle. Sits flush between the two boxes it joins, so there is never a gap. */
-.oc-v {
-    flex: 0 0 auto;
-    width: 100%;
-    height: var(--oc-gap);
-    position: relative;
-}
+    .oc-v {
+        flex: 0 0 auto;
+        width: 100%;
+        height: var(--oc-gap);
+        position: relative;
+    }
 
-.oc-v::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 50%;
-    margin-left: calc(var(--oc-line-w) / -2);
-    border-left: var(--oc-line-w) solid var(--oc-line);
-}
+    .oc-v::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 50%;
+        margin-left: calc(var(--oc-line-w) / -2);
+        border-left: var(--oc-line-w) solid var(--oc-line);
+    }
 
-/* fan-out: a centred drop into a horizontal bus (top half of the gap), then a
+    /* fan-out: a centred drop into a horizontal bus (top half of the gap), then a
    centred drop from the bus into each child (bottom half). The end children
    trim the outer bus half but keep their own drop, so the bus spans exactly
    from the first to the last child and every child stays connected. */
-.oc-fan {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
-    position: relative;
-    padding-top: var(--oc-gap);
-}
+    .oc-fan {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        position: relative;
+        padding-top: var(--oc-gap);
+    }
 
-.oc-fan::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 50%;
-    height: calc(var(--oc-gap) / 2);
-    margin-left: calc(var(--oc-line-w) / -2);
-    border-left: var(--oc-line-w) solid var(--oc-line);
-}
+    .oc-fan::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 50%;
+        height: calc(var(--oc-gap) / 2);
+        margin-left: calc(var(--oc-line-w) / -2);
+        border-left: var(--oc-line-w) solid var(--oc-line);
+    }
 
-.oc-fan > li {
-    list-style: none;
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 0 calc(var(--oc-col-gap) / 2);
-}
+    .oc-fan > li {
+        list-style: none;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 0 calc(var(--oc-col-gap) / 2);
+    }
 
-.oc-fan > li::before,
-.oc-fan > li::after {
-    content: '';
-    position: absolute;
-    top: calc(-1 * var(--oc-gap) / 2);
-    height: calc(var(--oc-gap) / 2);
-    width: 50%;
-    border-top: var(--oc-line-w) solid var(--oc-line);
-}
+    .oc-fan > li::before,
+    .oc-fan > li::after {
+        content: '';
+        position: absolute;
+        top: calc(-1 * var(--oc-gap) / 2);
+        height: calc(var(--oc-gap) / 2);
+        width: 50%;
+        border-top: var(--oc-line-w) solid var(--oc-line);
+    }
 
-.oc-fan > li::before {
-    right: 50%;
-}
+    .oc-fan > li::before {
+        right: 50%;
+    }
 
-.oc-fan > li::after {
-    left: 50%;
-    margin-left: calc(var(--oc-line-w) / -2);
-    border-left: var(--oc-line-w) solid var(--oc-line);
-}
+    .oc-fan > li::after {
+        left: 50%;
+        margin-left: calc(var(--oc-line-w) / -2);
+        border-left: var(--oc-line-w) solid var(--oc-line);
+    }
 
-.oc-fan > li:first-child::before {
-    border-top: 0;
-}
+    .oc-fan > li:first-child::before {
+        border-top: 0;
+    }
 
-.oc-fan > li:last-child::after {
-    border-top: 0;
-}
+    .oc-fan > li:last-child::after {
+        border-top: 0;
+    }
 
-/* wider horizontal gap between OrgUnits (Staffeln / SKs) than between tiles inside one */
-.oc-fan--units > li {
-    padding-left: calc(var(--oc-unit-gap) / 2);
-    padding-right: calc(var(--oc-unit-gap) / 2);
-}
+    /* wider horizontal gap between OrgUnits (Staffeln / SKs) than between tiles inside one */
+    .oc-fan--units > li {
+        padding-left: calc(var(--oc-unit-gap) / 2);
+        padding-right: calc(var(--oc-unit-gap) / 2);
+    }
 
-/* --- boxes ------------------------------------------------------------------ */
-.oc-node {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-    padding: 0.55rem 0.75rem;
-    background: var(--color-bg-dark-gray);
-    border: 1px solid var(--color-gray-3);
-    width: var(--oc-box-w);
-    text-align: left;
-}
+    /* --- boxes ------------------------------------------------------------------ */
+    .oc-node {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        padding: 0.55rem 0.75rem;
+        background: var(--color-bg-dark-gray);
+        border: 1px solid var(--color-gray-3);
+        width: var(--oc-box-w);
+        text-align: left;
+    }
 
-.oc-node-rank {
-    font-family: var(--font-body);
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    font-size: 0.62rem;
-    color: var(--color-primary);
-}
+    .oc-node-rank {
+        font-family: var(--font-body);
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        font-size: 0.62rem;
+        color: var(--color-primary);
+    }
 
-.oc-node-name {
-    color: var(--color-white);
-    font-weight: 700;
-    font-size: 0.92rem;
-    overflow-wrap: break-word;
-}
+    .oc-node-name {
+        color: var(--color-white);
+        font-weight: 700;
+        font-size: 0.92rem;
+        overflow-wrap: break-word;
+    }
 
-/* the Bereichsleiter reads as the hero: orange frame + bloom. Its frame is a hair
+    /* the Bereichsleiter reads as the hero: orange frame + bloom. Its frame is a hair
    thicker (2px vs the 1px hairline of every other node) so the leader box reads as
    heavier even when its bloom is replaced by a flat department colour in a tier. */
-.oc-node--hero {
-    border-width: 2px;
-    border-color: var(--color-primary);
-    box-shadow: var(--glow-primary);
-}
+    .oc-node--hero {
+        border-width: 2px;
+        border-color: var(--color-primary);
+        box-shadow: var(--glow-primary);
+    }
 
-/* Keyboard focus inside the tree is a SHARP outline with an offset — deliberately
+    /* Keyboard focus inside the tree is a SHARP outline with an offset — deliberately
    distinct from the hero's soft orange bloom (box-shadow) above, so a focused node
    never reads the same as the always-glowing Bereichsleiter. Covers the roving
    treeitems and the inline edit / remove / add controls (none of which the global
    focus rule reaches); :focus-visible keeps it off mouse interactions. */
-.oc-tree :focus-visible {
-    outline: 2px solid var(--color-primary);
-    outline-offset: 2px;
-}
+    .oc-tree :focus-visible {
+        outline: 2px solid var(--color-primary);
+        outline-offset: 2px;
+    }
 
-/* Vacant slot: a subtle filled box + readable italic label so the seat reads
+    /* Vacant slot: a subtle filled box + readable italic label so the seat reads
    clearly (not the old near-invisible grey-on-transparent); the dashed frame
    still signals "empty". */
-.oc-node--vacant {
-    border-style: dashed;
-    border-color: var(--color-gray-2);
-    background: var(--color-surface-input);
-}
+    .oc-node--vacant {
+        border-style: dashed;
+        border-color: var(--color-gray-2);
+        background: var(--color-surface-input);
+    }
 
-.oc-node--vacant .oc-node-name {
-    color: var(--color-gray-1);
-    font-weight: 400;
-    font-style: italic;
-}
+    .oc-node--vacant .oc-node-name {
+        color: var(--color-gray-1);
+        font-weight: 400;
+        font-style: italic;
+    }
 
-/* Free-text holder: a Kartell member named on the chart who has no Basetool account yet. The seat
+    /* Free-text holder: a Kartell member named on the chart who has no Basetool account yet. The seat
    IS occupied (solid frame, like an account node), but a small muted "Kein Account" pill marks that
    the name is provisional until the member is linked to an account. Distinct from the dashed vacant
    slot. The pill is a maintenance cue, not part of the public read of the chart, so it surfaces only
    while the inline editor is on (.oc-chart.editing); otherwise it stays hidden. */
-.oc-node-flag {
-    display: none;
-    align-self: flex-start;
-    margin-top: 0.1rem;
-    padding: 0.05rem 0.35rem;
-    font-family: var(--font-body);
-    font-size: 0.55rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--color-gray-1);
-    background: var(--color-surface-input);
-    border: 1px solid var(--color-gray-3);
-}
+    .oc-node-flag {
+        display: none;
+        align-self: flex-start;
+        margin-top: 0.1rem;
+        padding: 0.05rem 0.35rem;
+        font-family: var(--font-body);
+        font-size: 0.55rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--color-gray-1);
+        background: var(--color-surface-input);
+        border: 1px solid var(--color-gray-3);
+    }
 
-.oc-unit-box {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.15rem;
-    padding: 0.5rem 0.9rem;
-    background: var(--color-surface-input);
-    border: 1px solid var(--color-gray-3);
-    border-top: 3px solid var(--color-primary);
-    width: var(--oc-box-w);
-}
+    .oc-unit-box {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.15rem;
+        padding: 0.5rem 0.9rem;
+        background: var(--color-surface-input);
+        border: 1px solid var(--color-gray-3);
+        border-top: 3px solid var(--color-primary);
+        width: var(--oc-box-w);
+    }
 
-.oc-unit-box .sh {
-    font-weight: 700;
-    color: var(--color-primary);
-    font-size: 0.7rem;
-    letter-spacing: 0.06em;
-}
+    .oc-unit-box .sh {
+        font-weight: 700;
+        color: var(--color-primary);
+        font-size: 0.7rem;
+        letter-spacing: 0.06em;
+    }
 
-.oc-unit-box .nm {
-    font-family: var(--font-headline);
-    font-weight: var(--fw-bold);
-    text-transform: uppercase;
-    color: var(--color-white);
-    font-size: 0.95rem;
-    letter-spacing: 0.04em;
-    text-align: center;
-}
+    .oc-unit-box .nm {
+        font-family: var(--font-headline);
+        font-weight: var(--fw-bold);
+        text-transform: uppercase;
+        color: var(--color-white);
+        font-size: 0.95rem;
+        letter-spacing: 0.04em;
+        text-align: center;
+    }
 
-/* SK cards are marked in the Profit-Bereich green (Staffel cards use the brand
+    /* SK cards are marked in the Profit-Bereich green (Staffel cards use the brand
    orange) so the two OrgUnit kinds stay visually distinct — top edge + shorthand,
    mirroring the Staffel treatment. */
-.oc-unit-box--sk {
-    border-top-color: var(--color-dept-profit);
-}
+    .oc-unit-box--sk {
+        border-top-color: var(--color-dept-profit);
+    }
 
-.oc-unit-box--sk .sh {
-    color: var(--color-dept-profit);
-}
+    .oc-unit-box--sk .sh {
+        color: var(--color-dept-profit);
+    }
 
-/* --- multi-Bereich tiers (epic #692, REQ-ORG-026) ---------------------------
+    /* --- multi-Bereich tiers (epic #692, REQ-ORG-026) ---------------------------
    The chart stacks several independent ARIA trees: the Organisationsleitung on
    top, one tier per Bereich (tinted by its Bereichsfarbe), then the
    legacy/ungrouped tier. Each tier is a caption + an .oc-tree; subsequent tiers
    get extra top spacing so the captions clearly separate the trees. */
-.oc-tree + .oc-caption {
-    margin-top: 2.75rem;
-}
+    .oc-tree + .oc-caption {
+        margin-top: 2.75rem;
+    }
 
-/* The Organisationsleitung apex box: a neutral white top edge so it reads as
+    /* The Organisationsleitung apex box: a neutral white top edge so it reads as
    sitting above every (department-coloured) Bereich rather than belonging to one.
    As the apex it is not locked to the shared column width (--oc-box-w): its label
    is the long single word "ORGANISATIONSLEITUNG", which otherwise clings to the
    frame. It grows to fit that label with comfortable side padding — floored at the
    shared width so it never shrinks below a unit box, capped so it never sprawls. */
-.oc-unit-box--ol {
-    border-top-color: var(--color-white);
-    width: auto;
-    min-width: var(--oc-box-w);
-    max-width: calc(var(--oc-box-w) * 2);
-    padding: 0.7rem 1.75rem;
-}
+    .oc-unit-box--ol {
+        border-top-color: var(--color-white);
+        width: auto;
+        min-width: var(--oc-box-w);
+        max-width: calc(var(--oc-box-w) * 2);
+        padding: 0.7rem 1.75rem;
+    }
 
-.oc-unit-box--ol .sh {
-    color: var(--color-white);
-}
+    .oc-unit-box--ol .sh {
+        color: var(--color-white);
+    }
 
-/* Per-Bereich Bereichsfarbe. The template maps the department enum name to one of
+    /* Per-Bereich Bereichsfarbe. The template maps the department enum name to one of
    these classes (oc-dept--<name>), which only sets the --oc-dept custom property
    the tier rules below consume. Used as decorative ACCENTS on borders + a caption
    swatch only (never on text), so every department hue stays well clear of the
    WCAG 4.5:1 text-contrast floor on the dark canvas (REQ-ORG-026). */
-.oc-dept--profit {
-    --oc-dept: var(--color-dept-profit);
-}
+    .oc-dept--profit {
+        --oc-dept: var(--color-dept-profit);
+    }
 
-.oc-dept--sub-radar {
-    --oc-dept: var(--color-dept-sub-radar);
-}
+    .oc-dept--sub-radar {
+        --oc-dept: var(--color-dept-sub-radar);
+    }
 
-.oc-dept--raumueberlegenheit {
-    --oc-dept: var(--color-dept-raumueberlegenheit);
-}
+    .oc-dept--raumueberlegenheit {
+        --oc-dept: var(--color-dept-raumueberlegenheit);
+    }
 
-.oc-dept--forschung {
-    --oc-dept: var(--color-dept-forschung);
-}
+    .oc-dept--forschung {
+        --oc-dept: var(--color-dept-forschung);
+    }
 
-.oc-dept--marinekorps {
-    --oc-dept: var(--color-dept-marinekorps);
-}
+    .oc-dept--marinekorps {
+        --oc-dept: var(--color-dept-marinekorps);
+    }
 
-.oc-dept--search-rescue {
-    --oc-dept: var(--color-dept-search-rescue);
-}
+    .oc-dept--search-rescue {
+        --oc-dept: var(--color-dept-search-rescue);
+    }
 
-/* Caption swatch: a small square in the Bereichsfarbe next to the Bereich name.
+    /* Caption swatch: a small square in the Bereichsfarbe next to the Bereich name.
    Decorative (aria-hidden in the template) and rendered only when the Bereich has
    a department assigned. */
-.oc-dept-swatch {
-    display: inline-block;
-    width: 0.85rem;
-    height: 0.85rem;
-    margin-right: 0.55rem;
-    background: var(--oc-dept, var(--color-primary));
-    border: 1px solid var(--color-gray-3);
-}
+    .oc-dept-swatch {
+        display: inline-block;
+        width: 0.85rem;
+        height: 0.85rem;
+        margin-right: 0.55rem;
+        background: var(--oc-dept, var(--color-primary));
+        border: 1px solid var(--color-gray-3);
+    }
 
-/* Within a Bereich tier the nodes carry the Bereichsfarbe: the Bereichsleiter is
+    /* Within a Bereich tier the nodes carry the Bereichsfarbe: the Bereichsleiter is
    framed in it (replacing the orange hero bloom), the Stab + unit-leader nodes get a
    left accent rule, and the Staffel/SK boxes take the dept colour on their top edge.
    All text stays white/orange — only borders are tinted. */
-.oc-bereich-tier .oc-node--hero {
-    border-color: var(--oc-dept, var(--color-primary));
-    box-shadow: none;
-}
+    .oc-bereich-tier .oc-node--hero {
+        border-color: var(--oc-dept, var(--color-primary));
+        box-shadow: none;
+    }
 
-.oc-bereich-tier .oc-node:not(.oc-node--hero) {
-    border-left: 3px solid var(--oc-dept, var(--color-gray-3));
-}
+    .oc-bereich-tier .oc-node:not(.oc-node--hero) {
+        border-left: 3px solid var(--oc-dept, var(--color-gray-3));
+    }
 
-.oc-bereich-tier .oc-unit-box {
-    border-top-color: var(--oc-dept, var(--color-primary));
-}
+    .oc-bereich-tier .oc-unit-box {
+        border-top-color: var(--oc-dept, var(--color-primary));
+    }
 
-/* --- Bereiche side by side under the OL (epic #692) --------------------------
+    /* --- Bereiche side by side under the OL (epic #692) --------------------------
    The Bereiche fan out beneath the OL with the SAME connector lines a Bereich draws to its
    Staffeln/SKs — .oc-fan--bereiche reuses the .oc-fan primitive, but top-aligns the columns (a whole
    Bereich subtree is far taller than one unit box) and uses the wider unit gap. min-width:100%
    centres the connector bus under the OL apex box, which is centred in its own full-width tree above,
    so the OL→bus drop lands on the OL box. */
-.oc-fan--bereiche {
-    min-width: 100%;
-    justify-content: safe center;
-    align-items: flex-start;
-}
+    .oc-fan--bereiche {
+        min-width: 100%;
+        justify-content: safe center;
+        align-items: flex-start;
+    }
 
-.oc-fan--bereiche > li {
-    padding-left: calc(var(--oc-unit-gap) / 2);
-    padding-right: calc(var(--oc-unit-gap) / 2);
-}
+    .oc-fan--bereiche > li {
+        padding-left: calc(var(--oc-unit-gap) / 2);
+        padding-right: calc(var(--oc-unit-gap) / 2);
+    }
 
-/* No-OL fallback: the Bereiche still stand side by side, just without a connector head (there is no
+    /* No-OL fallback: the Bereiche still stand side by side, just without a connector head (there is no
    OL apex to fan from yet). */
-.oc-bereich-row {
-    display: flex;
-    justify-content: safe center;
-    align-items: flex-start;
-    gap: var(--oc-unit-gap);
-    min-width: 100%;
-}
+    .oc-bereich-row {
+        display: flex;
+        justify-content: safe center;
+        align-items: flex-start;
+        gap: var(--oc-unit-gap);
+        min-width: 100%;
+    }
 
-/* A Bereich's caption now sits above its own Bereichsleiter (per column) rather than as a full-width
+    /* A Bereich's caption now sits above its own Bereichsleiter (per column) rather than as a full-width
    tier heading, so it needs only a small gap to its box. */
-.oc-fan--bereiche .oc-caption,
-.oc-bereich-row .oc-caption {
-    margin-bottom: 0.6rem;
-}
+    .oc-fan--bereiche .oc-caption,
+    .oc-bereich-row .oc-caption {
+        margin-bottom: 0.6rem;
+    }
 
-/* The legacy/ungrouped tier follows the Bereich fan (a <ul>) or row (a <div>), neither of which the
+    /* The legacy/ungrouped tier follows the Bereich fan (a <ul>) or row (a <div>), neither of which the
    .oc-tree + .oc-caption rule matches, so give its caption the same tier separation. */
-.oc-fan--bereiche + .oc-caption,
-.oc-bereich-row + .oc-caption {
-    margin-top: 2.75rem;
-}
+    .oc-fan--bereiche + .oc-caption,
+    .oc-bereich-row + .oc-caption {
+        margin-top: 2.75rem;
+    }
 
-/* --- per-Bereich collapse toggle -------------------------------------------- */
-/* The Bereichsleiter box is wrapped so the collapse toggle can pin to its corner; the wrap is the
+    /* --- per-Bereich collapse toggle -------------------------------------------- */
+    /* The Bereichsleiter box is wrapped so the collapse toggle can pin to its corner; the wrap is the
    box width and centred in the column, regardless of how wide the unit fan below makes the column. */
-.oc-leader-wrap {
-    position: relative;
-    width: var(--oc-box-w);
-}
+    .oc-leader-wrap {
+        position: relative;
+        width: var(--oc-box-w);
+    }
 
-/* Square toggle in the Bereichsleiter's top-right corner. Available to everyone (not edit-mode), so
+    /* Square toggle in the Bereichsleiter's top-right corner. Available to everyone (not edit-mode), so
    anyone can fold a Bereich down to just its Bereichsleiter. The chevron is CSS-drawn and rotates
    with aria-expanded — no icon dependency, CSP-safe. */
-.oc-collapse {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.6rem;
-    height: 1.6rem;
-    padding: 0;
-    background: var(--color-bg-dark-gray);
-    border: 1px solid var(--color-gray-3);
-    color: var(--color-gray-1);
-    cursor: pointer;
-    transition:
-        color 0.2s ease,
-        border-color 0.2s ease;
-}
+    .oc-collapse {
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.6rem;
+        height: 1.6rem;
+        padding: 0;
+        background: var(--color-bg-dark-gray);
+        border: 1px solid var(--color-gray-3);
+        color: var(--color-gray-1);
+        cursor: pointer;
+        transition:
+            color 0.2s ease,
+            border-color 0.2s ease;
+    }
 
-.oc-collapse:hover {
-    color: var(--color-primary);
-    border-color: var(--color-primary);
-}
+    .oc-collapse:hover {
+        color: var(--color-primary);
+        border-color: var(--color-primary);
+    }
 
-/* Keep the chevron box visually compact (1.6rem) but stretch the clickable region to the 44px
+    /* Keep the chevron box visually compact (1.6rem) but stretch the clickable region to the 44px
    design-system minimum (var(--touch-target), "min hit area for every interactive control") via a
    transparent, centred overlay — the standard "small glyph, fat-finger target" pattern. The toggle
    sits in the card's top-right corner with empty space above/right, so the overlay grows mostly
    outward and never swallows clicks meant for the flow-positioned .oc-actions controls. */
-.oc-collapse::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: var(--touch-target);
-    height: var(--touch-target);
-    transform: translate(-50%, -50%);
-}
+    .oc-collapse::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: var(--touch-target);
+        height: var(--touch-target);
+        transform: translate(-50%, -50%);
+    }
 
-.oc-collapse-icon {
-    display: block;
-    width: 0.5rem;
-    height: 0.5rem;
-    border-right: 2px solid currentcolor;
-    border-bottom: 2px solid currentcolor;
-    /* expanded → chevron points down (body shown below) */
-    transform: translateY(-2px) rotate(45deg);
-    transition: transform 0.2s ease;
-}
+    .oc-collapse-icon {
+        display: block;
+        width: 0.5rem;
+        height: 0.5rem;
+        border-right: 2px solid currentcolor;
+        border-bottom: 2px solid currentcolor;
+        /* expanded → chevron points down (body shown below) */
+        transform: translateY(-2px) rotate(45deg);
+        transition: transform 0.2s ease;
+    }
 
-.oc-collapse[aria-expanded='false'] .oc-collapse-icon {
-    /* collapsed → chevron points right */
-    transform: translateX(-1px) rotate(-45deg);
-}
+    .oc-collapse[aria-expanded='false'] .oc-collapse-icon {
+        /* collapsed → chevron points right */
+        transform: translateX(-1px) rotate(-45deg);
+    }
 
-/* The collapsible part of a Bereich: the Stab spine + the unit fan. Continues the centred column;
+    /* The collapsible part of a Bereich: the Stab spine + the unit fan. Continues the centred column;
    hidden (display:none) when the Bereich is collapsed, which also drops its treeitems out of the
    keyboard-nav order (see treeItems() in org-chart.html). */
-.oc-bereich-body {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 100%;
-}
+    .oc-bereich-body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+    }
 
-.oc-bereich-body[hidden] {
-    display: none;
-}
+    .oc-bereich-body[hidden] {
+        display: none;
+    }
 
-/* Kommando(gruppe) header: names the command, sits above its Kommandoleiter. */
-.oc-command-head {
-    gap: 0.15rem;
-    border-top: 2px solid var(--color-primary);
-}
+    /* Kommando(gruppe) header: names the command, sits above its Kommandoleiter. */
+    .oc-command-head {
+        gap: 0.15rem;
+        border-top: 2px solid var(--color-primary);
+    }
 
-.oc-command-name {
-    color: var(--color-white);
-    font-weight: 700;
-    font-size: 0.9rem;
-    overflow-wrap: break-word;
-}
+    .oc-command-name {
+        color: var(--color-white);
+        font-weight: 700;
+        font-size: 0.9rem;
+        overflow-wrap: break-word;
+    }
 
-.oc-command-name--unnamed {
-    color: var(--color-gray-1);
-    font-weight: 400;
-    font-style: italic;
-}
+    .oc-command-name--unnamed {
+        color: var(--color-gray-1);
+        font-weight: 400;
+        font-style: italic;
+    }
 
-/* --- inline editor controls (admin, only while .editing) -------------------- */
-.oc-actions {
-    display: none;
-    gap: 0.4rem;
-    margin-top: 0.5rem;
-}
+    /* --- inline editor controls (admin, only while .editing) -------------------- */
+    .oc-actions {
+        display: none;
+        gap: 0.4rem;
+        margin-top: 0.5rem;
+    }
 
-.oc-chart.editing .oc-actions {
-    display: flex;
-}
+    .oc-chart.editing .oc-actions {
+        display: flex;
+    }
 
-.oc-chart.editing .oc-add {
-    display: inline-flex;
-}
+    .oc-chart.editing .oc-add {
+        display: inline-flex;
+    }
 
-/* The "Kein Account" pill (.oc-node-flag) is hidden by default (see its rule above) and revealed
+    /* The "Kein Account" pill (.oc-node-flag) is hidden by default (see its rule above) and revealed
    only here, so it reads purely as an edit-mode maintenance cue. */
-.oc-chart.editing .oc-node-flag {
-    display: inline-block;
-}
+    .oc-chart.editing .oc-node-flag {
+        display: inline-block;
+    }
 
-.oc-icon-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: var(--touch-target);
-    height: var(--touch-target);
-    padding: 0;
-    background: transparent;
-    border: 1px solid var(--color-gray-3);
-    color: var(--color-gray-1);
-    cursor: pointer;
-    transition:
-        color 0.2s ease,
-        border-color 0.2s ease,
-        background-color 0.2s ease;
-}
+    .oc-icon-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: var(--touch-target);
+        height: var(--touch-target);
+        padding: 0;
+        background: transparent;
+        border: 1px solid var(--color-gray-3);
+        color: var(--color-gray-1);
+        cursor: pointer;
+        transition:
+            color 0.2s ease,
+            border-color 0.2s ease,
+            background-color 0.2s ease;
+    }
 
-.oc-icon-btn:hover {
-    color: var(--color-primary);
-    border-color: var(--color-primary);
-    background: rgb(231 126 35 / 7%);
-}
+    .oc-icon-btn:hover {
+        color: var(--color-primary);
+        border-color: var(--color-primary);
+        background: rgb(231 126 35 / 7%);
+    }
 
-.oc-icon-btn.oc-icon-btn--danger:hover {
-    color: var(--color-danger);
-    border-color: var(--color-danger);
-    background: rgb(163 0 10 / 12%);
-}
+    .oc-icon-btn.oc-icon-btn--danger:hover {
+        color: var(--color-danger-text);
+        border-color: var(--color-danger);
+        background: rgb(163 0 10 / 12%);
+    }
 
-/* add-affordances are hidden until edit mode; they share --oc-box-w so they sit
+    /* add-affordances are hidden until edit mode; they share --oc-box-w so they sit
    in the column like a node. They are actions, not org nodes, so no connector
    line is drawn to them. */
-.oc-add {
-    display: none;
-    align-items: center;
-    justify-content: center;
-    gap: 0.35rem;
-    margin-top: var(--oc-gap);
-    padding: 0.35rem 0.7rem;
-    width: var(--oc-box-w);
-    background: transparent;
-    border: 1px dashed var(--color-gray-2);
-    color: var(--color-gray-1);
-    font-family: var(--font-body);
-    font-weight: 700;
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    cursor: pointer;
-    min-height: var(--touch-target);
-    transition:
-        color 0.2s ease,
-        border-color 0.2s ease;
-}
+    .oc-add {
+        display: none;
+        align-items: center;
+        justify-content: center;
+        gap: 0.35rem;
+        margin-top: var(--oc-gap);
+        padding: 0.35rem 0.7rem;
+        width: var(--oc-box-w);
+        background: transparent;
+        border: 1px dashed var(--color-gray-2);
+        color: var(--color-gray-1);
+        font-family: var(--font-body);
+        font-weight: 700;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        cursor: pointer;
+        min-height: var(--touch-target);
+        transition:
+            color 0.2s ease,
+            border-color 0.2s ease;
+    }
 
-.oc-add:hover {
-    color: var(--color-primary);
-    border-color: var(--color-primary);
-}
+    .oc-add:hover {
+        color: var(--color-primary);
+        border-color: var(--color-primary);
+    }
 
-/* Edit-mode legend: a quiet info line shown only while the inline editor is on
+    /* Edit-mode legend: a quiet info line shown only while the inline editor is on
    (toggled with the toolbar button + .oc-edit-hint--on). Reuses the .alert grammar —
    tint fill + a 4px left rule — in the brand orange, since editing is an admin/action
    context and there is no .alert-info variant to lean on. Capped + centred like the
    toolbar above the full-bleed chart. */
-.oc-edit-hint {
-    display: none;
-    max-width: var(--content-max);
-    margin: 0 auto 1rem;
-    padding: 0.6rem 0.9rem;
-    background: rgb(231 126 35 / 8%);
-    border: 1px solid var(--color-gray-3);
-    border-left: 4px solid var(--color-primary);
-    color: var(--color-gray-1);
-    font-size: 0.85rem;
-}
+    .oc-edit-hint {
+        display: none;
+        max-width: var(--content-max);
+        margin: 0 auto 1rem;
+        padding: 0.6rem 0.9rem;
+        background: rgb(231 126 35 / 8%);
+        border: 1px solid var(--color-gray-3);
+        border-left: 4px solid var(--color-primary);
+        color: var(--color-gray-1);
+        font-size: 0.85rem;
+    }
 
-.oc-edit-hint--on {
-    display: block;
-}
+    .oc-edit-hint--on {
+        display: block;
+    }
 
-/* Holder-mode chooser in the assign/reassign dialog: pick a Basetool account or type a free-text
+    /* Holder-mode chooser in the assign/reassign dialog: pick a Basetool account or type a free-text
    name for a member who has none yet. A plain stacked radio group in the HUD style. */
-.oc-holder-mode {
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-    margin: 0 0 0.75rem;
-    padding: 0;
-    border: 0;
-}
+    .oc-holder-mode {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+        margin: 0 0 0.75rem;
+        padding: 0;
+        border: 0;
+    }
 
-.oc-radio {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    cursor: pointer;
-    font-size: 0.9rem;
-    color: var(--color-gray-1);
-}
+    .oc-radio {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        cursor: pointer;
+        font-size: 0.9rem;
+        color: var(--color-gray-1);
+    }
 
-/* --- responsive: keep the tree, let it pan; narrow the shared box width ------ */
-@media (width <= 768px) {
-    .oc-chart {
-        --oc-box-w: 160px;
-        --oc-col-gap: 1rem;
-        --oc-unit-gap: 2rem;
+    /* --- responsive: keep the tree, let it pan; narrow the shared box width ------ */
+    @media (width <= 768px) {
+        .oc-chart {
+            --oc-box-w: 160px;
+            --oc-col-gap: 1rem;
+            --oc-unit-gap: 2rem;
+        }
     }
 }

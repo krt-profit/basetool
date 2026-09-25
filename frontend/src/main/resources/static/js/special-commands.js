@@ -49,7 +49,7 @@
         nameInput.value = '';
         shorthandInput.value = '';
         descInput.value = '';
-        modal.style.display = 'flex';
+        window.krtModal.open(modal);
     }
 
     function openEdit(btn) {
@@ -59,11 +59,11 @@
         nameInput.value = btn.getAttribute('data-name') || '';
         shorthandInput.value = btn.getAttribute('data-shorthand') || '';
         descInput.value = btn.getAttribute('data-desc') || '';
-        modal.style.display = 'flex';
+        window.krtModal.open(modal);
     }
 
     function closeModal() {
-        modal.style.display = 'none';
+        window.krtModal.close(modal);
     }
 
     // --- Delete (soft-deactivate) confirmation (#587) ---
@@ -78,11 +78,11 @@
             deleteForm.action,
         );
         if (deleteNameEl) deleteNameEl.textContent = btn.getAttribute('data-name') || '';
-        deleteModal.style.display = 'flex';
+        window.krtModal.open(deleteModal);
     }
 
     function closeDelete() {
-        if (deleteModal) deleteModal.style.display = 'none';
+        if (deleteModal) window.krtModal.close(deleteModal);
     }
 
     // The Edit and Delete buttons live INSIDE the AJAX swap target (#sc-results), so they are bound

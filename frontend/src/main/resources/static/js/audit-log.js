@@ -195,7 +195,8 @@
         const a = document.createElement('a');
         a.href = objectUrl;
         a.download = filename;
-        document.body.appendChild(a);
+        // Inside an open modal <dialog> the body is inert; append where a click still lands.
+        window.krtModal.layerRoot().appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(objectUrl);

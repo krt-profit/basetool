@@ -256,12 +256,8 @@
 </main>
 
 <!--/* Shared add-member modal (Bereich / OL): user picker + optional role */-->
-<div id="leitung-modal" class="krt-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="leitung-modal-title">
-    <div class="krt-modal krt-modal--wide">
-        <div class="krt-modal-head">
-            <h2 id="leitung-modal-title" th:text="#{leitung.modal.title}">Mitglied hinzufügen</h2>
-            <button type="button" class="krt-modal-close" data-leitung-cancel th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-        </div>
+<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='leitung-modal', titleKey='leitung.modal.title', variant='krt-modal--wide', titleId='leitung-modal-title', closeTrigger='', closeClass='leitung-modal-close', body=~{::leitung-modal-body})}">
+    <th:block th:ref="leitung-modal-body">
         <div class="krt-modal-body">
             <p class="leitung-modal-unit" id="leitung-modal-unit"></p>
             <div class="form-group">
@@ -280,8 +276,8 @@
             <button type="button" class="btn btn-ghost" data-leitung-cancel th:text="#{leitung.action.cancel}">Abbrechen</button>
             <button type="button" class="btn btn--cta" id="leitung-modal-submit" th:text="#{leitung.action.assign}">Zuweisen</button>
         </div>
-    </div>
-</div>
+    </th:block>
+</th:block>
 
 <th:block th:replace="~{fragments/toast :: toast}"/>
 

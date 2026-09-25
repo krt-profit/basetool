@@ -108,11 +108,12 @@ class IngestHandoffE2eTest {
     if (STACK.managesStack()) {
       BackendSeeder seeder = new BackendSeeder();
       seeder.ensureIridiumMembership(USERNAME, PASSWORD);
-      // The fixture's first row "E2E IMPORT MATERIAL" folds onto this seeded RAW material; its
-      // misspelled second row stays unmatched. Seed the sibling refinery test's material too so the
-      // shared 10-minute materials-lookup cache is warm regardless of class execution order.
-      materialId = seeder.ensureRefineryMaterial(USERNAME, PASSWORD, "E2E Import Material");
-      seeder.ensureRefineryMaterial(USERNAME, PASSWORD, "E2E Refinery Material");
+      // The fixture's first row "E2E IMPORT MATERIAL" folds onto this RAW material; its
+      // misspelled second row stays unmatched. E2eStackExtension seeds the material before any page
+      // renders (the picker's catalogue is cached from the first render on); this looks its id up.
+      materialId =
+          seeder.ensureRefineryMaterial(
+              USERNAME, PASSWORD, E2eStackExtension.PICKER_MATERIAL_IMPORT);
       sub = seeder.getUserId(USERNAME, PASSWORD);
       String extract =
           Files.readString(

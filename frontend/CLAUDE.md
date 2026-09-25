@@ -60,9 +60,26 @@ A rendered page carries no developer text and no inline page CSS (`REQ-UI-023`,
   sent with every response. Never put the star-slash pair inside one: it closes the block early and
   renders the rest of the text into the page. Write `* /`.
 - **Page CSS goes into `static/css/pages/<page>.css`**, linked with `<link rel="stylesheet">` where
-  a `<style>` block would stand (in the `extraLinks` fragment for the head, so it still loads after
-  `styles.css` and before `inline-migration.css`). No `<style>` element in a template. It is linted
-  by `:frontend:lintCssInline` with the tiny template rule set, and formatted by Prettier.
+  a `<style>` block would stand (in the `extraLinks` fragment for the head). No `<style>` element in
+  a template. It is linted by `:frontend:lintCssInline` with the tiny template rule set, and
+  formatted by Prettier.
+
+### CSS: the layer decides, not the load order (binding)
+
+Every stylesheet starts with `@layer base, components, page, migration, utilities;` and puts every
+rule inside one of those layers (`REQ-UI-024`, ADR-0212, `CascadeLayerOrderTest`). Between layers the
+order decides, before specificity:
+
+- `styles.css` owns `base` (fonts, tokens) and `components`; every page or area stylesheet is
+  `page`; `inline-migration.css` is `migration`; `krtm-hidden` / `krtm-modal-open` are `utilities`.
+- A page rule beats a design-system rule as an ordinary rule. Do not bump specificity
+  (`main .x`, `div.x`, `.x.x`) and do not add `!important` for it.
+- A design-system declaration that has to beat page CSS goes into the `@layer page` block at the end
+  of `styles.css`, with a comment naming what it beats. Never into `utilities`, which would also beat
+  the page rules that out-specify it and every migrated inline class.
+- A migrated `krtm-*` class beats page and component rules, like the inline style it replaced. To
+  restyle such an element, remove the migrated class from the markup; do not fight it.
+- A rule outside any layer beats every layer. That is why the test fails on one.
 
 ### Script load order (binding — it has regressed three times)
 
@@ -74,6 +91,39 @@ dictionaries, look up elements above it and register listeners / `window.krtEven
 whatever it has to run goes into `document.addEventListener('DOMContentLoaded', …)`. A top-level
 `bindX()` or IIFE that touches `window.krtFetch` silently does nothing. `InlineScriptLoadOrderTest`
 fails the build on it, `ScriptLoadOrderE2eTest` checks it in the browser.
+
+### Dialogs: one contract (binding)
+
+Every dialog is a `<dialog class="krt-modal-overlay">` > `.krt-modal` (REQ-UI-013, ADR-0177) and
+opens and closes **only** through `window.krtModal.open(el | id)` / `window.krtModal.close(el | id)`
+— or the shared `data-trigger="open-modal-display"` / `"close-modal-display"` triggers, which call
+it. Never write `overlay.style.display`, never toggle `krtm-modal-open` yourself: the contract
+calls `showModal()`, moves focus in and back, handles Escape, and keeps the class state that live
+sync and the tests read. While a dialog is open the page behind it is inert, so anything you append
+for the user to see or click — a toast, a confirm, a download link — goes into
+`window.krtModal.layerRoot()`, not `document.body`.
+
+**Never write a dialog shell by hand.** Every dialog is a call of `fragments/modal-wrapper :: modal`
+(`SingleModalShapeTest` fails on `.krt-modal-overlay`, `.krt-modal`, `.krt-modal-head` or
+`.krt-modal-close` anywhere else). The page supplies the body:
+
+```html
+<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='x-modal', titleKey='x.title',
+    variant='krt-modal--wide', body=~{::x-modal-body})}">
+    <th:block th:ref="x-modal-body">
+        <form …><div class="krt-modal-body">…</div><div class="krt-modal-foot">…</div></form>
+    </th:block>
+</th:block>
+```
+
+The optional parameters are `titleId` (a script retitles the dialog), `open` (server-rendered open
+state), `closeTrigger` (the ✕'s own handler; `''` when a script binds it by `closeClass`),
+`closeClass` and `closeId`. The wrapper's head comment documents each one. A condition or iteration
+goes on a `<th:block>` around the call. In a fragment file, name the body with its template
+(`~{fragments/x :: x-modal-body}`). A new dialog id also needs `DialogA11yE2eTest` to reach it, or an
+`UNREACHED` entry with the reason. Render a dialog under the same condition as its openers and the
+script that drives it: a dialog nothing can open, or whose handlers were never loaded, is dead
+markup (the promotion admin all-squadrons view and the bare admin blueprint page were).
 
 ## Live update
 

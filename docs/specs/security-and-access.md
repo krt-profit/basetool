@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-25.
 > **Owner area:** AUTH/SEC · **Related ADRs:** [ADR-0001](../adr/0001-frontend-confidential-oauth2-client.md) · **Role matrix:** [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md)
 
 # Security & access control
@@ -11,15 +11,17 @@ read/write is isolated to the calling user unless the caller is privileged.
 
 ## Requirements
 
-> [!note] Where the rest of the `REQ-SEC` namespace lives — checked 2026-09-22
-> Five `REQ-SEC` ids are specified in [`discord-integration.md`](discord-integration.md), not here:
+> [!note] Where the rest of the `REQ-SEC` namespace lives — checked 2026-09-25
+> Six `REQ-SEC` ids are specified in [`discord-integration.md`](discord-integration.md), not here:
 > **REQ-SEC-016** (fail-closed guild + membership gate), **REQ-SEC-017** (a `PENDING` registration
 > holds no authority), **REQ-SEC-019** (Discord-link indicator in member management),
-> **REQ-SEC-022** (colliding Discord first-login precheck) and **REQ-SEC-026** (admin-mediated
-> linking of a registration). The mission finance-entry scope below shared `REQ-SEC-019` with the
+> **REQ-SEC-022** (colliding Discord first-login precheck), **REQ-SEC-026** (admin-mediated
+> linking of a registration) and **REQ-SEC-071** (a Discord login that returns to the wrong browser
+> ends on a page with a way back). The mission finance-entry scope below shared `REQ-SEC-019` with the
 > Discord-link indicator until 2026-09-22, when it was renumbered to **REQ-SEC-065** on the owner's
 > decision (see the renumbering table in [`INDEX.md`](INDEX.md)). **REQ-SEC-054** was never
-> allocated. The next free id is **REQ-SEC-070** — re-check `origin/main` and open PRs before
+> allocated. The next free id is **REQ-SEC-072** (corrected 2026-09-25: this note still said
+> REQ-SEC-070 after REQ-SEC-070 had been allocated below) — re-check `origin/main` and open PRs before
 > claiming it. Requirements are grouped by subject, not strictly by number.
 
 ### REQ-SEC-001 — OIDC topology
@@ -1178,6 +1180,13 @@ from masquerading as an application outage (the failure mode that drove the fron
   confusion). Empty (the default) preserves the auto-configured, issuer-derived decoder
   byte-for-byte — the knob is off until an operator opts in, and the `test` profile's placeholder
   issuer is unaffected.
+  *(Corrected 2026-09-23: the backend's production environment never carried the variable —
+  neither `docker-compose.yml` nor the Quadlet `env.d` template passed it — so the opt-in could not
+  be taken in production. It now reaches the backend as `KEYCLOAK_JWK_SET_URI` from the host's
+  `IRI_BACKEND_KEYCLOAK_JWK_SET_URI`, empty by default; the runbook is
+  [`deployment.md` → *Internal JWKS for the backend*](../deployment.md#internal-jwks-for-the-backend).
+  The ingest gateway reads the same property but sits on no network that reaches Keycloak, so it is
+  not wired.)*
 - **The knob lives on `app.security.jwt.*` and MUST NOT be declared under Spring's
   `spring.security.oauth2.resourceserver.jwt.jwk-set-uri`.** The two keys look interchangeable and
   behave oppositely when blank. The application's own key is read by
@@ -1207,6 +1216,8 @@ from masquerading as an application outage (the failure mode that drove the fron
 - [ ] No profile declares `spring.security.oauth2.resourceserver.jwt.jwk-set-uri`; the override is
   only ever `app.security.jwt.jwk-set-uri`, so an unset `KEYCLOAK_JWK_SET_URI` leaves the
   auto-configured decoder in place instead of failing the context at boot.
+- [x] The backend's production environment passes `KEYCLOAK_JWK_SET_URI`, empty unless the host
+  sets `IRI_BACKEND_KEYCLOAK_JWK_SET_URI` (`JwkSetUriNamespaceTest`).
 - [ ] A JWKS timeout / 5xx / DNS failure yields `503` + `Retry-After` (not `500`), logged at WARN
   and counted on `basetool_http_error_total{code="SERVICE_UNAVAILABLE"}`.
 - [ ] An expired/invalid bearer token still yields `401`; a caller lacking the required role still
@@ -1275,9 +1286,10 @@ sibling subdomain and no plain-http response can plant or overwrite the session 
 into a session-fixation). All three conditions already held; the prefix makes the browser enforce
 them. It also makes them load-bearing: a `domain:`, a non-root `path:` or `secure: false` in any
 profile would not weaken the cookie quietly — the browser would drop it and every login would fail.
-The rename dropped every live session once, at the deploy that shipped it: the old `SESSION` cookie
-names nothing the app reads any more, so each member signed in again exactly once. The owner approved
-that trade.
+The rename drops every live session once, at the deploy that ships it — release **1.11.0**, not yet
+on production as of 2026-09-25: the old `SESSION` cookie names nothing the app reads any more, so
+each member signs in again exactly once (the Redis entries behind the old cookies simply age out;
+no flush). The owner approved that trade.
 
 **Acceptance**
 
@@ -3067,6 +3079,13 @@ Two rules, and which applies depends on who writes the value:
   list is resolved by name and skipped when absent, so it cannot break the build on a container that
   does not carry the class. It must stay short, and it must never carry one of our own classes —
   putting one there converts a two-character fix into a permanent exception.
+- **A `BindingResult` never enters a flash attribute** (added 2026-09-23). The session can *write*
+  one — `BindingResultMixin` hides its self-referencing model — but cannot *read* it back:
+  `BeanPropertyBindingResult` and `FieldError` have no constructor Jackson can use, so the
+  redirect's GET dropped the **whole flash map** — form input, field errors and every toast flashed
+  beside them. The admin personal-inventory form did that from the day it was written: an invalid
+  submission came back as a closed modal with no errors. A form that fails validation re-renders its
+  view inline, which every other form in the frontend already did.
 
 Tomcat 11.0.25 added `org.apache.tomcat.websocket.server.WsHttpSessionBindingListener`, a `record`
 that `WsServerContainer#registerAuthenticatedSession` writes whenever an authenticated WebSocket
@@ -3101,10 +3120,14 @@ read as bare scalars, and changing their wire format breaks every live session a
   is an exception per named class, never a policy change.
 - [ ] `basetool_session_value_dropped_total` is zero in steady state, so a non-zero rate is a real
   poisoning.
+- [x] No controller flashes a `BindingResult`; an invalid admin personal-inventory create or update
+  re-renders inline with the modal open and its field errors, and flashes nothing.
 
 **Enforced by:** `SessionSerializerRoundTripTest` (the required keys and scalars still read back;
 the Tomcat listener round-trips and carries `@class`; a plain record and `List.of`/`Map.of` still do
-not) · `FaultTolerantSessionSerializerTest`, `SessionAttributeDiagnosticMapperTest` (the survivable
+not; a `BindingResult` writes but does not read) · `FlashAttributeTypesTest` (no
+`addFlashAttribute` in the main sources names a binding result) ·
+`AdminPersonalInventoryPageControllerMvcTest` (the inline re-render) · `FaultTolerantSessionSerializerTest`, `SessionAttributeDiagnosticMapperTest` (the survivable
 path and the attribute-naming WARN) · **Code:** `RedisSessionConfig#buildSessionJsonMapper`,
 `CONTAINER_WRITTEN_FINAL_SESSION_TYPES`, `ForcedTypeIdMixin`, `FaultTolerantSessionSerializer`,
 `SessionAttributeDiagnosticMapper` · **Monitoring:** `SessionValueDropsSustained`,
@@ -3265,6 +3288,7 @@ Redis, which three services reach (APPSEC-05, improvement audit 2026-09-22).
 | `java.util.*`, `java.time.*` — direct members only | collections, dates and durations written by Spring Session, Spring Security and our filters; `java.util.logging` / `java.util.concurrent` are **not** covered |
 | the boxed scalars of `java.lang` (`Boolean` … `String`), `java.math.BigDecimal` / `BigInteger`, `java.net.URL` / `URI` — exact names | a final type in an `Object` slot of a container is written with a type id after all: the ID token's `iss` claim (`URL`), numeric claims and the session-created event's timestamps (`Long`), a flashed count |
 | `com.nimbusds.jose.shaded.gson.internal.LinkedTreeMap` — exact name | a nested ID-token claim (`realm_access`) as Nimbus decodes it |
+| `com.nimbusds.oauth2.sdk.util.OrderedJSONObject` — exact name | a token-response JSON object as the Nimbus OAuth 2.0 SDK parses it, inside the stored authorized client (added 2026-09-23: under `enforce` its refusal dropped `AUTHORIZED_CLIENTS` and looped every E2E login) |
 | `org.springframework.security.*` | security context, OAuth2 login and authorized-client state, CSRF token, saved request (the Security Jackson modules add their own exact types on top) |
 | `org.springframework.web.servlet.FlashMap`, `org.springframework.util.LinkedMultiValueMap`, direct members of `org.springframework.validation` | a redirect's flash attributes; `validation.beanvalidation` is **not** covered |
 | `de.greluc.krt.profit.basetool.frontend.model.*` | the application's own forms and DTOs, flashed across a redirect |

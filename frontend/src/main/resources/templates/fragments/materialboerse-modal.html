@@ -8,21 +8,11 @@
   window.materialboerseI18n (bootstrapped below, merged so a host page can add its own).
 */-->
 <th:block th:fragment="releaseModal">
-    <!--/* Opened via inline display:flex from materialboerse-release.js (the app-wide
-         .krt-modal-overlay contract); the global styles.css default keeps it display:none
-         until then, so no `hidden` attribute is used (that left the CSS display:none intact
-         and the modal opened invisibly). */-->
-    <div id="mb-modal" class="krt-modal-overlay">
-        <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true"
-             aria-labelledby="mb-modal-title" data-mb-modal>
-            <div class="krt-modal-head">
-                <h2 id="mb-modal-title" data-mb-modal-title
-                    th:text="#{materialboerse.modal.release.title}">Material für die Börse freigeben</h2>
-                <button type="button" class="btn btn-ghost btn-icon" data-mb-modal-close
-                        th:aria-label="#{materialboerse.modal.close}">
-                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg>
-                </button>
-            </div>
+    <!--/* Opened and closed by materialboerse-release.js through window.krtModal. Its ✕ carries
+         `mb-modal-close` next to the footer's data-mb-modal-close, both handled by the same
+         cancel(). */-->
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='mb-modal', titleKey='materialboerse.modal.release.title', variant='krt-modal--wide', titleId='mb-modal-title', closeTrigger='', closeClass='mb-modal-close', body=~{fragments/materialboerse-modal :: mb-modal-body})}">
+        <th:block th:ref="mb-modal-body">
             <div class="krt-modal-body">
                 <div class="mb-modal-picker" data-mb-picker hidden>
                     <!--/* Material/Item kind radio (REQ-MARKET-002): the releasable-items picker lists
@@ -99,8 +89,8 @@
                     <span data-mb-submit-label th:text="#{materialboerse.modal.submit.release}">Freigeben</span>
                 </button>
             </div>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
     <script th:inline="javascript" th:attr="nonce=${cspNonce}">
         window.materialboerseI18n = Object.assign(window.materialboerseI18n || {}, {
             releaseTitle: /*[[#{materialboerse.modal.release.title}]]*/ 'Material für die Börse freigeben',

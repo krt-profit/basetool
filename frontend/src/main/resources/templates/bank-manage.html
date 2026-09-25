@@ -266,13 +266,8 @@
     <!--/* ============ Modals ============ */-->
 
     <!--/* Create account */-->
-    <div class="krt-modal-overlay" id="bank-create-account-modal">
-        <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.createAccount.title}">
-            <div class="krt-modal-head">
-                <h3 th:text="#{bank.modal.createAccount.title}">Konto anlegen</h3>
-                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="bank-create-account-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bank-create-account-modal', titleKey='bank.modal.createAccount.title', body=~{::bank-create-account-modal-body})}">
+        <th:block th:ref="bank-create-account-modal-body">
             <form class="bank-ajax-form no-track" data-refresh="manageBody" data-livesync="bank/manage,grid"
                   data-endpoint="/api/proxy/bank/accounts" data-method="POST">
                 <div class="krt-modal-body">
@@ -319,17 +314,12 @@
                             th:text="#{bank.modal.createAccount.submit}">Anlegen</button>
                 </div>
             </form>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
 
     <!--/* Rename account */-->
-    <div class="krt-modal-overlay" id="bank-rename-modal">
-        <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.rename.title}">
-            <div class="krt-modal-head">
-                <h3 th:text="#{bank.modal.rename.title}">Konto umbenennen</h3>
-                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="bank-rename-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bank-rename-modal', titleKey='bank.modal.rename.title', body=~{::bank-rename-modal-body})}">
+        <th:block th:ref="bank-rename-modal-body">
             <form class="bank-ajax-form no-track" data-refresh="manageBody" data-livesync="bank/manage,grid"
                   data-endpoint="/api/proxy/bank/accounts/{id}" data-method="PATCH">
                 <input type="hidden" name="_id">
@@ -350,17 +340,12 @@
                             th:text="#{general.save}">Speichern</button>
                 </div>
             </form>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
 
     <!--/* Set / clear balance target (REQ-BANK-036): bank staff with access to the account. */-->
-    <div class="krt-modal-overlay" id="bank-target-modal">
-        <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.target.title}">
-            <div class="krt-modal-head">
-                <h3 th:text="#{bank.modal.target.title}">Zielkontostand</h3>
-                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="bank-target-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bank-target-modal', titleKey='bank.modal.target.title', body=~{::bank-target-modal-body})}">
+        <th:block th:ref="bank-target-modal-body">
             <form class="bank-ajax-form no-track" data-refresh="manageBody" data-livesync="bank/manage,grid"
                   data-endpoint="/api/proxy/bank/accounts/{id}/balance-target" data-method="PATCH">
                 <input type="hidden" name="_id">
@@ -382,17 +367,12 @@
                             th:text="#{general.save}">Speichern</button>
                 </div>
             </form>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
 
     <!--/* Close account (zero balance enforced server-side too) */-->
-    <div class="krt-modal-overlay" id="bank-close-modal">
-        <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.close.title}">
-            <div class="krt-modal-head">
-                <h3 th:text="#{bank.modal.close.title}">Konto schlie&szlig;en</h3>
-                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="bank-close-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bank-close-modal', titleKey='bank.modal.close.title', variant='krt-modal--danger', body=~{::bank-close-modal-body})}">
+        <th:block th:ref="bank-close-modal-body">
             <form class="bank-ajax-form no-track" data-refresh="manageBody" data-livesync="bank/manage,grid"
                   data-endpoint="/api/proxy/bank/accounts/{id}/close" data-method="POST">
                 <input type="hidden" name="_id">
@@ -408,17 +388,12 @@
                             th:text="#{bank.manage.account.close}">Schlie&szlig;en</button>
                 </div>
             </form>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
 
     <!--/* Reopen account */-->
-    <div class="krt-modal-overlay" id="bank-reopen-modal">
-        <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.reopen.title}">
-            <div class="krt-modal-head">
-                <h3 th:text="#{bank.modal.reopen.title}">Konto wieder&ouml;ffnen</h3>
-                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="bank-reopen-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bank-reopen-modal', titleKey='bank.modal.reopen.title', body=~{::bank-reopen-modal-body})}">
+        <th:block th:ref="bank-reopen-modal-body">
             <form class="bank-ajax-form no-track" data-refresh="manageBody" data-livesync="bank/manage,grid"
                   data-endpoint="/api/proxy/bank/accounts/{id}/reopen" data-method="POST">
                 <input type="hidden" name="_id">
@@ -434,17 +409,12 @@
                             th:text="#{bank.manage.account.reopen}">Wieder&ouml;ffnen</button>
                 </div>
             </form>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
 
     <!--/* Register holder */-->
-    <div class="krt-modal-overlay" id="bank-register-holder-modal">
-        <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.registerHolder.title}">
-            <div class="krt-modal-head">
-                <h3 th:text="#{bank.modal.registerHolder.title}">Halter registrieren</h3>
-                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="bank-register-holder-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bank-register-holder-modal', titleKey='bank.modal.registerHolder.title', body=~{::bank-register-holder-modal-body})}">
+        <th:block th:ref="bank-register-holder-modal-body">
             <form class="bank-ajax-form no-track" data-refresh="manageBody" data-livesync="bank/manage,grid"
                   data-endpoint="/api/proxy/bank/holders" data-method="POST">
                 <div class="krt-modal-body">
@@ -469,17 +439,12 @@
                             th:text="#{bank.modal.registerHolder.submit}">Registrieren</button>
                 </div>
             </form>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
 
     <!--/* Deactivate holder */-->
-    <div class="krt-modal-overlay" id="bank-holder-deactivate-modal">
-        <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.holderDeactivate.title}">
-            <div class="krt-modal-head">
-                <h3 th:text="#{bank.modal.holderDeactivate.title}">Halter deaktivieren</h3>
-                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="bank-holder-deactivate-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bank-holder-deactivate-modal', titleKey='bank.modal.holderDeactivate.title', variant='krt-modal--danger', body=~{::bank-holder-deactivate-modal-body})}">
+        <th:block th:ref="bank-holder-deactivate-modal-body">
             <form class="bank-ajax-form no-track" data-refresh="manageBody" data-livesync="bank/manage,grid"
                   data-endpoint="/api/proxy/bank/holders/{id}" data-method="PATCH">
                 <input type="hidden" name="_id">
@@ -496,17 +461,12 @@
                             th:text="#{bank.manage.holder.deactivate}">Deaktivieren</button>
                 </div>
             </form>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
 
     <!--/* Reactivate holder */-->
-    <div class="krt-modal-overlay" id="bank-holder-reactivate-modal">
-        <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.holderReactivate.title}">
-            <div class="krt-modal-head">
-                <h3 th:text="#{bank.modal.holderReactivate.title}">Halter reaktivieren</h3>
-                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="bank-holder-reactivate-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bank-holder-reactivate-modal', titleKey='bank.modal.holderReactivate.title', body=~{::bank-holder-reactivate-modal-body})}">
+        <th:block th:ref="bank-holder-reactivate-modal-body">
             <form class="bank-ajax-form no-track" data-refresh="manageBody" data-livesync="bank/manage,grid"
                   data-endpoint="/api/proxy/bank/holders/{id}" data-method="PATCH">
                 <input type="hidden" name="_id">
@@ -523,18 +483,13 @@
                             th:text="#{bank.manage.holder.reactivate}">Reaktivieren</button>
                 </div>
             </form>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
 
     <!--/* Holder-to-holder Umbuchung (REQ-BANK-031): moves custody between holders, no account touched.
          Open to every bank employee; the source holder may go negative (reconciliation tool). */-->
-    <div class="krt-modal-overlay" id="bank-holder-transfer-modal">
-        <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.modal.holderTransfer.title}">
-            <div class="krt-modal-head">
-                <h3 th:text="#{bank.modal.holderTransfer.title}">Halter-Umbuchung</h3>
-                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="bank-holder-transfer-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bank-holder-transfer-modal', titleKey='bank.modal.holderTransfer.title', body=~{::bank-holder-transfer-modal-body})}">
+        <th:block th:ref="bank-holder-transfer-modal-body">
             <form class="bank-ajax-form no-track" data-refresh="manageBody" data-livesync="bank/manage,grid"
                   data-endpoint="/api/proxy/bank/holders/transfer" data-method="POST">
                 <div class="krt-modal-body">
@@ -580,8 +535,8 @@
                             th:text="#{bank.modal.holderTransfer.submit}">Umbuchen</button>
                 </div>
             </form>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
 </main>
 
 <th:block th:replace="~{fragments/toast :: toast}" />

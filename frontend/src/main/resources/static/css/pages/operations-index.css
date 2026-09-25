@@ -2,34 +2,38 @@
  * (FE-PERF-02). Linked in the same place the block stood, so the cascade order is
  * unchanged. */
 
-html,
-body {
-    overflow-x: hidden;
-}
-/* Constrain long descriptions so the row never forces horizontal page scroll. */
-.operations-table {
-    width: 100%;
-    table-layout: auto;
-}
-.operations-table td.op-desc,
-.operations-table th.op-desc {
-    max-width: 40ch;
-    white-space: normal;
-    overflow-wrap: anywhere;
-}
-.operations-table td.op-action,
-.operations-table th.op-action {
-    white-space: nowrap;
-    text-align: right;
-}
-.operations-table td.op-action .btn {
-    margin-left: 0.25rem;
-}
+@layer base, components, page, migration, utilities;
 
-/* Smartphone: hide the description column to keep the table on screen. */
-@media (width <= 768px) {
+@layer page {
+    html,
+    body {
+        overflow-x: hidden;
+    }
+    /* Constrain long descriptions so the row never forces horizontal page scroll. */
+    .operations-table {
+        width: 100%;
+        table-layout: auto;
+    }
     .operations-table td.op-desc,
     .operations-table th.op-desc {
-        display: none;
+        max-width: 40ch;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+    .operations-table td.op-action,
+    .operations-table th.op-action {
+        white-space: nowrap;
+        text-align: right;
+    }
+    .operations-table td.op-action .btn {
+        margin-left: 0.25rem;
+    }
+
+    /* Smartphone: hide the description column to keep the table on screen. */
+    @media (width <= 768px) {
+        .operations-table td.op-desc,
+        .operations-table th.op-desc {
+            display: none;
+        }
     }
 }

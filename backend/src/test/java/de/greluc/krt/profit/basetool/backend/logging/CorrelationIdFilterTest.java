@@ -21,15 +21,18 @@ package de.greluc.krt.profit.basetool.backend.logging;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.config.LoggingProperties;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.OwnerScopeService;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import java.io.IOException;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
@@ -163,5 +166,76 @@ class CorrelationIdFilterTest {
 
     // Then
     assertThat(userIdDuringChain.get()).isEqualTo("anonymous");
+  }
+
+  @Test
+  void initialDispatch_ShouldStashTheResolvedValuesForAnAsyncDispatch()
+      throws ServletException, IOException {
+    // Given
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/notifications");
+    request.addHeader(props.correlationIdHeader(), "stash-me");
+
+    // When
+    filter.doFilter(request, new MockHttpServletResponse(), (req, res) -> {});
+
+    // Then
+    assertThat(request.getAttribute(CorrelationIdFilter.CORRELATION_ID_ATTRIBUTE))
+        .isEqualTo("stash-me");
+    assertThat(request.getAttribute(CorrelationIdFilter.USER_ID_ATTRIBUTE)).isEqualTo("anonymous");
+    assertThat(request.getAttribute(CorrelationIdFilter.ORG_UNIT_ID_ATTRIBUTE))
+        .isEqualTo("anonymous");
+  }
+
+  @Test
+  void asyncDispatch_ShouldRebindTheStashedValuesWithoutResolvingAnything()
+      throws ServletException, IOException {
+    // Given: the stream's async result is dispatched back, carrying a header the client sent
+    MockHttpServletRequest request =
+        new MockHttpServletRequest("GET", "/api/v1/notifications/stream");
+    request.setDispatcherType(DispatcherType.ASYNC);
+    request.setAttribute(CorrelationIdFilter.CORRELATION_ID_ATTRIBUTE, "from-initial");
+    request.setAttribute(CorrelationIdFilter.USER_ID_ATTRIBUTE, "member-sub");
+    request.setAttribute(CorrelationIdFilter.ORG_UNIT_ID_ATTRIBUTE, "org-unit-7");
+    request.addHeader(props.correlationIdHeader(), "client-sent-on-async");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    AtomicReference<Map<String, String>> mdcDuringChain = new AtomicReference<>();
+
+    // When
+    filter.doFilter(request, response, (req, res) -> mdcDuringChain.set(MDC.getCopyOfContextMap()));
+
+    // Then
+    assertThat(mdcDuringChain.get())
+        .containsEntry(props.correlationIdMdcKey(), "from-initial")
+        .containsEntry(props.userIdMdcKey(), "member-sub")
+        .containsEntry(props.orgUnitIdMdcKey(), "org-unit-7");
+    assertThat(response.getHeader(props.correlationIdHeader()))
+        .as("the async pass leaves the response header to the initial dispatch")
+        .isNull();
+    verifyNoInteractions(authHelperService, ownerScopeService);
+    assertThat(MDC.get(props.correlationIdMdcKey())).isNull();
+    assertThat(MDC.get(props.userIdMdcKey())).isNull();
+    assertThat(MDC.get(props.orgUnitIdMdcKey())).isNull();
+  }
+
+  @Test
+  void asyncDispatchWithoutStash_ShouldMintNothingAndTrustNoHeader()
+      throws ServletException, IOException {
+    // Given
+    MockHttpServletRequest request =
+        new MockHttpServletRequest("GET", "/api/v1/notifications/stream");
+    request.setDispatcherType(DispatcherType.ASYNC);
+    request.addHeader(props.correlationIdHeader(), "client-sent-on-async");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    AtomicReference<String> correlationDuringChain = new AtomicReference<>("unset");
+
+    // When
+    filter.doFilter(
+        request,
+        response,
+        (req, res) -> correlationDuringChain.set(MDC.get(props.correlationIdMdcKey())));
+
+    // Then
+    assertThat(correlationDuringChain.get()).isNull();
+    assertThat(response.getHeader(props.correlationIdHeader())).isNull();
   }
 }

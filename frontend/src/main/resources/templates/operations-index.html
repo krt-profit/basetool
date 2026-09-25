@@ -127,13 +127,8 @@
     </div>
 
     <!--/* Create Modal */-->
-    <div id="create-operation-modal" class="krt-modal-overlay">
-        <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{operation.create}">
-            <div class="krt-modal-head">
-                <h2 th:text="#{operation.create}">Create Operation</h2>
-                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="create-operation-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='create-operation-modal', titleKey='operation.create', variant='krt-modal--wide', body=~{::create-operation-modal-body})}">
+        <th:block th:ref="create-operation-modal-body">
             <form id="create-operation-form" th:action="@{/operations/create}" method="post">
                 <div class="krt-modal-body">
                 <div class="form-group">
@@ -161,17 +156,12 @@
                     <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{general.save}">Save</span></button>
                 </div>
             </form>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
 
     <!--/* Delete Modal */-->
-    <div id="delete-operation-modal" class="krt-modal-overlay">
-        <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{general.confirm}">
-            <div class="krt-modal-head">
-                <h2 th:text="#{general.confirm}">Confirm Delete</h2>
-                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="delete-operation-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='delete-operation-modal', titleKey='general.confirm', variant='krt-modal--danger', body=~{::delete-operation-modal-body})}">
+        <th:block th:ref="delete-operation-modal-body">
             <form id="delete-operation-form" th:action="@{/operations/delete}" method="post">
                 <div class="krt-modal-body">
                     <p class="m-0" th:text="#{operation.delete.confirm}">Confirm that you want to delete this operation.</p>
@@ -181,8 +171,8 @@
                     <button type="submit" class="btn btn-danger" th:text="#{general.delete}">Delete</button>
                 </div>
             </form>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
 </main>
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     /*<![CDATA[*/

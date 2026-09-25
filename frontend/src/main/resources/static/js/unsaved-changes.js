@@ -70,7 +70,7 @@ document.addEventListener('DOMContentLoaded', function () {
             targetUrl = a.href;
 
             if (modal) {
-                modal.style.display = 'flex';
+                window.krtModal.open(modal);
             }
         }
     });
@@ -78,7 +78,7 @@ document.addEventListener('DOMContentLoaded', function () {
     [stayBtn, closeBtn].forEach(function (btn) {
         if (!btn) return;
         btn.addEventListener('click', function () {
-            if (modal) modal.style.display = 'none';
+            if (modal) window.krtModal.close(modal);
             targetUrl = null;
         });
     });
@@ -96,7 +96,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (modal) {
         window.addEventListener('click', function (event) {
             if (event.target === modal) {
-                modal.style.display = 'none';
+                window.krtModal.close(modal);
                 targetUrl = null;
             }
         });

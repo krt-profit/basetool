@@ -1,6 +1,6 @@
 # ADR-0210 — A main push that changes no image input re-tags the previous build
 
-- **Status:** Accepted — amended 2026-09-23 (Amendment 1: per-module reuse, owner decision)
+- **Status:** Accepted — amended 2026-09-23 (Amendment 1: per-module reuse, owner decision; Amendment 2: the reuse base is the newest main ancestor with images)
 - **Date:** 2026-09-23
 - **Deciders:** @greluc (CI-07 approved with the improvement audit of 2026-09-22: "amends ADR-0137 —
   needs your approval", given)
@@ -152,3 +152,23 @@ Decision 6 ("all three images or none") is replaced; everything else above stand
    release-workflow changes, all shared inputs), which is why the all-three figure reads 4 rather than
    7 here. Per-module reuse roughly triples the saving on a code-heavy window and adds ~40 % on the
    longer one.
+
+## Amendment 2 (2026-09-23) — the reuse base is the newest main ancestor whose images exist
+
+The base was `github.event.before`, the previous tip. Since ADR-0137's amendment of the same day a
+superseded run skips, and a run can also be cancelled or fail; its commit then has no `:sha-<short>`,
+every gate failed, and the next push rebuilt all three images although nothing it changed required
+that.
+
+**Decision.** `plan` asks `image_reuse_plan.py --candidates` for the first-parent chain from
+`github.event.before`, newest first, **at most 20 commits**, and takes the first commit for which all
+three `:sha-<short>` tags exist (`merge` tags all three or none, so a complete set marks a finished
+run). The per-module decision is then computed against **that** commit — the diff covers everything
+since it, skipped commits included, so nothing changed in between can be missed, and a release commit
+in the range still rebuilds all three. The per-image gates (both architectures, main-branch signature,
+at most seven days) run as before; an image that fails one is built. No complete set within 20
+commits, or a `before` that is not an ancestor of the pushed commit, means a full build — the
+documented fallback. The bound keeps the diff and the registry probes (three per candidate) small; the
+seven-day gate would refuse most of what lies further back anyway. A `::notice` names the base whenever
+it is not the previous tip. Self-test cases cover the ordering, the bound and the unusable-`before`
+case.

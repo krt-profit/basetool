@@ -421,7 +421,10 @@ holds the CA **and** the old shared certificate, so either side verifies
 **3. `certs/grafana.{crt,key}`** — Grafana's own **self-signed, per-host** leaf. `grafana.container`
 will not start without it. **Never restore it from another host's backup** (the archive carries the
 old host's pair — extract around it, or re-mint afterwards); nothing verifies that leaf, so a wrong
-one fails quietly.
+one fails quietly — **unless the edge verifies it** (`EDGE_GRAFANA_UPSTREAM_VERIFY=on`,
+[`deployment.md` → *The edge verifies Grafana*](../docs/deployment.md#the-edge-verifies-grafana)):
+then the edge pins this exact file, and after re-minting it **restart the edge as well as
+Grafana**, or the Grafana host answers `503`.
 
 ```bash
 cd /var/iri/monitoring/certs
@@ -515,10 +518,11 @@ collector otherwise reports the **old** CA's expiry until the next 03:40.
 written by HotSpot and glibc outside logback and is **JVM-version-dependent**, so every bump of the
 `eclipse-temurin:25-jre-alpine` runtime digest in `docker/app/Dockerfile` owes a re-check — otherwise
 the rule keeps parsing, keeps deploying and can never fire again. It was verified on
-`…@sha256:28db6fdf…` (2026-08-29) and **re-verified on `…@sha256:3137541d…` (Temurin 25.0.4+7) on
-2026-09-22**, the digest the Dockerfiles pin: steps 1–3 below, plus the stream check on production
-(`{app=~"(backend|frontend|ingest)-stdout"}` present in Loki under the Podman journald path). The
-next digest bump owes it again.
+`…@sha256:28db6fdf…` (2026-08-29), **re-verified on `…@sha256:3137541d…` (Temurin 25.0.4+7) on
+2026-09-22** (steps 1–3 below, plus the stream check on production:
+`{app=~"(backend|frontend|ingest)-stdout"}` present in Loki under the Podman journald path) and
+**again on `…@sha256:2ca9adf4…` on 2026-09-25**, the digest `docker/app/Dockerfile` pins since #2035
+(steps 1–5; the #2035 bump itself had skipped it). The next digest bump owes it again.
 
 On a workstation, never on production:
 

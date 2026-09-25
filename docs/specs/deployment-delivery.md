@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-23.
 > **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md), [ADR-0075](../adr/0075-host-side-cosign-signature-verification.md), [ADR-0079](../adr/0079-redis-session-store-aof-and-maxmemory-noeviction.md), [ADR-0083](../adr/0083-deploy-bot-health-drift-targeted-restart.md), [ADR-0145](../adr/0145-build-provenance-anchored-outside-the-registry.md), [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md), [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md), [ADR-0187](../adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md), [ADR-0188](../adr/0188-the-host-bootstrap-is-an-ansible-role.md), [ADR-0189](../adr/0189-stateful-containers-run-as-their-own-uid.md), [ADR-0190](../adr/0190-every-container-but-keycloak-runs-read-only.md), [ADR-0196](../adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md)
 
 # Deployment delivery & promotion
@@ -137,6 +137,31 @@ this run and `start` for the rest, and the wait is structural — `Notify=health
 Compose path only). A rollback that restored the record without re-materialising the drop-ins would
 roll forward into the failed release, so both move together, together with the previous unit files.
 
+**A failure before the health gate is a deploy failure too, and is recorded as one.** Between the
+signature verification and the health gate `deploy.sh` extracts the config bundle, mirrors it onto
+the host, renders `env.d`, installs the units, writes the pin and pulls the images. A failure
+anywhere in that window — a `fail`, a mirror's rsync, an errexit, a pull — must leave the same
+evidence as a failed health gate: a `FATAL` line naming the step and the exit code, the previous
+config tree, units and pin restored if the run had changed them, a bad-digest backoff record for the
+target, and `basetool_deploy_last_failure_timestamp` (`DeployFailed`). An EXIT trap armed for exactly
+that window (`on_pre_gate_exit`) is what guarantees it, because errexit ends the process without
+passing through any code that could record it. Where the cause can be seen beforehand it is refused
+**before anything changes**: every directory in a subtree the apply mirrors must be owned and
+writable by the deploy account, and the compose directory, the unit directory and `env.d` writable
+(`assert_config_tree_writable`). The pin is written only after the config delivery, so a release
+the stateful-infra gate holds back (REQ-OPS-006) leaves no pin behind. A restore that fails itself
+is reported as an inconsistent tree, and `config-apply.incomplete` stops the next tick from
+snapshotting that tree over `config-previous/`.
+
+> [!bug] Added 2026-09-25 — this path was silent until then
+> v1.11.0 met a root-owned `/var/iri/code/docker/acme`. Every tick from 12:25 to 12:35 mirrored three
+> subtrees, died on rsync exit 23 inside `mirror_dir`, and ended under `set -e` with no FATAL line, no
+> backoff record, no restore and no metric; `DeployFailed` could not fire and production stayed on
+> the old release for fifteen minutes. The second tick also snapshotted the half-mirrored tree as
+> `config-previous/` and copied the first tick's new pin over the rollback anchor. This paragraph and
+> the last three acceptance criteria were written for that incident; `scripts/deploy.test.sh` replays
+> it (`scenario_config_mirror_failure_is_recorded_and_undone` and the four scenarios after it).
+
 **Acceptance**
 
 - [ ] A `:stable` tag flip in GHCR mid-deploy cannot partially apply: the deploy applies a
@@ -153,10 +178,20 @@ roll forward into the failed release, so both move together, together with the p
   well below the 5 s HEALTHCHECK timeout — ADR-0114). A slow/stalled dependency therefore yields a
   fast, truthful `DOWN`, so the health gate and the deploy `--wait` see a real, timely signal
   instead of a probe that never completed.
+- [ ] A failure between the signature verification and the health gate writes a `FATAL` line that
+  names the step and the exit code, a bad-digest backoff record for the target, and
+  `basetool_deploy_last_failure_timestamp`; the next tick inside the backoff window skips.
+- [ ] Such a failure after part of the config tree was mirrored restores `config-previous/` and the
+  previous units, and rolls back the pin if it had been written; a failed restore is reported and
+  leaves `config-apply.incomplete`, and a tick that finds it does not re-snapshot `config-previous/`.
+- [ ] A directory the apply would mirror into that the deploy account does not own or cannot write
+  is refused before the snapshot and before any mirror, with a line naming the path; a release held
+  back by the stateful-infra gate writes no digest pin.
 
-**Enforced by:** `scripts/deploy.sh` (rollback block) · `scripts/lib/container-runtime.sh`
+**Enforced by:** `scripts/deploy.sh` (rollback block, `on_pre_gate_exit`, `assert_config_tree_writable`,
+`restore_previous_config_tree`) · `scripts/lib/container-runtime.sh`
 (`rt_pin_apply`, `rt_pin_rollback`, `rt_apply_stack`) · `frontend/src/main/resources/application.yml`
-(`spring.data.redis.timeout` / `connect-timeout`, ADR-0114) · **Runbook:** `docs/deployment.md` → *What happens on the host*
+(`spring.data.redis.timeout` / `connect-timeout`, ADR-0114) · `scripts/deploy.test.sh` · **Runbook:** `docs/deployment.md` → *What happens on the host*, *Troubleshooting*
 
 ### REQ-OPS-004 — Host configuration delivered as a promotable, digest-pinned artifact
 
@@ -1032,11 +1067,22 @@ all three on six runners. The `plan` job's main path applies only to a `push` on
    A base that is missing, all-zero or not an ancestor of the pushed commit rebuilds all three;
 2. a range containing a **release commit** (a new dated CHANGELOG section) rebuilds all three;
 3. each image the script would re-tag must, **on its own**, resolve under `:sha-<short>` of the
-   previous tip, carry both architectures, cosign-verify against this workflow's identity pinned to
+   **reuse base** — the newest first-parent ancestor from `github.event.before` (at most 20 commits
+   back) whose three images all exist, so a skipped, cancelled or failed predecessor run does not force
+   a full build; the diff of steps 1–2 is taken against that base; no base within the bound is a full
+   build — carry both architectures, cosign-verify against this workflow's identity pinned to
    `refs/heads/main` (the tag path's gates 3–5), and have been **built within the last 7 days**
    (`org.opencontainers.image.created` — the runtime stage's `apk upgrade` makes an image only as
    patched as its build day). An image that fails any of these is built instead; the others stay
    re-tagged.
+
+**A superseded `main`-push run skips entirely** (ADR-0137 amendment, 2026-09-23). The concurrency
+group stays per commit, so every push to `main` queues a run; when `plan` starts and the pushed commit
+is already a strict ancestor of `origin/main`'s tip, `plan` sets `skip=true` and every later job
+(`build`, `scan`, `merge`, `build-config`, `keycloak-spi-jar`, `build-keycloak-spi`) is skipped, the run
+green, with the reason in the job summary. Never for a range containing a release commit, a tag push or
+`workflow_dispatch`, and never when the tip cannot be read or is not a descendant (force push).
+Decided by `image_reuse_plan.py --skip-check`.
 
 `plan` emits the re-tagged modules, their verified digests and a `build` matrix of only the images to
 build; `scan` covers the built images; `merge` assembles the built ones, re-tags the others and signs
@@ -1101,6 +1147,11 @@ produced artifact.
   re-tagged over the last 30 commits, 156 of 300 over the last 100).
 - [x] `promote.yml`'s `sync-testing` reads the `basetool-config` bundle's revision label, the one
   label that always names the published commit.
+- [x] A `main`-push run whose commit is no longer `main`'s tip at plan time skips every job after
+  `plan` and ends green, except for a range with a release commit; `workflow_dispatch` and tag pushes
+  never skip. `image_reuse_plan.py --selftest` covers each branch of the skip decision and of the
+  reuse-base search; the plan script was exercised against stubbed git/registry answers for both
+  (2026-09-23).
 
 **Enforced by:** `.github/workflows/release-images.yml` (`plan`, `build`, `scan`, `merge`) ·
 `.github/scripts/image_reuse_plan.py` · `.github/workflows/promote.yml` (`sync-testing`) · **Decision:** [ADR-0137](../adr/0137-one-image-build-per-commit-and-no-buildkit-layer-cache.md),
@@ -1445,6 +1496,26 @@ build-system reference and the `^runtimeClasspath$` restriction are set once, in
 applies it — four copies of the same block had been maintained by hand until then. Verified at the
 move: the component lists of all four BOMs were identical before and after.
 
+**Always a fresh generation, and checked against the classpath (2026-09-23).** cyclonedx-gradle
+3.4.1 declares `cyclonedxDirectBom` cacheable, and the only input it gives the dependency graph is
+the set of resolved artifact **files**. A project dependency contributes no file there, so adding
+`implementation(project(":logging-support"))` to the three applications changed no input: the
+task reported `UP-TO-DATE` — or came `FROM-CACHE` out of a build cache, which the release workflow
+restores — and the BOM kept its old component list. Reproduced on `:ingest` in both directions
+(dependency removed, the BOM still listed it; added back, the BOM still did not) until
+`--rerun-tasks`. Two measures close it:
+
+- both SBOM tasks are **untracked** (`doNotTrackState` in the root `build.gradle.kts`), so they
+  execute on every invocation and never read or write the build cache; `release-prepare.yml`
+  additionally passes `--no-build-cache`, so a release stays fresh even if the build script
+  regresses;
+- every `cyclonedxBom` is finalized by **`verifyCyclonedxBom`**, which fails unless the written BOM
+  lists **exactly** the components of the module's resolved `runtimeClasspath` — every external
+  module at its resolved version and every project dependency — in both directions. It runs in
+  `release-prepare.yml` and, on every pull request, in `ci.yml` (with the configuration cache), so
+  a plugin upgrade that stops seeing a component fails the PR that brings it rather than the next
+  release.
+
 **Why an assertion and not a habit.** By v1.7.3 the set had drifted in both directions available to
 it, and neither drift failed anything:
 
@@ -1481,9 +1552,16 @@ Recorded here rather than left to look like an oversight.
   REQ-OPS-023 closed.
 - [ ] `check_sbom_coverage.py` runs on every pull request via `repo-lint.yml` and fails on any of
   the above.
+- [ ] `cyclonedxDirectBom` and `cyclonedxBom` are untracked, and `release-prepare.yml` regenerates
+  with `--no-build-cache`: a release SBOM is never `UP-TO-DATE` or `FROM-CACHE`.
+- [ ] `verifyCyclonedxBom` finalizes every `cyclonedxBom` and fails when the BOM's components differ
+  from the resolved `runtimeClasspath` in either direction; `ci.yml` runs it for all four modules on
+  every pull request, and `check_sbom_coverage.py` fails if the untracking, the finalizer or the
+  `--no-build-cache` flag is removed.
 
 **Enforced by:** `.github/scripts/check_sbom_coverage.py` · `.github/workflows/repo-lint.yml`
-(`sbom-coverage`) · `.github/workflows/release-prepare.yml` · `.github/workflows/release-publish.yml`
+(`sbom-coverage`) · `verifyCyclonedxBom` (root `build.gradle.kts`) · `.github/workflows/ci.yml` ·
+`.github/workflows/release-prepare.yml` · `.github/workflows/release-publish.yml`
 · **Related:** REQ-OPS-023 (their provenance), REQ-OPS-024 (what is scanned), REQ-OPS-029 (the
 release notes that have to name this same set)
 
@@ -1742,6 +1820,15 @@ on two different collectors).
   (verified 2026-09-23 with two deliberately broken ingest builds — a verifying start under the
   other layout, and a training run without its JWK-set stub — each failed with its `[AOT] FAILED`
   message).
+- [x] The training run succeeds under the release builder (a `docker-container` BuildKit), not only
+  under the local default one: every `OTEL_*` variable BuildKit injects into the `RUN` step is unset
+  before the JVM starts (ADR-0209 Amendment 1; verified 2026-09-23 by building the ingest image with
+  such a builder — `origin/main`'s Dockerfile fails at `otlpGrpcSpanExporter`, the fixed one passes).
+- [x] The cache holds no machine code, so an image trained on one CPU starts on any other: training
+  runs with `-XX:-AOTAdapterCaching -XX:-AOTStubCaching`, and the image build fails unless the
+  verifying start reports `AOT Code Cache is empty` (ADR-0209 Amendment 1; verified 2026-09-23 — the
+  image from `origin/main` loaded 723 code entries, the fixed one none, and a build with adapter
+  caching switched back on failed at that check).
 - [x] `JvmStartupCacheRejected` fires on the JVM's rejection lines and stays silent on an accepted
   start (`check-loki-rule-signatures.py`, run in `repo-lint.yml`).
 - [x] No memory limit and no `MaxRAMPercentage` changed in the same unit of work.
@@ -1889,7 +1976,12 @@ there.
   decision 2026-09-22, ADR-0202 amendment): `basetool-sc-extractor`'s authorization-code flow and
   its two loopback wildcard redirect URIs (`REQ-INGEST-002`); both ingest scopes on
   `basetool-android` (`REQ-INGEST-011`); `basetool-frontend`'s `http://frontend:18081` redirect URI
-  and web origin. Production keeps them until the owner applies the provisioner there.
+  and web origin. Gone from production since the owner-approved provisioner apply of 2026-09-23;
+  the testing realm keeps them until it is provisioned.
+- **`basetool-frontend` carries `baseUrl` = `<--public-origin>/`** (2026-09-25, ADR-0202
+  amendment 3, `REQ-SEC-071`) — an added field, not in the 2026-09-22 production snapshot, so that
+  Keycloak's error pages for the web login link back to the app. Production gets it on the owner's
+  next apply.
 - **The DPoP write order holds** (`REQ-SEC-030`): when the Android client or the DPoP profile has to
   change, the policy is detached first and re-attached last, and both client-policy lists are merged
   by name so no other policy or profile is lost.

@@ -240,12 +240,8 @@
     </div>
 
     <!--/* Squadron Modal */-->
-    <div id="squadron-modal" class="krt-modal-overlay" th:classappend="${openModal == 'squadron-modal'} ? 'krtm-modal-open' : 'krtm-hidden'">
-        <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{admin.squadron.create}">
-            <div class="krt-modal-head">
-                <h2 id="squadron-modal-title" th:text="#{admin.squadron.create}">Staffel</h2>
-                <button type="button" class="krt-modal-close close-squadron-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='squadron-modal', titleKey='admin.squadron.create', variant='krt-modal--wide', titleId='squadron-modal-title', open=${openModal == 'squadron-modal'}, closeTrigger='', closeClass='close-squadron-modal', body=~{::squadron-modal-body})}">
+        <th:block th:ref="squadron-modal-body">
             <form id="squadron-form" method="post" th:action="${modalAction != null && openModal == 'squadron-modal'} ? ${modalAction} : @{/admin/mission-data/squadrons}" th:object="${squadronForm}">
                 <div class="krt-modal-body">
                     <input type="hidden" name="version" id="edit-squadron-version" th:value="*{version}">
@@ -270,16 +266,12 @@
                     <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{members.save}">Speichern</span></button>
                 </div>
             </form>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
 
     <!--/* JobType Modal */-->
-    <div id="jobtype-modal" class="krt-modal-overlay" th:classappend="${openModal == 'jobtype-modal'} ? 'krtm-modal-open' : 'krtm-hidden'">
-        <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{admin.job_type.create}">
-            <div class="krt-modal-head">
-                <h2 id="jobtype-modal-title" th:text="#{admin.job_type.create}">Job</h2>
-                <button type="button" class="krt-modal-close close-jobtype-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='jobtype-modal', titleKey='admin.job_type.create', variant='krt-modal--wide', titleId='jobtype-modal-title', open=${openModal == 'jobtype-modal'}, closeTrigger='', closeClass='close-jobtype-modal', body=~{::jobtype-modal-body})}">
+        <th:block th:ref="jobtype-modal-body">
             <form id="jobtype-form" method="post" th:action="${modalAction != null && openModal == 'jobtype-modal'} ? ${modalAction} : @{/admin/mission-data/job-types}" th:object="${jobTypeForm}">
                 <div class="krt-modal-body">
                     <input type="hidden" name="version" id="edit-jobtype-version" th:value="*{version}">
@@ -322,16 +314,12 @@
                     <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{members.save}">Speichern</span></button>
                 </div>
             </form>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
 
     <!--/* FrequencyType Modal */-->
-    <div id="frequency-type-modal" class="krt-modal-overlay" th:classappend="${openModal == 'frequency-type-modal'} ? 'krtm-modal-open' : 'krtm-hidden'">
-        <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{admin.frequency_type.create}">
-            <div class="krt-modal-head">
-                <h2 id="freqtype-modal-title" th:text="#{admin.frequency_type.create}">Frequenztyp</h2>
-                <button type="button" class="krt-modal-close close-freqtype-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='frequency-type-modal', titleKey='admin.frequency_type.create', variant='krt-modal--wide', titleId='freqtype-modal-title', open=${openModal == 'frequency-type-modal'}, closeTrigger='', closeClass='close-freqtype-modal', body=~{::frequency-type-modal-body})}">
+        <th:block th:ref="frequency-type-modal-body">
             <form id="freqtype-form" method="post" th:action="${modalAction != null && openModal == 'frequency-type-modal'} ? ${modalAction} : @{/admin/mission-data/frequency-types}" th:object="${frequencyTypeForm}">
                 <div class="krt-modal-body">
                     <input type="hidden" name="version" id="edit-freqtype-version" th:value="*{version}">
@@ -351,16 +339,12 @@
                     <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{members.save}">Speichern</span></button>
                 </div>
             </form>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
 
     <!--/* Delete Confirmation Modal */-->
-    <div id="delete-confirm-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
-        <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{info.delete.confirm.title}">
-            <div class="krt-modal-head">
-                <h2 th:text="#{info.delete.confirm.title}">Löschen bestätigen</h2>
-                <button type="button" class="krt-modal-close close-delete-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='delete-confirm-modal', titleKey='info.delete.confirm.title', variant='krt-modal--danger', closeTrigger='', closeClass='close-delete-modal', body=~{::delete-confirm-modal-body})}">
+        <th:block th:ref="delete-confirm-modal-body">
             <div class="krt-modal-body">
                 <p th:text="#{info.delete.confirm.message}" class="m-0">Wirklich löschen?</p>
             </div>
@@ -370,8 +354,8 @@
                     <button type="submit" class="btn btn-danger" th:text="#{info.delete}">Löschen</button>
                 </form>
             </div>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
 </main>
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">

@@ -69,12 +69,12 @@ class RefineryImportE2eTest {
       BackendSeeder seeder = new BackendSeeder();
       seeder.ensureIridiumMembership(USERNAME, PASSWORD);
       // The fixture's first row reads "E2E IMPORT MATERIAL" — the canonical fold matches it to
-      // this seeded manual RAW material; location + method come from the SQL catalog seed.
-      materialId = seeder.ensureRefineryMaterial(USERNAME, PASSWORD, "E2E Import Material");
-      // Pre-seed the sibling class's dropdown material too: the first create-page render of the
-      // suite freezes the frontend's 10-minute materials-lookup cache, so every material a later
-      // refinery create-form test selects must already exist BEFORE this class opens the page.
-      seeder.ensureRefineryMaterial(USERNAME, PASSWORD, "E2E Refinery Material");
+      // this manual RAW material; location + method come from the SQL catalog seed. The material
+      // itself is seeded by E2eStackExtension before any page renders (the picker's catalogue is
+      // cached from the first render on), so this only looks its id up.
+      materialId =
+          seeder.ensureRefineryMaterial(
+              USERNAME, PASSWORD, E2eStackExtension.PICKER_MATERIAL_IMPORT);
     }
   }
 

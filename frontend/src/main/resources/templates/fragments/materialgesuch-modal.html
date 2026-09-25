@@ -10,17 +10,8 @@
   kinds.
 */-->
 <th:block th:fragment="requestModal">
-    <div id="mg-modal" class="krt-modal-overlay">
-        <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true"
-             aria-labelledby="mg-modal-title" data-mg-modal>
-            <div class="krt-modal-head">
-                <h2 id="mg-modal-title" data-mg-modal-title
-                    th:text="#{materialgesuch.modal.request.title}">Material suchen</h2>
-                <button type="button" class="btn btn-ghost btn-icon" data-mg-modal-close
-                        th:aria-label="#{materialboerse.modal.close}">
-                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg>
-                </button>
-            </div>
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='mg-modal', titleKey='materialgesuch.modal.request.title', variant='krt-modal--wide', titleId='mg-modal-title', closeTrigger='', closeClass='mg-modal-close', body=~{fragments/materialgesuch-modal :: mg-modal-body})}">
+        <th:block th:ref="mg-modal-body">
             <div class="krt-modal-body">
                 <div class="mb-modal-picker" data-mg-picker hidden>
                     <!--/* Material/Item kind radio: switches between the material-catalogue combobox and
@@ -93,8 +84,8 @@
                     <span data-mg-submit-label th:text="#{materialgesuch.modal.submit.create}">Veröffentlichen</span>
                 </button>
             </div>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
     <script th:inline="javascript" th:attr="nonce=${cspNonce}">
         window.materialgesuchI18n = Object.assign(window.materialgesuchI18n || {}, {
             requestTitle: /*[[#{materialgesuch.modal.request.title}]]*/ 'Material suchen',

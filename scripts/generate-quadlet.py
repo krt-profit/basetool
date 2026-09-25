@@ -262,6 +262,7 @@ PATH_VARS = {
     "IRI_TRUSTSTORE_HOST_PATH": "/var/iri/secrets/tls/truststore.p12",
     "IRI_REDIS_ACL_HOST_PATH": "/var/iri/redis/users.acl",
     "IRI_UPSTREAM_CA_HOST_PATH": "/var/iri/monitoring/certs/basetool-ca.crt",
+    "IRI_GRAFANA_UPSTREAM_CERT_HOST_PATH": "/var/iri/monitoring/certs/grafana.crt",
 }
 
 #: Relative bind-mount sources in compose resolve against the project directory.

@@ -187,6 +187,13 @@ write, so restore them with `kc update client-policies/policies -r iri -f - < �
 (and the same for profiles); a client or scope the run created can be deleted by id. Detaching the
 DPoP policy alone is the safe partial rollback for the Android client.
 
+> [!warning] `clients.before.json` holds client secrets — delete the rollback basis afterwards
+> `kc get clients` returns the confidential clients **with their secrets** (`backend-service`,
+> `basetool-ingest-gateway`, `grafana`, …). Keep `/root/kc-realm/` `0700`, never copy it off the
+> host, and once the second dry run is empty and the apply is verified, remove it together with the
+> kcadm session file and the temporary `basetool-provisioner` client — as done on production on
+> 2026-09-23/25. A later rollback starts from a fresh `kc get`.
+
 ## Onboarding a new approved client
 
 Only for client software the owner has explicitly approved (box above). The gateway's gates are

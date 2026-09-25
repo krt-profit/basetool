@@ -2,42 +2,46 @@
  * (FE-PERF-02). Linked in the same place the block stood, so the cascade order is
  * unchanged. */
 
-.role-checkbox {
-    width: auto;
-    margin-right: 0.25rem;
-}
-.flags-form {
-    display: inline-flex;
-    gap: 0.5rem;
-    align-items: center;
-    margin: 0;
-}
-.lead-toggle-form {
-    display: inline-flex;
-    gap: 0.5rem;
-    align-items: center;
-    margin: 0;
-}
-.role-badge {
-    font-size: 0.7rem;
-    padding: 0.2rem 0.4rem;
-    border-radius: var(--radius-none);
-    margin-left: 0.25rem;
-}
-.role-badge.lead {
-    background-color: var(--color-accent-light);
-    color: var(--color-bg-black);
-}
-.role-badge.role-logistician {
-    background-color: var(--color-dept-search-rescue);
-    color: var(--color-bg-black);
-}
-.role-badge.role-mission-manager {
-    background-color: var(--color-dept-forschung);
-    color: var(--color-white);
-}
-.sk-meta {
-    color: var(--color-gray-2-text);
-    font-size: 0.9rem;
-    margin: 0.5rem 0;
+@layer base, components, page, migration, utilities;
+
+@layer page {
+    .role-checkbox {
+        width: auto;
+        margin-right: 0.25rem;
+    }
+    .flags-form {
+        display: inline-flex;
+        gap: 0.5rem;
+        align-items: center;
+        margin: 0;
+    }
+    .lead-toggle-form {
+        display: inline-flex;
+        gap: 0.5rem;
+        align-items: center;
+        margin: 0;
+    }
+    .role-badge {
+        font-size: 0.7rem;
+        padding: 0.2rem 0.4rem;
+        border-radius: var(--radius-none);
+        margin-left: 0.25rem;
+    }
+    .role-badge.lead {
+        background-color: var(--color-accent-light);
+        color: var(--color-bg-black);
+    }
+    .role-badge.role-logistician {
+        background-color: var(--color-dept-search-rescue);
+        color: var(--color-bg-black);
+    }
+    .role-badge.role-mission-manager {
+        background-color: var(--color-dept-forschung);
+        color: var(--color-white);
+    }
+    .sk-meta {
+        color: var(--color-gray-2-text);
+        font-size: 0.9rem;
+        margin: 0.5rem 0;
+    }
 }

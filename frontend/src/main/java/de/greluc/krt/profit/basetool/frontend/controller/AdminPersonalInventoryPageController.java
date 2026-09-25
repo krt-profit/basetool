@@ -137,16 +137,24 @@ public class AdminPersonalInventoryPageController {
   }
 
   /**
-   * Creates a personal-inventory item for the target user. Unlike its non-admin counterpart this
-   * handler is allowed to push the BindingResult through the redirect flash — the create flow here
-   * always redirects back through {@link #redirectToList} so the modal state has to survive the
-   * redirect.
+   * Creates a personal-inventory item for the target user.
+   *
+   * <p>Validation errors re-render the target user's list inline with the modal open, exactly as
+   * {@link PersonalInventoryPageController} does. Until 2026-09-23 this handler flashed the {@code
+   * BindingResult} through the redirect instead, and that could never work: the session serializer
+   * writes a {@code BeanPropertyBindingResult} but cannot read one back — it has no constructor
+   * Jackson can use — so the redirect's GET dropped the whole flash map (REQ-SEC-063) and the admin
+   * saw a closed modal, no errors and an empty form. A {@code BindingResult} stays request-scoped;
+   * {@code FlashAttributeTypesTest} holds every controller to that.
    *
    * @param userSub target user's Keycloak {@code sub}
    * @param form form-bound DTO
-   * @param bindingResult validation errors carrier
+   * @param bindingResult validation errors carrier; on failure it reaches the view through the
+   *     model, next to {@code form}
+   * @param model Thymeleaf model used for the inline re-render on validation failure
    * @param redirectAttributes flash attributes carrier
-   * @return redirect to the admin list (with optional form + binding-result flash)
+   * @return the inline {@code admin/personal-inventory} view on validation failure, otherwise a
+   *     redirect to the admin list
    */
   @NotNull
   @PostMapping("/{userSub}/add")
@@ -154,15 +162,10 @@ public class AdminPersonalInventoryPageController {
       @PathVariable @NotNull UUID userSub,
       @Valid @ModelAttribute("personalInventoryForm") PersonalInventoryForm form,
       BindingResult bindingResult,
+      Model model,
       RedirectAttributes redirectAttributes) {
     if (bindingResult.hasErrors()) {
-      redirectAttributes.addFlashAttribute(
-          "org.springframework.validation.BindingResult.personalInventoryForm", bindingResult);
-      redirectAttributes.addFlashAttribute("personalInventoryForm", form);
-      redirectAttributes.addFlashAttribute("showItemModal", true);
-      redirectAttributes.addFlashAttribute(
-          "modalAction", "/admin/personal-inventory/" + userSub + "/add");
-      return redirectToList(userSub);
+      return renderWithModal(userSub, "/admin/personal-inventory/" + userSub + "/add", model);
     }
 
     try {
@@ -191,9 +194,12 @@ public class AdminPersonalInventoryPageController {
    * @param userSub target user's Keycloak {@code sub} (used only for the redirect target)
    * @param id inventory item id
    * @param form form-bound DTO
-   * @param bindingResult validation errors carrier
+   * @param bindingResult validation errors carrier; on failure it reaches the view through the
+   *     model, as in {@link #add}
+   * @param model Thymeleaf model used for the inline re-render on validation failure
    * @param redirectAttributes flash attributes carrier
-   * @return redirect to the admin list
+   * @return the inline {@code admin/personal-inventory} view on validation failure, otherwise a
+   *     redirect to the admin list
    */
   @NotNull
   @PostMapping("/{userSub}/{id}/update")
@@ -202,15 +208,11 @@ public class AdminPersonalInventoryPageController {
       @PathVariable @NotNull UUID id,
       @Valid @ModelAttribute("personalInventoryForm") PersonalInventoryForm form,
       BindingResult bindingResult,
+      Model model,
       RedirectAttributes redirectAttributes) {
     if (bindingResult.hasErrors()) {
-      redirectAttributes.addFlashAttribute(
-          "org.springframework.validation.BindingResult.personalInventoryForm", bindingResult);
-      redirectAttributes.addFlashAttribute("personalInventoryForm", form);
-      redirectAttributes.addFlashAttribute("showItemModal", true);
-      redirectAttributes.addFlashAttribute(
-          "modalAction", "/admin/personal-inventory/" + userSub + "/" + id + "/update");
-      return redirectToList(userSub);
+      return renderWithModal(
+          userSub, "/admin/personal-inventory/" + userSub + "/" + id + "/update", model);
     }
 
     try {
@@ -256,6 +258,25 @@ public class AdminPersonalInventoryPageController {
           "errorToast", classifyError(e, "personalInventory.error.delete"));
     }
     return redirectToList(userSub);
+  }
+
+  /**
+   * Re-renders the target user's full admin page with the item modal open, for a submission that
+   * failed validation. The submitted form and its {@code BindingResult} are already in {@code
+   * model} (Spring put them there for the {@code @ModelAttribute}), so {@link #view} keeps them and
+   * the modal shows the input and the field errors.
+   *
+   * @param userSub the target user, whose inventory the page lists
+   * @param modalAction the URL the re-opened modal posts to
+   * @param model the request's model, holding the form and its errors
+   * @return the {@code admin/personal-inventory} view name
+   */
+  @NotNull
+  private String renderWithModal(
+      @NotNull UUID userSub, @NotNull String modalAction, @NotNull Model model) {
+    model.addAttribute("showItemModal", true);
+    model.addAttribute("modalAction", modalAction);
+    return view(userSub.toString(), null, null, null, null, null, model);
   }
 
   @NotNull

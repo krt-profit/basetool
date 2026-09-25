@@ -40,6 +40,11 @@ on:
       # removing a suppression changed the verdict and triggered nothing, so the change was first
       # exercised by the next weekly cron — on `main`, after the merge.
       - 'config/owasp/dependency-check-suppressions.xml'
+      # The scan resolves every dependency's POM, and each must match gradle/verification-metadata.xml
+      # (ADR-0208). A change to that file changes what the scan can resolve, so it re-runs the scan:
+      # from 2026-09-23 a missing POM entry failed this gate on main while the PR adding it could
+      # not show the fix.
+      - 'gradle/verification-metadata.xml'
   pull_request:
     branches: [main]
     paths:
@@ -53,6 +58,11 @@ on:
       # removing a suppression changed the verdict and triggered nothing, so the change was first
       # exercised by the next weekly cron — on `main`, after the merge.
       - 'config/owasp/dependency-check-suppressions.xml'
+      # The scan resolves every dependency's POM, and each must match gradle/verification-metadata.xml
+      # (ADR-0208). A change to that file changes what the scan can resolve, so it re-runs the scan:
+      # from 2026-09-23 a missing POM entry failed this gate on main while the PR adding it could
+      # not show the fix.
+      - 'gradle/verification-metadata.xml'
 
 concurrency:
   group: dep-check-${{ github.ref }}

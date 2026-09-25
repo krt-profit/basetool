@@ -66,6 +66,9 @@ import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
  *       Long} too;
  *   <li>{@code com.nimbusds.jose.shaded.gson.internal.LinkedTreeMap} by exact name — the map Nimbus
  *       decodes a nested JSON claim into ({@code realm_access}, {@code resource_access});
+ *   <li>{@code com.nimbusds.oauth2.sdk.util.OrderedJSONObject} by exact name — the ordered map the
+ *       Nimbus OAuth 2.0 SDK parses a token response's JSON objects into, which reaches the stored
+ *       authorized client ({@code AUTHORIZED_CLIENTS}) on a real Keycloak login;
  *   <li>{@code org.springframework.security.*} — the security context, the OAuth2 login and
  *       authorized-client state, the CSRF token and the saved request. The Spring Security Jackson
  *       modules add their own exact types on top, and this prefix covers what they reach through
@@ -132,8 +135,9 @@ public final class SessionTypeAllowList {
    * Individually named classes, matched exactly, so a class sharing the prefix (for instance {@code
    * FlashMapManager}) is not allowed by accident: the redirect flash map and the multi-value map it
    * keeps its target parameters in; the arbitrary-precision numbers and the URL / URI a JSON claim
-   * or Spring's OIDC claim conversion can produce ({@code iss} becomes a {@code URL}); and the map
-   * Nimbus decodes a nested claim object into.
+   * or Spring's OIDC claim conversion can produce ({@code iss} becomes a {@code URL}); the map
+   * Nimbus decodes a nested claim object into; and the ordered map the Nimbus OAuth 2.0 SDK parses
+   * a token response into (a {@code LinkedHashMap} with nothing of its own to run).
    *
    * <p>{@code java.net.URL} is the one entry with a side effect worth naming: its {@code hashCode}
    * resolves the host, so a {@code URL} placed into a set makes the frontend send a DNS query. A
@@ -149,7 +153,8 @@ public final class SessionTypeAllowList {
           "java.math.BigInteger",
           "java.net.URL",
           "java.net.URI",
-          "com.nimbusds.jose.shaded.gson.internal.LinkedTreeMap");
+          "com.nimbusds.jose.shaded.gson.internal.LinkedTreeMap",
+          "com.nimbusds.oauth2.sdk.util.OrderedJSONObject");
 
   /**
    * Upper bound on the distinct refused class names that are each logged once at {@code WARN}. A

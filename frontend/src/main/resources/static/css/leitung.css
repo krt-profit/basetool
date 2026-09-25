@@ -8,81 +8,85 @@
  * page's own composition (tier spacing, the Kommandogruppen grid, the rank-row controls).
  */
 
-.leitung-intro {
-    color: var(--color-gray-2-text);
-    margin: 0.5rem 0 0;
-}
+@layer base, components, page, migration, utilities;
 
-.leitung-error {
-    color: var(--color-danger);
-}
+@layer page {
+    .leitung-intro {
+        /* No colour of its own: `.greeting p` has always set it (FE-MOD-02). */
+        margin: 0.5rem 0 0;
+    }
 
-.leitung-tier {
-    margin-top: 2rem;
-}
+    .leitung-error {
+        color: var(--color-danger-text);
+    }
 
-.leitung-unit-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1rem;
-    margin-bottom: 1rem;
-}
+    .leitung-tier {
+        margin-top: 2rem;
+    }
 
-.leitung-unit-title {
-    margin: 0;
-}
+    .leitung-unit-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
 
-.leitung-subhead {
-    margin: 1.25rem 0 0.5rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    font-size: 0.85rem;
-    color: var(--color-gray-2-text);
-}
+    .leitung-unit-title {
+        margin: 0;
+    }
 
-.leitung-empty,
-.leitung-empty-all {
-    color: var(--color-gray-2-text);
-    padding: 0.75rem 0;
-}
+    .leitung-subhead {
+        margin: 1.25rem 0 0.5rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-size: 0.85rem;
+        color: var(--color-gray-2-text);
+    }
 
-.leitung-col-action {
-    text-align: right;
-    white-space: nowrap;
-}
+    .leitung-empty,
+    .leitung-empty-all {
+        color: var(--color-gray-2-text);
+        padding: 0.75rem 0;
+    }
 
-.leitung-rank-table select {
-    min-width: 12rem;
-}
+    .leitung-col-action {
+        text-align: right;
+        white-space: nowrap;
+    }
 
-.leitung-group-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 1rem;
-}
+    .leitung-rank-table select {
+        min-width: 12rem;
+    }
 
-.leitung-group,
-.leitung-group-add {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem;
-}
+    .leitung-group-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1rem;
+    }
 
-.leitung-group-name,
-.leitung-new-group-name {
-    flex: 1 1 auto;
-    min-width: 0;
-}
+    .leitung-group,
+    .leitung-group-add {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem;
+    }
 
-.leitung-group-actions {
-    display: flex;
-    gap: 0.25rem;
-    flex: 0 0 auto;
-}
+    .leitung-group-name,
+    .leitung-new-group-name {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
 
-.leitung-modal-unit {
-    color: var(--color-gray-2-text);
-    margin: 0 0 1rem;
+    .leitung-group-actions {
+        display: flex;
+        gap: 0.25rem;
+        flex: 0 0 auto;
+    }
+
+    .leitung-modal-unit {
+        color: var(--color-gray-2-text);
+        margin: 0 0 1rem;
+    }
 }

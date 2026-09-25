@@ -71,6 +71,13 @@ class SingleModalShapeTest {
           "close-modal");
 
   /**
+   * The shell's own classes, which only {@code fragments/modal-wrapper.html} may carry. A page's
+   * dialog supplies {@code .krt-modal-body} and {@code .krt-modal-foot}, never these.
+   */
+  private static final List<String> SHELL_CLASSES =
+      List.of("krt-modal-overlay", "krt-modal", "krt-modal-head", "krt-modal-close");
+
+  /**
    * Matches a class token exactly: not preceded or followed by a word character or a hyphen. That
    * is what separates the legacy {@code modal} from the canonical {@code krt-modal}, and the legacy
    * {@code close-modal} from the shared {@code close-modal-display} trigger name.
@@ -146,30 +153,88 @@ class SingleModalShapeTest {
   }
 
   /**
-   * Asserts the positive half: the canonical shape is actually in use, and every canonical overlay
-   * carries a frame.
+   * Asserts the positive half: every dialog is rendered by {@code fragments/modal-wrapper.html}
+   * (2026-09-23), and that fragment draws the canonical shell.
    *
-   * <p>Without this the two deletion checks above would pass on a template tree with no dialogs at
-   * all, which is the way a guard quietly stops measuring.
+   * <p>Until then 90 of the 96 dialogs wrote the shell by hand, and it had drifted: {@code <h2>} in
+   * 76 and {@code <h3>} in 20, an ✕ in 74 and an icon button in 22, the accessible name on the
+   * overlay in some and on the frame in others, and five close controls on the order page that
+   * closed nothing. So no template but the wrapper may carry the shell's own classes — the page
+   * supplies only {@code .krt-modal-body} and {@code .krt-modal-foot} — and the wrapper must be
+   * called often enough that the check is still measuring something.
    *
    * @throws IOException if a template cannot be read
    * @throws URISyntaxException if the templates classpath root cannot be resolved
    */
   @Test
-  void everyDialogUsesTheCanonicalShape() throws IOException, URISyntaxException {
-    int overlays = 0;
-    int frames = 0;
+  void everyDialogIsRenderedByTheWrapper() throws IOException, URISyntaxException {
+    List<String> offenders = new ArrayList<>();
+    int calls = 0;
+    String wrapper = null;
     for (Path template : templates()) {
-      String html = Files.readString(template, StandardCharsets.UTF_8);
-      overlays += count(html, "krt-modal-overlay");
-      frames += count(html, "krt-modal");
+      String html =
+          Files.readString(template, StandardCharsets.UTF_8).replaceAll("(?s)<!--.*?-->", "");
+      if (template.endsWith(Paths.get("fragments", "modal-wrapper.html"))) {
+        wrapper = html;
+        continue;
+      }
+      calls += countOccurrences(html, "fragments/modal-wrapper :: modal(");
+      for (String shell : SHELL_CLASSES) {
+        if (count(html, shell) > 0) {
+          offenders.add(template.getFileName() + " -> a hand-written ." + shell);
+        }
+      }
     }
-    assertThat(overlays).as("the app still renders dialogs at all").isGreaterThan(50);
-    // Every overlay holds exactly one frame; `krt-modal` also matches `krt-modal-overlay`,
-    // `krt-modal-head` and friends only if they were whole tokens, which they are not.
-    assertThat(frames)
-        .as("every .krt-modal-overlay carries exactly one .krt-modal frame")
-        .isEqualTo(overlays);
+    assertThat(offenders)
+        .as("REQ-UI-013/ADR-0177: every dialog is rendered by fragments/modal-wrapper :: modal")
+        .isEmpty();
+    assertThat(calls).as("the app still renders its dialogs through the wrapper").isGreaterThan(90);
+    assertThat(wrapper).as("fragments/modal-wrapper.html").isNotNull();
+    for (String shell : SHELL_CLASSES) {
+      assertThat(count(wrapper, shell)).as("the wrapper draws one .%s", shell).isEqualTo(1);
+    }
+    assertThat(wrapper)
+        .as("the design system's head: an <h2> title and the ✕ close glyph")
+        .contains("<h2 ")
+        .doesNotContain("<h3")
+        .contains("&#10005;</button>");
+  }
+
+  /**
+   * Asserts that every canonical overlay is a native {@code <dialog>} (FE-SIMP-04b, ADR-0177).
+   *
+   * <p>{@code window.krtModal.open} shows an overlay with {@code showModal()}: top layer, the page
+   * behind it inert, Escape raised as {@code cancel}. A {@code .krt-modal-overlay} left as a {@code
+   * <div>} would still open — by its class — but without any of that, so the app would be back to
+   * two dialog behaviours under one class name, which is the split this test exists to prevent.
+   *
+   * @throws IOException if a template cannot be read
+   * @throws URISyntaxException if the templates classpath root cannot be resolved
+   */
+  @Test
+  void everyOverlayIsANativeDialog() throws IOException, URISyntaxException {
+    Pattern overlayTag =
+        Pattern.compile(
+            "<(\\w+)\\b[^>]*class=\"[^\"]*(?<![-\\w])krt-modal-overlay(?![-\\w])[^\"]*\"");
+    List<String> offenders = new ArrayList<>();
+    int dialogs = 0;
+    for (Path template : templates()) {
+      String html =
+          Files.readString(template, StandardCharsets.UTF_8).replaceAll("(?s)<!--.*?-->", "");
+      Matcher tag = overlayTag.matcher(html);
+      while (tag.find()) {
+        if ("dialog".equals(tag.group(1))) {
+          dialogs++;
+        } else {
+          offenders.add(
+              template.getFileName() + " -> <" + tag.group(1) + " class=krt-modal-overlay>");
+        }
+      }
+    }
+    assertThat(offenders).as("every .krt-modal-overlay is a <dialog>").isEmpty();
+    assertThat(dialogs)
+        .as("exactly one overlay tag exists — the wrapper's root — and it is a <dialog>")
+        .isEqualTo(1);
   }
 
   /**
@@ -213,20 +278,24 @@ class SingleModalShapeTest {
   }
 
   /**
-   * Splits a template into the source text of each dialog, from a {@code .krt-modal-overlay}
-   * opening tag to the matching {@code </div>}.
+   * Splits a template into the source text of each dialog: every call of the wrapper, from the
+   * start tag that carries it ({@code <th:block>} or {@code <div>}) to that element's closing tag,
+   * which encloses the body the call passes in.
    *
    * @param html the template source
    * @return one string per dialog found
    */
   private static List<String> dialogBlocks(String html) {
-    Pattern overlay = Pattern.compile("<div\\b[^>]*class=\"[^\"]*krt-modal-overlay[^\"]*\"[^>]*>");
-    Pattern div = Pattern.compile("<div\\b[^>]*?(/)?>|</div>");
+    Pattern call =
+        Pattern.compile(
+            "<(th:block|div)\\b[^>]*th:replace=\"~\\{fragments/modal-wrapper :: modal\\(");
     List<String> blocks = new ArrayList<>();
-    Matcher start = overlay.matcher(html);
+    Matcher start = call.matcher(html);
     while (start.find()) {
+      String name = Pattern.quote(start.group(1));
+      Pattern tags = Pattern.compile("<" + name + "\\b[^>]*?(/)?>|</" + name + ">");
       int depth = 0;
-      Matcher walk = div.matcher(html);
+      Matcher walk = tags.matcher(html);
       walk.region(start.start(), html.length());
       while (walk.find()) {
         String tag = walk.group();
@@ -242,6 +311,15 @@ class SingleModalShapeTest {
       }
     }
     return blocks;
+  }
+
+  /** Counts the literal occurrences of {@code needle} in {@code haystack}. */
+  private static int countOccurrences(String haystack, String needle) {
+    int hits = 0;
+    for (int i = haystack.indexOf(needle); i >= 0; i = haystack.indexOf(needle, i + 1)) {
+      hits++;
+    }
+    return hits;
   }
 
   /** Counts whole-token occurrences of a class name inside {@code class="…"} attributes. */

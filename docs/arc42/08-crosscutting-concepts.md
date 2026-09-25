@@ -122,6 +122,20 @@ Two binding rules shape every UI change:
   behind the head scripts; inline page scripts run their code on `DOMContentLoaded`. A head-side
   `krtEvents` watchdog throws into the client-error beacon when `event-delegation.js` never ran
   (REQ-FE-023, `InlineScriptLoadOrderTest`, `ScriptLoadOrderE2eTest`).
+- **One dialog contract on native `<dialog>`s** (FE-SIMP-04/04b, 2026-09-23). Every
+  `.krt-modal-overlay` is a `<dialog>` opened by `window.krtModal` with `showModal()`: top layer,
+  inert page, Escape, focus in and back. Transient overlays go into the open dialog
+  (`krtModal.layerRoot()`). Every dialog is rendered by `fragments/modal-wrapper :: modal` (one
+  shell: `<h2>` and ✕; the page supplies the body), and `DialogA11yE2eTest` runs the contract on
+  every dialog it can reach. (REQ-UI-013, ADR-0177, `SingleModalShapeTest`.)
+- **Coloured text takes the accessible tints** (2026-09-25). The canonical danger, info and Grau 2
+  hues fail WCAG AA as text on the dark surfaces; text uses their `-text` tints, and
+  `AccessibleTextTintTest` fails the build on a stylesheet or script that sets one of the canonical
+  hues as a text colour (REQ-UI-006).
+- **The cascade layer decides, not the load order** (FE-MOD-02, 2026-09-23). Every stylesheet
+  declares `@layer base, components, page, migration, utilities;` and keeps its rules inside its
+  layer: page CSS beats the design system without specificity bumps, a migrated inline class beats
+  both, and the two state classes win outright (REQ-UI-024, ADR-0212, `CascadeLayerOrderTest`).
 
 Authority: [`ui-design-system.md`](../specs/ui-design-system.md),
 [`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md) (`REQ-FE-*`),
@@ -161,6 +175,11 @@ Authority: [`audit.md`](../specs/audit.md) (`REQ-AUDIT-001`).
 One access-log line per request; MDC carrying `correlationId`, `userId` and `orgUnitId`, propagated
 across module boundaries; JSON logging in production. Business metrics are `basetool_*` with
 bounded labels. **Never log names, e-mail addresses or tokens** — unconditionally.
+
+The MDC is a `ThreadLocal`, so it is bound per **dispatch**, not per request: a servlet async
+dispatch (an SSE stream's completion, a `DeferredResult`) runs on another container thread, and
+the filters that own the fields re-bind there what the initial dispatch resolved, from request
+attributes, without resolving anything afresh (since 2026-09-25, `REQ-OBS-001`).
 
 Monitoring moves with every feature: a new scheduled job needs task metrics, a new audited area its
 event counter, a new status enum its queue gauge, a new public surface its probe. A renamed or

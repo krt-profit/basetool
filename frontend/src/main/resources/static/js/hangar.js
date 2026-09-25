@@ -65,14 +65,14 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function openModal() {
-        modal.style.display = 'flex';
+        window.krtModal.open(modal);
     }
 
     function closeModal() {
         if (typeof window.resetUnsavedChanges === 'function') {
             window.resetUnsavedChanges();
         }
-        modal.style.display = 'none';
+        window.krtModal.close(modal);
     }
 
     if (closeBtn) closeBtn.addEventListener('click', closeModal);
@@ -83,13 +83,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
     window.addEventListener('click', (e) => {
         if (e.target === modal) closeModal();
-        if (deleteModal && e.target === deleteModal) deleteModal.style.display = 'none';
+        if (deleteModal && e.target === deleteModal) window.krtModal.close(deleteModal);
     });
 
     const modalDeleteBtn = document.getElementById('modal-delete-btn');
 
     function openAddModal(btn) {
-        modalTitle.textContent = modal.getAttribute('data-title-add');
+        modalTitle.textContent = form.getAttribute('data-title-add');
         form.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
         document.getElementById('ship-name').value = '';
         document.getElementById('ship-type').value = '';
@@ -102,7 +102,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function openEditModal(btn) {
-        modalTitle.textContent = modal.getAttribute('data-title-edit');
+        modalTitle.textContent = form.getAttribute('data-title-edit');
         form.action = window.safeSameOriginUrl(btn.getAttribute('data-action'), form.action);
         document.getElementById('ship-name').value = btn.getAttribute('data-name');
         document.getElementById('ship-type').value = btn.getAttribute('data-type');
@@ -130,13 +130,13 @@ document.addEventListener('DOMContentLoaded', function () {
             modalDeleteBtn.getAttribute('data-action'),
             deleteForm.action,
         );
-        deleteModal.style.display = 'flex';
+        window.krtModal.open(deleteModal);
     });
 
     if (deleteModal) {
         closeDeleteBtns.forEach((btn) => {
             btn.addEventListener('click', () => {
-                deleteModal.style.display = 'none';
+                window.krtModal.close(deleteModal);
             });
         });
     }
@@ -159,7 +159,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     errorMessage: hangarI18n.deleteError,
                     conflict: hangarConflict,
                     onSuccess() {
-                        if (deleteModal) deleteModal.style.display = 'none';
+                        if (deleteModal) window.krtModal.close(deleteModal);
                         closeModal();
                         reswapHangar();
                     },
@@ -231,13 +231,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 dupSection.style.display = 'none';
             }
 
-            resultModal.style.display = 'flex';
+            window.krtModal.open(resultModal);
         }
 
         [closeResultBtn, closeResultX].forEach(function (btn) {
             if (!btn) return;
             btn.addEventListener('click', function () {
-                resultModal.style.display = 'none';
+                window.krtModal.close(resultModal);
                 // In-place: re-render the ship table instead of reloading the page (REQ-FE-001).
                 if (document.getElementById('import-res-imported').textContent !== '0') {
                     reswapHangar();
@@ -247,7 +247,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         window.addEventListener('click', function (e) {
             if (e.target === resultModal) {
-                resultModal.style.display = 'none';
+                window.krtModal.close(resultModal);
             }
         });
 
@@ -323,16 +323,16 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!deleteAllBtn || !deleteAllModal) return;
 
         deleteAllBtn.addEventListener('click', function () {
-            deleteAllModal.style.display = 'flex';
+            window.krtModal.open(deleteAllModal);
         });
 
         deleteAllCancelBtn.addEventListener('click', function () {
-            deleteAllModal.style.display = 'none';
+            window.krtModal.close(deleteAllModal);
         });
 
         window.addEventListener('click', function (e) {
             if (e.target === deleteAllModal) {
-                deleteAllModal.style.display = 'none';
+                window.krtModal.close(deleteAllModal);
             }
         });
 
@@ -350,7 +350,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     errorMessage: deleteAllBtn.getAttribute('data-error-failed'),
                     conflict: hangarConflict,
                     onSuccess() {
-                        deleteAllModal.style.display = 'none';
+                        window.krtModal.close(deleteAllModal);
                         reswapHangar();
                         if (window.showFrontendSuccessToast) {
                             window.showFrontendSuccessToast(
@@ -372,7 +372,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!homeModal) return;
 
         function closeHome() {
-            homeModal.style.display = 'none';
+            window.krtModal.close(homeModal);
         }
 
         // Re-render the modal body with the LIVE ship count. The count baked in at page load
@@ -391,7 +391,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (window.krtEvents && typeof window.krtEvents.on === 'function') {
             window.krtEvents.on('click', 'hangar-open-home', function () {
                 refreshHomeBody();
-                homeModal.style.display = 'flex';
+                window.krtModal.open(homeModal);
             });
         }
 

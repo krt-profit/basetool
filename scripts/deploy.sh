@@ -103,6 +103,12 @@
 #                                          alerts once, then skips subsequent
 #                                          ticks quietly until a new promotion or
 #                                          a --force run. Cleared on apply.
+#   /var/lib/iri/config-apply.incomplete   present while the live config tree is
+#                                          not known to be one release: written
+#                                          before a config apply, removed when
+#                                          it (or the restore after a failed
+#                                          one) completed. While it exists,
+#                                          config-previous/ is not re-snapshotted.
 #   /var/lib/iri/keycloak-spi-previous.jar snapshot of the live provider JAR taken
 #                                          before a provider-JAR swap; restored on
 #                                          rollback if the keycloak recreate is
@@ -364,15 +370,25 @@ require_file() {
 # copy of keycloak-theme. `rsync -rlpt` / `cp -R` keep recursion, symlinks, perms
 # and times (all the maintenance/theme assets need) without ever touching
 # ownership, so the mirror succeeds as long as the destination dirs are writable.
+#
+# A failure RETURNS the tool's exit code after naming the path, and does not swallow it. Called as a
+# plain command, the non-zero return is what errexit acts on, and the pre-gate guard
+# (on_pre_gate_exit) turns that exit into a recorded failure. Until 2026-09-25 the rsync error was
+# the last thing a tick printed: errexit ended the script inside this function, before any FATAL
+# line, metric or backoff record — see on_pre_gate_exit for that incident.
 mirror_dir() {
-  local src="$1" dst="$2"
+  local src="$1" dst="$2" rc=0
+  DEPLOY_STEP="mirror ${dst}"
   if command -v rsync >/dev/null 2>&1; then
-    rsync -rlpt --delete "${src}/" "${dst}/"
+    rsync -rlpt --delete "${src}/" "${dst}/" || rc=$?
   else
-    rm -rf "${dst}"
-    install -d "${dst%/*}"
-    cp -R "${src}" "${dst}"
+    { rm -rf "${dst}" && install -d "${dst%/*}" && cp -R "${src}" "${dst}"; } || rc=$?
   fi
+  if (( rc != 0 )); then
+    log "mirror of ${src} onto ${dst} failed (exit ${rc}) — the tool's own error is above"
+    return "${rc}"
+  fi
+  return 0
 }
 
 # Extract the promoted config bundle (/config inside the scratch basetool-config
@@ -454,10 +470,17 @@ snapshot_config_tree() {
   install -d -m 0755 "${dst}"
   [[ -f "${COMPOSE_DIR}/docker-compose.yml" ]] \
     && cp -a "${COMPOSE_DIR}/docker-compose.yml" "${dst}/docker-compose.yml"
-  if [[ -d "${COMPOSE_DIR}/docker/maintenance" ]]; then
-    install -d "${dst}/docker"
-    cp -a "${COMPOSE_DIR}/docker/maintenance" "${dst}/docker/maintenance"
-  fi
+  # Every docker/ subtree apply_config_tree mirrors, not only the maintenance page. The edge and acme
+  # trees were added to the mirror list (2026-09-12, 2026-09-16) and not to this one, so a rollback
+  # left the failed release's edge configuration and ACME loop in place — and a restore after an
+  # apply that died halfway through could not have put them back at all.
+  local sub
+  for sub in maintenance edge acme; do
+    if [[ -d "${COMPOSE_DIR}/docker/${sub}" ]]; then
+      install -d "${dst}/docker"
+      cp -a "${COMPOSE_DIR}/docker/${sub}" "${dst}/docker/${sub}"
+    fi
+  done
   [[ -d "${COMPOSE_DIR}/keycloak-theme" ]] \
     && cp -a "${COMPOSE_DIR}/keycloak-theme" "${dst}/keycloak-theme"
   # Monitoring compose + config tree (epic #936). Carries no secrets; snapshotted so a rollback
@@ -478,10 +501,21 @@ snapshot_config_tree() {
 # files -- still the source the units are generated from, and carried for the
 # record -- are replaced atomically (write a temp, then rename → new inode); the
 # asset trees are mirrored within their own subtree only.
+#
+# Must be called as a PLAIN command (or inside a `( set -e; … )` subshell that is itself a plain
+# command). Under `if`, `!`, `&&` or `||` bash ignores errexit for the whole function body, so a
+# failed mirror in the middle would be skipped over and the function would report the status of its
+# last line only.
+#
+# The compose file is optional on the source side because the source is also a SNAPSHOT
+# (restore_previous_config_tree), and a Quadlet host may never have had one. A staged bundle always
+# carries it: the config block's require_file refuses one that does not.
 apply_config_tree() {
   local src="$1" dst="$2"
-  install -m 0644 "${src}/docker-compose.yml" "${dst}/.docker-compose.yml.tmp"
-  mv -f "${dst}/.docker-compose.yml.tmp" "${dst}/docker-compose.yml"
+  if [[ -f "${src}/docker-compose.yml" ]]; then
+    install -m 0644 "${src}/docker-compose.yml" "${dst}/.docker-compose.yml.tmp"
+    mv -f "${dst}/.docker-compose.yml.tmp" "${dst}/docker-compose.yml"
+  fi
   # Monitoring compose (atomic replace) + config tree (epic #936). Only present in bundles built
   # after Phase 2; the guards keep an older bundle (no monitoring/) applying cleanly.
   if [[ -f "${src}/docker-compose.monitoring.yml" ]]; then
@@ -573,6 +607,7 @@ install_quadlet_units() {
   install -d "${unit_dir}"
 
   # Render the environment files the units name, BEFORE anything reloads.
+  DEPLOY_STEP="render ${ENV_D_DIR}"
   if [[ -d "${src}/env.d" ]]; then
     if [[ -x "${ENV_RENDERER}" ]]; then
       if ! "${ENV_RENDERER}" --env "${COMPOSE_DIR}/.env"              --templates "${src}/env.d" --out "${ENV_D_DIR}" >/dev/null; then
@@ -585,6 +620,7 @@ install_quadlet_units() {
   fi
 
   # Install every unit the bundle names.
+  DEPLOY_STEP="install quadlet units into ${unit_dir}"
   local f base
   for f in "${src}"/systemd/*; do
     [[ -f "${f}" ]] || continue
@@ -618,6 +654,106 @@ install_quadlet_units() {
   done
 
   log "quadlet units: ${installed} installed/updated, ${removed} retired (${unit_dir})"
+  return 0
+}
+
+# ---------------------------------------------------------------------------
+# assert_config_tree_writable <staged-tree>
+#
+# Refuse BEFORE anything is changed when the deploy account cannot write where the apply is about to
+# write. The 2026-09-25 incident, v1.11.0: /var/iri/code/docker/acme was root-owned, and every tick
+# from 12:25 to 12:35 mirrored monitoring/, the maintenance page and the edge configuration onto the
+# host and then died inside the acme mirror with
+#
+#     rsync: [receiver] mkstemp "/var/iri/code/docker/acme/.publish-loop.sh.XXXX" failed: Permission denied (13)
+#
+# leaving a tree that was half the new release and half the old one. Checked here, the same host
+# produces one line naming the directory and changes nothing.
+#
+# What is checked is what `rsync -rlpt --delete` actually needs: every DIRECTORY in a subtree it
+# mirrors must be writable (it creates a temp file beside each target and renames it) and owned by
+# this account (it sets the directory's mode and mtime, which only the owner may). A FILE owned by
+# someone else is not a problem — rsync replaces it by rename rather than writing into it — so files
+# are deliberately not checked; demanding more would refuse hosts that deploy fine. Beside the
+# subtrees: the compose directory itself (the compose files are replaced through a temp file there),
+# the unit directory, and env.d when it exists. A subtree that does not exist yet needs its nearest
+# existing parent writable, because that is where rsync creates it.
+#
+# Only subtrees the staged bundle carries are checked: one the bundle does not carry is not mirrored.
+# ---------------------------------------------------------------------------
+assert_config_tree_writable() {
+  local src="$1" me sub d parent bad count
+  me="$(id -u)"
+  DEPLOY_STEP="pre-flight: the config tree is writable"
+  for d in "${COMPOSE_DIR}" "${RT_UNIT_DIR}"; do
+    [[ -w "${d}" ]] \
+      || fail "PRE-FLIGHT: ${d} is not writable by $(id -un) — nothing was changed; fix the owner (docs/deployment.md → Troubleshooting, 'deploy stuck on a config apply')"
+  done
+  if [[ -e "${ENV_D_DIR}" && ! -w "${ENV_D_DIR}" ]]; then
+    fail "PRE-FLIGHT: ${ENV_D_DIR} is not writable by $(id -un) — nothing was changed; the role's --tags directories restores deploy:iri 2750"
+  fi
+  for sub in monitoring docker/maintenance docker/edge docker/acme keycloak-theme quadlet; do
+    [[ -d "${src}/${sub}" ]] || continue
+    d="${COMPOSE_DIR}/${sub}"
+    if [[ -e "${d}" ]]; then
+      bad="$(find "${d}" -type d \( ! -user "${me}" -o ! -writable \) -print 2>/dev/null || true)"
+      if [[ -n "${bad}" ]]; then
+        count="$(printf '%s\n' "${bad}" | wc -l | tr -d '[:space:]')"
+        fail "PRE-FLIGHT: $(printf '%s\n' "${bad}" | head -n 1) is not owned or not writable by $(id -un) (${count} such directories under ${d}) — nothing was changed; fix with 'chown -R $(id -un):$(id -un) ${d}' or the role's --tags directories (docs/deployment.md → Troubleshooting)"
+      fi
+    else
+      parent="${d%/*}"
+      while [[ ! -e "${parent}" && "${parent}" == "${COMPOSE_DIR}"/* ]]; do
+        parent="${parent%/*}"
+      done
+      [[ -w "${parent}" ]] \
+        || fail "PRE-FLIGHT: ${parent} is not writable by $(id -un), so ${d} cannot be created — nothing was changed"
+    fi
+  done
+  return 0
+}
+
+# ---------------------------------------------------------------------------
+# restore_previous_config_tree
+#
+# Put config-previous/ back onto the host, and the previous units with it. Shared by the pre-gate
+# abort (on_pre_gate_exit) and the health-gate rollback.
+#
+# Returns 0 when the previous tree and its units are back, 1 when the restore itself failed — the
+# live tree is then a mix of two releases — and 2 when there is no previous DEFINITION to restore
+# to: the first bundle on a host, whose snapshot holds no quadlet/systemd. Installing units from the
+# live tree in that case would install the very release that just failed.
+#
+# The restore runs in a subshell with errexit ON, as a plain command between `set +e` and the
+# caller's own setting. That is the only shape in which a failing step stops the restore: in an `if`
+# or behind `||` bash ignores errexit inside the subshell, and a failed mirror would be skipped over
+# with the restore reporting success. The price is that the subshell's rt_note_changed calls do not
+# reach this shell. That loses nothing: the forward apply already noted every unit the restore
+# changes back, and a unit it retired is stopped, which the following start covers.
+# ---------------------------------------------------------------------------
+restore_previous_config_tree() {
+  local rc=0 errexit_was_on=false
+  if [[ ! -d "${CONFIG_PREVIOUS_DIR}/quadlet/systemd" ]]; then
+    log "no previous definition in ${CONFIG_PREVIOUS_DIR} (the first bundle on this host) — nothing to restore to"
+    return 2
+  fi
+  log "restoring previous host config from ${CONFIG_PREVIOUS_DIR}"
+  [[ "$-" == *e* ]] && errexit_was_on=true
+  set +e
+  (
+    set -e
+    apply_config_tree "${CONFIG_PREVIOUS_DIR}" "${COMPOSE_DIR}"
+    install_quadlet_units "${COMPOSE_DIR}"
+  )
+  rc=$?
+  if [[ "${errexit_was_on}" == "true" ]]; then
+    set -e
+  fi
+  if (( rc != 0 )); then
+    log "restoring the previous host config FAILED (exit ${rc})"
+    return 1
+  fi
+  log "previous host config restored"
   return 0
 }
 
@@ -1003,9 +1139,13 @@ fi
 # EVERY PKCS#12 mounted under /run/secrets/, not the first one (REQ-SEC-070): since the
 # per-service keystores each service mounts its own file plus the internal truststore, and one
 # missing file among several is exactly the case `head -n1` could not see.
+#
+# And the edge's two trust anchors under /etc/nginx/*.crt (REQ-OBS-008): the internal CA and, since
+# 2026-09-23, Grafana's own certificate. A single-file bind mount whose source is missing does not
+# start the container at all, and for the edge that is the whole site.
 keystore_mount_sources() {
   local src=""
-  src="$(grep -h -E '^Volume=[^:]+:/run/secrets/[A-Za-z0-9._-]+\.p12(:|$)' "${RT_UNIT_DIR}"/*.container \
+  src="$(grep -h -E '^Volume=[^:]+:(/run/secrets/[A-Za-z0-9._-]+\.p12|/etc/nginx/[A-Za-z0-9._-]+\.crt)(:|$)' "${RT_UNIT_DIR}"/*.container \
            2>/dev/null | sed -E 's/^Volume=([^:]+):.*/\1/' | sort -u || true)"
   if [[ -z "${src}" ]]; then
     src="$(read_env IRI_KEYSTORE_HOST_PATH || true)"
@@ -1070,6 +1210,11 @@ MON_RELOAD_STATE_DIR="${STATE_DIR}/monitoring-reload"
 # certificates it was last started with.
 EDGE_STATE_DIR="${STATE_DIR}/edge"
 CONFIG_BLOCKED_FILE="${STATE_DIR}/config-blocked.marker"
+# Present while the live config tree is not known to be one release: written before the first byte
+# of a config apply, removed once the apply (or the restore after a failed one) completed. A tick that
+# finds it does NOT re-snapshot config-previous/, because the live tree would be a mix of two releases
+# and snapshotting it would overwrite the only consistent rollback anchor with it.
+CONFIG_APPLY_INCOMPLETE_FILE="${STATE_DIR}/config-apply.incomplete"
 # The live Keycloak provider JAR (mounted into the keycloak container) and the
 # rollback snapshot of it taken before a provider-JAR swap.
 KEYCLOAK_SPI_JAR="${COMPOSE_DIR}/keycloak/providers/keycloak-spi.jar"
@@ -1223,6 +1368,86 @@ write_stack_health_metric() {
     echo "# TYPE basetool_deploy_last_health_restart_failed_timestamp gauge"
     echo "basetool_deploy_last_health_restart_failed_timestamp ${prev_failed}"
   } | write_textfile "$(basename "${f}")" || true
+}
+
+# record_target_failure — count one more failure of EXPECTED_MARKER in ${FAILED_FILE}, which is what
+# the bad-digest backoff reads. Sets FAIL_COUNT. The count restarts at 1 when the record belongs to a
+# different target, so a freshly promoted release is never throttled by its predecessor's failures.
+record_target_failure() {
+  local prev_marker="" prev_count=""
+  FAIL_COUNT=1
+  if [[ -f "${FAILED_FILE}" ]]; then
+    read -r prev_marker prev_count _ < "${FAILED_FILE}" || true
+    if [[ "${prev_marker}" == "${EXPECTED_MARKER}" ]] && [[ "${prev_count}" =~ ^[0-9]+$ ]]; then
+      FAIL_COUNT=$(( 10#${prev_count} + 1 ))
+    fi
+  fi
+  printf '%s %d %d\n' "${EXPECTED_MARKER}" "${FAIL_COUNT}" "$(date +%s)" > "${FAILED_FILE}"
+}
+
+# --- The pre-gate guard -----------------------------------------------------
+# Everything between the signature verification and the health gate changes the host — the config
+# tree, the units, env.d, the digest pin — and until 2026-09-25 a failure anywhere in it was recorded
+# NOWHERE. The only failure bookkeeping this script had was explicit code on three paths (the health
+# gate, the provider-JAR recreate, the signature check); `fail` writes no metric, and a command that
+# failed under `set -e` ended the process without even a FATAL line.
+#
+# That is how v1.11.0 sat undeployed for fifteen minutes on 2026-09-25. /var/iri/code/docker/acme was
+# root-owned; every tick from 12:25 to 12:35 logged "config changed → staging", mirrored three
+# subtrees, died on rsync exit 23 inside mirror_dir, and the next tick began. No FATAL line, no
+# backoff record, no rollback, `basetool_deploy_last_failure_timestamp 0` — so DeployFailed could not
+# fire, and a human noticed. It also destroyed both rollback anchors on the way: the second tick's pin
+# save copied the first tick's NEW pin over previous-digest-pin.yml, and its snapshot captured the
+# half-mirrored tree as config-previous/.
+#
+# The guard is an EXIT trap armed for exactly that window. Any non-zero exit inside it — a `fail`, a
+# mirror's rsync, an errexit anywhere, a pull — lands here, and is recorded the way every other
+# deploy failure is: a FATAL line naming the step and the exit code, the host tree and the pin put
+# back if this run had changed them, a backoff record, and the failure metric that DeployFailed
+# reads. A deliberate exit inside the window (the stateful-infra carve-out) disarms it first.
+DEPLOY_STEP=""
+PRE_GATE_GUARD=false
+CONFIG_TREE_TOUCHED=false
+PIN_TOUCHED=false
+PIN_HAD_PREVIOUS=false
+
+# shellcheck disable=SC2317  # runs indirectly via the EXIT trap armed before the config delivery
+on_pre_gate_exit() {
+  local rc=$?
+  [[ "${PRE_GATE_GUARD}" == "true" ]] || return 0
+  (( rc != 0 )) || return 0
+  PRE_GATE_GUARD=false
+  # Every step below is best-effort and must not end the handler early: the metric write at the end
+  # is the part the alerting depends on.
+  set +e
+  log "FATAL: deploy aborted before the health gate — step '${DEPLOY_STEP:-unknown}' failed (exit ${rc})"
+
+  if [[ "${CONFIG_TREE_TOUCHED}" == "true" ]]; then
+    restore_previous_config_tree
+    case $? in
+      0) rm -f "${CONFIG_APPLY_INCOMPLETE_FILE}" ;;
+      2) log "no previous definition to go back to — what was applied of the first bundle stays, and the next attempt applies it again" ;;
+      *) log "FATAL: the host config tree under ${COMPOSE_DIR} is INCONSISTENT — part of it is the failed release; ${CONFIG_PREVIOUS_DIR} is kept as the rollback anchor (${CONFIG_APPLY_INCOMPLETE_FILE}). Fix the cause, then: deploy.sh --force" ;;
+    esac
+  fi
+
+  if [[ "${PIN_TOUCHED}" == "true" ]]; then
+    if [[ "${PIN_HAD_PREVIOUS}" == "true" ]] && rt_pin_rollback; then
+      log "digest pin restored to the previous release"
+    elif [[ "${PIN_HAD_PREVIOUS}" != "true" ]]; then
+      # There was no pin before this run, so there is nothing to go back to — only this run's to remove.
+      rm -f "${PIN_FILE_CURRENT}"
+      rt_pin_clear backend; rt_pin_clear frontend; rt_pin_clear ingest
+      log "digest pin written by this run removed (there was none before it)"
+    else
+      log "WARNING: could not restore the previous digest pin from ${PIN_FILE_PREVIOUS}"
+    fi
+  fi
+
+  record_target_failure
+  log "recorded pre-gate failure #${FAIL_COUNT} for this target; the next attempt backs off (--force retries now)"
+  write_deploy_metric failure
+  exit "${rc}"
 }
 
 # --- Lock -------------------------------------------------------------------
@@ -1625,18 +1850,14 @@ verify_digest_or_die "ingest"   "${INGEST_IMAGE}@${INGEST_DIGEST}"
 [[ -n "${CONFIG_DIGEST}" ]]       && verify_digest_or_die "config"       "${CONFIG_IMAGE}@${CONFIG_DIGEST}"
 [[ -n "${KEYCLOAK_SPI_DIGEST}" ]] && verify_digest_or_die "keycloak-spi" "${KEYCLOAK_SPI_IMAGE}@${KEYCLOAK_SPI_DIGEST}"
 
-# --- Save rollback anchor + write new pin -----------------------------------
-# The pin has two halves and the seam owns both: the RECORD (this file, which the
-# rollback reads back) and the `.container.d/` drop-ins that actually bind the digest.
-# Restoring only the record on rollback would leave the new digests bound and
-# roll silently FORWARD into the release whose health check just failed.
+# --- Arm the pre-gate guard -------------------------------------------------
+# From here to the health gate every failure is recorded by on_pre_gate_exit: FATAL line, restore,
+# backoff record, failure metric. Disarmed before each deliberate exit and before the health gate,
+# whose success and rollback paths record their own outcome.
 export RT_PIN_FILE="${PIN_FILE_CURRENT}"
 export RT_PIN_FILE_PREVIOUS="${PIN_FILE_PREVIOUS}"
-rt_pin_save
-rt_pin_apply \
-  "backend=${BACKEND_IMAGE}@${BACKEND_DIGEST}" \
-  "frontend=${FRONTEND_IMAGE}@${FRONTEND_DIGEST}" \
-  "ingest=${INGEST_IMAGE}@${INGEST_DIGEST}"
+trap on_pre_gate_exit EXIT
+PRE_GATE_GUARD=true
 
 # --- Deliver promoted host config -------------------------------------------
 # The units and their sibling host config (the edge and monitoring configuration, the
@@ -1646,7 +1867,9 @@ rt_pin_apply \
 # app-only promotion stays byte-for-byte the legacy path.
 if [[ "${CONFIG_CHANGED}" == "true" ]]; then
   log "config changed → staging ${CONFIG_IMAGE}@${CONFIG_DIGEST}"
+  DEPLOY_STEP="extract the config bundle"
   extract_config_bundle "${CONFIG_IMAGE}@${CONFIG_DIGEST}" "${CONFIG_STAGE_DIR}"
+  DEPLOY_STEP="check the staged config bundle"
   require_file "${CONFIG_STAGE_DIR}/docker-compose.yml"
   assert_no_secrets "${CONFIG_STAGE_DIR}"
 
@@ -1672,6 +1895,7 @@ if [[ "${CONFIG_CHANGED}" == "true" ]]; then
     if [[ "${FORCE}" != "true" ]]; then
       if [[ -f "${CONFIG_BLOCKED_FILE}" ]] && grep -qFx "${EXPECTED_MARKER}" "${CONFIG_BLOCKED_FILE}"; then
         log "stateful-infra upgrade still operator-gated for this target; skipping tick (run the manual upgrade then --force)"
+        PRE_GATE_GUARD=false
         exit 0
       fi
       echo "${EXPECTED_MARKER}" > "${CONFIG_BLOCKED_FILE}"
@@ -1680,6 +1904,8 @@ if [[ "${CONFIG_CHANGED}" == "true" ]]; then
       log "  new: $(printf '%s' "${NEW_INFRA}" | tr '\n' ' ')"
       log "  perform the documented manual upgrade (docs/deployment.md → Stateful-infra upgrades), then: deploy.sh --force"
       write_deploy_metric blocked
+      # A deliberate refusal, recorded as `blocked` above — not a failure for the guard to record.
+      PRE_GATE_GUARD=false
       exit 3
     fi
     # --force through a gated stateful-infra change. Deliberately do NOT clear the
@@ -1702,19 +1928,56 @@ if [[ "${CONFIG_CHANGED}" == "true" ]]; then
   # changes are installed, not applied"), never by an automatic tick. The #974 clean-slate recreate
   # that did this for Compose was removed with the Docker runtime on 2026-09-22.
 
-  # Snapshot the live config tree as the rollback anchor, then swap in the new.
-  snapshot_config_tree "${CONFIG_PREVIOUS_DIR}"
+  # Refuse before the first byte is written if the deploy account cannot write where the apply
+  # writes. The incident this exists for is in assert_config_tree_writable.
+  assert_config_tree_writable "${CONFIG_STAGE_DIR}"
+
+  # Snapshot the live config tree as the rollback anchor, then swap in the new — unless an earlier
+  # apply died halfway and could not be undone: the live tree is then a mix of two releases, and
+  # snapshotting it would replace the last consistent anchor with that mix.
+  if [[ -f "${CONFIG_APPLY_INCOMPLETE_FILE}" && -d "${CONFIG_PREVIOUS_DIR}" ]]; then
+    log "an earlier config apply did not complete and was not undone — keeping ${CONFIG_PREVIOUS_DIR} as the rollback anchor instead of snapshotting a half-applied tree"
+  else
+    DEPLOY_STEP="snapshot the live config tree into ${CONFIG_PREVIOUS_DIR}"
+    snapshot_config_tree "${CONFIG_PREVIOUS_DIR}"
+  fi
+  DEPLOY_STEP="apply the config tree"
+  echo "${EXPECTED_MARKER}" > "${CONFIG_APPLY_INCOMPLETE_FILE}"
+  CONFIG_TREE_TOUCHED=true
   apply_config_tree "${CONFIG_STAGE_DIR}" "${COMPOSE_DIR}"
+  DEPLOY_STEP="check ${COMPOSE_DIR}/.env after the swap"
   [[ -f "${COMPOSE_DIR}/.env" ]] \
     || fail "POST-APPLY: ${COMPOSE_DIR}/.env vanished after config swap — aborting before up"
   # The unit files ARE the definition the apply below acts on, so they have to be in place before
   # the pin is written and long before anything is started.
   install_quadlet_units "${COMPOSE_DIR}"
+  rm -f "${CONFIG_APPLY_INCOMPLETE_FILE}"
   log "config applied"
 fi
 
+# --- Save rollback anchor + write new pin -----------------------------------
+# The pin has two halves and the seam owns both: the RECORD (this file, which the
+# rollback reads back) and the `.container.d/` drop-ins that actually bind the digest.
+# Restoring only the record on rollback would leave the new digests bound and
+# roll silently FORWARD into the release whose health check just failed.
+#
+# AFTER the config delivery, not before it (moved 2026-09-25). A drop-in binds as soon as anything
+# daemon-reloads — a reboot, another unit's restart — so a pin written before a config apply that
+# then refused (the stateful-infra carve-out) or failed left the NEW app digests bound to the OLD
+# units; and the next tick's rt_pin_save copied that new pin over previous-digest-pin.yml, so the
+# rollback anchor pointed at the release it was meant to roll back from.
+DEPLOY_STEP="write the digest pin"
+PIN_HAD_PREVIOUS=false
+[[ -f "${PIN_FILE_CURRENT}" ]] && PIN_HAD_PREVIOUS=true
+PIN_TOUCHED=true
+rt_pin_save
+rt_pin_apply \
+  "backend=${BACKEND_IMAGE}@${BACKEND_DIGEST}" \
+  "frontend=${FRONTEND_IMAGE}@${FRONTEND_DIGEST}" \
+  "ingest=${INGEST_IMAGE}@${INGEST_DIGEST}"
 
 # --- Apply ------------------------------------------------------------------
+DEPLOY_STEP="enter ${COMPOSE_DIR}"
 cd "${COMPOSE_DIR}"
 
 # Only pre-pull the images this deploy actually moves (backend + frontend +
@@ -1726,11 +1989,14 @@ cd "${COMPOSE_DIR}"
 # infra image that is genuinely missing locally, so a real digest bump is rolled
 # forward — an already-present pinned image is simply reused offline.
 log "pulling images"
+DEPLOY_STEP="pull the release images"
 RT_PIN_FILE="${PIN_FILE_CURRENT}" rt_pull \
   "backend=${BACKEND_IMAGE}@${BACKEND_DIGEST}" \
   "frontend=${FRONTEND_IMAGE}@${FRONTEND_DIGEST}" \
   "ingest=${INGEST_IMAGE}@${INGEST_DIGEST}"
 
+# The health gate records its own outcome — success, or the rollback below — so the guard ends here.
+PRE_GATE_GUARD=false
 log "applying (timeout ${HEALTH_TIMEOUT}s)"
 if rt_apply_stack; then
 
@@ -1765,14 +2031,7 @@ if rt_apply_stack; then
       # target, the same mechanism as a failed app deploy. The app images stay on
       # the new (healthy) version; only the provider JAR was reverted, so the
       # marker is deliberately NOT written and the next tick retries (backed off).
-      FAIL_COUNT=1
-      if [[ -f "${FAILED_FILE}" ]]; then
-        read -r PREV_MARKER PREV_COUNT _ < "${FAILED_FILE}" || true
-        if [[ "${PREV_MARKER:-}" == "${EXPECTED_MARKER}" ]] && [[ "${PREV_COUNT:-}" =~ ^[0-9]+$ ]]; then
-          FAIL_COUNT=$(( 10#${PREV_COUNT} + 1 ))
-        fi
-      fi
-      printf '%s %d %d\n' "${EXPECTED_MARKER}" "${FAIL_COUNT}" "$(date +%s)" > "${FAILED_FILE}"
+      record_target_failure
       log "recorded keycloak-spi health-check failure #${FAIL_COUNT} for this target"
       write_deploy_metric failure
       exit 1
@@ -1834,26 +2093,29 @@ log "health check failed within ${HEALTH_TIMEOUT}s — rolling back"
 
 # Record this failure so subsequent ticks back off this exact (broken) digest
 # pair instead of re-applying it every 5 minutes (see the backoff block above).
-FAIL_COUNT=1
-if [[ -f "${FAILED_FILE}" ]]; then
-  read -r PREV_MARKER PREV_COUNT _ < "${FAILED_FILE}" || true
-  if [[ "${PREV_MARKER:-}" == "${EXPECTED_MARKER}" ]] && [[ "${PREV_COUNT:-}" =~ ^[0-9]+$ ]]; then
-    FAIL_COUNT=$(( 10#${PREV_COUNT} + 1 ))
-  fi
-fi
-printf '%s %d %d\n' "${EXPECTED_MARKER}" "${FAIL_COUNT}" "$(date +%s)" > "${FAILED_FILE}"
+record_target_failure
 log "recorded health-check failure #${FAIL_COUNT} for this target; next retry backs off"
 
 # Revert the host config too (if this deploy swapped it), so the rolled-back
 # stack runs the exact units the previous digest pin expects. Done before the
 # pin check so even the no-previous-pin exit leaves the config tree consistent.
-if [[ "${CONFIG_CHANGED}" == "true" ]] && [[ -d "${CONFIG_PREVIOUS_DIR}" ]]; then
-  log "restoring previous host config"
-  apply_config_tree "${CONFIG_PREVIOUS_DIR}" "${COMPOSE_DIR}"
-  # And the units with it. Restoring the config tree and the digest pin while leaving the NEW
-  # unit files in place would put the previous release's digests on the failed release's
-  # definitions -- a state neither release was ever tested in.
-  install_quadlet_units "${COMPOSE_DIR}"
+# And the units with it: restoring the config tree and the digest pin while leaving the NEW unit
+# files in place would put the previous release's digests on the failed release's definitions --
+# a state neither release was ever tested in.
+#
+# A restore that fails does not end the rollback. Until 2026-09-25 it ran under errexit, so a failed
+# mirror here ended the script before the pin went back and before the rollback metric was written
+# -- the same silence as the forward apply's. Called as a plain command between `set +e` and `set -e`
+# because restore_previous_config_tree needs errexit to be honoured inside it.
+if [[ "${CONFIG_CHANGED}" == "true" ]]; then
+  set +e
+  restore_previous_config_tree
+  RESTORE_RC=$?
+  set -e
+  if (( RESTORE_RC == 1 )); then
+    echo "${EXPECTED_MARKER}" > "${CONFIG_APPLY_INCOMPLETE_FILE}" || true
+    log "FATAL: the host config tree under ${COMPOSE_DIR} is INCONSISTENT after the rollback — ${CONFIG_PREVIOUS_DIR} is kept as the anchor; the pin is rolled back regardless"
+  fi
 fi
 
 if [[ ! -f "${PIN_FILE_PREVIOUS}" ]]; then

@@ -108,7 +108,7 @@
                     </td>
                     <td>
                         <span th:if="${user.inKeycloak}" class="krtm-color-var-color-success-font-size-0-8rem-65c1" th:text="#{members.in_keycloak}">In Keycloak</span>
-                        <span th:if="${!user.inKeycloak}" class="krtm-color-var-color-danger-font-size-0-8rem-4da5" th:text="#{members.not_in_keycloak}">Nicht in Keycloak</span>
+                        <span th:if="${!user.inKeycloak}" class="text-danger krtm-font-size-0-8rem-0fed" th:text="#{members.not_in_keycloak}">Nicht in Keycloak</span>
                     </td>
                     <td>
                         <div class="flex-gap-xs">
@@ -137,13 +137,8 @@
              only (ADR-0140) and the action guards on PENDING in the service too. Same
              server-searched account picker as the queue's dialogs -- they differ in what moves, not
              in how the account is chosen. */-->
-        <div id="consolidate-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
-            <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{members.consolidate.modal.title}">
-                <div class="krt-modal-head">
-                    <h2 th:text="#{members.consolidate.modal.title}">Konten zusammenführen</h2>
-                    <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                            data-modal-id="consolidate-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-                </div>
+        <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='consolidate-modal', titleKey='members.consolidate.modal.title', variant='krt-modal--wide', body=~{::consolidate-modal-body})}">
+            <th:block th:ref="consolidate-modal-body">
                 <div class="krt-modal-body">
                     <label for="consolidate-target" th:text="#{members.consolidate.modal.targetLabel}">Konto, das bleibt</label>
                     <select id="consolidate-target" data-krt-combobox="remote-users"
@@ -156,8 +151,8 @@
                     <button type="button" class="btn btn-ghost" id="consolidate-cancel" th:text="#{general.cancel}">Abbrechen</button>
                     <button type="button" class="btn btn--cta" id="consolidate-confirm" th:text="#{members.consolidate}">Zusammenführen</button>
                 </div>
-            </div>
-        </div>
+            </th:block>
+        </th:block>
 
         <div th:replace="~{fragments/pagination :: pagination(pageResponse=${usersPage}, baseUrl='/members')}"></div>
         

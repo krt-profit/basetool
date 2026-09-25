@@ -9,34 +9,37 @@
  * pollute :root with 48 single-use tokens.
  */
 
-.matrix-table {
-    table-layout: fixed;
-    width: 0;
-    border-collapse: separate;
-    border-spacing: 0;
-    white-space: nowrap;
-    margin-top: 0;
-}
+@layer base, components, page, migration, utilities;
 
-.matrix-table th,
-.matrix-table td {
-    padding: 0.75rem;
-    text-align: left;
-    border-bottom: 1px solid var(--color-gray-3);
-    border-right: 1px solid var(--color-gray-3);
-}
+@layer page {
+    .matrix-table {
+        table-layout: fixed;
+        width: 0;
+        border-collapse: separate;
+        border-spacing: 0;
+        white-space: nowrap;
+        margin-top: 0;
+    }
 
-.matrix-table th {
-    color: var(--color-primary);
-    font-family: var(--font-body);
-    font-size: var(--fs-sm);
-    position: sticky;
-    background-color: var(--color-surface-input);
-    z-index: 20;
-    background-clip: padding-box;
-}
+    .matrix-table th,
+    .matrix-table td {
+        padding: 0.75rem;
+        text-align: left;
+        border-bottom: 1px solid var(--color-gray-3);
+        border-right: 1px solid var(--color-gray-3);
+    }
 
-/*
+    .matrix-table th {
+        color: var(--color-primary);
+        font-family: var(--font-body);
+        font-size: var(--fs-sm);
+        position: sticky;
+        background-color: var(--color-surface-input);
+        z-index: 20;
+        background-clip: padding-box;
+    }
+
+    /*
  * Planet-system tints. Terminal columns are grouped by their effective UEX planet (direct,
  * via parent moon, or via like-named orbit). The full tint sits behind the header text;
  * each body cell carries a 2px inset left-stripe in the same hue so the column stays
@@ -47,212 +50,212 @@
  * `PlanetColorResolver`. `planet-unknown` intentionally has no rule — terminals without a
  * parent planet (jump points, raw Lagrange) keep the default neutral header.
  */
-.matrix-table th.col-terminal.planet-hurston {
-    background-color: var(--krt-planet-hurston);
-}
-.matrix-table th.col-terminal.planet-crusader {
-    background-color: var(--krt-planet-crusader);
-}
-.matrix-table th.col-terminal.planet-arccorp {
-    background-color: var(--krt-planet-arccorp);
-}
-.matrix-table th.col-terminal.planet-microtech {
-    background-color: var(--krt-planet-microtech);
-}
-.matrix-table th.col-terminal.planet-pyro-1 {
-    background-color: var(--krt-planet-pyro-1);
-}
-.matrix-table th.col-terminal.planet-pyro-2 {
-    background-color: var(--krt-planet-pyro-2);
-}
-.matrix-table th.col-terminal.planet-pyro-3 {
-    background-color: var(--krt-planet-pyro-3);
-}
-.matrix-table th.col-terminal.planet-pyro-4 {
-    background-color: var(--krt-planet-pyro-4);
-}
-.matrix-table th.col-terminal.planet-pyro-5 {
-    background-color: var(--krt-planet-pyro-5);
-}
-.matrix-table th.col-terminal.planet-pyro-6 {
-    background-color: var(--krt-planet-pyro-6);
-}
-.matrix-table th.col-terminal.planet-terra {
-    background-color: var(--krt-planet-terra);
-}
-.matrix-table th.col-terminal.planet-delamar {
-    background-color: var(--krt-planet-delamar);
-}
-.matrix-table th.col-terminal.planet-hash-0 {
-    background-color: var(--krt-planet-hash-0);
-}
-.matrix-table th.col-terminal.planet-hash-1 {
-    background-color: var(--krt-planet-hash-1);
-}
-.matrix-table th.col-terminal.planet-hash-2 {
-    background-color: var(--krt-planet-hash-2);
-}
-.matrix-table th.col-terminal.planet-hash-3 {
-    background-color: var(--krt-planet-hash-3);
-}
-.matrix-table th.col-terminal.planet-hash-4 {
-    background-color: var(--krt-planet-hash-4);
-}
-.matrix-table th.col-terminal.planet-hash-5 {
-    background-color: var(--krt-planet-hash-5);
-}
-.matrix-table th.col-terminal.planet-hash-6 {
-    background-color: var(--krt-planet-hash-6);
-}
-.matrix-table th.col-terminal.planet-hash-7 {
-    background-color: var(--krt-planet-hash-7);
-}
-.matrix-table th.col-terminal.planet-hash-8 {
-    background-color: var(--krt-planet-hash-8);
-}
-.matrix-table th.col-terminal.planet-hash-9 {
-    background-color: var(--krt-planet-hash-9);
-}
-.matrix-table th.col-terminal.planet-hash-10 {
-    background-color: var(--krt-planet-hash-10);
-}
-.matrix-table th.col-terminal.planet-hash-11 {
-    background-color: var(--krt-planet-hash-11);
-}
+    .matrix-table th.col-terminal.planet-hurston {
+        background-color: var(--krt-planet-hurston);
+    }
+    .matrix-table th.col-terminal.planet-crusader {
+        background-color: var(--krt-planet-crusader);
+    }
+    .matrix-table th.col-terminal.planet-arccorp {
+        background-color: var(--krt-planet-arccorp);
+    }
+    .matrix-table th.col-terminal.planet-microtech {
+        background-color: var(--krt-planet-microtech);
+    }
+    .matrix-table th.col-terminal.planet-pyro-1 {
+        background-color: var(--krt-planet-pyro-1);
+    }
+    .matrix-table th.col-terminal.planet-pyro-2 {
+        background-color: var(--krt-planet-pyro-2);
+    }
+    .matrix-table th.col-terminal.planet-pyro-3 {
+        background-color: var(--krt-planet-pyro-3);
+    }
+    .matrix-table th.col-terminal.planet-pyro-4 {
+        background-color: var(--krt-planet-pyro-4);
+    }
+    .matrix-table th.col-terminal.planet-pyro-5 {
+        background-color: var(--krt-planet-pyro-5);
+    }
+    .matrix-table th.col-terminal.planet-pyro-6 {
+        background-color: var(--krt-planet-pyro-6);
+    }
+    .matrix-table th.col-terminal.planet-terra {
+        background-color: var(--krt-planet-terra);
+    }
+    .matrix-table th.col-terminal.planet-delamar {
+        background-color: var(--krt-planet-delamar);
+    }
+    .matrix-table th.col-terminal.planet-hash-0 {
+        background-color: var(--krt-planet-hash-0);
+    }
+    .matrix-table th.col-terminal.planet-hash-1 {
+        background-color: var(--krt-planet-hash-1);
+    }
+    .matrix-table th.col-terminal.planet-hash-2 {
+        background-color: var(--krt-planet-hash-2);
+    }
+    .matrix-table th.col-terminal.planet-hash-3 {
+        background-color: var(--krt-planet-hash-3);
+    }
+    .matrix-table th.col-terminal.planet-hash-4 {
+        background-color: var(--krt-planet-hash-4);
+    }
+    .matrix-table th.col-terminal.planet-hash-5 {
+        background-color: var(--krt-planet-hash-5);
+    }
+    .matrix-table th.col-terminal.planet-hash-6 {
+        background-color: var(--krt-planet-hash-6);
+    }
+    .matrix-table th.col-terminal.planet-hash-7 {
+        background-color: var(--krt-planet-hash-7);
+    }
+    .matrix-table th.col-terminal.planet-hash-8 {
+        background-color: var(--krt-planet-hash-8);
+    }
+    .matrix-table th.col-terminal.planet-hash-9 {
+        background-color: var(--krt-planet-hash-9);
+    }
+    .matrix-table th.col-terminal.planet-hash-10 {
+        background-color: var(--krt-planet-hash-10);
+    }
+    .matrix-table th.col-terminal.planet-hash-11 {
+        background-color: var(--krt-planet-hash-11);
+    }
 
-.matrix-table td.col-terminal.planet-hurston {
-    box-shadow: inset 2px 0 0 0 var(--krt-planet-hurston-stripe);
-}
-.matrix-table td.col-terminal.planet-crusader {
-    box-shadow: inset 2px 0 0 0 var(--krt-planet-crusader-stripe);
-}
-.matrix-table td.col-terminal.planet-arccorp {
-    box-shadow: inset 2px 0 0 0 var(--krt-planet-arccorp-stripe);
-}
-.matrix-table td.col-terminal.planet-microtech {
-    box-shadow: inset 2px 0 0 0 var(--krt-planet-microtech-stripe);
-}
-.matrix-table td.col-terminal.planet-pyro-1 {
-    box-shadow: inset 2px 0 0 0 var(--krt-planet-pyro-1-stripe);
-}
-.matrix-table td.col-terminal.planet-pyro-2 {
-    box-shadow: inset 2px 0 0 0 var(--krt-planet-pyro-2-stripe);
-}
-.matrix-table td.col-terminal.planet-pyro-3 {
-    box-shadow: inset 2px 0 0 0 var(--krt-planet-pyro-3-stripe);
-}
-.matrix-table td.col-terminal.planet-pyro-4 {
-    box-shadow: inset 2px 0 0 0 var(--krt-planet-pyro-4-stripe);
-}
-.matrix-table td.col-terminal.planet-pyro-5 {
-    box-shadow: inset 2px 0 0 0 var(--krt-planet-pyro-5-stripe);
-}
-.matrix-table td.col-terminal.planet-pyro-6 {
-    box-shadow: inset 2px 0 0 0 var(--krt-planet-pyro-6-stripe);
-}
-.matrix-table td.col-terminal.planet-terra {
-    box-shadow: inset 2px 0 0 0 var(--krt-planet-terra-stripe);
-}
-.matrix-table td.col-terminal.planet-delamar {
-    box-shadow: inset 2px 0 0 0 var(--krt-planet-delamar-stripe);
-}
-.matrix-table td.col-terminal.planet-hash-0 {
-    box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-0-stripe);
-}
-.matrix-table td.col-terminal.planet-hash-1 {
-    box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-1-stripe);
-}
-.matrix-table td.col-terminal.planet-hash-2 {
-    box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-2-stripe);
-}
-.matrix-table td.col-terminal.planet-hash-3 {
-    box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-3-stripe);
-}
-.matrix-table td.col-terminal.planet-hash-4 {
-    box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-4-stripe);
-}
-.matrix-table td.col-terminal.planet-hash-5 {
-    box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-5-stripe);
-}
-.matrix-table td.col-terminal.planet-hash-6 {
-    box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-6-stripe);
-}
-.matrix-table td.col-terminal.planet-hash-7 {
-    box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-7-stripe);
-}
-.matrix-table td.col-terminal.planet-hash-8 {
-    box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-8-stripe);
-}
-.matrix-table td.col-terminal.planet-hash-9 {
-    box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-9-stripe);
-}
-.matrix-table td.col-terminal.planet-hash-10 {
-    box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-10-stripe);
-}
-.matrix-table td.col-terminal.planet-hash-11 {
-    box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-11-stripe);
-}
+    .matrix-table td.col-terminal.planet-hurston {
+        box-shadow: inset 2px 0 0 0 var(--krt-planet-hurston-stripe);
+    }
+    .matrix-table td.col-terminal.planet-crusader {
+        box-shadow: inset 2px 0 0 0 var(--krt-planet-crusader-stripe);
+    }
+    .matrix-table td.col-terminal.planet-arccorp {
+        box-shadow: inset 2px 0 0 0 var(--krt-planet-arccorp-stripe);
+    }
+    .matrix-table td.col-terminal.planet-microtech {
+        box-shadow: inset 2px 0 0 0 var(--krt-planet-microtech-stripe);
+    }
+    .matrix-table td.col-terminal.planet-pyro-1 {
+        box-shadow: inset 2px 0 0 0 var(--krt-planet-pyro-1-stripe);
+    }
+    .matrix-table td.col-terminal.planet-pyro-2 {
+        box-shadow: inset 2px 0 0 0 var(--krt-planet-pyro-2-stripe);
+    }
+    .matrix-table td.col-terminal.planet-pyro-3 {
+        box-shadow: inset 2px 0 0 0 var(--krt-planet-pyro-3-stripe);
+    }
+    .matrix-table td.col-terminal.planet-pyro-4 {
+        box-shadow: inset 2px 0 0 0 var(--krt-planet-pyro-4-stripe);
+    }
+    .matrix-table td.col-terminal.planet-pyro-5 {
+        box-shadow: inset 2px 0 0 0 var(--krt-planet-pyro-5-stripe);
+    }
+    .matrix-table td.col-terminal.planet-pyro-6 {
+        box-shadow: inset 2px 0 0 0 var(--krt-planet-pyro-6-stripe);
+    }
+    .matrix-table td.col-terminal.planet-terra {
+        box-shadow: inset 2px 0 0 0 var(--krt-planet-terra-stripe);
+    }
+    .matrix-table td.col-terminal.planet-delamar {
+        box-shadow: inset 2px 0 0 0 var(--krt-planet-delamar-stripe);
+    }
+    .matrix-table td.col-terminal.planet-hash-0 {
+        box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-0-stripe);
+    }
+    .matrix-table td.col-terminal.planet-hash-1 {
+        box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-1-stripe);
+    }
+    .matrix-table td.col-terminal.planet-hash-2 {
+        box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-2-stripe);
+    }
+    .matrix-table td.col-terminal.planet-hash-3 {
+        box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-3-stripe);
+    }
+    .matrix-table td.col-terminal.planet-hash-4 {
+        box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-4-stripe);
+    }
+    .matrix-table td.col-terminal.planet-hash-5 {
+        box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-5-stripe);
+    }
+    .matrix-table td.col-terminal.planet-hash-6 {
+        box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-6-stripe);
+    }
+    .matrix-table td.col-terminal.planet-hash-7 {
+        box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-7-stripe);
+    }
+    .matrix-table td.col-terminal.planet-hash-8 {
+        box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-8-stripe);
+    }
+    .matrix-table td.col-terminal.planet-hash-9 {
+        box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-9-stripe);
+    }
+    .matrix-table td.col-terminal.planet-hash-10 {
+        box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-10-stripe);
+    }
+    .matrix-table td.col-terminal.planet-hash-11 {
+        box-shadow: inset 2px 0 0 0 var(--krt-planet-hash-11-stripe);
+    }
 
-.matrix-table .row-system th {
-    top: 0;
-    height: 40px;
-    box-sizing: border-box;
-    border-bottom: 1px solid var(--color-gray-3);
-    text-align: center;
-    font-family: var(--font-headline);
-    font-weight: var(--fw-bold);
-    font-size: var(--fs-xs);
-    padding: 0.5rem;
-}
+    .matrix-table .row-system th {
+        top: 0;
+        height: 40px;
+        box-sizing: border-box;
+        border-bottom: 1px solid var(--color-gray-3);
+        text-align: center;
+        font-family: var(--font-headline);
+        font-weight: var(--fw-bold);
+        font-size: var(--fs-xs);
+        padding: 0.5rem;
+    }
 
-.matrix-table .row-terminal th {
-    top: 40px;
-    border-bottom: 2px solid var(--color-primary);
-}
+    .matrix-table .row-terminal th {
+        top: 40px;
+        border-bottom: 2px solid var(--color-primary);
+    }
 
-.matrix-table th.col-terminal,
-.matrix-table td.col-terminal {
-    width: 120px;
-    min-width: 120px;
-    max-width: 120px;
-    text-align: right;
-}
+    .matrix-table th.col-terminal,
+    .matrix-table td.col-terminal {
+        width: 120px;
+        min-width: 120px;
+        max-width: 120px;
+        text-align: right;
+    }
 
-.matrix-table th.col-terminal {
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
+    .matrix-table th.col-terminal {
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
 
-.matrix-table th:first-child,
-.matrix-table td:first-child {
-    position: sticky;
-    left: 0;
-    background-color: var(--color-surface-input);
-    z-index: 11;
-    font-weight: bold;
-    color: var(--color-primary);
-    border-right: 2px solid var(--color-primary);
-    background-clip: padding-box;
-    width: 250px;
-    min-width: 250px;
-    max-width: 250px;
-    text-align: left;
-}
+    .matrix-table th:first-child,
+    .matrix-table td:first-child {
+        position: sticky;
+        left: 0;
+        background-color: var(--color-surface-input);
+        z-index: 11;
+        font-weight: bold;
+        color: var(--color-primary);
+        border-right: 2px solid var(--color-primary);
+        background-clip: padding-box;
+        width: 250px;
+        min-width: 250px;
+        max-width: 250px;
+        text-align: left;
+    }
 
-.matrix-table .row-system th:first-child,
-.matrix-table .row-terminal th:first-child {
-    z-index: 30;
-}
+    .matrix-table .row-system th:first-child,
+    .matrix-table .row-terminal th:first-child {
+        z-index: 30;
+    }
 
-.matrix-table td {
-    color: var(--color-gray-1);
-    font-family: var(--font-mono);
-    font-variant-numeric: tabular-nums;
-    text-align: right;
-    font-size: var(--fs-sm);
-}
+    .matrix-table td {
+        color: var(--color-gray-1);
+        font-family: var(--font-mono);
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+        font-size: var(--fs-sm);
+    }
 
-/*
+    /*
  * Uniform body-row height — required by the virtual scroller in /js/materials-matrix.js. It maps
  * scroll offset to row index and sizes the top/bottom spacer rows from a single row height, so
  * every flattened row (category header or material row) must be the same height. A price cell can
@@ -260,126 +263,126 @@
  * content; single-price and header rows then match. The script measures this height at runtime, so
  * the literal value here only has to be uniform and large enough for two lines.
  */
-.matrix-table tbody td {
-    height: 42px;
-    padding-top: 0.2rem;
-    padding-bottom: 0.2rem;
-    vertical-align: middle;
-}
+    .matrix-table tbody td {
+        height: 42px;
+        padding-top: 0.2rem;
+        padding-bottom: 0.2rem;
+        vertical-align: middle;
+    }
 
-.matrix-table td .price-sell,
-.matrix-table td .price-buy {
-    line-height: 1.15;
-}
+    .matrix-table td .price-sell,
+    .matrix-table td .price-buy {
+        line-height: 1.15;
+    }
 
-.matrix-table td .price-sell {
-    color: var(--color-success);
-}
+    .matrix-table td .price-sell {
+        color: var(--color-success);
+    }
 
-.matrix-table td .price-buy {
-    color: var(--color-danger);
-}
+    .matrix-table td .price-buy {
+        color: var(--color-danger-text);
+    }
 
-/*
+    /*
  * Spacer rows pad the virtual scroll height above and below the rendered window. Their single
  * colspan cell must not inherit the fixed body-row height, the cell borders/padding, or the
  * sticky first-column treatment from `td:first-child`; its height is set inline by the script.
  */
-.matrix-table tbody tr.row-spacer td {
-    position: static;
-    height: auto;
-    padding: 0;
-    border: 0;
-    background: transparent;
-}
+    .matrix-table tbody tr.row-spacer td {
+        position: static;
+        height: auto;
+        padding: 0;
+        border: 0;
+        background: transparent;
+    }
 
-/* Category (kind) header row, rendered inside the virtual body. */
-.matrix-table tbody tr.row-kind {
-    background-color: var(--color-surface-input);
-    cursor: pointer;
-}
+    /* Category (kind) header row, rendered inside the virtual body. */
+    .matrix-table tbody tr.row-kind {
+        background-color: var(--color-surface-input);
+        cursor: pointer;
+    }
 
-.matrix-table td.mtx-kind-cell {
-    font-weight: bold;
-    color: var(--color-primary);
-    font-family: var(--font-headline);
-    padding-left: 1rem;
-    text-align: left;
-}
+    .matrix-table td.mtx-kind-cell {
+        font-weight: bold;
+        color: var(--color-primary);
+        font-family: var(--font-headline);
+        padding-left: 1rem;
+        text-align: left;
+    }
 
-.matrix-table td.mtx-kind-cell .toggle-icon {
-    display: inline-block;
-    width: 1.5rem;
-    text-align: center;
-}
+    .matrix-table td.mtx-kind-cell .toggle-icon {
+        display: inline-block;
+        width: 1.5rem;
+        text-align: center;
+    }
 
-/* First (material-name) cell of a material row. */
-.matrix-table td.mtx-name-cell {
-    padding-left: 2rem;
-    text-align: left;
-}
+    /* First (material-name) cell of a material row. */
+    .matrix-table td.mtx-name-cell {
+        padding-left: 2rem;
+        text-align: left;
+    }
 
-.matrix-table .mtx-warn {
-    margin-right: 0.5rem;
-    font-weight: bold;
-}
+    .matrix-table .mtx-warn {
+        margin-right: 0.5rem;
+        font-weight: bold;
+    }
 
-/* Colgroup column widths — table-layout: fixed reads these to size the columns. */
-.matrix-table col.mtx-col-first {
-    width: 250px;
-}
+    /* Colgroup column widths — table-layout: fixed reads these to size the columns. */
+    .matrix-table col.mtx-col-first {
+        width: 250px;
+    }
 
-.matrix-table col.mtx-col-term {
-    width: 120px;
-}
+    .matrix-table col.mtx-col-term {
+        width: 120px;
+    }
 
-/* Loading placeholder and empty-result states. */
-.matrix-loading {
-    padding: 1rem;
-    color: var(--color-gray-2-text);
-    font-family: var(--font-body);
-}
+    /* Loading placeholder and empty-result states. */
+    .matrix-loading {
+        padding: 1rem;
+        color: var(--color-gray-2-text);
+        font-family: var(--font-body);
+    }
 
-.matrix-table td.mtx-no-results {
-    text-align: center;
-    font-style: italic;
-    color: var(--color-gray-2-text);
-}
+    .matrix-table td.mtx-no-results {
+        text-align: center;
+        font-style: italic;
+        color: var(--color-gray-2-text);
+    }
 
-.filters-container {
-    display: flex;
-    gap: 1.5rem;
-    margin-bottom: 1.5rem;
-    flex-wrap: wrap;
-}
+    .filters-container {
+        display: flex;
+        gap: 1.5rem;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+    }
 
-.materials-overview-main .form-group {
-    margin-bottom: 0;
-    flex: 1;
-    min-width: 150px;
-    max-width: 250px;
-}
+    .materials-overview-main .form-group {
+        margin-bottom: 0;
+        flex: 1;
+        min-width: 150px;
+        max-width: 250px;
+    }
 
-.materials-overview-main .form-group > label {
-    display: block;
-    margin-bottom: 0.25rem;
-    color: var(--color-primary);
-    font-family: var(--font-body);
-    font-size: var(--fs-sm);
-}
+    .materials-overview-main .form-group > label {
+        display: block;
+        margin-bottom: 0.25rem;
+        color: var(--color-primary);
+        font-family: var(--font-body);
+        font-size: var(--fs-sm);
+    }
 
-.materials-overview-main .form-group input:not([type='checkbox']),
-.materials-overview-main .form-group select {
-    width: 100%;
-    padding: 0.5rem;
-    background-color: var(--color-surface-input);
-    border: 1px solid var(--color-gray-3);
-    color: var(--color-gray-1);
-    font-family: var(--font-body);
-    box-sizing: border-box;
-}
+    .materials-overview-main .form-group input:not([type='checkbox']),
+    .materials-overview-main .form-group select {
+        width: 100%;
+        padding: 0.5rem;
+        background-color: var(--color-surface-input);
+        border: 1px solid var(--color-gray-3);
+        color: var(--color-gray-1);
+        font-family: var(--font-body);
+        box-sizing: border-box;
+    }
 
-/*
+    /*
  * The matrix scrolls internally (sticky header row + sticky first column).
  * Its height is capped to the space between the sticky page header and the
  * fixed footer (`.krt-footer` in styles.css, `position: fixed; bottom: 0`)
@@ -390,20 +393,21 @@
  * that sit above the table at top-of-page scroll. `max(...)` floors the
  * height so the grid never collapses on very short viewports.
  */
-.table-wrapper {
-    overflow: auto;
-    /* The viewport term and its `dvh` fallback are `--krt-panel-viewport-rest` in styles.css;
+    .table-wrapper {
+        overflow: auto;
+        /* The viewport term and its `dvh` fallback are `--krt-panel-viewport-rest` in styles.css;
        25rem is this panel's own reserve for the chrome above it. */
-    max-height: max(16rem, calc(var(--krt-panel-viewport-rest) - 25rem));
-    border: 1px solid var(--color-gray-3);
-}
+        max-height: max(16rem, calc(var(--krt-panel-viewport-rest) - 25rem));
+        border: 1px solid var(--color-gray-3);
+    }
 
-/*
+    /*
  * Override the global `main { max-width: 1200px }` (and its ultra-wide 1600px bump in
  * styles.css) for this page only. The matrix is a data grid, not long-form text, so
  * capping its width wastes screen real estate on large monitors. The 80ch p-cap from
  * styles.css still applies to any paragraphs inside.
  */
-main.materials-overview-main {
-    max-width: none;
+    main.materials-overview-main {
+        max-width: none;
+    }
 }

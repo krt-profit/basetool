@@ -74,7 +74,17 @@ public final class E2eStackExtension implements BeforeAllCallback {
    */
   static final String KEYSTORE_PW = "basetool-test";
 
-  /** Local image tag the compose build override tags the freshly built images with. */
+  /**
+   * The image tag of the PREBUILT path only: {@code .github/workflows/e2e.yml}'s {@code
+   * build-stack} job builds the images under it and every matrix cell boots them with {@code
+   * --no-build}. One runner, one checkout, so a fixed name is safe there and is what the three
+   * files agree on ({@code E2ePrebuiltImageParityTest}).
+   *
+   * <p>A stack built here uses {@link ServedBuildCheck#localImageTag} instead — a name unique to
+   * the checkout. This one name used to serve every checkout on a machine, and two checkouts
+   * running the suite at once raced for it: the first booted the second's image and went green
+   * against code it was never meant to test (2026-09-23). See {@link #imageTag}.
+   */
   private static final String IMAGE_TAG = "e2e-local";
 
   /**
@@ -123,6 +133,21 @@ public final class E2eStackExtension implements BeforeAllCallback {
 
   /** Throwaway admin password matching {@link #E2E_ADMIN_USER} in {@code realm-export.e2e.json}. */
   private static final String E2E_ADMIN_PASSWORD = "test-admin-pw";
+
+  /**
+   * The RAW material the refinery import fixture's first row folds onto; seeded at bootstrap so
+   * every create-form picker offers it (see {@link #bringUpAndSeed}).
+   */
+  static final String PICKER_MATERIAL_IMPORT = "E2E Import Material";
+
+  /** The RAW material the refinery create-form tests pick; seeded at bootstrap. */
+  static final String PICKER_MATERIAL_REFINERY = "E2E Refinery Material";
+
+  /** A RAW material with a refined counterpart, for the keyboard-pick test; seeded at bootstrap. */
+  static final String PICKER_MATERIAL_KEYBOARD_RAW = "E2E Keyboard Pick Raw";
+
+  /** The refined counterpart of {@link #PICKER_MATERIAL_KEYBOARD_RAW}; seeded at bootstrap. */
+  static final String PICKER_MATERIAL_KEYBOARD_REFINED = "E2E Keyboard Pick Refined";
 
   /** Max time to wait for one {@code docker compose up --build --wait} attempt to finish. */
   private static final Duration UP_TIMEOUT = Duration.ofMinutes(12);
@@ -184,7 +209,7 @@ public final class E2eStackExtension implements BeforeAllCallback {
    * The external services whose images are pulled from a registry ({@code db-backend-dev}, {@code
    * db-keycloak-dev}, {@code keycloak-dev}, {@code redis-dev}). {@code backend-dev} / {@code
    * frontend-dev} are deliberately excluded: they are built from local Dockerfiles and tagged with
-   * {@link #IMAGE_TAG}, so {@code docker compose pull} of them would fail against the registry.
+   * {@link #imageTag()}, so {@code docker compose pull} of them would fail against the registry.
    */
   private static final List<String> PULLED_SERVICES =
       List.of("db-backend-dev", "db-keycloak-dev", "keycloak-dev", "redis-dev");
@@ -269,9 +294,12 @@ public final class E2eStackExtension implements BeforeAllCallback {
 
   /**
    * Performs the one-time ephemeral-stack bring-up: stages the realm/keystore, pulls + {@code up}s
-   * the compose stack, seeds the UEX-owned catalog + profit-eligibility + an orderable item, marks
-   * the stack started, and registers the one-time teardown on the JUnit root store. Extracted from
-   * {@link #beforeAll} so the caller can remember a failure and fail the remaining classes fast.
+   * the compose stack, registers the one-time teardown on the JUnit root store as soon as it is up
+   * (so a failed check or seed still tears it down), checks that it serves this checkout, seeds the
+   * UEX-owned catalog, the refinery picker materials ({@code PICKER_MATERIAL_*}),
+   * profit-eligibility and an orderable item — everything a form picker must offer, before any page
+   * fills the frontend's catalogue caches — and marks the stack started. Extracted from {@link
+   * #beforeAll} so the caller can remember a failure and fail the remaining classes fast.
    *
    * @param context the JUnit extension context whose root store owns the teardown hook
    * @throws Exception if bootstrap or {@code docker compose up} fails
@@ -282,22 +310,49 @@ public final class E2eStackExtension implements BeforeAllCallback {
     if (prebuilt()) {
       requirePrebuiltImages(root);
     }
+    requireFrontendPortFree(root);
     prePullImages(root);
     composeUp(root);
+    // Register the teardown as soon as the stack is up, not after it has been checked and seeded:
+    // a failure in either (the served-build check below, a seeder error) used to leave this
+    // checkout's containers, networks and volumes running, holding the fixed ports and subnets
+    // every later run on the machine needs.
+    context
+        .getRoot()
+        .getStore(ExtensionContext.Namespace.GLOBAL)
+        .put("e2e-docker-stack", (AutoCloseable) () -> composeDown(root));
+    // The stack must be THIS checkout's: compare what it serves with the files here, before a
+    // single test runs against it (ServedBuildCheck).
+    ServedBuildCheck.assertServesThisCheckout(
+        EPHEMERAL_BASE_URL, root, BackendSeeder.trustingTestCa());
     // Seed UEX-owned catalog reference data (refinery-hosting location, ship type, refining
     // method) the admin REST API cannot create on a fresh DB — unblocks the Refinery/Hangar
     // flows.
     BackendSeeder seeder = new BackendSeeder();
     seeder.seedCatalog();
+    // Seed every material a refinery create-form test picks, before any page renders. The
+    // frontend caches the materials catalogue (6 h, evicted only by mutations made THROUGH the
+    // frontend), so the first render of a refinery page fixes the picker's options for the whole
+    // run; a material a class seeds through the backend API afterwards never shows up. Until
+    // 2026-09-23 the three refinery classes each seeded the union of each other's materials and
+    // relied on one of them running before the first create-page render anywhere in the suite —
+    // which a new class that renders every page (DialogA11yE2eTest) broke.
+    seeder.ensureRefineryMaterial(E2E_ADMIN_USER, E2E_ADMIN_PASSWORD, PICKER_MATERIAL_IMPORT);
+    seeder.ensureRefineryMaterial(E2E_ADMIN_USER, E2E_ADMIN_PASSWORD, PICKER_MATERIAL_REFINERY);
+    seeder.ensureRefineryMaterialWithRefinedOutput(
+        E2E_ADMIN_USER,
+        E2E_ADMIN_PASSWORD,
+        PICKER_MATERIAL_KEYBOARD_RAW,
+        PICKER_MATERIAL_KEYBOARD_REFINED);
     // Opt the canonical IRIDIUM Squadron into Job-Order processing exactly once, before any test
-    // page warms the frontend's 10-minute squadrons-catalog cache. Only profit-eligible org units
+    // page warms the frontend's long-lived squadrons-catalog cache. Only profit-eligible org units
     // may be a job order's responsible (processing) unit (V128); without this the create form's
     // responsible picker stays empty and every order-create / handover flow 400s. Seeding it here
     // (not per test class) guarantees the cache never pins a stale not-eligible snapshot.
     seeder.setSquadronProfitEligible(E2E_ADMIN_USER, E2E_ADMIN_PASSWORD, IRIDIUM_SQUADRON_ID, true);
     // Seed one orderable item (a game_item + an active blueprint with a resolved RESOURCE
     // ingredient) so the item-order create form's *frontend-cached* item picker is never empty.
-    // Done here — before any test navigates to /orders/create and warms that 10-minute cache —
+    // Done here — before any test navigates to /orders/create and warms that long-lived cache —
     // for the same reason the profit-eligibility seeding above runs at bootstrap. Non-fatal: only
     // the anonymous item-order flow (UC-12) depends on it, so a seed hiccup must not sink the
     // whole suite's bring-up.
@@ -312,10 +367,6 @@ public final class E2eStackExtension implements BeforeAllCallback {
           seedFailure.getMessage());
     }
     started = true;
-    context
-        .getRoot()
-        .getStore(ExtensionContext.Namespace.GLOBAL)
-        .put("e2e-docker-stack", (AutoCloseable) () -> composeDown(root));
   }
 
   /**
@@ -358,6 +409,35 @@ public final class E2eStackExtension implements BeforeAllCallback {
             missing);
       }
     }
+  }
+
+  /**
+   * The tag this run's backend and frontend images carry: the fixed {@link #IMAGE_TAG} in prebuilt
+   * mode, otherwise one derived from the checkout's path, so parallel checkouts never share an
+   * image.
+   *
+   * @return the value handed to compose as {@code IRI_BASETOOL_VERSION}
+   */
+  static String imageTag() {
+    return prebuilt() ? IMAGE_TAG : ServedBuildCheck.localImageTag(repoRoot());
+  }
+
+  /**
+   * Fails fast, naming the other stack, when a container already publishes the frontend port — the
+   * ports and subnets are fixed, so only one ephemeral stack can run on a machine at a time.
+   *
+   * @param root the repository root, used as the working directory of the {@code docker} call
+   * @throws Exception if the check cannot be run or the port is taken
+   */
+  private void requireFrontendPortFree(Path root) throws Exception {
+    Path out = Paths.get("build", "e2e", "port-check.log").toAbsolutePath();
+    runProcess(
+        root,
+        "port-check",
+        List.of("docker", "ps", "--filter", "publish=18081", "--format", "{{.Names}}"),
+        Map.of(),
+        Duration.ofMinutes(1));
+    ServedBuildCheck.assertPortFree(Files.readString(out), 18081);
   }
 
   /**
@@ -622,7 +702,10 @@ public final class E2eStackExtension implements BeforeAllCallback {
     env.put("REDIS_INGEST_USERNAME", RedisAclTemplate.INGEST_USER);
     env.put("REDIS_INGEST_PASSWORD", RedisAclTemplate.E2E_PASSWORDS.get("REDIS_INGEST_PASSWORD"));
     env.put("SERVER_SSL_KEY_STORE_PASSWORD", KEYSTORE_PW);
-    env.put("IRI_BASETOOL_VERSION", IMAGE_TAG);
+    env.put("IRI_BASETOOL_VERSION", imageTag());
+    // Its own compose project too, for the same reason: two checkouts whose directories share a
+    // name would otherwise share containers, networks and volumes.
+    env.put("COMPOSE_PROJECT_NAME", ServedBuildCheck.composeProjectName(repoRoot()));
     // Audit L-1 / REQ-SEC-024: exercise the enforced `aud` path. See EXPECTED_AUDIENCE — the
     // e2e realm stamps this audience, so turning the knob on here rehearses the prod flip.
     env.put("IRI_BACKEND_EXPECTED_AUDIENCES", EXPECTED_AUDIENCE);

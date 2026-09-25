@@ -1007,59 +1007,19 @@ window.krtLiveSync.createReceiver({
     hydrate(stepList, stepTemplate, stepsJson);
 })();
 
-// ---- KRT modal helpers: open with focus, dismiss buttons, Esc, focus trap. ----
+// ---- KRT modal helpers ----
+// The mission page's own open/close helpers, its Escape handler, its [data-modal-dismiss] click and
+// its hand-rolled Tab trap were one of the ninety copies FE-SIMP-04 folded into window.krtModal
+// (krt-modal.js): the dialogs are native <dialog>s opened with showModal(), which traps focus and
+// makes the page inert by itself. The two names stay as aliases because this file calls them in
+// twenty places and the edit-finance bootstrap in mission-detail.html does too.
 (function () {
-    function visibleOverlays() {
-        return Array.from(document.querySelectorAll('.krt-modal-overlay')).filter(
-            (o) => window.getComputedStyle(o).display !== 'none',
-        );
-    }
-    function focusables(overlay) {
-        return Array.from(
-            overlay.querySelectorAll(
-                'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-            ),
-        ).filter((el) => el.offsetParent !== null);
-    }
     window.krtModalOpen = function (overlay) {
-        if (!overlay) return;
-        overlay.style.display = 'flex';
-        const f = focusables(overlay);
-        if (f.length) f[0].focus();
+        window.krtModal.open(overlay);
     };
     window.krtModalClose = function (overlay) {
-        if (overlay) overlay.style.display = 'none';
+        window.krtModal.close(overlay);
     };
-    document.addEventListener('click', function (e) {
-        const dismiss = e.target.closest('[data-modal-dismiss]');
-        if (dismiss) {
-            const overlay = dismiss.closest('.krt-modal-overlay');
-            if (overlay) window.krtModalClose(overlay);
-        }
-    });
-    document.addEventListener('keydown', function (e) {
-        const open = visibleOverlays();
-        if (!open.length) return;
-        const top = open[open.length - 1];
-        if (e.key === 'Escape') {
-            e.preventDefault();
-            window.krtModalClose(top);
-            return;
-        }
-        if (e.key === 'Tab' && top.contains(document.activeElement)) {
-            const f = focusables(top);
-            if (!f.length) return;
-            const first = f[0];
-            const last = f[f.length - 1];
-            if (e.shiftKey && document.activeElement === first) {
-                e.preventDefault();
-                last.focus();
-            } else if (!e.shiftKey && document.activeElement === last) {
-                e.preventDefault();
-                first.focus();
-            }
-        }
-    });
     // Finance type segment controls: the buttons mirror their value into the hidden
     // type input so the classic Spring form binding keeps working unchanged.
     window.krtSegSet = function (targetId, value) {
@@ -2973,7 +2933,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         typeSelect.addEventListener('change', () => filterShips(true));
 
-        const modal = typeSelect.closest('.krt-modal');
+        const modal = typeSelect.closest('[data-init-shiptype]');
         if (modal) {
             const initialType = modal.dataset.initShiptype;
             const initialShip = modal.dataset.initShip;

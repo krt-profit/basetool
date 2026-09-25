@@ -644,6 +644,15 @@ x-backend: &backend-template
     # SILENTLY until the fetch-failure alert fires.
     KEYCLOAK_ADMIN_URL: https://keycloak:18443/auth
     KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:?KEYCLOAK_ADMIN_CLIENT_SECRET must be set in .env}
+    # Optional split-horizon JWKS (REQ-SEC-024, ADR-0073): fetch the token-signing keys from the
+    # INTERNAL Keycloak over net-backend-keycloak and the `keycloak-trust` bundle instead of through
+    # the public edge; `iss` is still checked against the public issuer. Empty (the default) keeps
+    # the issuer-location decoder exactly as before. application-prod.yml has read
+    # KEYCLOAK_JWK_SET_URI all along, but nothing passed it, so the documented knob could not be
+    # turned. The production value is
+    # https://keycloak:18443/auth/realms/iri/protocol/openid-connect/certs. Backend only: the ingest
+    # gateway reads the same property but sits on no network that reaches Keycloak.
+    KEYCLOAK_JWK_SET_URI: ${IRI_BACKEND_KEYCLOAK_JWK_SET_URI:-}
     # Cadence of the periodic Keycloak->local user sync (ADR-0085). Forwarded for the same reason
     # the retention sweeps below are: application.yml calls these "env-parameterised ... so the
     # cadence is tunable without a rebuild", and `.env.example` offers both to an operator -- but a
@@ -1948,6 +1957,10 @@ services:
       # anything beyond that, such as a jump host, and is held to the same rule:
       # literal addresses, whitespace-separated, never a prefix.
       EDGE_ADMIN_ALLOW: ${EDGE_ADMIN_ALLOW:-}
+      # Verify Grafana's upstream certificate (REQ-OBS-008): `on` pins the certificate mounted at
+      # /etc/nginx/grafana-upstream.crt below. Off by default, so shipping it changes nothing; the
+      # owner switches it on after checking the certificate names `grafana` (docs/deployment.md).
+      EDGE_GRAFANA_UPSTREAM_VERIFY: ${EDGE_GRAFANA_UPSTREAM_VERIFY:-off}
     healthcheck:
       # The jc21 image shipped none, so the deploy pipeline's fail-on-unhealthy
       # gate could never fire for the edge. /healthz proves nginx is accepting and
@@ -1990,6 +2003,11 @@ services:
       # rather than merely encrypted — NPM never verified anything. Same file
       # Prometheus already validates the apps against.
       - ${IRI_UPSTREAM_CA_HOST_PATH:-/var/iri/monitoring/certs/basetool-ca.crt}:/etc/nginx/upstream-ca.crt:ro
+      # Grafana's own self-signed certificate -- the SAME file Grafana serves, so every host that
+      # runs Grafana has it -- as the anchor for the Grafana upstream only. Read only when
+      # EDGE_GRAFANA_UPSTREAM_VERIFY=on. A single-file mount pins the inode: after re-minting it,
+      # restart the edge as well as Grafana.
+      - ${IRI_GRAFANA_UPSTREAM_CERT_HOST_PATH:-/var/iri/monitoring/certs/grafana.crt}:/etc/nginx/grafana-upstream.crt:ro
       - ./docker/maintenance/static:/usr/share/nginx/html/maintenance:ro
     networks:
       # Listed first: this is the leg the published ports land on. The other five

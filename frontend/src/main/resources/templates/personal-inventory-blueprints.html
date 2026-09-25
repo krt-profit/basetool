@@ -209,12 +209,8 @@
 </main>
 
 <!--/* Edit-note modal (KRT modal frame, no native dialogs) */-->
-<div id="krt-bp-edit-modal" class="krt-modal-overlay krtm-display-none-5790" role="dialog" aria-modal="true" th:aria-label="#{personalInventory.blueprints.modal.editNote.title}">
-    <div class="krt-modal krt-modal--wide">
-        <div class="krt-modal-head">
-            <h2 id="krt-bp-edit-title" th:text="#{personalInventory.blueprints.modal.editNote.title}">Notiz bearbeiten</h2>
-            <button type="button" class="btn btn-ghost btn-icon close" data-trigger="bp-close-edit" th:title="#{personalInventory.action.cancel}" th:aria-label="#{personalInventory.action.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
-        </div>
+<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='krt-bp-edit-modal', titleKey='personalInventory.blueprints.modal.editNote.title', variant='krt-modal--wide', titleId='krt-bp-edit-title', closeTrigger='bp-close-edit', body=~{::krt-bp-edit-modal-body})}">
+    <th:block th:ref="krt-bp-edit-modal-body">
         <form id="krt-bp-edit-form" method="post">
             <div class="krt-modal-body">
                 <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
@@ -231,16 +227,12 @@
                 <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{personalInventory.action.save}">Speichern</span></button>
             </div>
         </form>
-    </div>
-</div>
+    </th:block>
+</th:block>
 
 <!--/* Remove confirmation modal (KRT danger frame; the body names what is removed) */-->
-<div id="krt-bp-delete-modal" class="krt-modal-overlay krtm-display-none-5790" role="dialog" aria-modal="true" th:aria-label="#{personalInventory.blueprints.modal.remove.title}">
-    <div class="krt-modal krt-modal--danger">
-        <div class="krt-modal-head">
-            <h2 th:text="#{personalInventory.blueprints.modal.remove.title}">Blueprint entfernen</h2>
-            <button type="button" class="btn btn-ghost btn-icon close" data-trigger="bp-close-delete" th:title="#{personalInventory.action.cancel}" th:aria-label="#{personalInventory.action.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
-        </div>
+<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='krt-bp-delete-modal', titleKey='personalInventory.blueprints.modal.remove.title', variant='krt-modal--danger', closeTrigger='bp-close-delete', body=~{::krt-bp-delete-modal-body})}">
+    <th:block th:ref="krt-bp-delete-modal-body">
         <div class="krt-modal-body">
             <p id="krt-bp-delete-message" class="krtm-margin-0-2a0c" th:text="#{personalInventory.blueprints.modal.remove.body}">Wirklich entfernen?</p>
         </div>
@@ -251,18 +243,14 @@
                 <button type="submit" class="btn btn-danger"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{personalInventory.blueprints.action.remove}">Entfernen</span></button>
             </div>
         </form>
-    </div>
-</div>
+    </th:block>
+</th:block>
 
 <!--/* Delete-all confirmation modal (KRT danger frame): clears every removable blueprint the caller
      owns (REQ-INV-023). Lives outside the swapped #krt-bp-list fragment so its form survives every
      list re-render; the classic POST is the no-JS fallback. */-->
-<div id="krt-bp-delete-all-modal" class="krt-modal-overlay krtm-display-none-5790" role="dialog" aria-modal="true" th:aria-label="#{personalInventory.blueprints.modal.removeAll.title}">
-    <div class="krt-modal krt-modal--danger">
-        <div class="krt-modal-head">
-            <h2 th:text="#{personalInventory.blueprints.modal.removeAll.title}">Alle Blueprints entfernen</h2>
-            <button type="button" class="btn btn-ghost btn-icon close" data-trigger="bp-close-delete-all" th:title="#{personalInventory.action.cancel}" th:aria-label="#{personalInventory.action.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
-        </div>
+<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='krt-bp-delete-all-modal', titleKey='personalInventory.blueprints.modal.removeAll.title', variant='krt-modal--danger', closeTrigger='bp-close-delete-all', body=~{::krt-bp-delete-all-modal-body})}">
+    <th:block th:ref="krt-bp-delete-all-modal-body">
         <div class="krt-modal-body">
             <p class="krtm-margin-0-2a0c" th:text="#{personalInventory.blueprints.modal.removeAll.body}">Wirklich ALLE deine Blueprints entfernen? Standard-Blueprints bleiben erhalten. Dies kann nicht r&uuml;ckg&auml;ngig gemacht werden.</p>
         </div>
@@ -273,16 +261,12 @@
                 <button type="submit" class="btn btn-danger"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{personalInventory.blueprints.action.removeAll}">Alle entfernen</span></button>
             </div>
         </form>
-    </div>
-</div>
+    </th:block>
+</th:block>
 
 <!--/* Blueprint import preview modal (KRT modal frame, wide). Body filled by JS. */-->
-<div id="krt-bp-import-modal" class="krt-modal-overlay krtm-display-none-5790" role="dialog" aria-modal="true" th:aria-label="#{personalInventory.blueprints.import.title}">
-    <div class="krt-modal krt-bp-import-frame">
-        <div class="krt-modal-head">
-            <h2 th:text="#{personalInventory.blueprints.import.title}">Import-Vorschau</h2>
-            <button type="button" class="btn btn-ghost btn-icon close" data-trigger="bp-import-close" th:title="#{personalInventory.action.cancel}" th:aria-label="#{personalInventory.action.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
-        </div>
+<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='krt-bp-import-modal', titleKey='personalInventory.blueprints.import.title', variant='krt-bp-import-frame', body=~{::krt-bp-import-modal-body})}">
+    <th:block th:ref="krt-bp-import-modal-body">
         <div class="krt-modal-body">
             <p class="krt-bp-import-summary" id="krt-bp-import-summary"></p>
             <div class="krt-bp-import-toolbar">
@@ -299,8 +283,8 @@
             <button type="button" id="krt-bp-import-apply" class="btn btn--cta" data-trigger="bp-import-apply"
                     th:text="#{personalInventory.blueprints.import.apply}">Anwenden</button>
         </div>
-    </div>
-</div>
+    </th:block>
+</th:block>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">

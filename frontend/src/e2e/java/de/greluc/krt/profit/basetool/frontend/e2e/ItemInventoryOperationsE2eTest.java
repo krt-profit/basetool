@@ -66,7 +66,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * /api/v1/inventory/my-inventory/grouped?catalog=ITEM&gameItemIds=…}), which never races the
  * post-write render. The item picker is a remote-searched combobox ({@code remote-game-items} →
  * {@code /inventory/item-search}, uncached), so a freshly seeded widget is offered at once; the
- * location picker stays the 10-minute-cached local combobox, so the flows select whatever it offers
+ * location picker stays the long-cached local combobox, so the flows select whatever it offers
  * rather than assuming a fresh location is listed.
  */
 @Tag("e2e")
@@ -196,7 +196,7 @@ class ItemInventoryOperationsE2eTest {
           E2eSupport.selectComboboxByValue(
               page.locator(".krt-combobox:has(#gameItemId) .krt-combobox__input"),
               einbuchenGameItemId);
-          // The location lookup is 10-minute cached, so pick whatever the combobox offers (the
+          // The location lookup is long-cached, so pick whatever the combobox offers (the
           // stack assertion is location-agnostic — the widget is unique to this scenario).
           E2eSupport.selectComboboxFirstOption(
               page.locator(".krt-combobox:has(#locationId) .krt-combobox__input"));

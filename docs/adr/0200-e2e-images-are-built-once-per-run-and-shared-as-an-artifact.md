@@ -60,6 +60,14 @@ store were evicted before the next run could read them.
   assumption before any launch and use the seam when enabled, and `E2eBrowserLaunchSeamTest`
   (frontend unit tests) rejects a direct engine launch outside `E2eSupport`.
 
+- **The fixed tag is the prebuilt path's alone** (added 2026-09-23). A locally built stack used the
+  same `:e2e-local` for every checkout on a machine; two checkouts running the suite at once raced
+  for it, and one booted the other's image and went green against code it was never meant to test.
+  A local build now tags `e2e-<directory>-<path hash>` and runs under a compose project name derived
+  the same way, and after `up` `ServedBuildCheck` compares every content-hashed asset the landing
+  page links with this checkout's files, failing the bring-up on any difference. CI keeps
+  `:e2e-local`: one runner, one checkout, and the three strings above still have to agree on it.
+
 ## Alternatives considered
 
 - **Keep building per cell.** Rejected: fifteen identical builds and fifteen failure chances for

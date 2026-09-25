@@ -23,7 +23,7 @@ ARG MODULE
 # L-8: pin the base image to its multi-arch index digest (not just the floating tag) so builds are
 # bit-reproducible and the SLSA provenance stays sound. Dependabot bumps the tag + digest together
 # (one `docker` entry for this directory in .github/dependabot.yml).
-FROM eclipse-temurin:25-jdk-alpine@sha256:09349d79941fd53bb3d487b393ca118d8853c08c09193f416fe6a8718df9e732 AS build
+FROM eclipse-temurin:25-jdk-alpine@sha256:541729c21f9308a68cebbe5a0627e4cd465dfe8980fc03bac0b2feaee57daafd AS build
 ARG MODULE
 # Application version string forwarded to Gradle as `-PappVersion=...`. Only the frontend reads it
 # (its `bootBuildInfo` stamps it into META-INF/build-info.properties, which the sidebar's version
@@ -116,7 +116,7 @@ RUN java -Djarmode=tools -jar app.jar extract --layers --destination extracted
 # renders with its 14 embedded Type-1 fonts (no fontconfig / freetype), no Tomcat APR connector,
 # pure-Java PostgreSQL and Redis clients, Reactor Netty and Lettuce. The first native library that
 # needs glibc ends this: switch back to `25-jre-jammy`. L-8: digest-pinned (see the build stage).
-FROM eclipse-temurin:25-jre-alpine@sha256:3137541deb3cac6626b5d9a4a2187bc0d6a34312f858bd2c67dd01e732e6b682 AS runtime
+FROM eclipse-temurin:25-jre-alpine@sha256:2ca9adf44f5c29d28ecd26cf92d75cc0c66b7f32bfd839a4439e363a8b428af8 AS runtime
 WORKDIR /app
 
 # Non-root runtime user with a fixed UID/GID so host bind mounts (the log directory) can be
@@ -204,8 +204,35 @@ COPY --from=build --chown=10001:10001 /app/extracted/application/ ./
 # suppressed during it: a console-only logging config would keep the appender and PII-masking
 # classes every real startup loads out of the cache (ingest, 2026-09-16: 56 classes, 278 KB),
 # and a bare `-Dlogging.config=` suppresses nothing (Spring Boot falls back to logback-spring.xml).
+#
+# BUILDKIT'S OWN OTEL VARIABLES ARE REMOVED FIRST. A docker-container BuildKit -- the builder
+# release-images.yml uses, not the local default one -- hands every RUN step
+# OTEL_TRACES_EXPORTER=otlp, OTEL_EXPORTER_OTLP_TRACES_PROTOCOL=grpc and
+# OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=unix:///dev/otel-grpc.sock so that build steps can report their
+# own spans. Spring Boot reads them, builds a gRPC span exporter on that endpoint, and the exporter
+# rejects anything but http(s) -- every module's refresh died at `otlpGrpcSpanExporter` (2026-09-23,
+# the first release build of this file). Every OTEL_* variable is unset rather than the three by
+# name, so a BuildKit that adds a fourth cannot bring it back; the runtime never sees these, only
+# the build does.
+#
+# NO MACHINE CODE IN THE CACHE (`-XX:-AOTAdapterCaching -XX:-AOTStubCaching` on the training run). Creating a cache switches AOTAdapterCaching on by
+# ergonomics, so JDK 25 also stores the interpreter/compiled-code adapters -- generated machine code
+# -- in it. The image is built on one CI runner and started on others and on the hosts, with other
+# CPUs: on 2026-09-23 the E2E backend died at start on 10 of 16 runners with `SIGILL ... Problematic
+# frame: v ~AdapterBlob` after "Saved blob's name ... is different from the expected name" and
+# "Failed to link AdapterHandlerEntry ... in the AOT code cache"; the 6 runners with the build
+# runner's CPU started. What remains in the cache -- parsed and linked classes, method profiles --
+# is data, not code, and does not depend on the CPU. Only the training run needs the flags: a cache
+# that holds no adapters gives the runtime none to load. The verifying start below logs the code
+# cache's state and FAILS THE BUILD unless the JVM reports "AOT Code Cache is empty" -- so a Temurin
+# bump that starts caching some other kind of code cannot slip in silently either.
 ARG MODULE
 RUN set -eu; \
+    env > /tmp/aot-env; \
+    while IFS='=' read -r name _; do \
+        case "$name" in OTEL_*) unset "$name" ;; esac; \
+    done < /tmp/aot-env; \
+    rm -f /tmp/aot-env; \
     layout="-XX:+UseCompactObjectHeaders"; \
     stub="aot-training.invalid"; \
     case "$MODULE" in \
@@ -232,7 +259,8 @@ RUN set -eu; \
             -Dspring.security.oauth2.resourceserver.jwt.issuer-uri= \
             -Dspring.security.oauth2.resourceserver.jwt.jwk-set-uri="http://${stub}/certs" ;; \
     esac; \
-    if ! java -XX:AOTCacheOutput=/app/app.aot "$layout" \
+    if ! java -XX:+UnlockDiagnosticVMOptions -XX:-AOTAdapterCaching -XX:-AOTStubCaching \
+            -XX:AOTCacheOutput=/app/app.aot "$layout" \
             -Dspring.context.exit=onRefresh -Dserver.ssl.enabled=false "$@" \
             -jar app.jar > /tmp/aot-training.log 2>&1; then \
         cat /tmp/aot-training.log; \
@@ -241,14 +269,19 @@ RUN set -eu; \
     fi; \
     [ -s /app/app.aot ] || { cat /tmp/aot-training.log; echo "[AOT] FAILED: no cache written to /app/app.aot" >&2; exit 1; }; \
     echo "[AOT] Cache created: $(wc -c < /app/app.aot) bytes"; \
-    if ! java -XX:AOTCache=/app/app.aot -XX:AOTMode=on "$layout" \
+    if ! java -XX:AOTCache=/app/app.aot -XX:AOTMode=on "$layout" -Xlog:aot+codecache+init=info \
             -Dspring.context.exit=onRefresh -Dserver.ssl.enabled=false "$@" \
             -jar app.jar > /tmp/aot-check.log 2>&1; then \
         cat /tmp/aot-check.log; \
         echo "[AOT] FAILED: a JVM started with the runtime's layout ($layout) refuses the cache (see above)." >&2; \
         exit 1; \
     fi; \
-    echo "[AOT] Cache accepted by a start under -XX:AOTMode=on $layout"; \
+    if ! grep -q "AOT Code Cache is empty" /tmp/aot-check.log; then \
+        grep -i "codecache" /tmp/aot-check.log || true; \
+        echo "[AOT] FAILED: the cache holds machine code (see above); it would crash on a host with another CPU. Keep -XX:-AOTAdapterCaching -XX:-AOTStubCaching on the training run." >&2; \
+        exit 1; \
+    fi; \
+    echo "[AOT] Cache accepted by a start under -XX:AOTMode=on $layout, and it holds no machine code"; \
     chown 10001:10001 /app/app.aot; \
     rm -rf /tmp/aot-training.log /tmp/aot-check.log /tmp/tomcat.* /tmp/tomcat-docbase.*; \
     rm -rf /app/logs && mkdir -p /app/logs && chown 10001:10001 /app/logs; \

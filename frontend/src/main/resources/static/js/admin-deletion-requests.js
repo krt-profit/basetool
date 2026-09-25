@@ -84,26 +84,16 @@
     }
 
     /**
-     * Shows a modal by id, using the same display contract as the shared close handler.
+     * Shows a modal by id through the shared window.krtModal contract.
      * @param {string} id
      */
     function openModal(id) {
-        const modal = document.getElementById(id);
-        if (modal) {
-            modal.style.removeProperty('display');
-            modal.classList.add('krtm-modal-open');
-            modal.classList.remove('krtm-hidden');
-        }
+        window.krtModal.open(id);
     }
 
     /** @param {string} id */
     function closeModal(id) {
-        const modal = document.getElementById(id);
-        if (modal) {
-            modal.style.removeProperty('display');
-            modal.classList.remove('krtm-modal-open');
-            modal.classList.add('krtm-hidden');
-        }
+        window.krtModal.close(id);
     }
 
     /**

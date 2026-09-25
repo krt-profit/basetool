@@ -212,13 +212,8 @@
     </div>
 
     <!--/* Confirm modal (records the holder; books the ledger). _id + version primed per row. */-->
-    <div class="krt-modal-overlay" id="bank-confirm-request-modal">
-        <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.request.confirm.modal.title}">
-            <div class="krt-modal-head">
-                <h3 th:text="#{bank.request.confirm.modal.title}">Antrag best&auml;tigen</h3>
-                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="bank-confirm-request-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bank-confirm-request-modal', titleKey='bank.request.confirm.modal.title', body=~{::bank-confirm-request-modal-body})}">
+        <th:block th:ref="bank-confirm-request-modal-body">
             <form class="bank-ajax-form no-track" data-refresh="requestQueue"
                   data-livesync="bank/requestQueue,grid orgunit-bank/orgUnitBank bank:@account/account,bookings,chart bank:@destination/account,bookings,chart"
                   data-endpoint="/api/proxy/bank/requests/{id}/confirm" data-method="POST">
@@ -315,17 +310,12 @@
                             th:text="#{bank.request.action.confirm}">Best&auml;tigen</button>
                 </div>
             </form>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
 
     <!--/* Reject modal. _id + version primed per row. */-->
-    <div class="krt-modal-overlay" id="bank-reject-request-modal">
-        <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{bank.request.reject.modal.title}">
-            <div class="krt-modal-head">
-                <h3 th:text="#{bank.request.reject.modal.title}">Antrag ablehnen</h3>
-                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="bank-reject-request-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bank-reject-request-modal', titleKey='bank.request.reject.modal.title', body=~{::bank-reject-request-modal-body})}">
+        <th:block th:ref="bank-reject-request-modal-body">
             <form class="bank-ajax-form no-track" data-refresh="requestQueue"
                   data-livesync="bank/requestQueue,grid orgunit-bank/orgUnitBank"
                   data-endpoint="/api/proxy/bank/requests/{id}/reject" data-method="POST">
@@ -348,8 +338,8 @@
                             th:text="#{bank.request.action.reject}">Ablehnen</button>
                 </div>
             </form>
-        </div>
-    </div>
+        </th:block>
+    </th:block>
 
     <!--/* Direct-booking movement modal (REQ-BANK-017/-023, #997): outside the swapped requestQueue
          fragment, with a source-account selector; a successful booking re-renders the queue in place

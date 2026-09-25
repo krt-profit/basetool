@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-25.
 > **Owner area:** AUTH/SEC · **Related ADRs:** ADR-0030 (federation + first-login gate); ADR-0036 (Discord link recognised from the federated identity); ADR-0051 (account-existence precheck denies a colliding first-login); ADR-0111 (admin-mediated linking of a Discord registration to an existing account); role/unit sync (planned — Track 2)
 
 # Discord integration — login, membership gate & admin approval
@@ -162,6 +162,50 @@ second time for the nickname. All Discord calls of the provider JAR share one `H
   that call's member object (`DiscordGuildRoleGateAuthenticatorTest`).
 
 **Enforced by:** `DiscordMembershipCheckerTest` (keycloak-spi) proves the decision matrix · `DiscordGuildRoleGateAuthenticatorTest` (exactly one Discord call per first login) · `MessageBundleConsistencyTest` (frontend) pins the `nav.login.discord` key across the default/de/en bundles · _(planned T1.4: login-gate e2e + log PII grep)_ · **Code:** `DiscordGuildRoleGateAuthenticator(+Factory)`, `DiscordMembershipChecker`, `fragments/sidebar.html`, `fragments/icons.html` (`krt-icon-discord`) · **Issues:** #723, #725
+
+### REQ-SEC-071 — A Discord login that returns to the wrong browser ends on a page with a way back
+
+A Discord login leaves the app origin for one hop (`discord.com/…/oauth2/authorize`, see the
+2026-09-25 correction in [ADR-0166](../adr/0166-identity-moves-onto-the-app-origin.md)). When the
+callback to `/auth/realms/iri/broker/discord/endpoint` arrives in a browser context that holds none of
+Keycloak's login cookies (`AUTH_SESSION_ID`, `KC_RESTART`, `KEYCLOAK_IDENTITY`), Keycloak cannot
+resume the login and logs `IDENTITY_PROVIDER_LOGIN_ERROR` with `error="cookie_not_found"`
+(`SessionCodeChecks.initialVerifyAuthSession`, Keycloak 26.7.4). Known triggers: Discord finishing
+the authorization in the Discord app or another browser, an installed iOS web app whose Discord hop
+opens outside the app, a callback URL reopened from history after logout, blocked cookies. None of
+them can be repaired server-side — the broker `state` is bound to the browser that started — so the
+requirement is that the member is never stranded:
+
+- **The error page links back to the app.** `basetool-frontend` carries `baseUrl` = the public
+  origin + `/`, so Keycloak's `error.ftl` renders its *"« Zurück zur Applikation"* link. Without it
+  the link is not rendered at all, while the page's own text tells the member to click it. Converged
+  by `scripts/provision-keycloak-realm.py` (`REQ-OPS-033`, ADR-0202 amendment 3).
+- **The message names the real causes.** The `krt-theme` login messages override
+  `cookieNotFoundMessage` (DE/EN): the login was finished in a different app or browser than it was
+  started in, an old login page was reopened, or cookies are blocked — and the member starts again
+  from the link, completing every step in the same browser. Keycloak's own text blames disabled
+  cookies only.
+- **Nothing new is logged or measured.** The event stays in Keycloak's event log and in
+  `keycloak_user_events_total{event="identity_provider_login_error"}`, which the existing
+  `KeycloakLoginErrorSpike` alert already reads.
+
+**Acceptance**
+
+- [x] A callback replayed without cookies from a login started elsewhere produces the
+  `cookie_not_found` event, and with `baseUrl` set the page carries `#backToApplication` pointing at
+  the public origin; without it, it carries none. _(reproduced 2026-09-25 against a local Keycloak
+  26.7.4 distribution with the krt-theme and a throwaway realm; the theme has no automated harness.)_
+- [x] The page shows the krt-theme text in German and English.
+- [x] `provision-keycloak-realm.test.sh` cases 2 and 5: a new frontend client is created with the
+  `baseUrl`, and an existing one without it is converged.
+- [ ] Production's `basetool-frontend` carries the `baseUrl`. _(owner-run: `--apply` of the
+  provisioner on the production host.)_
+
+**Enforced by:** `scripts/provision-keycloak-realm.test.sh` · review of the theme bundles ·
+**Code:** `scripts/provision-keycloak-realm.py` (`client_specs`, `basetool-frontend`),
+`keycloak-theme/krt-theme/login/messages/messages_{de,en}.properties` · **Decision:**
+[ADR-0202](../adr/0202-a-realm-is-brought-to-the-production-shape-by-a-provisioner-that-never-deletes.md)
+amendment 3
 
 ### REQ-SEC-022 — Deny a colliding Discord first-login & redirect to account linking (fail-open)
 

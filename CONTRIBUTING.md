@@ -230,6 +230,18 @@ give that bean's dependency a stub in the module's `case` branch of the training
 ones show the patterns — an unresolvable `aot-training.invalid` host, a JWK set URI instead of an
 issuer, a property that skips a startup call). ADR-0209 has the reasons.
 
+`docker build` uses the local default builder, which is **not** the one `release-images.yml` builds
+with: that is a `docker-container` BuildKit, and it hands every `RUN` step environment variables the
+default builder does not (its `OTEL_*` tracing variables broke the training run on 2026-09-23, and
+the training `RUN` now unsets them). When you change the training `RUN` or the base image, build once
+the way the release does:
+
+```bash
+docker buildx create --name release-like --driver docker-container
+docker buildx build --builder release-like -f docker/app/Dockerfile --build-arg MODULE=ingest .
+docker buildx rm release-like
+```
+
 Hard project rule: **always use the Gradle wrapper** (`./gradlew`).
 Never the IDE test runner; never `mvn`; never a system-installed Gradle.
 This is what CI runs, this is what every contributor's machine runs,
@@ -316,6 +328,18 @@ entry does no harm).
   `./gradlew --write-verification-metadata sha256 <the failing task>` on the
   machine that fails, compare each added SHA against the file on Maven Central
   (its published `.sha1` must match too), and commit the additions.
+- **`dependencyCheckAggregate` resolves more than `help build` does.** The OWASP
+  plugin fetches the POM of every dependency it scans through a detached
+  configuration, so a PR that touches any `build.gradle.kts` (which runs
+  `dependency-check.yml`) failed on 23 POMs nothing else ever resolved — Keycloak's
+  OpenTelemetry, Jackson 2 and webauthn4j among them — from 2026-09-23 (#2034).
+  Regenerate them without downloading the NVD feed: a one-line init script
+  `allprojects { plugins.withId('org.owasp.dependencycheck') { dependencyCheck { autoUpdate = false } } }`
+  saved as `no-nvd-update.gradle`, then
+  `./gradlew --no-parallel --write-verification-metadata sha256 -I no-nvd-update.gradle dependencyCheckAggregate`.
+  The task then fails with *Analysis failed* for want of a database; the
+  resolution before it, which is what the writer needs, has already run. Check
+  the additions against Maven Central as above.
 - **Dependabot** only manages GitHub Actions, Docker images and the frontend's
   npm packages here, none of which Gradle resolves. A Dependabot *security
   update* for a Gradle dependency, should one ever be opened, fails verification
@@ -368,10 +392,22 @@ of this repository's schedules is a clock time). Maintainers apply the label to 
 flows, auth / session, controllers or migrations; ask for it if your PR
 does.
 
+Locally, `./gradlew :frontend:e2eTest` builds and boots its own stack under an image tag and a
+compose project name derived from your checkout's path, so parallel checkouts never test each
+other's code, and it refuses to start if the page the stack serves is not your checkout's build
+(`ServedBuildCheck`). Ports are fixed, so only one E2E stack runs on a machine at a time; a second
+one fails at start-up and names the stack holding port 18081.
+
 The CycloneDX SBOMs are a release artefact, not a build output: they are
 regenerated and committed only by the
 [release-prepare workflow](.github/workflows/release-prepare.yml) (or on
 demand via `./gradlew :<module>:cyclonedxBom`), never by `./gradlew build`.
+Both SBOM tasks are untracked — never `UP-TO-DATE`, never `FROM-CACHE`,
+because the plugin's inputs do not see project dependencies — and every
+`cyclonedxBom` is finalized by `verifyCyclonedxBom`, which fails unless the
+BOM lists exactly the module's resolved runtime classpath (REQ-OPS-025). CI
+runs the four SBOM tasks on every PR for that check; the regenerated files
+are not committed there.
 
 CodeQL additionally runs weekly, and the OWASP
 [dependency check](.github/workflows/dependency-check.yml) runs weekly

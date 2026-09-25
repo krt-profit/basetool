@@ -1,3 +1,11 @@
+// Security override on THIS script's buildscript classpath, where the Spring Boot plugin below is
+// loaded: spring-boot-buildpack-platform -> commons-compress 1.27.1 asks for commons-lang3 3.16.0,
+// which carries CVE-2025-48924 (Dependabot alert #19). It ships nowhere and was never loaded -- the
+// root classpath holds 3.20.0 and is asked first -- but the dependency-submission workflow reports
+// every build classpath. The same line sits in ingest/build.gradle.kts. The version, the reasoning
+// and the removal condition live on `commonsLang3` in the version catalog.
+buildscript { dependencies { constraints { classpath(libs.commons.lang3) } } }
+
 plugins {
   java
   checkstyle
@@ -248,5 +256,13 @@ tasks.named<Test>("test") {
       )
     )
     .withPropertyName("liveSyncTopicRegistrySource")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
+
+  // `JwkSetUriNamespaceTest` asserts that the backend's generated Quadlet environment passes
+  // KEYCLOAK_JWK_SET_URI (REQ-SEC-024). Off the classpath like the files above, so a compose edit
+  // that dropped the line would otherwise leave this task UP-TO-DATE and the check unrun.
+  inputs
+    .file(rootProject.file("quadlet/env.d/backend.env.tmpl"))
+    .withPropertyName("backendQuadletEnvTemplate")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 }

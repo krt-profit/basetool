@@ -2334,6 +2334,24 @@ scenario_podman_missing_per_service_keystore_refuses() {
 
 # --- the working directory podman inherits -----------------------------------
 
+scenario_podman_missing_edge_trust_anchor_refuses() {
+  echo "Scenario: ...and so is the edge's Grafana trust anchor, whose absence would keep the edge down"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  podman_units "${tmp}"
+  write_marker "${PMARKER}"
+  # REQ-OBS-008: the edge mounts Grafana's certificate. On a host that never minted it the edge
+  # container could not start, so the pre-flight refuses before anything is applied.
+  printf 'Volume=%s/certs/grafana.crt:/etc/nginx/grafana-upstream.crt:ro\n' "${tmp}" >> "${T_UNIT_DIR}/backend.container"
+  mapfile -t pod < <(podman_env)
+  mapfile -t conv < <(podman_converged_env)
+  run_deploy -- "${pod[@]}" "${conv[@]}" || rc=$?
+  assert_exit 1 "$rc" "podman: a missing edge trust anchor refuses before anything is applied"
+  assert_contains "required file missing: ${tmp}/certs/grafana.crt" "podman: ...and names the file"
+  rm -rf "${tmp}"
+}
+
 scenario_podman_runs_podman_from_root_dir() {
   echo "Scenario: podman is never run from the caller's working directory"
   local tmp rc=0 first
@@ -2361,6 +2379,320 @@ scenario_podman_runs_podman_from_root_dir() {
   rm -rf "${tmp}"
 }
 
+# --- a failure between the signature check and the health gate is recorded ----
+#
+# 2026-09-25, v1.11.0: /var/iri/code/docker/acme was root-owned. Every tick from 12:25 to 12:35
+# logged "config changed → staging", mirrored monitoring/, the maintenance page and the edge onto
+# the host, and died inside the acme mirror on rsync exit 23. Errexit ended the script right there:
+# no FATAL line, no backoff record, no restore, `basetool_deploy_last_failure_timestamp 0` — so
+# DeployFailed never fired, and production stayed on the old release until a human noticed. The
+# second tick then snapshotted the half-mirrored tree as config-previous/ and copied the first tick's
+# NEW pin over the rollback anchor.
+
+# An rsync stand-in that fails the way the host's did, for the mirrors a scenario names. The rules are
+# `<source-substring>=><destination-substring>` pairs, space-separated, in FAKE_RSYNC_FAIL_RULES, so a
+# scenario can fail the forward apply and let the restore through (or fail both). Every other mirror
+# is carried out: the destination is replaced by the source, which is what `--delete` amounts to.
+write_rsync_stub() {
+  cat > "${T_FAKE_BIN}/rsync" <<'RSYNC'
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'rsync %s\n' "$*" >> "${FAKE_DOCKER_LOG}"
+src="${*: -2:1}"
+dst="${*: -1}"
+for rule in ${FAKE_RSYNC_FAIL_RULES:-}; do
+  if [[ "${src}" == *"${rule%%=>*}"* && "${dst}" == *"${rule#*=>}"* ]]; then
+    echo "rsync: [receiver] mkstemp \"${dst}.publish-loop.sh.XXXXXX\" failed: Permission denied (13)" >&2
+    echo "rsync error: some files/attrs were not transferred (see previous errors) (code 23) at main.c(1338) [generator=3.4.1]" >&2
+    exit 23
+  fi
+done
+rm -rf "${dst}"
+mkdir -p "${dst}"
+cp -R "${src}." "${dst}"
+RSYNC
+  chmod +x "${T_FAKE_BIN}/rsync"
+}
+
+# The host's live config tree as the previous release left it — every file says OLD — with the units
+# it delivered, identical to what is installed, so a restore that works changes nothing in the unit
+# directory. $1 is the tree.
+seed_live_config_tree() {
+  local t="$1" u
+  mkdir -p "${t}/docker/acme" "${t}/docker/edge" "${t}/monitoring/prometheus" "${t}/quadlet/systemd"
+  echo "OLD acme" > "${t}/docker/acme/publish-loop.sh"
+  echo "OLD edge" > "${t}/docker/edge/nginx.conf"
+  echo "OLD prometheus" > "${t}/monitoring/prometheus/prometheus.yml"
+  for u in "${T_UNIT_DIR}"/*.container; do
+    cp "${u}" "${t}/quadlet/systemd/"
+  done
+}
+
+# The release being deployed: the same subtrees, every file NEW, and a changed backend unit. $1 is
+# the bundle directory.
+write_mirror_bundle() {
+  local b="$1" u
+  mkdir -p "${b}/docker/acme" "${b}/docker/edge" "${b}/monitoring/prometheus" "${b}/quadlet/systemd"
+  echo "# promoted compose" > "${b}/docker-compose.yml"
+  echo "NEW acme" > "${b}/docker/acme/publish-loop.sh"
+  echo "NEW edge" > "${b}/docker/edge/nginx.conf"
+  echo "NEW prometheus" > "${b}/monitoring/prometheus/prometheus.yml"
+  for u in "${T_UNIT_DIR}"/*.container; do
+    cp "${u}" "${b}/quadlet/systemd/"
+  done
+  echo "# NEW release" >> "${b}/quadlet/systemd/backend.container"
+}
+
+# assert_file_says <file> <expected-first-line> <description>
+assert_file_says() {
+  local file="$1" want="$2" desc="$3" got
+  got="$(head -n 1 "${file}" 2>/dev/null || echo "<missing>")"
+  if [[ "${got}" == "${want}" ]]; then
+    record 1 "${desc}"
+  else
+    record 0 "${desc} (${file} says '${got}', expected '${want}')"
+  fi
+}
+
+# assert_failure_metric <description> -- the textfile DeployFailed reads carries a failure stamp.
+assert_failure_metric() {
+  if grep -q 'basetool_deploy_last_failure_timestamp [1-9]' "${T_STATE_DIR}/textfile/deploy.prom" 2>/dev/null; then
+    record 1 "$1"
+  else
+    record 0 "$1 (no failure timestamp in deploy.prom)"
+  fi
+}
+
+scenario_config_mirror_failure_is_recorded_and_undone() {
+  echo "Scenario: a mirror that fails halfway through the config apply is recorded, undone and backed off (2026-09-25)"
+  local tmp rc=0 target
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_rsync_stub
+  seed_live_config_tree "${T_COMPOSE_DIR}"
+  local bundle="${tmp}/bundle"
+  write_mirror_bundle "${bundle}"
+  write_marker "${MARKER}"
+  echo "# the previous release's pin record" > "${T_STATE_DIR}/current-digest-pin.yml"
+  target="${DIG_BACKEND}|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG_NEXT}|${DIG_KCSPI}"
+  mapfile -t fake < <(converged_env)
+
+  # Tick 1: the acme mirror fails exactly as it did on the host, after three subtrees went through.
+  run_deploy -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${bundle}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" \
+    "FAKE_RSYNC_FAIL_RULES=config-stage=>/docker/acme" || rc=$?
+  assert_exit 23 "$rc" "the tick exits with rsync's own code instead of pretending nothing happened"
+  assert_contains "Permission denied (13)" "rsync's own error is in the log"
+  assert_contains "FATAL: deploy aborted before the health gate — step 'mirror ${T_COMPOSE_DIR}/docker/acme' failed (exit 23)" \
+    "a FATAL line names the step, the path and the exit code"
+  assert_failure_metric "the failure metric DeployFailed reads is written"
+  if grep -qx "${target} 1 [0-9]*" "${T_STATE_DIR}/failed.digests" 2>/dev/null; then
+    record 1 "the failure is recorded for the backoff, against this target"
+  else
+    record 0 "the failure is recorded for the backoff, against this target"
+  fi
+  # The mirrors that went through before the failure are undone, so the host is the previous
+  # release again rather than half of each.
+  assert_file_says "${T_COMPOSE_DIR}/monitoring/prometheus/prometheus.yml" "OLD prometheus" \
+    "a subtree mirrored before the failure is restored"
+  assert_file_says "${T_COMPOSE_DIR}/docker/edge/nginx.conf" "OLD edge" \
+    "the edge configuration is restored too (it is in the snapshot now)"
+  assert_file_says "${T_COMPOSE_DIR}/docker/acme/publish-loop.sh" "OLD acme" "the failed subtree is the previous one"
+  assert_file_says "${T_STATE_DIR}/config-previous/docker/edge/nginx.conf" "OLD edge" \
+    "config-previous/ holds the previous release, edge included"
+  assert_contains "previous host config restored" "the restore says it completed"
+  if [[ ! -f "${T_STATE_DIR}/config-apply.incomplete" ]]; then
+    record 1 "a completed restore leaves no incomplete-apply marker"
+  else
+    record 0 "a completed restore leaves no incomplete-apply marker"
+  fi
+  if grep -q '# NEW release' "${T_UNIT_DIR}/backend.container"; then
+    record 0 "the unit directory still holds the previous units"
+  else
+    record 1 "the unit directory still holds the previous units"
+  fi
+  # The pin is written after the config apply, so a failed apply never touched it.
+  if [[ ! -e "${T_UNIT_DIR}/backend.container.d/10-digest-pin.conf" ]] \
+    && grep -qx '# the previous release.s pin record' "${T_STATE_DIR}/current-digest-pin.yml"; then
+    record 1 "the digest pin is untouched by a failed config apply"
+  else
+    record 0 "the digest pin is untouched by a failed config apply"
+  fi
+  assert_no_apply "nothing is started or restarted"
+
+  # Tick 2, five minutes later: the backoff holds the same target instead of failing every tick.
+  : > "${T_DOCKER_LOG}"
+  rc=0
+  run_deploy -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${bundle}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" \
+    "FAKE_RSYNC_FAIL_RULES=config-stage=>/docker/acme" || rc=$?
+  assert_exit 0 "$rc" "the next tick inside the backoff window is a quiet skip"
+  assert_contains "in backoff window" "and says it is backing off"
+  assert_excludes "config changed" "no config is staged while backing off"
+
+  # The operator fixes the owner and retries now.
+  : > "${T_DOCKER_LOG}"
+  rc=0
+  run_deploy --force -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${bundle}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" || rc=$?
+  assert_exit 0 "$rc" "--force after the fix applies the release"
+  assert_file_says "${T_COMPOSE_DIR}/docker/acme/publish-loop.sh" "NEW acme" "the release's acme loop reaches the host"
+  if [[ ! -f "${T_STATE_DIR}/failed.digests" ]]; then
+    record 1 "the successful retry clears the failure record"
+  else
+    record 0 "the successful retry clears the failure record"
+  fi
+  rm -rf "${tmp}"
+}
+
+scenario_config_restore_failure_keeps_the_anchor() {
+  echo "Scenario: when the restore fails as well, the tick says so and the next one does not snapshot the mixed tree"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_rsync_stub
+  seed_live_config_tree "${T_COMPOSE_DIR}"
+  local bundle="${tmp}/bundle"
+  write_mirror_bundle "${bundle}"
+  write_marker "${MARKER}"
+  mapfile -t fake < <(converged_env)
+
+  # The forward apply gets as far as the units and dies there; the restore dies on its first mirror,
+  # so the host is left with the new edge and acme beside the old units.
+  run_deploy -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${bundle}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" \
+    "FAKE_RSYNC_FAIL_RULES=config-stage=>/code/quadlet config-previous=>/code/monitoring" || rc=$?
+  assert_exit 23 "$rc" "the tick exits non-zero"
+  assert_contains "restoring the previous host config FAILED" "the failed restore is reported"
+  assert_contains "INCONSISTENT" "and the operator is told the tree is mixed"
+  assert_failure_metric "the failure metric is written although the restore failed"
+  if [[ -f "${T_STATE_DIR}/config-apply.incomplete" ]]; then
+    record 1 "the incomplete-apply marker stays"
+  else
+    record 0 "the incomplete-apply marker stays"
+  fi
+
+  : > "${T_DOCKER_LOG}"
+  rc=0
+  run_deploy --force -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${bundle}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" || rc=$?
+  assert_exit 0 "$rc" "the retry applies the release"
+  assert_contains "keeping ${T_STATE_DIR}/config-previous as the rollback anchor" \
+    "the retry does not snapshot the half-applied tree"
+  assert_file_says "${T_STATE_DIR}/config-previous/docker/edge/nginx.conf" "OLD edge" \
+    "config-previous/ still holds the last consistent release"
+  if [[ ! -f "${T_STATE_DIR}/config-apply.incomplete" ]]; then
+    record 1 "a completed apply clears the marker"
+  else
+    record 0 "a completed apply clears the marker"
+  fi
+  rm -rf "${tmp}"
+}
+
+scenario_pull_failure_after_config_apply_is_undone() {
+  echo "Scenario: a pull that fails after the config was applied puts the config AND the pin back"
+  local tmp rc=0 dig_new pin
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_rsync_stub
+  seed_live_config_tree "${T_COMPOSE_DIR}"
+  local bundle="${tmp}/bundle"
+  write_mirror_bundle "${bundle}"
+  write_marker "${MARKER}"
+  # The previous release's pin: the record and the drop-in that binds it.
+  printf 'services:\n  backend:\n    image: %s\n  frontend:\n    image: %s\n  ingest:\n    image: %s\n' \
+    "${REPO_BACKEND}" "${REPO_FRONTEND}" "${REPO_INGEST}" > "${T_STATE_DIR}/current-digest-pin.yml"
+  pin="${T_UNIT_DIR}/backend.container.d/10-digest-pin.conf"
+  mkdir -p "${pin%/*}"
+  printf '[Container]\nImage=%s\n' "${REPO_BACKEND}" > "${pin}"
+  dig_new="$(hexdig beef2)"
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${bundle}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" \
+    "FAKE_REMOTE_BACKEND=${dig_new}" "FAKE_PULL_RC=1" || rc=$?
+  assert_exit 1 "$rc" "a failed pull exits non-zero"
+  assert_contains "step 'pull the release images' failed (exit 1)" "the FATAL line names the pull"
+  assert_failure_metric "the failure metric is written"
+  assert_file_says "${T_COMPOSE_DIR}/docker/edge/nginx.conf" "OLD edge" "the applied config tree is put back"
+  if grep -q "${dig_new}" "${pin}" 2>/dev/null; then
+    record 0 "the drop-in no longer binds the release that was never pulled"
+  elif grep -q "${DIG_BACKEND}" "${pin}" 2>/dev/null; then
+    record 1 "the drop-in no longer binds the release that was never pulled"
+  else
+    record 0 "the drop-in no longer binds the release that was never pulled (drop-in missing)"
+  fi
+  assert_no_apply "nothing is started or restarted"
+  rm -rf "${tmp}"
+}
+
+scenario_config_preflight_refuses_an_unwritable_subtree() {
+  echo "Scenario: a subtree the deploy account cannot write is refused before anything changes"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  seed_live_config_tree "${T_COMPOSE_DIR}"
+  local bundle="${tmp}/bundle"
+  write_mirror_bundle "${bundle}"
+  write_marker "${MARKER}"
+  chmod 0555 "${T_COMPOSE_DIR}/docker/acme"
+  # Mode bits do not bind root, and an MSYS/NTFS mount ignores them: on such a runner the directory
+  # stays writable and there is nothing to refuse. Said out loud rather than passed — CI's
+  # ubuntu-latest runner is neither, and runs it for real.
+  if [[ -w "${T_COMPOSE_DIR}/docker/acme" ]]; then
+    echo "  skip - this runner cannot make a directory unwritable (root, or a noacl mount)"
+    chmod 0755 "${T_COMPOSE_DIR}/docker/acme"
+    rm -rf "${tmp}"
+    return 0
+  fi
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${bundle}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" || rc=$?
+  chmod 0755 "${T_COMPOSE_DIR}/docker/acme"
+  assert_exit 1 "$rc" "the pre-flight refuses"
+  assert_contains "PRE-FLIGHT: ${T_COMPOSE_DIR}/docker/acme is not owned or not writable" \
+    "and names the directory"
+  assert_failure_metric "the refusal is a recorded failure"
+  assert_file_says "${T_COMPOSE_DIR}/monitoring/prometheus/prometheus.yml" "OLD prometheus" \
+    "no subtree was mirrored"
+  if [[ ! -d "${T_STATE_DIR}/config-previous" ]]; then
+    record 1 "not even the snapshot was taken"
+  else
+    record 0 "not even the snapshot was taken"
+  fi
+  rm -rf "${tmp}"
+}
+
+scenario_carve_out_leaves_no_pin_behind() {
+  echo "Scenario: a gated stateful-infra change refuses without writing the pin or a failure"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_infra_units "${T_COMPOSE_DIR}" 26.6 \
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  local bundle="${tmp}/bundle"
+  write_infra_units "${bundle}" 26.7 \
+    bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  write_marker "${MARKER}"
+  mapfile -t fake < <(converged_env)
+  # A backend digest that moves with the gated config: before 2026-09-25 its drop-in was written
+  # first and stayed behind, bound to the old units.
+  run_deploy -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${bundle}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" \
+    "FAKE_REMOTE_BACKEND=$(hexdig beef3)" || rc=$?
+  assert_exit 3 "$rc" "the carve-out refuses"
+  assert_contains "CARVE-OUT" "and says why"
+  if [[ ! -e "${T_UNIT_DIR}/backend.container.d/10-digest-pin.conf" && ! -e "${T_STATE_DIR}/current-digest-pin.yml" ]]; then
+    record 1 "no digest pin is written for a release the gate held back"
+  else
+    record 0 "no digest pin is written for a release the gate held back"
+  fi
+  assert_excludes "FATAL: deploy aborted" "a deliberate refusal is not recorded as a failure"
+  if [[ ! -f "${T_STATE_DIR}/failed.digests" ]]; then
+    record 1 "and puts nothing into the backoff"
+  else
+    record 0 "and puts nothing into the backoff"
+  fi
+  rm -rf "${tmp}"
+}
+
+scenario_config_mirror_failure_is_recorded_and_undone
+scenario_config_restore_failure_keeps_the_anchor
+scenario_pull_failure_after_config_apply_is_undone
+scenario_config_preflight_refuses_an_unwritable_subtree
+scenario_carve_out_leaves_no_pin_behind
+
 scenario_podman_bundle_installs_the_units
 scenario_podman_retired_unit_is_stopped_then_removed
 scenario_podman_first_deploy_fills_an_empty_unit_dir
@@ -2370,6 +2702,7 @@ scenario_podman_acme_is_part_of_the_stack
 scenario_podman_keystore_checked_where_the_unit_mounts_it
 scenario_podman_missing_mounted_keystore_refuses
 scenario_podman_missing_per_service_keystore_refuses
+scenario_podman_missing_edge_trust_anchor_refuses
 scenario_podman_runs_podman_from_root_dir
 
 echo

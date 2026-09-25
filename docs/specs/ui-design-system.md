@@ -10,7 +10,8 @@
 > [0191](../adr/0191-touch-drags-the-crew-board-through-pointer-events.md) (REQ-UI-009) ·
 > [0177](../adr/0177-the-app-has-exactly-one-dialog-shape.md) (REQ-UI-013) ·
 > [0197](../adr/0197-shipped-dependencies-pass-a-gpl-compatible-licence-gate-and-are-listed-on-a-public-page.md) (REQ-UI-021) ·
-> **Next free id:** `REQ-UI-024` · **Visual source of truth:** the design
+> [0212](../adr/0212-every-stylesheet-sits-in-a-cascade-layer.md) (REQ-UI-024) ·
+> **Next free id:** `REQ-UI-025` · **Visual source of truth:** the design
 > skill [`.claude/skills/das-kartell-design/README.md`](../../.claude/skills/das-kartell-design/README.md)
 > (+ [`colors_and_type.css`](../../.claude/skills/das-kartell-design/colors_and_type.css)).
 
@@ -156,10 +157,22 @@ purely decorative glyphs.
 
 **Acceptance**
 
-- [ ] Semantic colour used as small text uses the matching `*-text` tint, not the dark
+- [x] Semantic colour used as small text uses the matching `*-text` tint, not the dark
   canonical hue; the canonical hues stay on fills/borders/tags.
-- [ ] Muted grey used as small text uses `--color-gray-2-text`, not the canonical
+- [x] Muted grey used as small text uses `--color-gray-2-text`, not the canonical
   `--color-gray-2`; the canonical Grau 2 stays on borders/scrollbars/decorative glyphs.
+
+Until 2026-09-25 nothing checked this, and 49 declarations broke it: the item badge in the order
+list (#355DDC, 3.29:1, the `/orders` finding of the a11y smoke that appeared only once another test
+had created an item order), the price column of the materials matrix, the outline danger button,
+error texts, empty-state hints and more, most of them on elements no test had data to render. All
+now take the tints. The two exceptions are the `aria-hidden` glyphs that keep Grau 2 as allowed
+above: the unsorted-column indicator of the material demand table and the blueprint search icon.
+
+**Enforced by:** `AccessibleTextTintTest` (no stylesheet sets `color` to the danger, info or Grau 2
+hue, and no script writes one into `style.color`; the two decorative glyphs are exempted by
+selector) · `AccessibilitySmokeE2eTest` (axe WCAG A/AA on five pages; its report now names every
+failing node with its colours and ratio)
 
 ### REQ-UI-007 — Visual style: square-first sci-fi HUD
 
@@ -203,20 +216,68 @@ enabled in `frontend/eslint.config.mjs` (checked 2026-09-22) — see Open questi
 > reappears, if an overlay does not carry exactly one frame, or if a footer's submit button sits
 > outside the form it submits.
 
+> [!important] One open/close contract, and every overlay is a native `<dialog>` (2026-09-23)
+> **FE-SIMP-04.** `window.krtModal` (`krt-modal.js`, loaded globally) is the only way a dialog
+> opens and closes: `krtModal.open(el | id, {focus?})` and `krtModal.close(el | id)`, plus
+> `isOpen`, `topmost` and `layerRoot`. Ninety dialogs had carried their own copy of that code and
+> 107 call sites wrote `overlay.style.display` directly; every one now calls the contract, and so do
+> the shared `open-modal-display` / `close-modal-display` triggers and the mission page's
+> `krtModalOpen` / `krtModalClose` (kept as aliases). What the contract guarantees for every dialog:
+> the class state below; focus moves in on open (`[autofocus]`, else the first visible field, else
+> the frame — never a button, so Enter can not hit „Löschen") and returns to the opening control on
+> close; **Escape closes the topmost dialog** by clicking its own close control, so whatever the page
+> does on close still runs (a dialog may opt out with `data-modal-static`).
+>
+> **FE-SIMP-04b.** Every `.krt-modal-overlay` is a `<dialog>` element, and `krtModal.open` shows it
+> with `showModal()`: it goes to the top layer and the page behind it becomes inert — the focus trap
+> and background lock that before existed only on the mission page and the org chart. The class
+> stays on the element (live sync's "is a dialog open?" probe, the layout guard and the E2E suite key
+> on it), `styles.css` undoes the user-agent dialog box so it is the same full-viewport scrim, and a
+> dialog shown by its class alone (a server-rendered open dialog, the layout guard revealing every
+> dialog) is still shown — and upgraded to a modal one by the contract's observer, which also closes
+> the modal state of any dialog hidden without the contract, so no code path can leave an invisible
+> dialog holding the page inert. Because the page behind an open dialog is inert, a toast, the KRT
+> confirm and a programmatic download link are appended to `krtModal.layerRoot()` — the open dialog —
+> and a toast is handed back to the body when its dialog closes.
+>
+> The paragraph below about inline `display` versus classes describes the defect the contract ended;
+> the contract clears any inline `display` on both open and close.
+>
+> **Every dialog is rendered by `fragments/modal-wrapper.html` (2026-09-23, owner decision).** The
+> 94 hand-written shells (and the bank movement fragment) now call `modal-wrapper :: modal`, so the
+> overlay, the frame and the head exist once. The head is the design system's: an `<h2>` title and
+> the ✕ `.krt-modal-close` labelled `general.a11y.closeModal`. Until then the shells had drifted
+> (`<h2>` in 76, `<h3>` in 20; an ✕ in 74, an icon button in 22). The accessible name moved onto
+> the `<dialog>` itself (`aria-labelledby` the heading when a script retitles it, else
+> `aria-label`), instead of a `role="dialog"` frame inside a native dialog. Dialog ids stayed as
+> they were. Five hooks moved: hangar's add/edit titles and the mission unit dialogs' initial ship
+> now sit on their forms, and the Materialbörse, Materialgesuch and Leitung ✕ are bound by the
+> page-scoped classes `mb-modal-close` / `mg-modal-close` / `leitung-modal-close`. The move also
+> fixed five order-detail dialogs (Eintragung, Notiz, Übergabe, Item-Übergabe, Produktion): their ✕
+> carried `close-modal-display` without a `data-modal-id`, so it closed nothing, and Escape, which
+> clicks the ✕, closed nothing either.
+
 The KRT HUD modal — `.krt-modal-overlay` scrim > `.krt-modal` frame (orange top edge + corner
-brackets) > `.krt-modal-head` (title + close-X) — is extracted as the reusable Thymeleaf fragment
-`fragments/modal-wrapper.html :: modal(modalId, titleKey, variant, body)`. New `.krt-modal-overlay`
-modals and migrations use it rather than hand-copying the shell; the bespoke body/footer is passed
-through the `body` fragment expression (`~{::selector}`) so rendering stays identical, and
-`variant` appends a `.krt-modal--*` class (e.g. `krt-modal--wide`, `krt-modal--danger`). Modals open
-with `data-trigger="open-modal-display"` and **close with the single standardized trigger
-`data-trigger="close-modal-display"` + `data-modal-id`** (common-handlers.js). The older
-`data-modal-dismiss` convention is being migrated onto it and survives only on the
-`mission-detail.html` dialogs (handled in `mission-detail.js`); new dialogs never use it. The overlay's hidden default comes from
+brackets) > `.krt-modal-head` (title + close-X) — is the Thymeleaf fragment
+`fragments/modal-wrapper.html :: modal`, and **every** dialog is rendered by it. The fragment
+declares no signature; a call names what it needs: `modalId` and `titleKey` (required), `body`
+(required: by convention a `<th:block th:ref="<modalId>-body">` inside the call, holding the
+`.krt-modal-body` and `.krt-modal-foot`; in a fragment file it names its template,
+`~{fragments/x :: <ref>}`), and optionally `variant` (a `.krt-modal--*` or page frame class),
+`titleId` (heading id for a script that retitles; the dialog is then `aria-labelledby` it), `open`
+(server-rendered open state), `closeTrigger` (the ✕'s `data-trigger`, default
+`close-modal-display`; `''` when a page script binds the ✕ by `closeClass`), `closeClass` and
+`closeId`. A condition or iteration goes on a `<th:block>` around the call. Modals open with
+`data-trigger="open-modal-display"` and **close with the single standardized trigger
+`data-trigger="close-modal-display"` + `data-modal-id`** (common-handlers.js), which the wrapper puts
+on every ✕ that has no page handler. The older `data-modal-dismiss` convention survives only on
+footer buttons of the `mission-detail.html` dialogs (handled by `krt-modal.js`); new dialogs never
+use it. The overlay's hidden default comes from
 the **global** `.krt-modal-overlay { display:none }` in `styles.css` (loaded on every page;
 `bank.css` duplicates it as defense-in-depth), so the fragment injects no inline style. A modal is
-made visible by adding the `krtm-modal-open` class (`display:flex`, in `inline-migration.css` which
-is loaded last so it wins) — at runtime via `open-modal-display` (which toggles `classList`, not an
+made visible by adding the `krtm-modal-open` class (`display:flex`, in the `utilities` cascade layer,
+so it wins over every component, page and migrated rule — REQ-UI-024; until 2026-09-23 it won by
+being loaded last) — at runtime via `open-modal-display` (which toggles `classList`, not an
 inline `style.display`) or a server-rendered `th:classappend`; the global default must never be
 `display:flex`, or a page whose scoped stylesheet fails to load would render every closed modal open
 on load (#1003 WebKit flake). A page script that **closes** a modal after an in-place AJAX write
@@ -232,22 +293,46 @@ alone, or the inline `display:flex` outranks `krtm-hidden` and the modal stays o
 inline `display` on the modal — `open-modal-display` before showing it, `close-modal-display` before
 hiding it — so the class always wins regardless of how the other side toggled visibility.
 
+**Acceptance (FE-SIMP-04 / 04b, 2026-09-23)**
+
+- [x] Every `.krt-modal-overlay` in the templates is a `<dialog>`.
+- [x] No script shows or hides a dialog through `style.display` or its own class toggle; all go
+  through `window.krtModal`.
+- [x] An opened dialog is modal (`:modal`), takes focus, makes the page behind it unfocusable, keeps
+  Tab inside it, closes on Escape, returns focus to its opener and opens again.
+- [x] Every dialog is rendered by `modal-wrapper :: modal`; no other template carries
+  `.krt-modal-overlay`, `.krt-modal`, `.krt-modal-head` or `.krt-modal-close`, and the head is an
+  `<h2>` and an ✕ (2026-09-23).
+- [x] A dialog renders only where its openers and the script that drives it do. The promotion
+  admin pages in the admin's all-squadrons view, and the admin blueprint page before a member is
+  picked, render none of their dialogs (2026-09-23; until then they rendered dead markup).
+- [x] Every dialog on every page route and on a seeded mission, operation, order, refinery order and
+  bank account opens modally with a title, an accessible name and a visible ✕, takes focus, and
+  closes on Escape and on its ✕. A declared dialog the walk does not reach is listed with its reason.
+
+**Enforced by:** `SingleModalShapeTest` (`everyOverlayIsANativeDialog`,
+`everyDialogIsRenderedByTheWrapper`), `ModalWrapperRenderTest`, `DialogA11yE2eTest`
+(`everyDialogFollowsTheContract`), `PromotionAdminDialogsRenderWithTheirScriptMvcTest`,
+`AdminPersonalBlueprintsPageControllerMvcTest`, `OrgChartKeyboardA11yE2eTest`,
+`TouchClassLayoutE2eTest`
+
 **Three sanctioned widths, and no fourth.** `.krt-modal` is 440 px (confirms and single-field
 prompts), `.krt-modal--wide` is 600 px (form-heavy: 3+ stacked fields) and `.krt-modal--xwide` is
 800 px, reserved for dialogs whose body carries a **table** rather than a form — the Auftrag
 material/item pickers and the refinery store sheet. A dialog that needs a width none of these gives
 is a signal to revisit its content, not to add a per-page `max-width`.
 
-**The head's parts are styled, and both heading levels count.** `.krt-modal-close` carries the
+**The head's parts are styled.** `.krt-modal-close` carries the
 `.close-sidebar-btn` treatment (its already-approved sibling — same job, an ✕ that dismisses a
 surface), squared and floored to 44 px in the touch block, with `flex-shrink: 0` so a long German
 title cannot squeeze it narrower than its glyph and a `:focus-visible` ring because it is the first
 Tab stop inside a dialog. It had **no rule at all** until #1884 found it by measurement, and the
 port would have moved the legacy dialogs onto something worse than the styled `.close-modal` they
-came from. The head's title rule covers **`h2` and `h3`**: hand-written shells use `h2` and
-the `modal-wrapper` fragment emits `h3`, and while only `h2` was styled a fragment-rendered title
-fell through to the global heading rule and rendered orange at the browser's default `h3` size
-instead of white at `0.85rem`. The close button's accessible name is **`general.a11y.closeModal`**
+came from. The head's title rule styles the wrapper's **`h2`**. It covered `h3` as well while the
+hand-written shells used `h2` and the fragment emitted `h3` (an unstyled `h3` title fell through to
+the global heading rule and rendered orange at the browser's `h3` size); since 2026-09-23 every
+dialog's title is the wrapper's `h2` and the `h3` selector is gone. The close button's accessible
+name is **`general.a11y.closeModal`**
 (it was `bank.a11y.closeModal`, on fifteen pages that have nothing to do with the Bank).
 
 **A wrapper between the frame and its form needs `.krt-modal-flow`.** The frame caps itself at
@@ -321,7 +406,7 @@ out-specify the page-level `.form-row > .form-group` floor, which is declared la
 - [ ] The frame's width is one of the three sanctioned variants (default / `--wide` / `--xwide`),
   not a per-page `max-width`.
 - [ ] The head carries a `.krt-modal-close` labelled `general.a11y.closeModal`, and its title is an
-  `h2` or `h3` (both are styled).
+  `h2`.
 - [ ] A swap container between `.krt-modal` and its `<form>` carries `.krt-modal-flow`, so the body
   still scrolls under the `90vh` cap.
 - [ ] `.krt-modal-overlay` is `display:none` by default in the global `styles.css` (not only in a
@@ -482,8 +567,11 @@ and no stylesheet had ever declared:
 
 Three rules remain written out per control in the touch block, and each states a decision rather than
 filling a gap: `.btn.btn-xs2` and `input.item-checkbox` must out-specify a page-local rule (a page
-stylesheet under `css/pages/`, formerly an inline `<style>`) that the browser reads after
-`styles.css`, and the dismiss-button group (`.close-sidebar-btn`,
+stylesheet under `css/pages/`, formerly an inline `<style>`), so since REQ-UI-024 both sit in the
+page-layer block at the end of `styles.css`, where specificity against the page stylesheets decides
+*(2026-09-23: `input.item-checkbox` was first left in `components`, where the page layer's 20px
+square beat it at every width; the group checkbox on `/inventory/my` measured 26px on touch classes
+until it moved)*, and the dismiss-button group (`.close-sidebar-btn`,
 `.krt-modal-close`) declares its square and its centring. *(2026-09-22: that group used to exist
 because `.close-modal` was a `<span>` no element selector reaches; the span went with the legacy
 dialog shapes in #1891, and the explicit `min-height` is kept only because it is harmless.)*
@@ -1061,10 +1149,10 @@ A rendered page carries what the browser needs and nothing a developer wrote for
   drops at parse time. A plain `<!-- … -->` is sent with every response. The star-slash pair may not
   appear inside one — it closes the block early and renders the rest; write `* /`.
 - **Page CSS lives in `static/css/pages/<page>.css`**, linked by a `<link rel="stylesheet">` in the
-  place the page's `<style>` block used to stand — so a head stylesheet still sits between
-  `styles.css` and `inline-migration.css`, a body one after both, and the cascade order is the one
-  the page always had. A template carries no `<style>` element. Each file belongs to exactly one
-  template.
+  place the page's `<style>` block used to stand. A template carries no `<style>` element. Each file
+  belongs to exactly one template. Its rules sit in the `page` cascade layer (REQ-UI-024), so where
+  the link stands no longer decides what it beats. Until 2026-09-23 it did: the link kept the page's
+  load order.
 - **The icon sprite stays inline, by measurement.** After the two rules above it is 16.2 KB raw and
   2.4 KB gzipped per page; a separate file would save those 2.4 KB per navigation at the cost of a
   second request before the first icon paints, a content-hashed URL in every `<use href>` of the
@@ -1101,6 +1189,73 @@ tests, `SingleModalShapeTest` (which now also reads the page stylesheets — and
 legacy `.modal` rules the inline blocks had hidden from it), `:frontend:lintCssInline`,
 `:frontend:prettierCheck` · **Related:** REQ-UI-009, REQ-UI-013, REQ-SEC-031 (`no-store` pages),
 ADR-0093 (nonce-gated style blocks), ADR-0168 (asset trees)
+
+### REQ-UI-024 — Every stylesheet sits in a cascade layer; the layer decides, not the load order
+
+Precedence between two stylesheets is decided by the **cascade layer** each rule sits in, declared
+in this order at the top of every file:
+
+```css
+@layer base, components, page, migration, utilities;
+```
+
+| Layer | Holds |
+| --- | --- |
+| `base` | `@font-face` and the `:root` design tokens (`styles.css`) |
+| `components` | the rest of `styles.css`: the design system's components and helpers |
+| `page` | every page / area stylesheet (`bank.css`, …, `css/pages/*.css`), and the few design-system declarations that must keep beating one (the block at the end of `styles.css`) |
+| `migration` | `inline-migration.css`: one class per former inline `style="…"` |
+| `utilities` | the two runtime state classes, `krtm-hidden` and `krtm-modal-open` |
+
+Between layers the order decides, before specificity. Inside a layer, specificity and source order
+decide as before. So:
+
+- **A page stylesheet beats the design system with an ordinary rule.** No specificity bump
+  (`main .form-group select`, `div.page-wrapper`, `.btn.btn-xs2`) and no `!important`: 27 page
+  `!important`s existed only to win against `styles.css` and were removed.
+- **A design-system declaration that has to keep beating page CSS goes into the page-layer block at
+  the end of `styles.css`**, with a comment naming what it beats. Inside that layer, specificity
+  against the page stylesheets decides exactly as it did under load order. It does not go into
+  `utilities`: that would also let it beat the page rules that deliberately out-specify it
+  (`.krt-personal-inventory .form-group select`) and every migrated inline class.
+- **A migrated inline style wins against page and component CSS**, as the inline `style=""` it
+  replaced did (ADR-0093). Under load order it lost to any rule with higher specificity. That changed
+  what a few elements look like, and the owner accepted each change (listed below).
+- **The state classes win outright.** `krtm-hidden` hides whatever display a component, page or
+  migrated rule sets. The co-located `.x.krtm-hidden` re-assertions are gone.
+- **`head.html`'s link order is no longer part of the contract.** `inline-migration.css` still loads
+  last, but only because it always did.
+
+**Accepted visible corrections (owner decision 2026-09-23).** In each case a migrated inline style
+now wins over a page rule that had out-specified it:
+
+| Where | Element | Before → after |
+| --- | --- | --- |
+| Bank, Bank-Anträge, Berechtigungen, Kontenverwaltung, Staffelbank, Admin-Bank, Bank- und Audit-Log | sub-line under the page greeting | 17.6 px → 12.8 px, top margin 0.25 rem |
+| Spezialkommandos (admin), Organigramm | sub-line under the page greeting | grey 1 → grey 2 (text), top margin 0.5 rem |
+| Missionsdaten (admin), Lager-Eingabe, Auftrag anlegen | checkbox labels | block → flex row, gap 0.5 rem, weight 400 |
+| Raffinerieauftrag anlegen | read-only inputs | surface and border of the migrated read-only style |
+| Persönliches Inventar | one field group | margin-bottom of its migrated class |
+
+**Measured, not assumed.** Every page route in `FrontendPageRoutes.PAGES`, logged in as admin, at
+375 and 1280 px, with the stylesheets as they were and as they are, in the same stack at the same
+moment: computed style of every element and a full-page pixel diff, with the winning rule of each
+changed property attributed through the DevTools protocol. Result: 26 of 140 measurements differ in
+pixels, on 13 routes, and two more routes (Missionsdaten, Persönliches Inventar) differ only in
+computed values, with no pixel difference (fields in a closed dialog, and sub-pixel widths). Every difference is an accepted correction above or a
+knock-on of one; no declaration changed hands between the design system and a page stylesheet.
+
+**Acceptance**
+
+- [x] Every stylesheet under `static/css` starts with the layer order and puts all its rules in one
+  of the five layers.
+- [x] No page stylesheet uses `!important` against a component rule; the two that remain beat a
+  migrated class (the Lager filter rows).
+- [x] No change a user can see beyond the accepted corrections above.
+
+**Enforced by:** `CascadeLayerOrderTest` (the order line and the layer of every file) ·
+`SingleModalShapeTest` and `TouchClassLayoutE2eTest` read rules inside `@layer` blocks ·
+**Related:** ADR-0212, ADR-0093, ADR-0176, REQ-UI-023
 
 ## Out of scope
 

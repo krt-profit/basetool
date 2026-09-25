@@ -682,7 +682,7 @@ function openUmbuchenModal(
     adminLager.refreshUmbuchenTransferOrgUnitPicker();
     // Inline `flex` (not `block`) preserves `.modal`'s flex centring; `block` would override the
     // stylesheet flex and pin the dialog to the top of the viewport (#1328).
-    modal.style.display = 'flex';
+    window.krtModal.open(modal);
     // Variante C (REQ-INV-027): build the transfer "Herkunft" picker (the moved row inherits the
     // reduced tags) after the modal is shown, so its initial validity gates the submit button.
     if (window.krtHerkunft && id) {
@@ -777,11 +777,11 @@ function submitUmbuchen(event) {
 
     const dialog = modal;
     function closeModal() {
-        dialog.style.display = 'none';
+        window.krtModal.close(dialog);
     }
 
     deleteBtn.addEventListener('click', function () {
-        modal.style.display = 'flex';
+        window.krtModal.open(modal);
     });
 
     cancelBtn.addEventListener('click', closeModal);

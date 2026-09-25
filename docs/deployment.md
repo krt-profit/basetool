@@ -255,27 +255,41 @@ accepts `NOAUTH`, so it does not care which users exist.
 ```bash
 cd /
 cp -p /var/iri/redis/users.acl /var/iri/redis/users.acl.backup-$(date +%Y%m%d-%H%M%S)
+# Render NEXT TO the live file, never onto it -- see "Why .new and cat" below.
 /var/iri/code/scripts/render-redis-acl.py --env /var/iri/code/.env \
-  --template /var/iri/code/scripts/redis-users.acl.tmpl --out /var/iri/redis/users.acl
-chown root:root /var/iri/redis/users.acl && chmod 0644 /var/iri/redis/users.acl
-restorecon -F /var/iri/redis/users.acl
-grep -c '^user default ' /var/iri/redis/users.acl                 # must be 1
-grep -c '>' /var/iri/redis/users.acl                               # must be 0: hashes only
+  --template /var/iri/code/scripts/redis-users.acl.tmpl --out /var/iri/redis/users.acl.new
+grep -c '^user default ' /var/iri/redis/users.acl.new             # must be 1
+grep -c '>' /var/iri/redis/users.acl.new                           # must be 0: hashes only
+cat /var/iri/redis/users.acl.new > /var/iri/redis/users.acl && rm /var/iri/redis/users.acl.new
+stat -c '%U:%G %a' /var/iri/redis/users.acl                        # root:root 644, unchanged
 # live and atomic -- a malformed file is rejected and the running ACL stays. As `admin` once the
 # rendered file has been loaded at least once; the very first load authenticates as `default`
 # (drop `--user admin`), because the hand-written file before it has no admin user.
 ${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin ACL LOAD'   # OK
+${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin ACL USERS'  # the users the render printed
 ```
 
 `ACL LOAD` needs no restart and signs nobody out. `check-conformance.py --only redis-requires-auth`
 still proves an unauthenticated `PING` is refused.
+
+**Why `.new` and `cat`** *(corrected 2026-09-25)*. The unit mounts the single file
+(`Volume=/var/iri/redis/users.acl:/etc/redis/users.acl:ro`), and a single-file bind mount follows
+the **inode**, not the name. `render-redis-acl.py` writes atomically — a temporary file renamed over
+the target, i.e. a **new** inode — so rendering straight onto the live path would leave the
+container on the old inode, and `ACL LOAD` would quietly reload the **old** rules (the same reason
+`grafana.crt` needs an edge restart after a re-mint). Writing the checked result into the existing
+file with `cat … >` keeps the inode, its owner, mode and SELinux label, so no `chown`/`restorecon`
+is needed and the running container sees the new content. The `ACL USERS` line is the proof: if it
+still lists the old set, the content did not reach the container — `${UCTL} restart redis.service`
+then loads it from the mount (it also restarts `frontend` and `ingest`, which `Requires=` redis;
+sessions survive in the AOF).
 
 > [!warning] Read the ACL log by field, never whole
 > `redis-cli ACL LOG` answers what was refused and by whom — and its `object` field is the key or
 > channel, which for a session key **is a session id**. Print the usernames and reasons only:
 > `${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin ACL LOG 20' | awk 'p{print; p=0} /^(username|reason|context)$/{printf "%s: ", $0; p=1}'`.
 
-**Rotating a password** is `.env` + render + `ACL LOAD` + restarting the one service that uses it
+**Rotating a password** is `.env` + render (the `.new` + `cat` block above) + `ACL LOAD` + restarting the one service that uses it
 (`render-env-d.py` first, so its `env.d` file carries the new value). Rotating `REDIS_PASSWORD`
 touches `default`/`admin` and the redis unit's own environment: render both, `ACL LOAD`, then
 `${UCTL} restart redis.service` so the container sees the new `REDIS_PASSWORD` for the next `ACL
@@ -291,6 +305,19 @@ can be stopped and rolled back on its own.
 1. **Install the renderer** (from WSL): `ansible-playbook site.yml --limit production --tags scripts
    --check --diff`, then without `--check --diff`. Verify
    `ls -l /var/iri/code/scripts/render-redis-acl.py /var/iri/code/scripts/redis-users.acl.tmpl`.
+
+> [!warning] Steps 2–4 are one sitting, with the deploy timer stopped *(corrected 2026-09-25)*
+> Step 2 is **not** inert. The env templates pick each service's password with
+> `REDIS_PASSWORD=${REDIS_<SVC>_PASSWORD:-${REDIS_PASSWORD…}}` — whether or not its
+> `REDIS_<SVC>_USERNAME` is set. So from the moment the three passwords are in `.env`, **any**
+> `env.d/` render hands each application its new password with no username: a password-only `AUTH`
+> as `default` with the wrong password, `WRONGPASS`, and the service goes unhealthy on its next
+> restart. `deploy.sh` re-renders `env.d/` on every config change, so a deploy tick between step 2
+> and step 4 is exactly that render. Hence: `systemctl stop iri-deploy.timer` before step 2, run
+> steps 2–4 back to back, and `systemctl start iri-deploy.timer` only after step 4 verified (or after
+> a rollback). And never add the three passwords before the release carrying REQ-SEC-068 (1.11.0)
+> is live.
+
 2. **Three new passwords into `.env`**, generated on the host so they never cross a terminal:
 
    ```bash
@@ -305,6 +332,12 @@ can be stopped and rolled back on its own.
 
 3. **Render with `default` still on, and load it** — the block above, first load without `--user
    admin`. Nothing changes for the applications yet; `admin` and the three service users now exist.
+   Before rendering, confirm that `.env`'s `REDIS_EXPORTER_PASSWORD` is the password the hand-written
+   file gives `monitoring` — the render re-derives that user's hash from `.env`, and a mismatch takes
+   `redis-exporter` down (`redis_up == 0`). Compare digests, never the values:
+   `grep '^user monitoring ' /var/iri/redis/users.acl | grep -o '>[^ ]*' | cut -c2- | tr -d '\n' | sha256sum`
+   against `sed -n 's/^REDIS_EXPORTER_PASSWORD=//p' /var/iri/code/.env | tr -d '"\n' | sha256sum` —
+   the two sums must be equal; if they differ, stop and settle which one is right first.
    Check: `${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin ACL
    USERS'` lists all six.
 4. **Move the applications**, one at a time, watching each come back healthy:
@@ -330,10 +363,14 @@ can be stopped and rolled back on its own.
    and `redis-exporter` still scrapes (`redis_up == 1`).
 
 **Rollback**, from any step: step 5 — set `REDIS_DEFAULT_USER=on` (or delete the line), render,
-`ACL LOAD`. Step 4 — delete the three `REDIS_*_USERNAME` lines, render `env.d/`, restart the three
-services: they are back on `default`. Step 3 — `cp -p` the `users.acl.backup-*` back and `ACL LOAD`
-(authenticating as `default`). The passwords may stay in `.env`; nothing reads them without the
-usernames.
+`ACL LOAD`. Step 4 — delete the three `REDIS_*_USERNAME` lines **and** the three
+`REDIS_{FRONTEND,BACKEND,INGEST}_PASSWORD` lines, render `env.d/`, restart the three services: they
+are back on `default` with the shared password. Step 3 — `cat` the `users.acl.backup-*` back into
+`users.acl` (keeping the inode, as above) and `ACL LOAD` (authenticating as `default`); step 2 —
+delete the three password lines. *(Corrected 2026-09-25: this used to say the passwords may stay in
+`.env` because nothing reads them without the usernames — the templates read them either way, see
+the warning above.)* **A release rollback** to a version before REQ-SEC-068 (1.10.0 or older) needs
+`default` **on** first: its health check and its applications authenticate as `default`.
 
 ---
 
@@ -373,7 +410,7 @@ a privately signed edge, the JVM truststore (`20-jvm-truststore.conf`). `check-c
 | `/var/iri/code/scripts/` | the role | `deploy.sh`, `backup.sh`, `restore-drill.sh`, `container-cleanup.sh`, `lib/container-runtime.sh`, `render-env-d.py`, `render-redis-acl.py`, `mint-internal-tls.sh`, the two collectors — `root:root 0755`, so `deploy` cannot rewrite its own deployer |
 | `/etc/containers/systemd/users/<iri-uid>/` | `deploy.sh` | the 39 units, plus `<svc>.container.d/10-digest-pin.conf` (the release's digest) and the role's host drop-ins |
 | `/var/iri/code/env.d/` | `deploy.sh` via `render-env-d.py` | one rendered environment file per service |
-| `/var/lib/iri/` | `deploy.sh` | digest-pin record and its predecessor, `last-deployed.digests`, backoff records, `config-stage/`, `config-previous/`, `config-blocked.marker`, `edge/` and `monitoring-reload/` snapshots |
+| `/var/lib/iri/` | `deploy.sh` | digest-pin record and its predecessor, `last-deployed.digests`, backoff records, `config-stage/`, `config-previous/`, `config-blocked.marker`, `config-apply.incomplete` (only while a config apply is unfinished or could not be undone), `edge/` and `monitoring-reload/` snapshots |
 
 `~iri/.config/containers/systemd/` must stay **empty**: Quadlet searches it before the delivery
 directory, so a unit of the same name there silently shadows every release.
@@ -410,6 +447,11 @@ Two phases, PR-based; no hand-pushed tag, no tag ever moved.
 1. **Prepare.** *Actions → Release · Prepare → Run workflow*, version without the `v` (e.g.
    `1.9.3`). It cuts `[Unreleased]` into a dated CHANGELOG section, regenerates the CycloneDX SBOMs
    (`*/docs/*-bom.{json,xml}` — release-only artefacts), and opens a `chore(release): vX.Y.Z` PR.
+   The SBOMs are always a fresh generation: both SBOM tasks are untracked in the root build and
+   the step passes `--no-build-cache`, so a restored Gradle cache cannot hand back an older
+   component list, and each module's `verifyCyclonedxBom` fails the run unless its BOM lists
+   exactly the resolved runtime classpath, project dependencies such as `logging-support` included
+   (REQ-OPS-025).
 2. **Merge that PR.** `release-publish.yml` creates the tag once, at the merge commit, publishes the
    GitHub Release with the eight SBOM files (backend, frontend, ingest, keycloak-spi — REQ-OPS-025),
    attests them (REQ-OPS-023), and the tag push fires `release-images.yml`.
@@ -420,7 +462,10 @@ falls back to a full build. A `main` push does the same, per image, for every im
 did not change (ADR-0210) — so the three `:edge` / `:sha-<short>` images can carry different, earlier
 commits' revision labels, and the frontend's version chip can name an earlier commit; the release
 commit itself always builds all three, and `promote.yml` orders `:testing` against `:stable` by the
-config bundle's revision, which always names the published commit. The tag is created with a short-lived token of the **`basetool-release`
+config bundle's revision, which always names the published commit. A `main`-push run whose commit
+has been superseded by a newer `main` push before it starts skips entirely (green, "skipped —
+superseded" in its summary), so a busy merge day no longer queues one full pipeline per merge; a
+skipped commit has no `:sha-<short>` tag. A release commit's run never skips. The tag is created with a short-lived token of the **`basetool-release`
 GitHub App** (ADR-0201), minted from the secret `RELEASE_APP_PRIVATE_KEY`: the tag ruleset "Version"
 lets only that App and @greluc create `v*` tags, and an App token's events trigger
 `release-images.yml` where `GITHUB_TOKEN`'s would not. There is no fallback — without the key the
@@ -431,6 +476,11 @@ rest.
 Nothing is deployed yet: `:stable` still names the previous release.
 
 ### Promoting to production
+
+> [!note] A release whose PRs need more than this path gets its own runbook
+> When a release carries host steps, ordering constraints or switches beyond the promotion below,
+> they are collected per release from an audit of its PRs: **1.11.0** →
+> [`RELEASE_1.11.0_PRODUCTION_RUNBOOK.md`](RELEASE_1.11.0_PRODUCTION_RUNBOOK.md).
 
 ```bash
 gh workflow run promote.yml -f version=1.9.3
@@ -467,20 +517,40 @@ Within about five minutes the timer fires `deploy.sh`, which:
    wrong image) is logged as `drift: …` and re-applied. A sick container on the **right** image gets
    a targeted restart of that service only, never a release rollback (ADR-0083);
 3. otherwise **cosign-verifies every digest** (REQ-OPS-015) — a failure aborts before anything is
-   pulled or staged — and writes the digest-pin record and the per-service pin drop-ins;
+   pulled or staged;
 4. if the config digest moved: extracts the bundle, asserts it carries no secret, applies the
-   stateful-infra gate (below), snapshots the live tree to `config-previous/`, mirrors the new tree
-   into `/var/iri/code`, **renders `env.d/`**, installs changed units and stops-then-removes units
-   the release no longer names;
-5. pulls the three app images, restarts every application service whose pin or unit changed,
-   starts the rest of the application stack, and waits for health; then stages a moved provider
-   JAR and restarts keycloak alone;
+   stateful-infra gate (below), **checks that `deploy` owns and can write every directory it is
+   about to mirror into** (and the compose directory, the unit directory and `env.d/`), snapshots
+   the live tree to `config-previous/`, mirrors the new tree into `/var/iri/code`, **renders
+   `env.d/`**, installs changed units and stops-then-removes units the release no longer names;
+5. writes the digest-pin record and the per-service pin drop-ins — after the config, so a release
+   the stateful-infra gate holds back leaves no pin behind — pulls the three app images, restarts
+   every application service whose pin or unit changed, starts the rest of the application stack,
+   and waits for health; then stages a moved provider JAR and restarts keycloak alone;
 6. on success writes the marker, clears the failure records, reconciles the monitoring units and
    the edge (config drift or renewed certificates → edge recreate), and prunes dangling images older
    than 30 days;
 7. on a health failure restores the previous config tree, the previous units **and** the previous
    pin drop-ins, restarts, records an exponential backoff for that target (600 s doubling, capped
    at 6 h; `--force` bypasses it) and exits non-zero — `DeployRolledBack` / `DeployFailed`.
+
+A failure in steps 4–5 **before** the health gate — the pre-flight, the extraction, a mirror, the
+`env.d` render, the unit install, the pull — is recorded the same way: a `FATAL: deploy aborted
+before the health gate — step '…' failed (exit N)` line, the previous config tree, units and pin put
+back if this run had changed them, the same backoff record, and `basetool_deploy_last_failure_timestamp`
+(`DeployFailed`). Nothing has been restarted at that point, so the stack keeps running the previous
+release. If the restore itself fails the log says the tree is **INCONSISTENT**, and
+`/var/lib/iri/config-apply.incomplete` stays, which stops the next tick from snapshotting the
+half-applied tree over `config-previous/`.
+
+> [!warning] Until 2026-09-25 such a failure was silent
+> A command failing under `set -e` ended the run with no FATAL line, no metric, no backoff and no
+> restore. With v1.11.0 a root-owned `/var/iri/code/docker/acme` failed the acme mirror (`rsync …
+> mkstemp … Permission denied (13)`, exit 23) on every tick from 12:25 to 12:35 after three other
+> subtrees had already been mirrored; `deploy.prom` kept `basetool_deploy_last_failure_timestamp 0`,
+> `DeployFailed` never fired, and production stayed on the old release until someone looked. The
+> second of those ticks also snapshotted the half-mirrored tree as `config-previous/` and saved the
+> first tick's new pin as the rollback anchor.
 
 Read the result in `/var/log/iri-deploy.log`, or off-host in Grafana → Explore → Loki with
 `{app="ops-deploy"}`. **Not** `journalctl -u iri-deploy.service`: the unit's `StandardOutput=append:`
@@ -589,6 +659,14 @@ compose changed (`generate-quadlet.py`), merge, cut a release, promote. The next
 bundle, installs the changed units and restarts exactly the application services whose definition
 moved. Dependabot's image-pin bumps take this path too.
 
+The subtrees a release owns — `docker/` (edge, acme, maintenance), `keycloak-theme/`, `monitoring/`
+and `quadlet/` under `/var/iri/code` — must be owned by `deploy` all the way down, because the mirror
+(`rsync -rlpt --delete`) creates a temp file in every directory it updates and sets each directory's
+mode and mtime. A directory created by hand as root blocks every config change. Since 2026-09-25
+`deploy.sh` checks this before it changes anything and refuses with one line naming the directory
+(`PRE-FLIGHT: … is not owned or not writable by deploy`); the fix is in
+[Troubleshooting](#troubleshooting). The role's `--tags directories` reclaims exactly these four.
+
 > [!note] Monitoring and `acme` units are restarted like the rest — fixed 2026-09-22
 > Every unit a release re-defines is **restarted**, every other one merely **started**: the nine
 > application services (`db-backend db-keycloak redis keycloak backend ingest frontend edge acme`)
@@ -663,6 +741,45 @@ the same request (REQ-SEC-050) — the member keeps the login.
 `env.d/` again with the same command and `${UCTL} restart frontend.service`. No stored session is
 touched either way: the mode governs reading only. `off` restores the pre-list validator exactly, for
 the case where the reporting itself misbehaves.
+
+### Internal JWKS for the backend
+
+The backend can fetch the keys that sign access tokens from the **internal** Keycloak
+(`https://keycloak:18443`, over `net-backend-keycloak` and the pinned `keycloak-trust` bundle)
+instead of through the public edge (REQ-SEC-024, ADR-0073). `iss` is still checked against the
+public issuer, so tokens do not change. Until 2026-09-23 `application-prod.yml` read the variable but
+nothing passed it to the container, so this could not be switched on in production; the release
+carrying the wiring passes it **empty**, which keeps today's issuer-location decoder exactly.
+
+**What changes when it is set:** the key fetch no longer hairpins through the edge, so an edge or
+public-DNS blip can no longer fail token validation, and the accepted signature algorithms widen
+from what the live JWKS advertises to the full asymmetric set. Members notice nothing. Only the
+backend: the ingest gateway reads the same property but is on no network that reaches Keycloak.
+
+**Precondition** (read-only): Keycloak's certificate names `keycloak` — it must already, because
+the user sync verifies it (REQ-SEC-014); a failing daily sync would say so.
+
+**Apply** (as root, from `/`; a production write, so it waits for the owner's yes):
+
+```bash
+cd /
+cp -p /var/iri/code/.env /var/iri/code/.env.backup-$(date +%Y%m%d-%H%M%S)
+printf 'IRI_BACKEND_KEYCLOAK_JWK_SET_URI=https://keycloak:18443/auth/realms/iri/protocol/openid-connect/certs\n' \
+  >> /var/iri/code/.env
+grep -c '^IRI_BACKEND_KEYCLOAK_JWK_SET_URI=' /var/iri/code/.env                        # 1
+sudo -u deploy /var/iri/code/scripts/render-env-d.py \
+  --env /var/iri/code/.env --templates /var/iri/code/quadlet/env.d --out /var/iri/code/env.d
+grep '^KEYCLOAK_JWK_SET_URI=' /var/iri/code/env.d/backend.env    # ...=https://keycloak:18443/auth/realms/iri/protocol/openid-connect/certs
+${UCTL} restart backend.service                                   # blocks until healthy
+```
+
+**Verify:** sign in on the web app and load a page that calls the API (the mission list); the app
+works and the backend log shows no `401` burst and no `JWKS` / `PKIX` / `No subject alternative`
+line (`${UPOD} logs --since 10m backend 2>&1 | grep -iE 'jwk|PKIX|subject alternative'`).
+`basetool_http_error_total{code="SERVICE_UNAVAILABLE"}` stays flat.
+
+**Rollback:** delete the line from `.env`, render `env.d/` again with the same command, restart the
+backend. The variable then arrives empty and the issuer-location decoder is back.
 
 ### Network changes are installed, not applied
 
@@ -819,6 +936,52 @@ client ──► haproxy :80/:443 (host, v4+v6) ──send-proxy-v2──► edg
 - **The API vhost's allow-list** is `docker/edge/include/api-allowlist.conf`, the source of truth
   (ADR-0135). `edge-deny-probe.yml` probes the public deny rules from outside every day.
 
+### The edge verifies Grafana
+
+Every upstream the edge re-encrypts to is verified against the internal CA
+(`include/upstream-tls.conf`), except Grafana: it serves its own self-signed certificate
+(`/var/iri/monitoring/certs/grafana.crt`, minted once per host, [`monitoring/README.md`](../monitoring/README.md)
+step 3). Since 2026-09-23 the edge can verify that hop too, pinning that very certificate as the
+Grafana upstream's only anchor and checking the name `grafana` (`include/upstream-grafana-tls.conf`,
+REQ-OBS-008). It is behind **`EDGE_GRAFANA_UPSTREAM_VERIFY`**, `off` by default, so the release that
+carries it changes nothing but one read-only mount: the edge now mounts `grafana.crt`, the same file
+Grafana itself needs to start. `deploy.sh`'s mount pre-flight reads the units **already installed**
+at the start of a tick (before the tick installs the incoming bundle's), so it does not stop the
+release that *adds* this mount: with the file missing, that release fails at the edge's start and
+the health gate rolls it back; only later ticks refuse it up front *(corrected 2026-09-25)*. The
+file exists wherever Grafana runs, and on production it was confirmed on 2026-09-25.
+
+**Precondition** (read-only): the certificate names `grafana`.
+
+```bash
+openssl x509 -in /var/iri/monitoring/certs/grafana.crt -noout -subject -enddate -ext subjectAltName
+# subjectAltName must list DNS:grafana; enddate in the future
+```
+
+If it does not, re-mint it first (monitoring/README.md step 3) and restart Grafana.
+
+**Apply** (as root, from `/`; a production write, so it waits for the owner's yes):
+
+```bash
+cd /
+cp -p /var/iri/code/.env /var/iri/code/.env.backup-$(date +%Y%m%d-%H%M%S)
+printf 'EDGE_GRAFANA_UPSTREAM_VERIFY=on\n' >> /var/iri/code/.env
+grep -c '^EDGE_GRAFANA_UPSTREAM_VERIFY=' /var/iri/code/.env              # 1
+sudo -u deploy /var/iri/code/scripts/render-env-d.py \
+  --env /var/iri/code/.env --templates /var/iri/code/quadlet/env.d --out /var/iri/code/env.d
+${UCTL} restart edge.service                                            # blocks until healthy
+${UPOD} logs --since 2m edge 2>&1 | grep "Grafana's upstream"           # ... is verified (pinned)
+curl -sS -o /dev/null -w '%{http_code}\n' "https://$(sed -n 's/^EDGE_HOST_GRAFANA=//p' /var/iri/code/.env)/api/health"   # 200
+```
+
+A verification failure shows as the maintenance page / `503` on the Grafana host and an
+`upstream SSL certificate verify error` line in the edge log. **Rollback:** delete the line, render
+`env.d/` again, restart the edge.
+
+**From then on, a re-minted `grafana.crt` needs the edge restarted as well as Grafana:** the edge
+mounts the file (a single-file mount pins the inode) and pins its contents. Until the restart the
+edge refuses the new certificate and Grafana answers `503`.
+
 ### Maintenance page
 
 `include/maintenance.conf` turns an upstream 502/503/504 into a `503` with `Retry-After: 60` — the
@@ -946,7 +1109,9 @@ ansible-playbook site.yml --limit production --tags scripts --check --diff
 ansible-playbook site.yml --limit production --tags scripts
 ```
 
-Expected: `mint-internal-tls.sh`, `deploy.sh`, `backup.sh` changed under `/var/iri/code/scripts/`.
+Expected: `mint-internal-tls.sh`, `deploy.sh`, `backup.sh` changed under `/var/iri/code/scripts/`,
+plus `render-redis-acl.py` and `redis-users.acl.tmpl` if the Redis ACL renderer
+([The Redis ACL](#the-redis-acl)) was not installed before — the same run installs both.
 Rollback: re-run the role from the previous commit.
 
 ### Step 1 — check the names (independent of everything else)
@@ -1043,8 +1208,12 @@ may stay, nothing mounts it yet.
 ### Step 3 — serve the new certificates
 
 Merge and promote the follow-up release that bakes the step-2 files into the units (`PATH_VARS`) —
-its `deploy.sh` pre-flight refuses the release if any of the files is missing, before anything is
-applied. The deploy recreates backend, frontend, ingest and Keycloak on their own leaves; the
+**only after step 2 has put every file in place**. The `deploy.sh` mount pre-flight reads the units
+already installed at the start of the tick, not the incoming ones, so it does **not** refuse this
+release before applying it: a missing file makes the containers fail to start and the health gate
+roll the release back (and later ticks then refuse it). Check the files by hand first
+(`ls -l /var/iri/secrets/tls/`) *(corrected 2026-09-25: this used to say the pre-flight refuses the
+release before anything is applied)*. The deploy recreates backend, frontend, ingest and Keycloak on their own leaves; the
 truststore still carries the old certificate, so the restart order does not matter.
 
 Verify:
@@ -1305,6 +1474,7 @@ goes.
 | nothing answers on 80/443 | `systemctl status haproxy`, `firewall-cmd --list-all` | haproxy not started (fresh host), or a firewall layer — probe from a third machine |
 | Stack comes back after a manual stop | `drift:` lines in the deploy log | the drift check (REQ-OPS-013); stop the timer first |
 | `CARVE-OUT: postgres/Keycloak image pin changed` | the deploy log, `config-blocked.marker` | a gated upgrade — see [Stateful-infra upgrades](#stateful-infra-upgrades) |
+| Deploy stuck on a config apply: `PRE-FLIGHT: … is not owned or not writable by deploy`, or `FATAL: deploy aborted before the health gate — step 'mirror …' failed (exit 23)` after an `rsync: … mkstemp … Permission denied (13)`; `DeployFailed` fires, then `target failed Nx; in backoff window` | the deploy log, `find /var/iri/code/{docker,keycloak-theme,monitoring,quadlet} ! -user deploy` | a release-owned subtree (here `docker/acme`, 2026-09-25) was created or copied as root. Fix the owner — `chown -R deploy:deploy /var/iri/code/docker` (or the subtree named), or the role with `--tags directories` — then `sudo -u deploy /var/iri/code/scripts/deploy.sh --force` to skip the backoff. If the log also says **INCONSISTENT**, the restore failed too: the same fix, then `--force`; `config-previous/` was kept |
 | A promoted unit change is ignored | `ls ~iri/.config/containers/systemd/` | a hand-placed unit of the same name shadows the delivered one |
 | Monitoring config changes never load | the deploy log (`IRI_MONITORING_ENABLED != 'true'`) | set `IRI_MONITORING_ENABLED=true` in `.env`; `MonitoringReconcileDisabled` fires meanwhile |
 

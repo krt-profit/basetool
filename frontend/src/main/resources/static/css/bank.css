@@ -8,41 +8,44 @@
  * device classes (<=768, <=1024, default, >=1600).
  */
 
-/* ---- Dashboard tiles (D1): .kpi-total aggregate strip + .kpi-card per account ---- */
-.bank-totals {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
-}
+@layer base, components, page, migration, utilities;
 
-.kpi-total {
-    background: var(--color-bg-dark-gray);
-    border: var(--border-hairline);
-    border-left: 4px solid var(--color-primary);
-    padding: 10px 14px;
-}
+@layer page {
+    /* ---- Dashboard tiles (D1): .kpi-total aggregate strip + .kpi-card per account ---- */
+    .bank-totals {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+    }
 
-.kpi-label {
-    font-size: 0.62rem;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--color-gray-2-text);
-    font-weight: var(--fw-bold);
-}
+    .kpi-total {
+        background: var(--color-bg-dark-gray);
+        border: var(--border-hairline);
+        border-left: 4px solid var(--color-primary);
+        padding: 10px 14px;
+    }
 
-.kpi-value {
-    font-family: var(--font-headline);
-    font-weight: var(--fw-bold);
-    font-size: 1.2rem;
-    color: var(--color-white);
-    margin-top: 2px;
-    font-variant-numeric: tabular-nums;
-}
+    .kpi-label {
+        font-size: 0.62rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--color-gray-2-text);
+        font-weight: var(--fw-bold);
+    }
 
-.bank-acc-grid {
-    display: grid;
+    .kpi-value {
+        font-family: var(--font-headline);
+        font-weight: var(--fw-bold);
+        font-size: 1.2rem;
+        color: var(--color-white);
+        margin-top: 2px;
+        font-variant-numeric: tabular-nums;
+    }
 
-    /*
+    .bank-acc-grid {
+        display: grid;
+
+        /*
      * `minmax(0, 1fr)`, not `1fr` — the same reason `.bank-detail-panels` further down states it.
      *
      * `1fr` is `minmax(auto, 1fr)`, and `auto` resolves to the item's MIN-CONTENT width, so a card
@@ -54,347 +57,344 @@
      * (`min-width: 0` below), and so must the row inside it that sits beside the fixed-width
      * sparkline. Fixing only the track moves the overflow one level down.
      */
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px;
-}
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+    }
 
-.kpi-card {
-    /* Link 2 of the chain above: a grid item's automatic minimum size is its min-content. */
-    min-width: 0;
-    background: var(--color-bg-dark-gray);
-    border: var(--border-hairline);
-    padding: 12px 14px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    cursor: pointer;
-    transition: border-color 0.15s;
-    color: inherit;
-    text-decoration: none;
-}
+    .kpi-card {
+        /* Link 2 of the chain above: a grid item's automatic minimum size is its min-content. */
+        min-width: 0;
+        background: var(--color-bg-dark-gray);
+        border: var(--border-hairline);
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        cursor: pointer;
+        transition: border-color 0.15s;
+        color: inherit;
+        text-decoration: none;
+    }
 
-.kpi-card:hover {
-    border-color: var(--color-primary);
-}
+    .kpi-card:hover {
+        border-color: var(--color-primary);
+    }
 
-.kpi-card:focus-visible {
-    outline: 2px solid var(--color-primary);
-    outline-offset: 2px;
-}
+    .kpi-card:focus-visible {
+        outline: 2px solid var(--color-primary);
+        outline-offset: 2px;
+    }
 
-.kpi-card .kpi-title {
-    font-weight: var(--fw-bold);
-    color: var(--color-white);
-    font-size: 0.85rem;
+    .kpi-card .kpi-title {
+        font-weight: var(--fw-bold);
+        color: var(--color-white);
+        font-size: 0.85rem;
 
-    /* A long account name is otherwise one unbreakable run holding the row open. */
-    overflow-wrap: anywhere;
-}
+        /* A long account name is otherwise one unbreakable run holding the row open. */
+        overflow-wrap: anywhere;
+    }
 
-.kpi-card .kpi-sub {
-    font-size: 0.66rem;
-    color: var(--color-gray-2-text);
-    font-variant-numeric: tabular-nums;
-}
+    .kpi-card .kpi-sub {
+        font-size: 0.66rem;
+        color: var(--color-gray-2-text);
+        font-variant-numeric: tabular-nums;
+    }
 
-.kpi-card .kpi-value {
-    font-size: 1.3rem;
-}
+    .kpi-card .kpi-value {
+        font-size: 1.3rem;
+    }
 
-.kpi-card-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 8px;
+    .kpi-card-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 8px;
 
-    /* Link 3: the title block is a flex item beside a fixed-width sparkline, and flex items carry
+        /* Link 3: the title block is a flex item beside a fixed-width sparkline, and flex items carry
        the same automatic minimum size as grid items. */
-    min-width: 0;
-}
+        min-width: 0;
+    }
 
-.kpi-card-top > * {
-    min-width: 0;
-}
+    .kpi-card-top > * {
+        min-width: 0;
+    }
 
-.kpi-card-foot {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-    gap: 8px;
-}
+    .kpi-card-foot {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 8px;
+    }
 
-/*
+    /*
  * Action footer (detail link + request button / view-only label): the auto top
  * margin consumes the card's free vertical space so the action feet sit flush at
  * the card bottom. The grid stretches every card in a row to equal height, so the
  * detail and request buttons line up across cards whether or not a given card
  * carries the optional balance-target progress block above it (REQ-BANK-036).
  */
-.kpi-card .kpi-card-foot--actions {
-    margin-top: auto;
-}
+    .kpi-card .kpi-card-foot--actions {
+        margin-top: auto;
+    }
 
-.kpi-delta {
-    font-size: 0.72rem;
-    font-weight: var(--fw-bold);
-    font-variant-numeric: tabular-nums;
-}
+    .kpi-delta {
+        font-size: 0.72rem;
+        font-weight: var(--fw-bold);
+        font-variant-numeric: tabular-nums;
+    }
 
-.kpi-delta--pos {
-    color: var(--color-success);
-}
+    .kpi-delta--pos {
+        color: var(--color-success);
+    }
 
-.kpi-delta--neg {
-    color: var(--color-danger-text);
-}
+    .kpi-delta--neg {
+        color: var(--color-danger-text);
+    }
 
-.kpi-delta--flat {
-    color: var(--color-gray-2-text);
-}
+    .kpi-delta--flat {
+        color: var(--color-gray-2-text);
+    }
 
-.kpi-card--closed {
-    opacity: 0.55;
-}
+    .kpi-card--closed {
+        opacity: 0.55;
+    }
 
-/* 30-day trend sparkline: design-system tokens, not inline hex (KRT orange / muted grey). */
-.kpi-sparkline {
-    stroke: var(--color-primary);
-}
+    /* 30-day trend sparkline: design-system tokens, not inline hex (KRT orange / muted grey). */
+    .kpi-sparkline {
+        stroke: var(--color-primary);
+    }
 
-.kpi-sparkline--flat {
-    stroke: var(--color-gray-2);
-}
+    .kpi-sparkline--flat {
+        stroke: var(--color-gray-2);
+    }
 
-/* ---- Holder distribution (K1): rows with track bars + the proportional stack bar ---- */
-.holder-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 6px 0;
-    border-bottom: 1px dashed var(--color-surface-input);
-}
+    /* ---- Holder distribution (K1): rows with track bars + the proportional stack bar ---- */
+    .holder-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 0;
+        border-bottom: 1px dashed var(--color-surface-input);
+    }
 
-.holder-row:last-child {
-    border-bottom: none;
-}
+    .holder-row:last-child {
+        border-bottom: none;
+    }
 
-.holder-row .holder-name {
-    font-weight: var(--fw-bold);
-    color: var(--color-white);
-    font-size: 0.8rem;
-    min-width: 80px;
-}
+    .holder-row .holder-name {
+        font-weight: var(--fw-bold);
+        color: var(--color-white);
+        font-size: 0.8rem;
+        min-width: 80px;
+    }
 
-.holder-row .holder-bar {
-    flex: 1;
-    height: 9px;
-    background: var(--color-surface-input);
-    position: relative;
-}
+    .holder-row .holder-bar {
+        flex: 1;
+        height: 9px;
+        background: var(--color-surface-input);
+        position: relative;
+    }
 
-.holder-row .holder-bar i {
-    position: absolute;
-    inset: 0 auto 0 0;
-    background: var(--color-primary);
-}
+    .holder-row .holder-bar i {
+        position: absolute;
+        inset: 0 auto 0 0;
+        background: var(--color-primary);
+    }
 
-.holder-row .holder-value {
-    font-size: 0.76rem;
-    min-width: 110px;
-    text-align: right;
-    color: var(--color-gray-1);
-    font-variant-numeric: tabular-nums;
-}
+    .holder-row .holder-value {
+        font-size: 0.76rem;
+        min-width: 110px;
+        text-align: right;
+        color: var(--color-gray-1);
+        font-variant-numeric: tabular-nums;
+    }
 
-.holder-sum {
-    border-top: var(--border-hairline);
-    margin-top: 7px;
-    padding-top: 7px;
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.76rem;
-}
+    .holder-sum {
+        border-top: var(--border-hairline);
+        margin-top: 7px;
+        padding-top: 7px;
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.76rem;
+    }
 
-.stack-bar {
-    display: flex;
-    height: 14px;
-    border: var(--border-hairline);
-    overflow: hidden;
-    margin-bottom: 8px;
-}
+    .stack-bar {
+        display: flex;
+        height: 14px;
+        border: var(--border-hairline);
+        overflow: hidden;
+        margin-bottom: 8px;
+    }
 
-.stack-bar i {
-    display: block;
-    height: 100%;
-}
+    .stack-bar i {
+        display: block;
+        height: 100%;
+    }
 
-.stack-seg-0 {
-    background: var(--color-primary);
-}
+    .stack-seg-0 {
+        background: var(--color-primary);
+    }
 
-.stack-seg-1 {
-    background: var(--color-accent-light);
-}
+    .stack-seg-1 {
+        background: var(--color-accent-light);
+    }
 
-.stack-seg-2 {
-    background: var(--color-accent-dark);
-}
+    .stack-seg-2 {
+        background: var(--color-accent-dark);
+    }
 
-.stack-seg-3 {
-    background: var(--color-dept-profit);
-}
+    .stack-seg-3 {
+        background: var(--color-dept-profit);
+    }
 
-.stack-seg-4 {
-    background: var(--color-dept-raumueberlegenheit);
-}
+    .stack-seg-4 {
+        background: var(--color-dept-raumueberlegenheit);
+    }
 
-.stack-seg-5 {
-    background: var(--color-dept-forschung);
-}
+    .stack-seg-5 {
+        background: var(--color-dept-forschung);
+    }
 
-.stack-legend {
-    display: flex;
-    gap: 14px;
-    flex-wrap: wrap;
-    font-size: 0.7rem;
-    color: var(--color-gray-2-text);
-    margin-top: 8px;
-}
+    .stack-legend {
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+        font-size: 0.7rem;
+        color: var(--color-gray-2-text);
+        margin-top: 8px;
+    }
 
-.stack-legend .sw {
-    display: inline-block;
-    width: 9px;
-    height: 9px;
-    margin-right: 5px;
-    vertical-align: -1px;
-}
+    .stack-legend .sw {
+        display: inline-block;
+        width: 9px;
+        height: 9px;
+        margin-right: 5px;
+        vertical-align: -1px;
+    }
 
-/* ---- Permission flag matrix (G1): row existence = view right ---- */
-.matrix-flag {
-    display: inline-flex;
-    width: 18px;
-    height: 18px;
-    border: var(--border-hairline);
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    background: var(--color-surface-input);
-    color: transparent;
-    font-size: 0.7rem;
-    padding: 0;
-}
+    /* ---- Permission flag matrix (G1): row existence = view right ---- */
+    .matrix-flag {
+        display: inline-flex;
+        width: 18px;
+        height: 18px;
+        border: var(--border-hairline);
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        background: var(--color-surface-input);
+        color: transparent;
+        font-size: 0.7rem;
+        padding: 0;
+    }
 
-.matrix-flag.on {
-    background: var(--color-primary);
-    border-color: var(--color-primary);
-    color: var(--color-bg-black);
-    font-weight: var(--fw-black);
-}
+    .matrix-flag.on {
+        background: var(--color-primary);
+        border-color: var(--color-primary);
+        color: var(--color-bg-black);
+        font-weight: var(--fw-black);
+    }
 
-.matrix-flag:focus-visible {
-    outline: 2px solid var(--color-primary);
-    outline-offset: 2px;
-}
+    .matrix-flag:focus-visible {
+        outline: 2px solid var(--color-primary);
+        outline-offset: 2px;
+    }
 
-.matrix-flag[disabled] {
-    cursor: default;
-}
+    .matrix-flag[disabled] {
+        cursor: default;
+    }
 
-tr.is-inert td {
-    opacity: 0.5;
-}
+    tr.is-inert td {
+        opacity: 0.5;
+    }
 
-/* ---- KRT modal frame (formalized head/body/foot) + type-to-confirm ---- */
-/* Mirrors the global `.krt-modal-overlay` in styles.css (same hidden default).
+    /* ---- KRT modal frame (formalized head/body/foot) + type-to-confirm ---- */
+    /* Mirrors the global `.krt-modal-overlay` in styles.css (same hidden default).
    Kept as defense-in-depth so the overlay stays hidden even if only one of the two
    stylesheets loads; both must agree on `display: none`. */
-.krt-modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgb(0 0 0 / 80%);
-    backdrop-filter: blur(2px);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-    z-index: 3000;
-}
+    .krt-modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgb(0 0 0 / 80%);
+        backdrop-filter: blur(2px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        z-index: 3000;
+    }
 
-.krt-modal {
-    width: 100%;
-    max-width: 440px;
-    background: var(--color-bg-dark-gray);
-    border: var(--border-hairline);
-    border-top: 3px solid var(--color-primary);
-    position: relative;
-    box-shadow: var(--glow-primary-lg);
-}
+    .krt-modal {
+        width: 100%;
+        max-width: 440px;
+        background: var(--color-bg-dark-gray);
+        border: var(--border-hairline);
+        border-top: 3px solid var(--color-primary);
+        position: relative;
+        box-shadow: var(--glow-primary-lg);
+    }
 
-.krt-modal::before,
-.krt-modal::after {
-    content: '';
-    position: absolute;
-    width: 13px;
-    height: 13px;
-    border: 2px solid var(--color-primary);
-}
+    .krt-modal::before,
+    .krt-modal::after {
+        content: '';
+        position: absolute;
+        width: 13px;
+        height: 13px;
+        border: 2px solid var(--color-primary);
+    }
 
-.krt-modal::before {
-    top: -2px;
-    left: -2px;
-    border-right: none;
-    border-bottom: none;
-}
+    .krt-modal::before {
+        top: -2px;
+        left: -2px;
+        border-right: none;
+        border-bottom: none;
+    }
 
-.krt-modal::after {
-    bottom: -2px;
-    right: -2px;
-    border-left: none;
-    border-top: none;
-}
+    .krt-modal::after {
+        bottom: -2px;
+        right: -2px;
+        border-left: none;
+        border-top: none;
+    }
 
-.krt-modal--danger {
-    border-top-color: var(--color-danger);
-    box-shadow: var(--glow-danger-lg);
-}
+    .krt-modal--danger {
+        border-top-color: var(--color-danger);
+        box-shadow: var(--glow-danger-lg);
+    }
 
-.krt-modal--danger::before,
-.krt-modal--danger::after {
-    border-color: var(--color-danger);
-}
+    .krt-modal--danger::before,
+    .krt-modal--danger::after {
+        border-color: var(--color-danger);
+    }
 
-.krt-modal-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 10px;
-    padding: 12px 16px;
-    border-bottom: var(--border-hairline);
-}
+    .krt-modal-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 16px;
+        border-bottom: var(--border-hairline);
+    }
 
-/* Mirrors styles.css: the shell's title is an <h2> hand-written and an <h3>
-   from `modal-wrapper :: modal(...)`, so both carry the head style. */
-.krt-modal-head h2,
-.krt-modal-head h3 {
-    font-family: var(--font-headline);
-    font-weight: var(--fw-bold);
-    font-size: 0.85rem;
-    color: var(--color-white);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    margin: 0;
-}
+    /* Mirrors styles.css: the shell's title is the wrapper's <h2>. */
+    .krt-modal-head h2 {
+        font-family: var(--font-headline);
+        font-weight: var(--fw-bold);
+        font-size: 0.85rem;
+        color: var(--color-white);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin: 0;
+    }
 
-.krt-modal--danger .krt-modal-head h2,
-.krt-modal--danger .krt-modal-head h3 {
-    color: var(--color-danger-text);
-}
+    .krt-modal--danger .krt-modal-head h2 {
+        color: var(--color-danger-text);
+    }
 
-.krt-modal-body {
-    padding: 14px 16px;
-}
+    .krt-modal-body {
+        padding: 14px 16px;
+    }
 
-/* `.krt-modal-foot` is NOT redeclared here any more.
+    /* `.krt-modal-foot` is NOT redeclared here any more.
  *
  * This file loads after styles.css, so a copy of the selector wins every property it names — and
  * the copy named six of the canonical rule's seven, silently dropping `flex-shrink: 0`. A tall bank
@@ -402,452 +402,452 @@ tr.is-inert td {
  * copy gives the bank pages the canonical rule, wrap included, and ends the obligation to keep two
  * declarations of one thing in step. */
 
-.krt-modal .confirm-input {
-    width: 100%;
-    box-sizing: border-box;
-    background: var(--color-surface-input);
-    color: var(--color-gray-1);
-    border: var(--border-hairline);
-    padding: 7px 9px;
-    font-size: 0.8rem;
-    margin-top: 8px;
-    font-family: var(--font-body);
-}
+    .krt-modal .confirm-input {
+        width: 100%;
+        box-sizing: border-box;
+        background: var(--color-surface-input);
+        color: var(--color-gray-1);
+        border: var(--border-hairline);
+        padding: 7px 9px;
+        font-size: 0.8rem;
+        margin-top: 8px;
+        font-family: var(--font-body);
+    }
 
-.krt-modal .confirm-input:focus {
-    border-color: var(--color-primary);
-    outline: none;
-    box-shadow: var(--glow-primary);
-}
+    .krt-modal .confirm-input:focus {
+        border-color: var(--color-primary);
+        outline: none;
+        box-shadow: var(--glow-primary);
+    }
 
-/* ---- Admin danger card (A1: wipe-reset) ---- */
-.bank-danger-card {
-    background: var(--color-bg-dark-gray);
-    border: 1px solid var(--color-danger);
-    border-left: 4px solid var(--color-danger);
-    padding: 16px 18px;
-}
+    /* ---- Admin danger card (A1: wipe-reset) ---- */
+    .bank-danger-card {
+        background: var(--color-bg-dark-gray);
+        border: 1px solid var(--color-danger);
+        border-left: 4px solid var(--color-danger);
+        padding: 16px 18px;
+    }
 
-.bank-danger-head {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 8px;
-}
+    .bank-danger-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 8px;
+    }
 
-.bank-danger-head h2 {
-    margin: 0;
-    font-size: 1rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--color-danger-text);
-}
+    .bank-danger-head h2 {
+        margin: 0;
+        font-size: 1rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--color-danger-text);
+    }
 
-.bank-danger-head .krt-icon {
-    width: 22px;
-    height: 22px;
-    color: var(--color-danger-text);
-}
+    .bank-danger-head .krt-icon {
+        width: 22px;
+        height: 22px;
+        color: var(--color-danger-text);
+    }
 
-.bank-danger-card p {
-    color: var(--color-gray-1);
-    font-size: 0.85rem;
-    line-height: 1.45;
-    margin: 0 0 14px;
-}
+    .bank-danger-card p {
+        color: var(--color-gray-1);
+        font-size: 0.85rem;
+        line-height: 1.45;
+        margin: 0 0 14px;
+    }
 
-/* ---- Audit filter bar action cluster ---- */
-.bank-filter-actions {
-    display: flex;
-    gap: 8px;
-    align-items: flex-end;
-}
+    /* ---- Audit filter bar action cluster ---- */
+    .bank-filter-actions {
+        display: flex;
+        gap: 8px;
+        align-items: flex-end;
+    }
 
-/* ---- Bank page scaffolding (screen panels, facts strip, two-column detail) ---- */
-.bank-head-actions {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    align-items: center;
-}
+    /* ---- Bank page scaffolding (screen panels, facts strip, two-column detail) ---- */
+    .bank-head-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
 
-/* Requests overview header right side (#997): the direct-booking "Kontobewegung" CTA sits above the
+    /* Requests overview header right side (#997): the direct-booking "Kontobewegung" CTA sits above the
    parallel status-filter chip group; both align to the right edge and wrap onto their own line on
    narrow viewports. */
-.bank-requests-head-right {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
-    justify-content: flex-end;
-}
+    .bank-requests-head-right {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        justify-content: flex-end;
+    }
 
-/* Request status filter (REQ-BANK-023): the independent status checkboxes, wrapping onto their own
+    /* Request status filter (REQ-BANK-023): the independent status checkboxes, wrapping onto their own
    line on narrow viewports. */
-.bank-status-filter {
-    display: inline-flex;
-    flex-wrap: wrap;
-    gap: 8px 14px;
-    align-items: center;
-}
+    .bank-status-filter {
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: 8px 14px;
+        align-items: center;
+    }
 
-/* ---- Account-name live filter (REQ-BANK-046): dashboard cards + org-unit account list ---- */
-/*
+    /* ---- Account-name live filter (REQ-BANK-046): dashboard cards + org-unit account list ---- */
+    /*
  * The filter hides non-matching items via the `hidden` attribute. The card / row author rules set
  * `display: flex` / `display: grid`, which would otherwise beat the UA stylesheet's
  * `[hidden] { display: none }`, so both are re-hidden explicitly here (same landmine the
  * `.bank-form-row[hidden]` rule guards against).
  */
-.kpi-card[hidden],
-.ou-row[hidden] {
-    display: none;
-}
+    .kpi-card[hidden],
+    .ou-row[hidden] {
+        display: none;
+    }
 
-/* Search box: the magnifier icon overlays the input's left padding (square-first HUD, no rounding). */
-.bank-acc-search {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-}
+    /* Search box: the magnifier icon overlays the input's left padding (square-first HUD, no rounding). */
+    .bank-acc-search {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+    }
 
-.bank-acc-search-icon {
-    position: absolute;
-    left: 8px;
-    width: 15px;
-    height: 15px;
-    color: var(--color-gray-2-text);
-    pointer-events: none;
-}
+    .bank-acc-search-icon {
+        position: absolute;
+        left: 8px;
+        width: 15px;
+        height: 15px;
+        color: var(--color-gray-2-text);
+        pointer-events: none;
+    }
 
-/* The descendant selector lifts this above the global `input[type='search']` rule (specificity
+    /* The descendant selector lifts this above the global `input[type='search']` rule (specificity
    0,1,1), whose `padding` shorthand would otherwise reset padding-left and slide the placeholder
    text under the magnifier icon (dashboard D1 + org-unit bank live filters, REQ-BANK-046). */
-.bank-acc-search .bank-acc-search-input {
-    /* Wide enough for the full German placeholder "Nach Kontonamen filtern" once the 30px icon gutter
+    .bank-acc-search .bank-acc-search-input {
+        /* Wide enough for the full German placeholder "Nach Kontonamen filtern" once the 30px icon gutter
        is subtracted; max-width keeps it from overflowing the narrow device classes. */
-    width: 260px;
-    max-width: 100%;
-    padding-left: 30px;
-}
+        width: 260px;
+        max-width: 100%;
+        padding-left: 30px;
+    }
 
-.bank-facts {
-    display: flex;
-    gap: 16px;
-    flex-wrap: wrap;
-    padding: 8px 16px;
-    background: var(--color-surface-input);
-    border: var(--border-hairline);
-    font-size: 0.78rem;
-    margin-bottom: 12px;
-}
+    .bank-facts {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        padding: 8px 16px;
+        background: var(--color-surface-input);
+        border: var(--border-hairline);
+        font-size: 0.78rem;
+        margin-bottom: 12px;
+    }
 
-.bank-facts .fact-key {
-    color: var(--color-gray-2-text);
-    text-transform: uppercase;
-    font-size: 0.6rem;
-    letter-spacing: 0.08em;
-    font-weight: var(--fw-bold);
-    margin-right: 5px;
-}
+    .bank-facts .fact-key {
+        color: var(--color-gray-2-text);
+        text-transform: uppercase;
+        font-size: 0.6rem;
+        letter-spacing: 0.08em;
+        font-weight: var(--fw-bold);
+        margin-right: 5px;
+    }
 
-.bank-facts .fact-value {
-    color: var(--color-white);
-    font-weight: var(--fw-bold);
-    font-variant-numeric: tabular-nums;
-}
+    .bank-facts .fact-value {
+        color: var(--color-white);
+        font-weight: var(--fw-bold);
+        font-variant-numeric: tabular-nums;
+    }
 
-.bank-cols {
-    display: grid;
-    grid-template-columns: 1.7fr 1fr;
-    gap: 12px;
-    align-items: start;
-}
+    .bank-cols {
+        display: grid;
+        grid-template-columns: 1.7fr 1fr;
+        gap: 12px;
+        align-items: start;
+    }
 
-.bank-col-side {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
+    .bank-col-side {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
 
-.bank-panel {
-    background: var(--color-bg-dark-gray);
-    border: var(--border-hairline);
-}
+    .bank-panel {
+        background: var(--color-bg-dark-gray);
+        border: var(--border-hairline);
+    }
 
-.bank-panel-head {
-    padding: 8px 12px;
-    background: var(--color-surface-input);
-    border-bottom: 2px solid var(--color-primary);
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    font-weight: var(--fw-bold);
-    color: var(--color-gray-1);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-}
+    .bank-panel-head {
+        padding: 8px 12px;
+        background: var(--color-surface-input);
+        border-bottom: 2px solid var(--color-primary);
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-weight: var(--fw-bold);
+        color: var(--color-gray-1);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
 
-.bank-panel-body {
-    padding: 10px 12px;
-}
+    .bank-panel-body {
+        padding: 10px 12px;
+    }
 
-.bank-kv {
-    display: flex;
-    justify-content: space-between;
-    gap: 8px;
-    font-size: 0.78rem;
-    padding: 2px 0;
-}
+    .bank-kv {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 0.78rem;
+        padding: 2px 0;
+    }
 
-.bank-kv .bank-kv-key {
-    color: var(--color-gray-2-text);
-}
+    .bank-kv .bank-kv-key {
+        color: var(--color-gray-2-text);
+    }
 
-.bank-kv .bank-kv-value {
-    color: var(--color-white);
-    font-variant-numeric: tabular-nums;
-}
+    .bank-kv .bank-kv-value {
+        color: var(--color-white);
+        font-variant-numeric: tabular-nums;
+    }
 
-.bank-form-row {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    margin-bottom: 12px;
-}
+    .bank-form-row {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin-bottom: 12px;
+    }
 
-/* The hidden attribute must win over the flex display above (the author-level rule outranks the UA
+    /* The hidden attribute must win over the flex display above (the author-level rule outranks the UA
    stylesheet's [hidden] { display: none }). Without this the JS-toggled conditional rows — the
    transfer-only Zielkonto, the split-percentage row, the WITHDRAWAL/TRANSFER-only Begruendung and
    the confirm modal's destination-holder — would stay visible even while marked hidden. */
-.bank-form-row[hidden] {
-    display: none;
-}
+    .bank-form-row[hidden] {
+        display: none;
+    }
 
-.bank-form-row label {
-    font-size: 0.66rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    font-weight: var(--fw-bold);
-    color: var(--color-gray-2-text);
-}
+    .bank-form-row label {
+        font-size: 0.66rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-weight: var(--fw-bold);
+        color: var(--color-gray-2-text);
+    }
 
-.bank-check-label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.78rem;
-    color: var(--color-white);
-    text-transform: none;
-    letter-spacing: normal;
-}
+    .bank-check-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.78rem;
+        color: var(--color-white);
+        text-transform: none;
+        letter-spacing: normal;
+    }
 
-/* Compact inline checkbox + label used by the dashboard view options (REQ-BANK-016) and the request
+    /* Compact inline checkbox + label used by the dashboard view options (REQ-BANK-016) and the request
    status filter (REQ-BANK-023): a small checkbox that is orange only when ticked, beside a quiet
    label — deliberately NOT a filled-orange toggle button, so an active filter does not shout. */
-.bank-check-inline {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.72rem;
-    color: var(--color-gray-1);
-    cursor: pointer;
-    user-select: none;
-    text-transform: none;
-    letter-spacing: normal;
-}
+    .bank-check-inline {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.72rem;
+        color: var(--color-gray-1);
+        cursor: pointer;
+        user-select: none;
+        text-transform: none;
+        letter-spacing: normal;
+    }
 
-.bank-check-inline input[type='checkbox'] {
-    width: 1rem;
-    height: 1rem;
-}
+    .bank-check-inline input[type='checkbox'] {
+        width: 1rem;
+        height: 1rem;
+    }
 
-.bank-datetime-row {
-    display: flex;
-    gap: 8px;
-}
+    .bank-datetime-row {
+        display: flex;
+        gap: 8px;
+    }
 
-.bank-datetime-row .date-part {
-    flex: 1.4;
-}
+    .bank-datetime-row .date-part {
+        flex: 1.4;
+    }
 
-.bank-datetime-row .time-part {
-    flex: 1;
-}
+    .bank-datetime-row .time-part {
+        flex: 1;
+    }
 
-.bank-field-hint {
-    font-size: 0.66rem;
-    color: var(--color-gray-2-text);
-    margin-top: 3px;
-}
+    .bank-field-hint {
+        font-size: 0.66rem;
+        color: var(--color-gray-2-text);
+        margin-top: 3px;
+    }
 
-.bank-field-error {
-    font-size: 0.72rem;
-    color: var(--color-danger-text);
-    margin-top: 4px;
-    display: none;
-}
+    .bank-field-error {
+        font-size: 0.72rem;
+        color: var(--color-danger-text);
+        margin-top: 4px;
+        display: none;
+    }
 
-.bank-field-error.visible {
-    display: block;
-}
+    .bank-field-error.visible {
+        display: block;
+    }
 
-.bank-amount {
-    font-variant-numeric: tabular-nums;
-}
+    .bank-amount {
+        font-variant-numeric: tabular-nums;
+    }
 
-.bank-amount--pos {
-    color: var(--color-success);
-}
+    .bank-amount--pos {
+        color: var(--color-success);
+    }
 
-.bank-amount--neg {
-    color: var(--color-danger-text);
-}
+    .bank-amount--neg {
+        color: var(--color-danger-text);
+    }
 
-.bank-amount--zero {
-    color: var(--color-gray-2-text);
-}
+    .bank-amount--zero {
+        color: var(--color-gray-2-text);
+    }
 
-.bank-note-cell {
-    color: var(--color-gray-2-text);
-    max-width: 220px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
+    .bank-note-cell {
+        color: var(--color-gray-2-text);
+        max-width: 220px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
 
-/* Collapsible Konto-Info tile head (REQ-BANK-017): the .bank-panel-head is a full-width toggle
+    /* Collapsible Konto-Info tile head (REQ-BANK-017): the .bank-panel-head is a full-width toggle
    button; it keeps the head look and the orange underline while resetting the native button chrome. */
-.bank-collapse-head {
-    width: 100%;
-    cursor: pointer;
-    text-align: left;
-    font-family: inherit;
-    border-top: 0;
-    border-left: 0;
-    border-right: 0;
-    border-radius: 0;
-}
+    .bank-collapse-head {
+        width: 100%;
+        cursor: pointer;
+        text-align: left;
+        font-family: inherit;
+        border-top: 0;
+        border-left: 0;
+        border-right: 0;
+        border-radius: 0;
+    }
 
-.bank-collapse-head:hover {
-    background: var(--color-gray-3);
-}
+    .bank-collapse-head:hover {
+        background: var(--color-gray-3);
+    }
 
-.bank-collapse-head:focus-visible {
-    outline: 2px solid var(--color-primary);
-    outline-offset: -2px;
-}
+    .bank-collapse-head:focus-visible {
+        outline: 2px solid var(--color-primary);
+        outline-offset: -2px;
+    }
 
-.bank-collapse-title {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-}
+    .bank-collapse-title {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
 
-/* Chevron shared by the info tile and the expandable booking rows: points right when collapsed and
+    /* Chevron shared by the info tile and the expandable booking rows: points right when collapsed and
    rotates down (90deg) when its aria-expanded control is open. */
-.bank-chevron {
-    width: 0.85em;
-    height: 0.85em;
-    flex: 0 0 auto;
-    color: var(--color-primary);
-    transition: transform 0.15s ease;
-}
+    .bank-chevron {
+        width: 0.85em;
+        height: 0.85em;
+        flex: 0 0 auto;
+        color: var(--color-primary);
+        transition: transform 0.15s ease;
+    }
 
-[aria-expanded='true'] .bank-chevron {
-    transform: rotate(90deg);
-}
+    [aria-expanded='true'] .bank-chevron {
+        transform: rotate(90deg);
+    }
 
-/* Expandable booking rows: a leading chevron marks a row carrying a Begruendung/Notiz; clicking the
+    /* Expandable booking rows: a leading chevron marks a row carrying a Begruendung/Notiz; clicking the
    row (or its chevron) reveals the detail sub-row below it. */
-.bank-bookings-table .bank-expand-col {
-    width: 1.8rem;
-}
+    .bank-bookings-table .bank-expand-col {
+        width: 1.8rem;
+    }
 
-.bank-bookings-table .bank-expand-cell {
-    padding-left: 4px;
-    padding-right: 4px;
-    text-align: center;
-}
+    .bank-bookings-table .bank-expand-cell {
+        padding-left: 4px;
+        padding-right: 4px;
+        text-align: center;
+    }
 
-.bank-booking-row.is-expandable {
-    cursor: pointer;
-}
+    .bank-booking-row.is-expandable {
+        cursor: pointer;
+    }
 
-.bank-booking-row.is-expandable:hover {
-    background: var(--color-gray-3);
-}
+    .bank-booking-row.is-expandable:hover {
+        background: var(--color-gray-3);
+    }
 
-.bank-row-toggle {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 2px;
-    background: none;
-    border: 0;
-    color: var(--color-primary);
-    cursor: pointer;
-}
+    .bank-row-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2px;
+        background: none;
+        border: 0;
+        color: var(--color-primary);
+        cursor: pointer;
+    }
 
-.bank-row-toggle:focus-visible {
-    outline: 2px solid var(--color-primary);
-    outline-offset: 1px;
-}
+    .bank-row-toggle:focus-visible {
+        outline: 2px solid var(--color-primary);
+        outline-offset: 1px;
+    }
 
-/* Booking-detail sub-row (REQ-BANK-045): the reason + note revealed on expand, indented under the
+    /* Booking-detail sub-row (REQ-BANK-045): the reason + note revealed on expand, indented under the
    row and set on the input surface so it reads as belonging to the booking above. */
-.bank-booking-detail-cell {
-    padding: 8px 12px 10px 2.4rem;
-    background: var(--color-surface-input);
-}
+    .bank-booking-detail-cell {
+        padding: 8px 12px 10px 2.4rem;
+        background: var(--color-surface-input);
+    }
 
-.bank-booking-detail-body {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
+    .bank-booking-detail-body {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
 
-.bank-detail-item {
-    display: flex;
-    gap: 10px;
-    font-size: 0.8rem;
-}
+    .bank-detail-item {
+        display: flex;
+        gap: 10px;
+        font-size: 0.8rem;
+    }
 
-.bank-detail-item .bank-detail-label {
-    flex: 0 0 7rem;
-    padding-top: 1px;
-    color: var(--color-gray-2-text);
-    font-size: 0.66rem;
-    font-weight: var(--fw-bold);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-}
+    .bank-detail-item .bank-detail-label {
+        flex: 0 0 7rem;
+        padding-top: 1px;
+        color: var(--color-gray-2-text);
+        font-size: 0.66rem;
+        font-weight: var(--fw-bold);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+    }
 
-.bank-detail-item .bank-detail-value {
-    color: var(--color-white);
-    white-space: pre-wrap;
-    overflow-wrap: break-word;
-}
+    .bank-detail-item .bank-detail-value {
+        color: var(--color-white);
+        white-space: pre-wrap;
+        overflow-wrap: break-word;
+    }
 
-.bank-filterbar {
-    display: flex;
-    gap: 8px;
-    align-items: flex-end;
-    flex-wrap: wrap;
-    margin-bottom: 12px;
-}
+    .bank-filterbar {
+        display: flex;
+        gap: 8px;
+        align-items: flex-end;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+    }
 
-.bank-filterbar label {
-    font-size: 0.6rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    font-weight: var(--fw-bold);
-    color: var(--color-gray-2-text);
-}
+    .bank-filterbar label {
+        font-size: 0.6rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-weight: var(--fw-bold);
+        color: var(--color-gray-2-text);
+    }
 
-/*
+    /*
  * Grants view only: the account/employee filter <select> sits directly beside
  * the .tab-nav group (its label is .visually-hidden, so the form row is just
  * the select). Stretch both children to a shared height and drop the form-row's
@@ -855,39 +855,39 @@ tr.is-inert td {
  * line up flush at their top and bottom edges. Scoped to the --tabs modifier so
  * the multi-row audit filter bar keeps its flex-end baseline alignment.
  */
-.bank-filterbar--tabs {
-    align-items: stretch;
-}
-
-.bank-filterbar--tabs .bank-form-row {
-    margin-bottom: 0;
-}
-
-.bank-filterbar--tabs .bank-form-row select {
-    height: 100%;
-}
-
-/* ---- Small shared utilities scoped to the bank pages ---- */
-.btn-sm {
-    padding: 3px 9px;
-    font-size: 0.62rem;
-}
-
-.text-right {
-    text-align: right;
-}
-
-/* ---- Responsive: tablet and smartphone device classes ---- */
-@media (width <= 1024px) {
-    .bank-acc-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+    .bank-filterbar--tabs {
+        align-items: stretch;
     }
 
-    .bank-cols {
-        grid-template-columns: 1fr;
+    .bank-filterbar--tabs .bank-form-row {
+        margin-bottom: 0;
     }
 
-    /*
+    .bank-filterbar--tabs .bank-form-row select {
+        height: 100%;
+    }
+
+    /* ---- Small shared utilities scoped to the bank pages ---- */
+    .btn-sm {
+        padding: 3px 9px;
+        font-size: 0.62rem;
+    }
+
+    .text-right {
+        text-align: right;
+    }
+
+    /* ---- Responsive: tablet and smartphone device classes ---- */
+    @media (width <= 1024px) {
+        .bank-acc-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .bank-cols {
+            grid-template-columns: 1fr;
+        }
+
+        /*
      * The two in-row controls of the bank tables, raised to REQ-UI-009's dense
      * floor on the touch classes (measured by TouchClassLayoutE2eTest on seeded
      * data, 2026-09-13: the grant flags 18px, the booking chevron 15px).
@@ -906,47 +906,47 @@ tr.is-inert td {
      * The chevron grows the booking row with it, which on a phone is an
      * improvement rather than a cost.
      */
-    .matrix-flag {
-        width: var(--touch-target-dense);
-        height: var(--touch-target-dense);
-        /* `min-height`, not only `height`: styles.css puts the 44px floor on every `button` by
+        .matrix-flag {
+            width: var(--touch-target-dense);
+            height: var(--touch-target-dense);
+            /* `min-height`, not only `height`: styles.css puts the 44px floor on every `button` by
            default now (ADR-0176), and a min-height clamps a height regardless of specificity —
            different properties never compete. Declaring the dense token is what opts this flag
            out, and it is also what puts it in TouchClassLayoutE2eTest's CSSOM-derived dense set. */
-        min-height: var(--touch-target-dense);
+            min-height: var(--touch-target-dense);
+        }
+
+        .bank-row-toggle {
+            min-width: var(--touch-target-dense);
+            min-height: var(--touch-target-dense);
+        }
     }
 
-    .bank-row-toggle {
-        min-width: var(--touch-target-dense);
-        min-height: var(--touch-target-dense);
-    }
-}
+    @media (width <= 768px) {
+        .bank-totals {
+            grid-template-columns: repeat(2, 1fr);
+        }
 
-@media (width <= 768px) {
-    .bank-totals {
-        grid-template-columns: repeat(2, 1fr);
+        .bank-acc-grid {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .bank-form-row {
+            grid-template-columns: 1fr;
+        }
+
+        .holder-row .holder-value {
+            min-width: 90px;
+        }
     }
 
-    .bank-acc-grid {
-        grid-template-columns: minmax(0, 1fr);
+    @media (width >= 1600px) {
+        .bank-acc-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
     }
 
-    .bank-form-row {
-        grid-template-columns: 1fr;
-    }
-
-    .holder-row .holder-value {
-        min-width: 90px;
-    }
-}
-
-@media (width >= 1600px) {
-    .bank-acc-grid {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-    }
-}
-
-/* Settings-tab tiles (REQ-BANK-035/-036/-041): the responsible holder's three independent settings
+    /* Settings-tab tiles (REQ-BANK-035/-036/-041): the responsible holder's three independent settings
    boxes — Sichtbarkeit, Freigabe-Limits, Kontostandsziel — laid out as an auto-fill grid whose track
    floor (540px) is wide enough that each tile's widest row (a Freigabe-Limit tier: a long role label
    + the amount input + the "Setzen"/"Entfernen" buttons) stays on ONE line. The tiles therefore never
@@ -956,645 +956,646 @@ tr.is-inert td {
    lets the lone column shrink to the viewport on a phone rather than overflowing it; auto-fill (not
    auto-fit) keeps the trailing Kontostandsziel tile at a single track width instead of stretching it
    across the whole row; align-items keeps tiles top-aligned despite differing heights. */
-.oud-settings-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(540px, 100%), 1fr));
-    gap: 12px;
-    align-items: start;
-}
+    .oud-settings-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(min(540px, 100%), 1fr));
+        gap: 12px;
+        align-items: start;
+    }
 
-/* Balance-target progress (REQ-BANK-036) and org-unit visibility settings (REQ-BANK-035). */
-.bank-target-bar {
-    width: 100%;
-    height: 6px;
-    margin-top: 0.35rem;
-    overflow: hidden;
-    background: var(--color-surface-input);
-    border: var(--border-hairline);
-    border-radius: 2px;
-}
+    /* Balance-target progress (REQ-BANK-036) and org-unit visibility settings (REQ-BANK-035). */
+    .bank-target-bar {
+        width: 100%;
+        height: 6px;
+        margin-top: 0.35rem;
+        overflow: hidden;
+        background: var(--color-surface-input);
+        border: var(--border-hairline);
+        border-radius: 2px;
+    }
 
-.bank-target-bar-fill {
-    height: 100%;
-    background: var(--color-primary);
-}
+    .bank-target-bar-fill {
+        height: 100%;
+        background: var(--color-primary);
+    }
 
-.bank-vis-group {
-    margin-top: 0.75rem;
-}
+    .bank-vis-group {
+        margin-top: 0.75rem;
+    }
 
-.bank-vis-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-top: 0.35rem;
-}
+    .bank-vis-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.35rem;
+    }
 
-.bank-vis-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.25rem 0.5rem;
-    background: var(--color-bg-dark-gray);
-    border: var(--border-hairline);
-}
+    .bank-vis-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.25rem 0.5rem;
+        background: var(--color-bg-dark-gray);
+        border: var(--border-hairline);
+    }
 
-.bank-vis-users {
-    margin: 0.35rem 0;
-    padding: 0;
-    list-style: none;
-}
+    .bank-vis-users {
+        margin: 0.35rem 0;
+        padding: 0;
+        list-style: none;
+    }
 
-.bank-vis-users li {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    padding: 0.25rem 0;
-    border-bottom: var(--border-hairline);
-}
+    .bank-vis-users li {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        padding: 0.25rem 0;
+        border-bottom: var(--border-hairline);
+    }
 
-/* ==========================================================================
+    /* ==========================================================================
    Org-unit bank overview (REQ-BANK-021/-038) — DS alignment: tabs + a dense
    account list (no CTA-heavy cards) + quiet detail visibility toggles.
    ========================================================================== */
 
-/* Tab panels: the [hidden] attribute must win even if a layout rule sets display. */
-[data-tabpanel][hidden] {
-    display: none;
-}
-
-/* Dense account list: one grid row per account, header strip on top. */
-.ou-list {
-    border: var(--border-hairline);
-    background: var(--color-bg-dark-gray);
-}
-
-.ou-rowhead,
-.ou-row {
-    display: grid;
-    grid-template-columns: minmax(180px, 1.6fr) 132px minmax(120px, 1.1fr) 168px 116px;
-    gap: 16px;
-    align-items: center;
-}
-
-.ou-rowhead {
-    padding: 10px 18px;
-    background: var(--color-surface-input);
-    border-bottom: 2px solid var(--color-primary);
-    font-size: 0.62rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    font-weight: var(--fw-bold);
-    color: var(--color-gray-1);
-}
-
-.ou-rowhead .e {
-    text-align: right;
-}
-
-.ou-row {
-    padding: 14px 18px;
-    border-bottom: 1px solid var(--color-gray-3);
-}
-
-.ou-row:last-child {
-    border-bottom: none;
-}
-
-.ou-row:hover {
-    background: rgb(255 255 255 / 2%);
-}
-
-.ou-row .r-name {
-    font-weight: var(--fw-bold);
-    color: var(--color-white);
-    font-size: 0.9rem;
-}
-
-.ou-row .r-name a {
-    color: inherit;
-    text-decoration: none;
-}
-
-.ou-row .r-name a:hover {
-    color: var(--color-primary);
-}
-
-.ou-row .r-sub {
-    font-size: 0.68rem;
-    color: var(--color-gray-2-text);
-    font-variant-numeric: tabular-nums;
-    margin-top: 2px;
-}
-
-.r-trend {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-}
-
-.ou-row .r-bal {
-    text-align: right;
-    font-family: var(--font-headline);
-    font-weight: var(--fw-bold);
-    font-size: 1.15rem;
-    color: var(--color-white);
-    font-variant-numeric: tabular-nums;
-}
-
-.ou-row .unit {
-    color: var(--color-gray-2-text);
-    font-weight: 400;
-    font-size: 0.62em;
-}
-
-.r-act {
-    text-align: right;
-}
-
-.r-noziel {
-    color: var(--color-gray-2-text);
-    font-size: 0.72rem;
-}
-
-/* Compact balance-target progress in the list "Ziel" column. */
-.ou-target {
-    width: 100%;
-}
-
-.ou-target-meta {
-    display: flex;
-    justify-content: space-between;
-    gap: 8px;
-    font-size: 0.68rem;
-    color: var(--color-gray-2-text);
-    margin-top: 4px;
-}
-
-.ou-target-meta b {
-    color: var(--color-gray-1);
-    font-weight: var(--fw-bold);
-    font-variant-numeric: tabular-nums;
-}
-
-/* The list collapses to stacked rows on the smartphone device class. */
-@media (width <= 820px) {
-    .ou-rowhead {
+    /* Tab panels: the [hidden] attribute must win even if a layout rule sets display. */
+    [data-tabpanel][hidden] {
         display: none;
     }
 
+    /* Dense account list: one grid row per account, header strip on top. */
+    .ou-list {
+        border: var(--border-hairline);
+        background: var(--color-bg-dark-gray);
+    }
+
+    .ou-rowhead,
     .ou-row {
-        grid-template-columns: 1fr;
-        gap: 9px;
-        padding: 16px;
+        display: grid;
+        grid-template-columns: minmax(180px, 1.6fr) 132px minmax(120px, 1.1fr) 168px 116px;
+        gap: 16px;
+        align-items: center;
+    }
+
+    .ou-rowhead {
+        padding: 10px 18px;
+        background: var(--color-surface-input);
+        border-bottom: 2px solid var(--color-primary);
+        font-size: 0.62rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-weight: var(--fw-bold);
+        color: var(--color-gray-1);
+    }
+
+    .ou-rowhead .e {
+        text-align: right;
+    }
+
+    .ou-row {
+        padding: 14px 18px;
+        border-bottom: 1px solid var(--color-gray-3);
+    }
+
+    .ou-row:last-child {
+        border-bottom: none;
+    }
+
+    .ou-row:hover {
+        background: rgb(255 255 255 / 2%);
+    }
+
+    .ou-row .r-name {
+        font-weight: var(--fw-bold);
+        color: var(--color-white);
+        font-size: 0.9rem;
+    }
+
+    .ou-row .r-name a {
+        color: inherit;
+        text-decoration: none;
+    }
+
+    .ou-row .r-name a:hover {
+        color: var(--color-primary);
+    }
+
+    .ou-row .r-sub {
+        font-size: 0.68rem;
+        color: var(--color-gray-2-text);
+        font-variant-numeric: tabular-nums;
+        margin-top: 2px;
+    }
+
+    .r-trend {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
     }
 
     .ou-row .r-bal {
-        text-align: left;
-        font-size: 1.4rem;
+        text-align: right;
+        font-family: var(--font-headline);
+        font-weight: var(--fw-bold);
+        font-size: 1.15rem;
+        color: var(--color-white);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .ou-row .unit {
+        color: var(--color-gray-2-text);
+        font-weight: 400;
+        font-size: 0.62em;
     }
 
     .r-act {
-        text-align: left;
+        text-align: right;
     }
 
-    .r-act .btn {
+    .r-noziel {
+        color: var(--color-gray-2-text);
+        font-size: 0.72rem;
+    }
+
+    /* Compact balance-target progress in the list "Ziel" column. */
+    .ou-target {
         width: 100%;
-        justify-content: center;
     }
-}
 
-/* Konten toolbar (REQ-BANK-021/-046): the account-name filter grows, the view toggle trails, both
+    .ou-target-meta {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 0.68rem;
+        color: var(--color-gray-2-text);
+        margin-top: 4px;
+    }
+
+    .ou-target-meta b {
+        color: var(--color-gray-1);
+        font-weight: var(--fw-bold);
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* The list collapses to stacked rows on the smartphone device class. */
+    @media (width <= 820px) {
+        .ou-rowhead {
+            display: none;
+        }
+
+        .ou-row {
+            grid-template-columns: 1fr;
+            gap: 9px;
+            padding: 16px;
+        }
+
+        .ou-row .r-bal {
+            text-align: left;
+            font-size: 1.4rem;
+        }
+
+        .r-act {
+            text-align: left;
+        }
+
+        .r-act .btn {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+
+    /* Konten toolbar (REQ-BANK-021/-046): the account-name filter grows, the view toggle trails, both
    wrap onto their own line on a narrow viewport. */
-.ou-konten-toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    flex-wrap: wrap;
-}
+    .ou-konten-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
 
-.ou-konten-toolbar .bank-acc-search {
-    flex: 1 1 220px;
-}
+    .ou-konten-toolbar .bank-acc-search {
+        flex: 1 1 220px;
+    }
 
-/* Card view of the org-unit account list (REQ-BANK-021): the shared responsive .bank-acc-grid track
+    /* Card view of the org-unit account list (REQ-BANK-021): the shared responsive .bank-acc-grid track
    holds one .ou-card per account. Unlike the dashboard .kpi-card the whole card is NOT a link — the
    name and the "Details" action are the click targets — so it carries no pointer cursor, only the
    same hover-border affordance. */
-.ou-card {
-    /* Same three-link chain as `.kpi-card` above — this card shares `.bank-acc-grid`. */
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    padding: 14px 16px;
-    background: var(--color-bg-dark-gray);
-    border: var(--border-hairline);
-    transition: border-color 0.15s;
-}
-
-.ou-card:hover {
-    border-color: var(--color-primary);
-}
-
-.ou-card-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 10px;
-    min-width: 0;
-}
-
-.ou-card-top > * {
-    min-width: 0;
-}
-
-.ou-card-name {
-    font-weight: var(--fw-bold);
-    color: var(--color-white);
-    font-size: 0.95rem;
-    text-decoration: none;
-
-    /* As `.kpi-title` above. */
-    overflow-wrap: anywhere;
-}
-
-.ou-card-name:hover {
-    color: var(--color-primary);
-}
-
-.ou-card-sub {
-    font-size: 0.68rem;
-    color: var(--color-gray-2-text);
-    font-variant-numeric: tabular-nums;
-    margin-top: 2px;
-}
-
-.ou-card-figures {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 10px;
-}
-
-.ou-card-bal {
-    font-family: var(--font-headline);
-    font-weight: var(--fw-bold);
-    font-size: 1.4rem;
-    color: var(--color-white);
-    font-variant-numeric: tabular-nums;
-}
-
-.ou-card-bal .unit {
-    color: var(--color-gray-2-text);
-    font-weight: 400;
-    font-size: 0.6em;
-}
-
-/* The action sits flush-bottom-right so cards with and without a target line up their buttons. */
-.ou-card-act {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: auto;
-}
-
-/* Org-unit account-detail facts: a 4-up kpi-total grid (NOT the shared .bank-facts strip,
-   which two other bank pages keep using with .fact-key/.fact-value). */
-.ou-facts {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
-}
-
-@media (width <= 820px) {
-    .ou-facts {
-        grid-template-columns: 1fr 1fr;
+    .ou-card {
+        /* Same three-link chain as `.kpi-card` above — this card shares `.bank-acc-grid`. */
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 14px 16px;
+        background: var(--color-bg-dark-gray);
+        border: var(--border-hairline);
+        transition: border-color 0.15s;
     }
-}
 
-/* Detail visibility toggles: one quiet row per audience. */
-.sub-h {
-    font-family: var(--font-headline);
-    font-weight: var(--fw-bold);
-    color: var(--color-gray-1);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    font-size: 0.75rem;
-    margin: 18px 0 9px;
-}
+    .ou-card:hover {
+        border-color: var(--color-primary);
+    }
 
-.vis-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 10px 0;
-    border-bottom: 1px dashed var(--color-surface-input);
-}
+    .ou-card-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 10px;
+        min-width: 0;
+    }
 
-.vis-row:last-of-type {
-    border-bottom: none;
-}
+    .ou-card-top > * {
+        min-width: 0;
+    }
 
-.vis-row .v-label {
-    font-size: 0.82rem;
-    color: var(--color-gray-1);
-}
+    .ou-card-name {
+        font-weight: var(--fw-bold);
+        color: var(--color-white);
+        font-size: 0.95rem;
+        text-decoration: none;
 
-.vis-state {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-}
+        /* As `.kpi-title` above. */
+        overflow-wrap: anywhere;
+    }
 
-/* Inline label + control + action row (the "grant a user" picker). */
-.field-row {
-    display: flex;
-    gap: 12px;
-    align-items: flex-end;
-    flex-wrap: wrap;
-}
+    .ou-card-name:hover {
+        color: var(--color-primary);
+    }
 
-.field-row .grow {
-    flex: 1;
-    min-width: 220px;
-    max-width: 340px;
-}
+    .ou-card-sub {
+        font-size: 0.68rem;
+        color: var(--color-gray-2-text);
+        font-variant-numeric: tabular-nums;
+        margin-top: 2px;
+    }
 
-/* Every labeled field in an inline action row drops its default 12px stacking margin so the
+    .ou-card-figures {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 10px;
+    }
+
+    .ou-card-bal {
+        font-family: var(--font-headline);
+        font-weight: var(--fw-bold);
+        font-size: 1.4rem;
+        color: var(--color-white);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .ou-card-bal .unit {
+        color: var(--color-gray-2-text);
+        font-weight: 400;
+        font-size: 0.6em;
+    }
+
+    /* The action sits flush-bottom-right so cards with and without a target line up their buttons. */
+    .ou-card-act {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: auto;
+    }
+
+    /* Org-unit account-detail facts: a 4-up kpi-total grid (NOT the shared .bank-facts strip,
+   which two other bank pages keep using with .fact-key/.fact-value). */
+    .ou-facts {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+    }
+
+    @media (width <= 820px) {
+        .ou-facts {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+
+    /* Detail visibility toggles: one quiet row per audience. */
+    .sub-h {
+        font-family: var(--font-headline);
+        font-weight: var(--fw-bold);
+        color: var(--color-gray-1);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-size: 0.75rem;
+        margin: 18px 0 9px;
+    }
+
+    .vis-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px dashed var(--color-surface-input);
+    }
+
+    .vis-row:last-of-type {
+        border-bottom: none;
+    }
+
+    .vis-row .v-label {
+        font-size: 0.82rem;
+        color: var(--color-gray-1);
+    }
+
+    .vis-state {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+
+    /* Inline label + control + action row (the "grant a user" picker). */
+    .field-row {
+        display: flex;
+        gap: 12px;
+        align-items: flex-end;
+        flex-wrap: wrap;
+    }
+
+    .field-row .grow {
+        flex: 1;
+        min-width: 220px;
+        max-width: 340px;
+    }
+
+    /* Every labeled field in an inline action row drops its default 12px stacking margin so the
    select, the per-user limit input and the action button bottom-align flush (align-items:
    flex-end). Without this a non-.grow .bank-form-row (the Freigabe-Limit "Einzelne Nutzer" input)
    keeps its margin-bottom and its input floats 12px above the select and the Setzen button. */
-.field-row .bank-form-row {
-    margin-bottom: 0;
-}
+    .field-row .bank-form-row {
+        margin-bottom: 0;
+    }
 
-/* Approval limits (REQ-BANK-041): inline per-tier set/clear editor in a vis-row. */
-.bank-limit-edit {
-    flex-wrap: wrap;
-    justify-content: flex-end;
-}
+    /* Approval limits (REQ-BANK-041): inline per-tier set/clear editor in a vis-row. */
+    .bank-limit-edit {
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
 
-.bank-limit-input {
-    width: 140px;
-    max-width: 45vw;
-}
+    .bank-limit-input {
+        width: 140px;
+        max-width: 45vw;
+    }
 
-/* Quiet over-limit warning tone (requester request modal + bank-staff confirm modal). */
-.bank-limit-warning {
-    margin-top: 6px;
-    padding: 8px 10px;
-    font-size: 0.72rem;
-    color: var(--color-warning);
-    border: 1px solid var(--color-warning);
-    border-left-width: 4px;
-    border-radius: 2px;
-    background: rgb(255 210 63 / 8%);
-}
+    /* Quiet over-limit warning tone (requester request modal + bank-staff confirm modal). */
+    .bank-limit-warning {
+        margin-top: 6px;
+        padding: 8px 10px;
+        font-size: 0.72rem;
+        color: var(--color-warning);
+        border: 1px solid var(--color-warning);
+        border-left-width: 4px;
+        border-radius: 2px;
+        background: rgb(255 210 63 / 8%);
+    }
 
-.bank-owner-approval-warning {
-    margin-bottom: 12px;
-    padding: 10px 12px;
-    border: 1px solid var(--color-warning);
-    border-left-width: 4px;
-    border-radius: 2px;
-    background: rgb(255 210 63 / 8%);
-}
+    .bank-owner-approval-warning {
+        margin-bottom: 12px;
+        padding: 10px 12px;
+        border: 1px solid var(--color-warning);
+        border-left-width: 4px;
+        border-radius: 2px;
+        background: rgb(255 210 63 / 8%);
+    }
 
-.bank-owner-approval-warning > p {
-    margin: 0 0 8px;
-    font-size: 0.78rem;
-    color: var(--color-warning);
-}
+    .bank-owner-approval-warning > p {
+        margin: 0 0 8px;
+        font-size: 0.78rem;
+        color: var(--color-warning);
+    }
 
-/* ===== Dashboard view options (REQ-BANK-016): table-view + by-Bereich grouping checkboxes ===== */
+    /* ===== Dashboard view options (REQ-BANK-016): table-view + by-Bereich grouping checkboxes ===== */
 
-/* The two view-option checkboxes sit inline in the dashboard header (both unchecked = the default
+    /* The two view-option checkboxes sit inline in the dashboard header (both unchecked = the default
    card grid ordered A→Z). */
-.bank-view-toggles {
-    display: inline-flex;
-    gap: 14px;
-    flex-wrap: wrap;
-    align-items: center;
-}
+    .bank-view-toggles {
+        display: inline-flex;
+        gap: 14px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
 
-/* Tabular account view — reuses the shared .data-table look; keep the trend cell compact. */
-.bank-acc-table td .kpi-sparkline {
-    stroke: var(--color-primary);
-}
+    /* Tabular account view — reuses the shared .data-table look; keep the trend cell compact. */
+    .bank-acc-table td .kpi-sparkline {
+        stroke: var(--color-primary);
+    }
 
-.bank-row--closed {
-    opacity: 0.55;
-}
+    .bank-row--closed {
+        opacity: 0.55;
+    }
 
-/* A by-Bereich group: a coloured header rule over its accounts, stacked vertically. */
-.bank-acc-group {
-    margin-top: 1.25rem;
-}
+    /* A by-Bereich group: a coloured header rule over its accounts, stacked vertically. */
+    .bank-acc-group {
+        margin-top: 1.25rem;
+    }
 
-.bank-acc-group-head {
-    margin: 0 0 0.5rem;
-    padding: 0.35rem 0 0.35rem 0.75rem;
-    font-size: 0.95rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    border-left: 4px solid var(--bank-dept, var(--color-primary));
-    color: var(--color-text);
-}
+    .bank-acc-group-head {
+        margin: 0 0 0.5rem;
+        padding: 0.35rem 0 0.35rem 0.75rem;
+        font-size: 0.95rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        border-left: 4px solid var(--bank-dept, var(--color-primary));
+        color: var(--color-text);
+    }
 
-/* Bereich department colour classes — mirror the org chart's oc-dept--* over the shared
+    /* Bereich department colour classes — mirror the org chart's oc-dept--* over the shared
    --color-dept-* tokens so both surfaces read from one design-system source (REQ-ORG-026). */
-.bank-dept--profit {
-    --bank-dept: var(--color-dept-profit);
-}
+    .bank-dept--profit {
+        --bank-dept: var(--color-dept-profit);
+    }
 
-.bank-dept--sub-radar {
-    --bank-dept: var(--color-dept-sub-radar);
-}
+    .bank-dept--sub-radar {
+        --bank-dept: var(--color-dept-sub-radar);
+    }
 
-.bank-dept--raumueberlegenheit {
-    --bank-dept: var(--color-dept-raumueberlegenheit);
-}
+    .bank-dept--raumueberlegenheit {
+        --bank-dept: var(--color-dept-raumueberlegenheit);
+    }
 
-.bank-dept--forschung {
-    --bank-dept: var(--color-dept-forschung);
-}
+    .bank-dept--forschung {
+        --bank-dept: var(--color-dept-forschung);
+    }
 
-.bank-dept--marinekorps {
-    --bank-dept: var(--color-dept-marinekorps);
-}
+    .bank-dept--marinekorps {
+        --bank-dept: var(--color-dept-marinekorps);
+    }
 
-.bank-dept--search-rescue {
-    --bank-dept: var(--color-dept-search-rescue);
-}
+    .bank-dept--search-rescue {
+        --bank-dept: var(--color-dept-search-rescue);
+    }
 
-/* ============================================================================
+    /* ============================================================================
    Account-detail balance chart (REQ-BANK-049) + booking-history period filter
    (REQ-BANK-051). Server-rendered inline SVG line chart (BankBalanceChart), a
    segmented preset-range selector and the from/to period filter. Colours are
    design-system tokens; no external chart library (CSP).
    ============================================================================ */
 
-.bank-chart-toolbar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    align-items: center;
-    margin-bottom: 0.75rem;
-}
+    .bank-chart-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: center;
+        margin-bottom: 0.75rem;
+    }
 
-/* Segmented preset-range group (30 Tage / 90 Tage / 1 Jahr / Gesamt). */
-.bank-chart-ranges {
-    display: inline-flex;
-    flex-wrap: wrap;
-    border: 1px solid var(--color-gray-3);
-}
+    /* Segmented preset-range group (30 Tage / 90 Tage / 1 Jahr / Gesamt). */
+    .bank-chart-ranges {
+        display: inline-flex;
+        flex-wrap: wrap;
+        border: 1px solid var(--color-gray-3);
+    }
 
-.bank-chart-range-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: var(--touch-target-dense);
-    padding: 0 0.75rem;
-    font-size: 0.75rem;
-    color: var(--color-gray-1);
-    background-color: var(--color-surface-input);
-    border-right: 1px solid var(--color-gray-3);
-    text-decoration: none;
-    cursor: pointer;
-    white-space: nowrap;
-}
+    .bank-chart-range-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: var(--touch-target-dense);
+        padding: 0 0.75rem;
+        font-size: 0.75rem;
+        color: var(--color-gray-1);
+        background-color: var(--color-surface-input);
+        border-right: 1px solid var(--color-gray-3);
+        text-decoration: none;
+        cursor: pointer;
+        white-space: nowrap;
+    }
 
-.bank-chart-ranges > *:last-child {
-    border-right: 0;
-}
+    .bank-chart-ranges > *:last-child {
+        border-right: 0;
+    }
 
-.bank-chart-range-btn:hover {
-    background-color: var(--color-gray-3);
-    color: var(--color-white);
-}
+    .bank-chart-range-btn:hover {
+        background-color: var(--color-gray-3);
+        color: var(--color-white);
+    }
 
-.bank-chart-range-btn.is-active {
-    background-color: var(--color-primary);
-    color: var(--color-bg-black);
-    font-weight: var(--fw-bold);
-    cursor: default;
-}
+    .bank-chart-range-btn.is-active {
+        background-color: var(--color-primary);
+        color: var(--color-bg-black);
+        font-weight: var(--fw-bold);
+        cursor: default;
+    }
 
-.bank-chart {
-    width: 100%;
-}
+    .bank-chart {
+        width: 100%;
+    }
 
-.bank-chart-svg {
-    display: block;
-    width: 100%;
-    height: auto;
-    overflow: visible;
-}
+    .bank-chart-svg {
+        display: block;
+        width: 100%;
+        height: auto;
+        overflow: visible;
+    }
 
-.bank-chart-area {
-    fill: rgb(231 126 35 / 12%);
-    stroke: none;
-}
+    .bank-chart-area {
+        fill: rgb(231 126 35 / 12%);
+        stroke: none;
+    }
 
-.bank-chart-line {
-    fill: none;
-    stroke: var(--color-primary);
-    stroke-width: 2;
-    stroke-linejoin: round;
-    stroke-linecap: round;
-}
+    .bank-chart-line {
+        fill: none;
+        stroke: var(--color-primary);
+        stroke-width: 2;
+        stroke-linejoin: round;
+        stroke-linecap: round;
+    }
 
-.bank-chart-grid {
-    stroke: var(--color-gray-3);
-    stroke-width: 1;
-}
+    .bank-chart-grid {
+        stroke: var(--color-gray-3);
+        stroke-width: 1;
+    }
 
-.bank-chart-target {
-    stroke: var(--color-info-text);
-    stroke-width: 1.5;
-    stroke-dasharray: 5 4;
-}
+    .bank-chart-target {
+        stroke: var(--color-info-text);
+        stroke-width: 1.5;
+        stroke-dasharray: 5 4;
+    }
 
-.bank-chart-axis-label {
-    fill: var(--color-gray-2);
-    font-family: var(--font-body);
-    font-size: 12px;
-    dominant-baseline: middle;
-}
+    .bank-chart-axis-label {
+        fill: var(--color-gray-2);
+        font-family: var(--font-body);
+        font-size: 12px;
+        dominant-baseline: middle;
+    }
 
-.bank-chart-empty {
-    padding: 2rem 0;
-}
+    .bank-chart-empty {
+        padding: 2rem 0;
+    }
 
-.bank-chart-legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
-    margin-top: 0.5rem;
-    font-size: 0.75rem;
-    color: var(--color-gray-1);
-}
+    .bank-chart-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-top: 0.5rem;
+        font-size: 0.75rem;
+        color: var(--color-gray-1);
+    }
 
-.bank-chart-legend-item {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-}
+    .bank-chart-legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
 
-.bank-chart-swatch {
-    display: inline-block;
-    width: 18px;
-    height: 0;
-    border-top: 3px solid var(--color-primary);
-}
+    .bank-chart-swatch {
+        display: inline-block;
+        width: 18px;
+        height: 0;
+        border-top: 3px solid var(--color-primary);
+    }
 
-.bank-chart-swatch--target {
-    border-top-style: dashed;
-    border-top-color: var(--color-info-text);
-}
+    .bank-chart-swatch--target {
+        border-top-style: dashed;
+        border-top-color: var(--color-info-text);
+    }
 
-.bank-history-filter {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    gap: 0.75rem;
-    margin-bottom: 1rem;
-}
+    .bank-history-filter {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
 
-.bank-history-filter-field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-}
+    .bank-history-filter-field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
 
-.bank-history-filter-field label {
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--color-gray-2-text);
-}
+    .bank-history-filter-field label {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--color-gray-2-text);
+    }
 
-/* Chart + booking-history layout (REQ-BANK-052): stacked by default (chart above the history),
+    /* Chart + booking-history layout (REQ-BANK-052): stacked by default (chart above the history),
    side by side on ultra-wide screens. There, main.bank-detail is allowed past its normal 1200px
    content cap so the two panels get real room to sit next to each other (REQ-UI-009 "exploit
    space"); minmax(0, 1fr) lets the history table shrink and scroll instead of blowing out the grid. */
-.bank-detail-panels {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 1rem;
-    align-items: start;
-}
-
-@media (width >= 1800px) {
-    main.bank-detail {
-        max-width: min(2200px, 94vw);
+    .bank-detail-panels {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 1rem;
+        align-items: start;
     }
 
-    main.bank-detail .bank-detail-panels {
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-        gap: 1.25rem;
+    @media (width >= 1800px) {
+        main.bank-detail {
+            max-width: min(2200px, 94vw);
+        }
+
+        main.bank-detail .bank-detail-panels {
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 1.25rem;
+        }
     }
 }
