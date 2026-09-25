@@ -68,8 +68,9 @@ jobs:
             `gradle/libs.versions.toml` — that is the marker this tool
             writes, and that catalog is the only file in this repo that
             carries versions. Then bump the entries you want to take by hand
-            (refreshVersions never auto-applies — it only annotates), and
-            leave a comment next to each saying why it was taken or held.
+            (refreshVersions never auto-applies — it only annotates). Say
+            in this PR's body why each bump was taken, and record why an
+            entry was held or a proposal refused in `docs/dependency-pins.md`.
 
             Closes any previous open `chore/refresh-versions` PR.
           add-paths: |

@@ -290,7 +290,9 @@ declares one fails the build (`FAIL_ON_PROJECT_REPOS`).
 refreshVersions plugin; without it the task does not exist, because the plugin
 is not configuration-cache compatible and is kept off every other build. The
 run annotates `gradle/libs.versions.toml` and recreates an empty, gitignored
-`versions.properties` — do not commit that file.
+`versions.properties` — do not commit that file. Why an entry is held, pinned
+or floored is recorded in [`docs/dependency-pins.md`](docs/dependency-pins.md),
+not in a comment (ADR-0214); update its row in the PR that changes the entry.
 
 <a id="dependency-verification"></a>**Dependency verification** ([ADR-0208](docs/adr/0208-gradle-verifies-every-dependency-against-a-committed-sha-256.md),
 REQ-OPS-034). Every jar, POM and Gradle module file the build resolves must
@@ -561,10 +563,10 @@ Never force-push to `main` itself.
 The [`.github/workflows/dco.yml`](.github/workflows/dco.yml) workflow
 runs on every pull request and verifies that every commit in the PR
 carries a `Signed-off-by` trailer whose name and email match the
-commit's author (case-insensitive on the email). Merge commits and
-commits authored by well-known bots (Dependabot, Renovate, GitHub
-Actions) are skipped — see the workflow header for the exact
-exemption list.
+commit's author (case-insensitive on the email). Merge commits (two
+or more parents) and commits authored by well-known bots (Dependabot,
+refreshVersions, GitHub Actions, Renovate) are skipped; the exact bot
+addresses are the `bot_emails` list in the workflow.
 
 If the check fails:
 
@@ -665,7 +667,13 @@ that — promotion to `:stable` and the host rollout — is in
   warning in the changed code must be fixed; do not silence findings
   with `@SuppressWarnings` / `@SuppressFBWarnings` / Checkstyle
   suppressions unless the rule is genuinely wrong for that specific
-  call site — and then leave a one-line comment explaining why.
+  call site. The justification then goes into
+  `@SuppressFBWarnings(justification = "...")` where the annotation has
+  that attribute, otherwise into the commit message and the PR — never
+  into a code comment.
+- **No comments besides Javadoc** (ADR-0214). Javadoc is short, precise
+  and carries no history; the reasoning behind a change goes into the
+  commit message and the PR.
 - **SpotBugs** runs as part of `check`. Same rule: no new findings on
   top of pre-existing ones.
 - **Constructor injection only**, ideally via Lombok

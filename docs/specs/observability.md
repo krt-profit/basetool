@@ -672,8 +672,10 @@ rule — no blanket "everything is masked" claim:
   `pthread_create failed (EAGAIN)` and `unable to create native thread`, both matched by the filter;
   the three `<svc>-stdout` streams were measured carrying 1k–43k lines/24h on the host; and neither
   the single `older_than = "167h"` drop stage nor any of the three masking replaces can touch a fresh
-  line or either phrase. The observed line is recorded verbatim beside the rule, because its wording
-  is JVM-version-dependent and a Temurin bump is the thing that would silently invalidate it. The
+  line or either phrase. The observed lines are recorded verbatim in
+  `scripts/check-loki-rule-signatures.py` (amended 2026-09-25, ADR-0214: until then also in a
+  comment beside the rule), because their wording
+  is JVM-version-dependent and a Temurin bump is the thing that would silently invalidate them. The
   re-check in [`monitoring/README.md`](../../monitoring/README.md) → *After a Temurin bump* was done
   on `…@sha256:3137541d…` (2026-09-22) and on `…@sha256:2ca9adf4…` (2026-09-25), the digest
   `docker/app/Dockerfile` pins since #2035; every further bump owes it again. A second rule consumes the same stream since 2026-09-23: **`JvmStartupCacheRejected`**
@@ -1416,9 +1418,9 @@ the boot run carries the last run's values over and re-reads only the reboot fla
   for three days, while `scwiki_sync` kept recording success with a healthy item tally and
   `ExternalSyncStale` / `SyncZeroItems` / `ScWikiStepFailing` all stayed quiet. The burst-shaped
   `ExternalFetchErrors` (> 3 in 6 h) catches the outage; this one catches the silent degradation, and
-  the two firing together read as an ordinary multi-day upstream outage. The proxy is a **superset** —
-  a failed fetch on a pass that feeds no sweep also counts, which is the safe direction for a warning —
-  and both the alert comment and the `monitoring/README.md` runbook row say so. Panel 44 on dashboard
+  the two firing together read as an ordinary multi-day upstream outage. The proxy is a **superset**:
+  a failed fetch on a pass that feeds no sweep also counts, which is the safe direction for a warning.
+  Panel 44 on dashboard
   `07` plots the counter per `source`; it had no panel anywhere before. ~~**Still open:** a dedicated
   "sweep stood down" meter would let the alert drop the proxy~~ — **closed 2026-09-02** by the meter
   below. **Narrowed by ADR-0195 (2026-09-22):** a complete residual `/api/items` census now vouches
@@ -3200,8 +3202,10 @@ blackbox modules they need shipped live and inert, and all of them were enabled 
 The rule outlives that surface: an un-staged probe of a host that does not exist pages
 `BlackboxProbeFailed` and `DnsResolutionFailed` from the minute it merges, and a permanently-firing
 channel is one an operator stops reading (REQ-OBS-014). A future public surface ships its probes
-staged the same way and enables them all-or-nothing, widening the affected alert scopes in the same
-edit — a partially enabled probe set reads as "monitored".
+staged — held outside the live configuration, written out in its spec or PR rather than as
+commented-out targets — and enables them all-or-nothing, widening the affected alert scopes in the
+same edit; a partially enabled probe set reads as "monitored". Amended 2026-09-25 (ADR-0214): staging
+used to mean commented-out entries in the live files.
 
 The liveness probe deliberately targets an **allow-listed path that answers 401**
 (`/api/v1/terms/status`), not the vhost root: the vhost is a default-deny allow-list that 404s its
@@ -3233,7 +3237,20 @@ loosening the frontend's `http_2xx_hsts` assertion.
   is a deploy-time observation, not a repo property: confirm every new `blackbox-*` target is `up`
   with `probe_success == 1` after the config reaches production.
 - [ ] The staged `ApiClientAttributionBlind` rule is enabled once a week of production data shows the
-  `none` series flat at zero. **Open**.
+  `none` series flat at zero. **Open**. Amended 2026-09-25 (ADR-0214): the rule sat commented out in
+  `monitoring/prometheus/alerts/business.yml` and went with the comments; its definition is kept
+  here until it is enabled (in the `business.yml` group that holds `ApiUnknownClient`):
+
+  ```yaml
+  - alert: ApiClientAttributionBlind
+    expr: sum (rate(basetool_api_client_requests_total{client_id="none"}[10m])) > 0
+    for: 15m
+    labels:
+      severity: warning
+    annotations:
+      summary: "API requests arrive without a client identity (azp missing)"
+      description: "Authenticated /api/** requests carry no azp claim, so basetool_api_client_requests_total can no longer attribute traffic to a client and ApiUnknownClient is blind. This is a realm-side regression (a removed/renamed protocol mapper on the client's dedicated scope), not a caller problem."
+  ```
 
 **Enforced by:** `ApiClientMetricsFilter`, `ApiClientMetricsProperties`,
 `SecurityProblemResponseHandler` (backend) · `monitoring/prometheus/alerts/business.yml`,

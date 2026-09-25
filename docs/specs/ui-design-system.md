@@ -1145,9 +1145,11 @@ entries in `AnonymousSurfaceSweepMvcTest`, `PublicPathsTest`, `TermsAcceptanceGa
 
 A rendered page carries what the browser needs and nothing a developer wrote for another developer.
 
-- **Template comments are Thymeleaf parser-level comments** (`<!--/* … */-->`), which the engine
-  drops at parse time. A plain `<!-- … -->` is sent with every response. The star-slash pair may not
-  appear inside one — it closes the block early and renders the rest; write `* /`.
+- **Templates carry no comments** (ADR-0214; amended 2026-09-25 — until then the rule was that
+  template comments are Thymeleaf parser-level comments). A plain `<!-- … -->` is sent with every
+  response. Should a parser-level `<!--/* … */-->` block ever appear (the engine drops it at parse
+  time), the star-slash pair may not appear inside it — it closes the block early and renders the
+  rest.
 - **Page CSS lives in `static/css/pages/<page>.css`**, linked by a `<link rel="stylesheet">` in the
   place the page's `<style>` block used to stand. A template carries no `<style>` element. Each file
   belongs to exactly one template. Its rules sit in the `page` cascade layer (REQ-UI-024), so where
@@ -1214,7 +1216,8 @@ decide as before. So:
   (`main .form-group select`, `div.page-wrapper`, `.btn.btn-xs2`) and no `!important`: 27 page
   `!important`s existed only to win against `styles.css` and were removed.
 - **A design-system declaration that has to keep beating page CSS goes into the page-layer block at
-  the end of `styles.css`**, with a comment naming what it beats. Inside that layer, specificity
+  the end of `styles.css`**, and into the table below with what it beats (amended 2026-09-25,
+  ADR-0214: this used to be a comment beside the rule). Inside that layer, specificity
   against the page stylesheets decides exactly as it did under load order. It does not go into
   `utilities`: that would also let it beat the page rules that deliberately out-specify it
   (`.krt-personal-inventory .form-group select`) and every migrated inline class.
@@ -1225,6 +1228,22 @@ decide as before. So:
   migrated rule sets. The co-located `.x.krtm-hidden` re-assertions are gone.
 - **`head.html`'s link order is no longer part of the contract.** `inline-migration.css` still loads
   last, but only because it always did.
+
+**The page-layer block at the end of `styles.css`.** Before the layers these won by specificity
+alone; in `components` they would lose to every page rule. `styles.css` loads first, so a page rule
+of equal specificity still wins the tie. A computed-style diff of every page route at 375 and
+1280 px showed no page-versus-component change after the move (2026-09-23).
+
+| Rule | Declaration | Beats |
+| --- | --- | --- |
+| `main .form-group select` (0,1,2) | chevron room in the padding | a page's `.form-group select` (0,1,1); stays below `.krt-personal-inventory .form-group select` (0,2,1) |
+| `.krt-combobox .krt-combobox__input` | right padding for the dropdown chevron | a page's padding on the combobox textbox |
+| `.form-row > .form-group.datetime-split-group`, `.form-row:has(> …datetime-split-group)` | minimum width, `row-gap: 0` | the mission pages' generic `.form-row` rules |
+| `.master-row.is-active` | fill and orange left edge | a page's reset of `.master-row` |
+| `div.filters-container > .form-group` (≤ 768 px) | full-row filter groups on phones | page filter layouts |
+| `div.page-wrapper` (≤ 768 px) | no bottom room reserved for the scrolling footer (REQ-UI-009) | a page's bottom padding |
+| `.btn.btn-xs2` (≤ 1024 px) | 44 px touch floor (REQ-UI-009) | the page-local 32 px `.btn-xs2` |
+| `input.item-checkbox` (≤ 1024 px) | 32 px dense floor, one per inventory row (REQ-UI-009) | `inventory-my.css`'s 20 px square in the page layer (26 px measured in `components`, 2026-09-23) |
 
 **Accepted visible corrections (owner decision 2026-09-23).** In each case a migrated inline style
 now wins over a page rule that had out-specified it:

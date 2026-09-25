@@ -39,8 +39,7 @@
 
 > [!note] WoltLab is not a neighbour yet
 > The organisation's forum is intended to become the roster's source of truth (the knowledge base's
-> WoltLab note carries the decision). Nothing in the code talks to it today; the only traces are
-> monitoring comments that anticipate it.
+> WoltLab note carries the decision). Nothing in the code talks to it or anticipates it today.
 
 ## 3.2 Technical context — what is reachable from the internet
 
