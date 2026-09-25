@@ -252,6 +252,9 @@ groups:
       # of our services trying its luck. INFO's acl_access_denied_* counters, verified against the
       # pinned redis_exporter on 2026-09-23. Held for five minutes so one stray probe cannot page,
       # while a misconfigured service -- which fails on every connection attempt -- always will.
+      # One refusal is expected and benign: every frontend start runs Spring Session's CONFIG GET
+      # (TolerantKeyspaceNotificationsAction), the ACL refuses it by design -- two cmd denials per
+      # start on production, 2026-09-25 -- and this rule did not fire for it that day.
       - alert: RedisAclDenials
         expr: >-
           (sum(increase(redis_acl_access_denied_auth_total[5m])) or vector(0))

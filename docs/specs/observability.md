@@ -867,7 +867,9 @@ not silent — so the only detector was a human reading a log export.
   then vouch for other upstreams. Behind `EDGE_GRAFANA_UPSTREAM_VERIFY` (`off` until the owner
   switches it on, [`deployment.md` → *The edge verifies Grafana*](../deployment.md#the-edge-verifies-grafana));
   `on` without the certificate, or an unknown value, refuses to start. `check-edge-nginx.sh`
-  renders and starts both shapes and asserts the anchor and the name.
+  renders and starts both shapes and asserts the anchor and the name. **On in production since
+  2026-09-25** (~15:40 UTC, owner-approved): the edge logs `Grafana's upstream certificate is
+  verified (pinned)` and Grafana's `/api/health` answers `200`.
 - The private key of the shared `keystore.p12` never leaves the four existing services — and, once
   REQ-SEC-070 is rolled out, each of those four holds only its own leaf's key; Grafana gets its
   own self-signed certificate.

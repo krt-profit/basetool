@@ -241,6 +241,48 @@ production write with its own yes; do them one at a time, never inside the deplo
 Optional tidy-ups found on the way, no urgency: the duplicate `IRI_BACKEND_EXPECTED_AUDIENCES` line in
 production's `.env`; the leftover `/var/iri/code/scripts/lib/container-runtime.sh.bak-2026-09-22`.
 
+> [!note] Status on 2026-09-25 (evening) — added after the fact; the table above is left as written
+> Every host write below had the owner's yes in chat for that exact command. The living procedures
+> in `deployment.md` now carry the same record.
+>
+> **Done:**
+> - **#2053 `baseUrl`** — set by the owner **by hand in the Admin Console** (Home URL
+>   `https://profit-base.online/`), not through the provisioner run the table describes; confirmed by
+>   a read-only query of the Keycloak database. REQ-SEC-071's last item is ticked.
+> - **#2038 internal JWKS** — ~15:38 UTC, as documented; only `backend.env` changed, backend healthy
+>   in 11 s, no JWKS/PKIX/SAN line, an authenticated `/api/v1/users/me` → `200`, no `401` after.
+> - **#2039 edge verifies Grafana** — ~15:40 UTC; edge logs "Grafana's upstream certificate is
+>   verified (pinned)", Grafana `/api/health` → `200`.
+> - **ING-SEC-04 step 1** — ~15:40 UTC; all four services `Verification: OK` beforehand,
+>   `INTERNAL_TLS_VERIFY_HOSTNAME=true`, frontend and ingest restarted healthy.
+> - **ING-SEC-04 step 2 (2a–2e)** — ~15:52 UTC; the mint printed "The CA key no longer exists.",
+>   `basetool-ca.crt` carries two anchors, edge/Prometheus/blackbox restarted, no edge verify error.
+> - **Step 2f surfaced a pre-existing defect:** `.env` set `KRT_BACKEND_TRUSTSTORE_PATH` to a file
+>   that had never existed, so the Discord duplicate-account precheck had been **failing open on
+>   production** (≥ 7 days of `Failed to load the backend truststore` warnings). Fixed ~15:52 UTC:
+>   `/var/iri/secrets/backend-truststore.p12` built with aliases `backend` and `internal-ca`, mounted
+>   by the drop-in `keycloak.container.d/50-backend-truststore.conf`; no warning since.
+>   [`DISCORD_KEYCLOAK_SETUP.md` §7.3](keycloak/DISCORD_KEYCLOAK_SETUP.md#73-truststore-for-the-backend-certificate)
+>   and [`deployment.md` → Step 2f](deployment.md#step-2f--the-keycloak-spi-prechecks-truststore)
+>   are corrected.
+> - **The keycloak restart for 2f was a ~2-minute full outage** (15:52:40–15:54:50 UTC, 175
+>   maintenance-page 502/503/504 at the edge): backend, frontend and ingest `Requires=` it and
+>   restarted with it. The runbooks now warn at every Keycloak restart.
+> - **APPSEC-04 steps 2–5** — ~15:47–15:51 UTC with `iri-deploy.timer` stopped; `REDIS_DEFAULT_USER=off`.
+>   From now on a rollback to 1.10.0 needs `default` back on first (§6). The frontend's refused
+>   `CONFIG GET` at each start is expected (`deployment.md` → *The Redis ACL*).
+> - **Tidy-ups** — the duplicate `IRI_BACKEND_EXPECTED_AUDIENCES` line removed from `.env` (inode
+>   kept); `container-runtime.sh.bak-2026-09-22` deleted.
+> - **Host reboot** for kernel 6.12.0-211.58.1 at 15:56 UTC — all 18 containers healthy by 15:59,
+>   `basetool_host_reboot_required 0`. At boot the four `iri-*` services ran and failed within a
+>   second ("no lingering user could be found"); the stack was unaffected and the next regular tick
+>   succeeds. The code fix is an open follow-up (`deployment.md` → host patching, arc42 §7.4b).
+>
+> **Still open:** APPSEC-05 `enforce` (not before 2026-10-02, once both report queries are empty);
+> APPSEC-07, the confidential frontend client; ING-SEC-04 step 3 (the `PATH_VARS` release, #2036)
+> and step 4; #1992, the `Internal=true` networks — testing first, and the testing host is still
+> held; the Android release (basetool-android #182).
+
 ---
 
 ## 8. What the audit found and fixed alongside this runbook (2026-09-25)
@@ -337,4 +379,5 @@ failure.
 
 **Still open after the deploy (each owner-gated):** the §7 list — above all the Android #182
 release, the host reboot for the pending kernel, and the testing realm (then start testing's
-`iri-deploy.timer` again).
+`iri-deploy.timer` again). *(2026-09-25 evening: the reboot and most of §7 are done — see the
+status note at the end of §7.)*

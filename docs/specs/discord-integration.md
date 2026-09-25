@@ -198,8 +198,11 @@ requirement is that the member is never stranded:
 - [x] The page shows the krt-theme text in German and English.
 - [x] `provision-keycloak-realm.test.sh` cases 2 and 5: a new frontend client is created with the
   `baseUrl`, and an existing one without it is converged.
-- [ ] Production's `basetool-frontend` carries the `baseUrl`. _(owner-run: `--apply` of the
-  provisioner on the production host.)_
+- [x] Production's `basetool-frontend` carries the `baseUrl`. _(2026-09-25: set by the owner by
+  hand in the Admin Console — Home URL `https://profit-base.online/` — not through the provisioner
+  `--apply` this item first named; confirmed by a read-only query of the Keycloak database. It is
+  the value the provisioner converges to, so its next production run should plan no `baseUrl`
+  change.)_
 
 **Enforced by:** `scripts/provision-keycloak-realm.test.sh` · review of the theme bundles ·
 **Code:** `scripts/provision-keycloak-realm.py` (`client_specs`, `basetool-frontend`),
@@ -257,6 +260,19 @@ truststore, and a TLS failure simply fails open.
   startup (`DiscordSpiPrecheckProperties#isSharedSecretBlankOrStrong` `@AssertTrue`), while a blank
   value stays valid because it disables the endpoint.
 - [x] The two krt-theme login bundles (de/en) carry `discordAccountAlreadyExists`.
+
+> [!warning] Production status — corrected 2026-09-25
+> The items above are proven by tests; **on production the precheck was failing open** until
+> 2026-09-25. `.env` named `KRT_BACKEND_TRUSTSTORE_PATH=/run/secrets/backend-truststore.p12`, but the
+> file had never been created and nothing mounted it, so `BackendTrustSupport` logged `Failed to
+> load the backend truststore; the Discord account-existence precheck will fail open until it is
+> fixed.` at every Keycloak start (at least seven days of log history; how long before that is not
+> known). Every colliding first login in that time landed `PENDING` instead of being denied. Fixed
+> ~15:52 UTC that day: the store was built (aliases `backend` and `internal-ca`) and mounted by a
+> keycloak drop-in; no warning since. Runbook:
+> [`DISCORD_KEYCLOAK_SETUP.md` §7.3](../keycloak/DISCORD_KEYCLOAK_SETUP.md#73-truststore-for-the-backend-certificate),
+> whose §7.4 now checks the startup log. The fail-open is by design; what was missing was any
+> signal that the configured check was not running.
 
 **Enforced by:** `BackendAccountCheckerTest` (fail-open HTTP matrix) · `DiscordGuildRoleGateAuthenticatorTest` (deny-on-exists with the right message key, allow-on-not-exists, fail-open on unknown, skip on linking / unconfigured / non-HTTPS) · `DiscordAccountExistenceServiceTest` (candidate normalisation + name/e-mail split + empty-candidate short-circuit) · `DiscordAccountExistenceControllerTest` (shared-secret gate: 503 unconfigured / 401 bad / 200 exists) · `DiscordSpiPrecheckPropertiesTest` (blank secret valid, <32-char secret rejected, ≥32-char secret valid) · **Code:** `DiscordGuildRoleGateAuthenticator`, `BackendAccountChecker`, `BackendTrustSupport`, `DiscordGuildRoleGateAuthenticatorFactory`, `DiscordAccountExistenceController`, `DiscordAccountExistenceService`, `DiscordSpiPrecheckProperties`, `UserRepository#existsByLowerUsernameOrDisplayNameIn` / `#existsByLowerEmail`, krt-theme `messages_*.properties` · **Decision:** ADR-0051
 
